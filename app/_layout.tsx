@@ -2,6 +2,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -26,6 +27,13 @@ function RootLayoutNav() {
   );
 }
 
+function PlatformKeyboardProvider({ children }: { children: React.ReactNode }) {
+  if (Platform.OS === "web") {
+    return <>{children}</>;
+  }
+  return <KeyboardProvider>{children}</KeyboardProvider>;
+}
+
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     PlayfairDisplay_700Bold,
@@ -47,7 +55,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000" }}>
-          <KeyboardProvider>
+          <PlatformKeyboardProvider>
             <AuthProvider>
               <WardrobeProvider>
                 <CreditsProvider>
@@ -56,7 +64,7 @@ export default function RootLayout() {
                 </CreditsProvider>
               </WardrobeProvider>
             </AuthProvider>
-          </KeyboardProvider>
+          </PlatformKeyboardProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
     </ErrorBoundary>
