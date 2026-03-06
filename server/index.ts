@@ -195,6 +195,24 @@ function serveLandingPage({
 }
 
 function configureExpoAndLanding(app: express.Application) {
+  const webBuildPath = path.resolve(process.cwd(), "web-build");
+  const webIndexPath = path.join(webBuildPath, "index.html");
+  const hasWebBuild = fs.existsSync(webIndexPath);
+
+  if (hasWebBuild) {
+    app.use(express.static(webBuildPath));
+    app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
+
+    app.get(/.*/, (req: Request, res: Response, next: NextFunction) => {
+      if (req.path.startsWith("/api")) return next();
+      if (req.method !== "GET") return next();
+      return res.sendFile(webIndexPath);
+    });
+
+    log("Serving Expo web build from /web-build");
+    return;
+  }
+
   const templatePath = path.resolve(
     process.cwd(),
     "server",

@@ -70,7 +70,7 @@ Repo-ul este pregatit pentru Railway cu:
 
 Comenzile de deploy sunt deja definite:
 
-- Build: `npm run build:railway`
+- Build: `npm run build:railway` (exporta web app + build backend)
 - Start: `npm run start:railway`
 
 ## Endpoint InstaMe
