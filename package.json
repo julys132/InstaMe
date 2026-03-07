@@ -13,9 +13,10 @@
     "server:prod": "NODE_ENV=production node server_dist/index.js",
     "build": "npm run expo:static:build && npm run server:build",
     "build:railway": "npm run web:build && npm run server:build",
+    "db:prepare": "node scripts/prepare-db.js",
     "db:push": "drizzle-kit push",
     "start": "npx expo start",
-    "start:railway": "npm run db:push && npm run server:prod",
+    "start:railway": "npm run db:prepare && npm run db:push && npm run server:prod",
     "lint": "npx expo lint",
     "lint:fix": "npx expo lint --fix"
   },
