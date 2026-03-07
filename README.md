@@ -63,6 +63,7 @@ Repo-ul este pregatit pentru Railway cu:
    - `STRIPE_SECRET_KEY`
    - `STRIPE_WEBHOOK_SECRET`
    - `PUBLIC_WEB_URL` = URL-ul public Railway (ex: `https://instame-production.up.railway.app`)
+   - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (obligatoriu daca vrei Google auth pe web)
 4. Optional pentru CORS:
    - `CORS_ORIGINS` (lista separata prin virgula)
    - `CORS_ALLOW_ALL=true` (doar temporar pentru debugging)

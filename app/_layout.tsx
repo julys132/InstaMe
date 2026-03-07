@@ -4,7 +4,6 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -31,6 +30,8 @@ function PlatformKeyboardProvider({ children }: { children: React.ReactNode }) {
   if (Platform.OS === "web") {
     return <>{children}</>;
   }
+  // Avoid static import on web; this package is native-focused.
+  const { KeyboardProvider } = require("react-native-keyboard-controller");
   return <KeyboardProvider>{children}</KeyboardProvider>;
 }
 

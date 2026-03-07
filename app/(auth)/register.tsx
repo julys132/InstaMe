@@ -45,26 +45,25 @@ export default function RegisterScreen() {
       .catch(() => setAppleAuthAvailable(false));
   }, []);
 
-  const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-  const nativeGoogleWebClientId = googleWebClientId || "";
+  const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "";
+  const nativeGoogleWebClientId = googleWebClientId;
   const googleIosClientId =
     process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || googleWebClientId;
   const googleAndroidClientId =
     process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || googleWebClientId;
-  const googleAuthSessionConfigured = Boolean(
-    googleWebClientId || googleIosClientId || googleAndroidClientId,
-  );
+  const googleWebConfigured = googleWebClientId.length > 0;
+  const googleAuthSessionConfigured =
+    Platform.OS === "web"
+      ? googleWebConfigured
+      : Boolean(googleWebClientId || googleIosClientId || googleAndroidClientId);
   const googleNativeConfigured = nativeGoogleWebClientId.length > 0;
   const googleIsConfigured =
     Platform.OS === "android" ? googleNativeConfigured : googleAuthSessionConfigured;
+  const fallbackGoogleClientId = "placeholder-web-client-id.apps.googleusercontent.com";
 
   const googleAuthConfig: any = {
-    ...(googleWebClientId
-      ? {
-          clientId: googleWebClientId,
-          webClientId: googleWebClientId,
-        }
-      : {}),
+    clientId: googleWebClientId || fallbackGoogleClientId,
+    webClientId: googleWebClientId || fallbackGoogleClientId,
     ...(googleIosClientId ? { iosClientId: googleIosClientId } : {}),
     ...(googleAndroidClientId ? { androidClientId: googleAndroidClientId } : {}),
     redirectUri:
@@ -76,6 +75,12 @@ export default function RegisterScreen() {
   const [googleRequest, , promptGoogleAuth] = Google.useIdTokenAuthRequest(googleAuthConfig);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
+
+  useEffect(() => {
+    if (Platform.OS === "web" && !googleWebConfigured) {
+      console.warn("Missing EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID; Google signup is disabled on web.");
+    }
+  }, [googleWebConfigured]);
 
   useEffect(() => {
     if (Platform.OS !== "android" || !googleNativeConfigured) return;
