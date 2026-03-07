@@ -15,7 +15,7 @@
     "build:railway": "npm run web:build && npm run server:build",
     "db:push": "drizzle-kit push",
     "start": "npx expo start",
-    "start:railway": "npm run server:prod",
+    "start:railway": "npm run db:push && npm run server:prod",
     "lint": "npx expo lint",
     "lint:fix": "npx expo lint --fix"
   },
