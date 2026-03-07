@@ -2,9 +2,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { PlatformKeyboardProvider } from "@/components/PlatformKeyboardProvider";
 import { queryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WardrobeProvider } from "@/contexts/WardrobeContext";
@@ -19,20 +19,13 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "#000" } }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="welcome" />
+      <Stack.Screen name="launch" />
       <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="payment-success" options={{ headerShown: false }} />
     </Stack>
   );
-}
-
-function PlatformKeyboardProvider({ children }: { children: React.ReactNode }) {
-  if (Platform.OS === "web") {
-    return <>{children}</>;
-  }
-  // Avoid static import on web; this package is native-focused.
-  const { KeyboardProvider } = require("react-native-keyboard-controller");
-  return <KeyboardProvider>{children}</KeyboardProvider>;
 }
 
 export default function RootLayout() {
