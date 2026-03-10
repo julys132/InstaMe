@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -51,7 +51,26 @@ export default function InstaMeScreen() {
   const [intensity, setIntensity] = useState<TransformIntensity>("editorial");
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
+  const [styleReferenceCount, setStyleReferenceCount] = useState<number>(0);
+  const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    apiClient
+      .getInstaMeStyleLibrary()
+      .then((data) => {
+        if (!mounted) return;
+        setStyleReferenceCount(data.referenceCount || 0);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setStyleReferenceCount(0);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const canGenerate = useMemo(
     () => Boolean(photo && !loading && credits >= TRANSFORM_COST),
@@ -124,6 +143,7 @@ export default function InstaMeScreen() {
         preserveBackground,
       });
       setResultBase64(result.imageBase64);
+      setLastUsedStyleRefs(Array.isArray(result.styleReferenceIds) ? result.styleReferenceIds : []);
       await refreshCredits();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
@@ -180,6 +200,14 @@ export default function InstaMeScreen() {
             <Ionicons name="sparkles" size={14} color="#C9A96E" />
             <Text style={styles.creditText}>{credits} credite</Text>
           </View>
+          <Text style={styles.libraryHint}>
+            Style base: {styleReferenceCount} curated references
+          </Text>
+          {lastUsedStyleRefs.length > 0 ? (
+            <Text style={styles.libraryHintMuted}>
+              Last transform anchors: {lastUsedStyleRefs.join(", ")}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -304,6 +332,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   creditText: { color: "#F3E0BA", fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  libraryHint: { color: "#CFCFCF", fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
+  libraryHintMuted: { color: "#8B8B8B", fontFamily: "Inter_400Regular", fontSize: 11 },
   card: {
     marginHorizontal: 20,
     marginTop: 14,

@@ -11,6 +11,11 @@ InstaMe este o aplicatie Expo + Express care transforma imagini in stil **old mo
   - consuma credite
   - face refund automat daca generarea esueaza
   - foloseste model Gemini image real
+  - foloseste automat style references din `assets/style-references` (stil/vibe/aesthetic/gender tags)
+- Librarie vizuala de stil:
+  - 110 imagini importate din `C:\Users\stiul\OneDrive\Pictures\Screenshots\Styles`
+  - metadata multi-label in `assets/style-references/library.json`
+  - endpoint de inspectie: `GET /api/instame/style-library`
 - Ecran nou principal `InstaMe` pentru:
   - upload imagine
   - setare intensitate (soft/editorial/dramatic)
@@ -67,7 +72,10 @@ Repo-ul este pregatit pentru Railway cu:
 4. Optional pentru CORS:
    - `CORS_ORIGINS` (lista separata prin virgula)
    - `CORS_ALLOW_ALL=true` (doar temporar pentru debugging)
-5. Rulezi migrarea o singura data cu `npm run db:push` (din Railway shell sau local, pe `DATABASE_URL` de productie).
+5. Nu e nevoie de Railway shell pentru migrare: `start:railway` ruleaza automat:
+   - `npm run db:prepare` (asigura `pgcrypto`)
+   - `npm run db:push`
+   - `npm run server:prod`
 
 Comenzile de deploy sunt deja definite:
 
@@ -94,6 +102,17 @@ Response:
   "imageBase64": "...",
   "creditsCharged": 5,
   "creditsRemaining": 12,
-  "model": "gemini-3.1-flash-image-preview"
+  "model": "gemini-3.1-flash-image-preview",
+  "styleReferenceIds": ["style_ref_004", "style_ref_072"]
 }
 ```
+
+## Import Style Dataset
+
+Pentru a reimporta setul de imagini de stil:
+
+```powershell
+python scripts\import_style_references.py --source "C:\Users\stiul\OneDrive\Pictures\Screenshots\Styles"
+```
+
+Detalii despre structura sunt in `assets/style-references/README.md`.

@@ -1,5 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "node:http";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import {
   createHmac,
   createPublicKey,
@@ -419,6 +421,248 @@ const GOOGLE_IAP_PRODUCT_CREDITS: Record<string, number> = {
 type GeminiTextPart = { text: string };
 type GeminiInlineDataPart = { inlineData: { mimeType: string; data: string } };
 type GeminiPart = GeminiTextPart | GeminiInlineDataPart;
+type StyleReferenceMetrics = {
+  dominantPalette?: string[];
+};
+type StyleReferenceRecord = {
+  id: string;
+  file: string;
+  sourceFilename?: string;
+  styleTags: string[];
+  vibeTags: string[];
+  aestheticTags: string[];
+  genderTags: string[];
+  promptHints: string[];
+  metrics?: StyleReferenceMetrics;
+};
+type StyleReferenceProfile = {
+  id: string;
+  title: string;
+  description: string;
+  referenceIds: string[];
+};
+type StyleReferenceLibrary = {
+  generatedAt?: string;
+  referenceCount?: number;
+  profiles: StyleReferenceProfile[];
+  references: StyleReferenceRecord[];
+};
+type SelectedStyleReference = StyleReferenceRecord & {
+  score: number;
+  matchReasons: string[];
+};
+
+const STYLE_REFERENCE_LIBRARY_PATH = path.resolve(
+  process.cwd(),
+  "assets",
+  "style-references",
+  "library.json",
+);
+const MAX_INSTAME_STYLE_REFERENCES = Number.parseInt(
+  process.env.INSTAME_STYLE_REFERENCE_LIMIT || "2",
+  10,
+);
+
+const INTENSITY_TAG_PRIORITIES: Record<TransformIntensity, string[]> = {
+  soft: ["soft_contrast", "understated", "delicate", "minimal_luxury", "quiet_luxury"],
+  editorial: ["balanced_contrast", "modern_editorial", "quiet_luxury", "polished"],
+  dramatic: ["dramatic_contrast", "cinematic", "statement", "editorial_night", "noir_luxe"],
+};
+
+let styleReferenceLibraryCache: StyleReferenceLibrary | null = null;
+const styleReferenceImageCache = new Map<string, UploadedReferenceImage>();
+
+function normalizeSearchToken(input: string): string {
+  return input.toLowerCase().replace(/[_-]+/g, " ").trim();
+}
+
+function tokenizePromptTerms(input: string): string[] {
+  return input
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .split(/[^a-z0-9]+/)
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 3);
+}
+
+function loadStyleReferenceLibrary(): StyleReferenceLibrary | null {
+  if (styleReferenceLibraryCache) {
+    return styleReferenceLibraryCache;
+  }
+
+  if (!fs.existsSync(STYLE_REFERENCE_LIBRARY_PATH)) {
+    return null;
+  }
+
+  try {
+    const raw = fs.readFileSync(STYLE_REFERENCE_LIBRARY_PATH, "utf-8");
+    const parsed = JSON.parse(raw) as StyleReferenceLibrary;
+    if (!Array.isArray(parsed.references) || parsed.references.length === 0) {
+      return null;
+    }
+
+    styleReferenceLibraryCache = {
+      generatedAt: parsed.generatedAt,
+      referenceCount: parsed.referenceCount,
+      profiles: Array.isArray(parsed.profiles) ? parsed.profiles : [],
+      references: parsed.references,
+    };
+    return styleReferenceLibraryCache;
+  } catch (error) {
+    console.error("Failed to load style reference library:", error);
+    return null;
+  }
+}
+
+function getMimeTypeFromFilename(filePath: string): string {
+  const extension = path.extname(filePath).toLowerCase();
+  if (extension === ".png") return "image/png";
+  if (extension === ".webp") return "image/webp";
+  return "image/jpeg";
+}
+
+function loadStyleReferenceImage(reference: StyleReferenceRecord): UploadedReferenceImage | null {
+  const cached = styleReferenceImageCache.get(reference.id);
+  if (cached) return cached;
+
+  const absolutePath = path.resolve(process.cwd(), reference.file);
+  if (!fs.existsSync(absolutePath)) {
+    return null;
+  }
+
+  try {
+    const base64 = fs.readFileSync(absolutePath).toString("base64");
+    if (!base64) return null;
+
+    const image: UploadedReferenceImage = {
+      base64,
+      mimeType: getMimeTypeFromFilename(reference.file),
+    };
+    styleReferenceImageCache.set(reference.id, image);
+    return image;
+  } catch (error) {
+    console.error(`Failed to read style reference image ${reference.id}:`, error);
+    return null;
+  }
+}
+
+function scoreStyleReference(
+  reference: StyleReferenceRecord,
+  intensity: TransformIntensity,
+  customPrompt: string,
+): { score: number; matchReasons: string[] } {
+  const reasons: string[] = [];
+  let score = 1;
+
+  const intensityTags = INTENSITY_TAG_PRIORITIES[intensity];
+  const allTags = [
+    ...reference.styleTags,
+    ...reference.vibeTags,
+    ...reference.aestheticTags,
+    ...reference.promptHints,
+  ].map(normalizeSearchToken);
+
+  for (const priorityTag of intensityTags) {
+    const normalizedPriority = normalizeSearchToken(priorityTag);
+    if (allTags.some((tag) => tag.includes(normalizedPriority))) {
+      score += 6;
+      reasons.push(`intensity:${priorityTag}`);
+    }
+  }
+
+  const customTokens = tokenizePromptTerms(customPrompt);
+  for (const token of customTokens) {
+    if (allTags.some((tag) => tag.includes(token))) {
+      score += 3;
+      reasons.push(`prompt:${token}`);
+    }
+  }
+
+  if (reference.styleTags.includes("old_money")) {
+    score += 2;
+  }
+  if (reference.styleTags.includes("luxury_editorial")) {
+    score += 2;
+  }
+
+  return {
+    score,
+    matchReasons: Array.from(new Set(reasons)),
+  };
+}
+
+function selectStyleReferencesForTransform(options: {
+  intensity: TransformIntensity;
+  customPrompt: string;
+}): SelectedStyleReference[] {
+  const library = loadStyleReferenceLibrary();
+  if (!library || library.references.length === 0) {
+    return [];
+  }
+
+  const withScores = library.references
+    .map((reference) => {
+      const { score, matchReasons } = scoreStyleReference(
+        reference,
+        options.intensity,
+        options.customPrompt,
+      );
+      return { ...reference, score, matchReasons };
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.id.localeCompare(b.id);
+    });
+
+  const limit =
+    Number.isInteger(MAX_INSTAME_STYLE_REFERENCES) && MAX_INSTAME_STYLE_REFERENCES > 0
+      ? Math.min(MAX_INSTAME_STYLE_REFERENCES, 4)
+      : 2;
+
+  const selected: SelectedStyleReference[] = [];
+  for (const candidate of withScores) {
+    if (selected.length >= limit) break;
+    if (!loadStyleReferenceImage(candidate)) continue;
+    selected.push(candidate);
+  }
+  return selected;
+}
+
+function toStyleReferenceImageParts(
+  selectedReferences: SelectedStyleReference[],
+): GeminiInlineDataPart[] {
+  const parts: GeminiInlineDataPart[] = [];
+  for (const reference of selectedReferences) {
+    const image = loadStyleReferenceImage(reference);
+    if (!image) continue;
+    parts.push({
+      inlineData: {
+        mimeType: image.mimeType || "image/jpeg",
+        data: image.base64,
+      },
+    });
+  }
+  return parts;
+}
+
+function buildStyleReferenceContext(selectedReferences: SelectedStyleReference[]): string[] {
+  if (selectedReferences.length === 0) {
+    return ["No internal style-board references available for this request."];
+  }
+
+  return selectedReferences.map((reference, index) => {
+    const styleLine = reference.styleTags.slice(0, 4).join(", ");
+    const vibeLine = reference.vibeTags.slice(0, 3).join(", ");
+    const aestheticLine = reference.aestheticTags.slice(0, 3).join(", ");
+    const hints = reference.promptHints.slice(0, 2).join(" | ");
+    const paletteValues = Array.isArray(reference.metrics?.dominantPalette)
+      ? reference.metrics.dominantPalette
+      : [];
+    const palette = paletteValues.length > 0 ? paletteValues.slice(0, 3).join(", ") : "not specified";
+
+    return `Style reference ${index + 1} (${reference.id}): styles=${styleLine}; vibe=${vibeLine}; aesthetic=${aestheticLine}; palette=${palette}; hints=${hints}.`;
+  });
+}
 
 function getInitialCredits(): number {
   if (Number.isInteger(DEFAULT_INITIAL_CREDITS) && DEFAULT_INITIAL_CREDITS > 0) {
@@ -803,6 +1047,7 @@ function buildOldMoneyTransformPrompt(options: {
   intensity: TransformIntensity;
   customPrompt: string;
   preserveBackground: boolean;
+  styleReferences: SelectedStyleReference[];
 }): string {
   const intensityGuide: Record<TransformIntensity, string> = {
     soft: "subtle upgrade, understated palette, clean tailoring, minimal accessories",
@@ -817,15 +1062,30 @@ function buildOldMoneyTransformPrompt(options: {
   const userPrompt = options.customPrompt
     ? `User custom direction: ${options.customPrompt}`
     : "No extra user direction.";
+  const styleReferenceContext = buildStyleReferenceContext(options.styleReferences);
+  const styleReferenceCount = options.styleReferences.length;
+  const styleOrderLine =
+    styleReferenceCount > 0
+      ? `- First ${styleReferenceCount} image(s): style references (pose, hair styling structure, palette, light, vibe, aesthetic).`
+      : "- No additional style-reference images are attached for this request.";
 
   return [
     "Transform the attached photo into an old money luxury style image.",
+    "Image order is mandatory:",
+    styleOrderLine,
+    "- Last image: target subject to preserve.",
+    "Apply pose language, facial expression energy, styling mood, and lighting direction from style references to the target subject.",
+    "Keep the target subject identity unchanged: preserve face shape, skin tone, facial details, and hair color from the target subject image.",
+    "Hair guidance: transfer only hair structure/coafing from style reference, never copy style-reference hair color.",
+    "Clothing guidance: perform only subtle outfit updates; keep changes tasteful and realistic.",
     "Keep identity, face, body shape, age appearance, and pose faithful to the original subject.",
     "Do not create extra people, duplicate limbs, or distorted anatomy.",
     "Preserve realistic skin texture and natural proportions.",
     "Use premium materials and classic old-money fashion cues: cashmere, wool, silk, tailored coats, elegant neutrals.",
     `Intensity: ${intensityGuide[options.intensity]}.`,
     backgroundRule,
+    "Internal style-board descriptors:",
+    ...styleReferenceContext,
     userPrompt,
     `Output one photorealistic image, ${STYLE_IMAGE_SIZE}, with coherent light and color grading.`,
   ].join("\n");
@@ -2334,6 +2594,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/instame/style-library", authMiddleware, async (_req, res) => {
+    const library = loadStyleReferenceLibrary();
+    if (!library) {
+      return res.status(503).json({
+        error: "Style reference library is not available on this deployment.",
+      });
+    }
+
+    return res.json({
+      generatedAt: library.generatedAt || null,
+      referenceCount: library.referenceCount || library.references.length,
+      profiles: library.profiles.map((profile) => ({
+        id: profile.id,
+        title: profile.title,
+        description: profile.description,
+        referenceCount: profile.referenceIds.length,
+      })),
+    });
+  });
+
   app.post("/api/instame/transform", authMiddleware, async (req, res) => {
     const userId = req.user!.id;
     const body = req.body || {};
@@ -2373,15 +2653,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       creditsConsumed = true;
 
+      const selectedStyleReferences = selectStyleReferencesForTransform({
+        intensity,
+        customPrompt,
+      });
+
       const prompt = buildOldMoneyTransformPrompt({
         intensity,
         customPrompt,
         preserveBackground,
+        styleReferences: selectedStyleReferences,
       });
 
       const imageResponse = await generateGeminiContent({
         model: DEFAULT_STYLE_IMAGE_MODEL,
-        parts: [{ text: prompt }, ...toGeminiInlineImageParts(uploadedImages)],
+        parts: [
+          { text: prompt },
+          ...toStyleReferenceImageParts(selectedStyleReferences),
+          ...toGeminiInlineImageParts(uploadedImages),
+        ],
         responseModalities: ["IMAGE", "TEXT"],
         maxOutputTokens: 800,
       });
@@ -2401,6 +2691,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         creditsCharged: transformCost,
         creditsRemaining: updatedUser?.credits ?? 0,
         model: DEFAULT_STYLE_IMAGE_MODEL,
+        styleReferenceIds: selectedStyleReferences.map((reference) => reference.id),
       });
     } catch (error: unknown) {
       console.error("InstaMe transform error:", error);

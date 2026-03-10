@@ -438,6 +438,7 @@ class ApiClient {
       creditsCharged: number;
       creditsRemaining: number;
       model: string;
+      styleReferenceIds?: string[];
     }>(
       "/instame/transform",
       {
@@ -446,6 +447,19 @@ class ApiClient {
       },
       true,
     );
+  }
+
+  async getInstaMeStyleLibrary() {
+    return this.request<{
+      generatedAt: string | null;
+      referenceCount: number;
+      profiles: Array<{
+        id: string;
+        title: string;
+        description: string;
+        referenceCount: number;
+      }>;
+    }>("/instame/style-library", {}, true);
   }
 
   async generateStyle(payload: {
