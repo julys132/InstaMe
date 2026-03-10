@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import type { InstaMeStylePreset } from "@shared/instame-style-presets";
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: "@instame_access_token",
@@ -433,8 +434,6 @@ class ApiClient {
     intensity?: "soft" | "editorial" | "dramatic";
     preserveBackground?: boolean;
     stylePresetId?: string;
-    stylePresetLabel?: string;
-    stylePresetPromptHint?: string;
   }) {
     return this.request<{
       imageBase64: string;
@@ -464,6 +463,12 @@ class ApiClient {
         referenceCount: number;
       }>;
     }>("/instame/style-library", {}, true);
+  }
+
+  async getInstaMeStylePresets() {
+    return this.request<{
+      presets: InstaMeStylePreset[];
+    }>("/instame/style-presets", {}, true);
   }
 
   async generateStyle(payload: {

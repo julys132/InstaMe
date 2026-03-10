@@ -14,6 +14,11 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "./db";
 import { creditTransactions, users } from "../shared/schema";
 import {
+  INSTAME_STYLE_PRESETS,
+  findInstaMeStylePresetById,
+  type InstaMeStylePreset,
+} from "../shared/instame-style-presets";
+import {
   authMiddleware,
   createSession,
   generateAccessToken,
@@ -716,6 +721,15 @@ function normalizeTransformIntensity(input: unknown): TransformIntensity {
     return input;
   }
   return "editorial";
+}
+
+function resolveInstaMeStylePreset(input: unknown): InstaMeStylePreset | null {
+  const presetId = normalizeStringValue(input);
+  if (!presetId) {
+    return INSTAME_STYLE_PRESETS[0] || null;
+  }
+
+  return findInstaMeStylePresetById(presetId) || INSTAME_STYLE_PRESETS[0] || null;
 }
 
 function normalizeStringValue(input: unknown): string {
@@ -2624,13 +2638,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.get("/api/instame/style-presets", authMiddleware, async (_req, res) => {
+    return res.json({
+      presets: INSTAME_STYLE_PRESETS,
+    });
+  });
+
   app.post("/api/instame/transform", authMiddleware, async (req, res) => {
     const userId = req.user!.id;
     const body = req.body || {};
     const customPrompt = normalizeStringValue(body.customPrompt);
-    const stylePresetId = normalizeStringValue(body.stylePresetId);
-    const stylePresetLabel = normalizeStringValue(body.stylePresetLabel);
-    const stylePresetPromptHint = normalizeStringValue(body.stylePresetPromptHint);
+    const resolvedStylePreset = resolveInstaMeStylePreset(body.stylePresetId);
+    const stylePresetId = resolvedStylePreset?.id || "";
+    const stylePresetLabel = resolvedStylePreset?.label || "";
+    const stylePresetPromptHint = resolvedStylePreset?.promptHint || "";
     const intensity = normalizeTransformIntensity(body.intensity);
     const preserveBackground = body.preserveBackground !== false;
     const transformCost =

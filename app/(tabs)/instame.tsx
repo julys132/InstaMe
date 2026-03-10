@@ -22,6 +22,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCredits } from "@/contexts/CreditsContext";
 import { apiClient } from "@/lib/api-client";
 import Colors from "@/constants/colors";
+import { INSTAME_STYLE_PRESETS, type InstaMeStylePreset } from "@shared/instame-style-presets";
 
 type UploadedPhoto = {
   uri: string;
@@ -30,15 +31,6 @@ type UploadedPhoto = {
 };
 
 type TransformIntensity = "soft" | "editorial" | "dramatic";
-
-type StylePreset = {
-  id: string;
-  label: string;
-  subtitle: string;
-  promptHint: string;
-  representativeImage: string;
-  examples: string[];
-};
 
 const TRANSFORM_COST = 5;
 const MAX_UPLOAD_IMAGE_BASE64_LENGTH = 2_300_000;
@@ -49,89 +41,6 @@ const INTENSITY_OPTIONS: { value: TransformIntensity; label: string; subtitle: s
   { value: "dramatic", label: "Dramatic", subtitle: "Bold cinematic styling" },
 ];
 
-const STYLE_PRESETS: StylePreset[] = [
-  {
-    id: "old_money",
-    label: "Old Money",
-    subtitle: "Timeless tailoring and refined neutrals",
-    promptHint:
-      "quiet old-money elegance, tailored silhouettes, premium fabrics, minimal luxury accessories",
-    representativeImage:
-      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop",
-    examples: [
-      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
-    ],
-  },
-  {
-    id: "retro",
-    label: "Retro",
-    subtitle: "Vintage vibe with film-like warmth",
-    promptHint: "retro editorial mood, soft grain feeling, vintage styling cues, analog-inspired color",
-    representativeImage:
-      "https://images.unsplash.com/photo-1464863979621-258859e62245?q=80&w=1000&auto=format&fit=crop",
-    examples: [
-      "https://images.unsplash.com/photo-1464863979621-258859e62245?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1200&auto=format&fit=crop",
-    ],
-  },
-  {
-    id: "glam",
-    label: "Glam",
-    subtitle: "Polished beauty and statement details",
-    promptHint: "high-end glam editorial, sculpted light, clean skin texture, polished luxury finish",
-    representativeImage:
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1000&auto=format&fit=crop",
-    examples: [
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1488716820095-cbe80883c496?q=80&w=1200&auto=format&fit=crop",
-    ],
-  },
-  {
-    id: "selfie",
-    label: "Selfie",
-    subtitle: "Natural face-first premium selfie look",
-    promptHint:
-      "clean premium selfie aesthetic, flattering light, natural skin texture, subtle makeup refinement",
-    representativeImage:
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1000&auto=format&fit=crop",
-    examples: [
-      "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1521146764736-56c929d59c83?q=80&w=1200&auto=format&fit=crop",
-    ],
-  },
-  {
-    id: "in_car_selfie",
-    label: "In-Car Selfie",
-    subtitle: "Luxury car ambience with elegant light",
-    promptHint:
-      "inside premium car selfie look, realistic in-car reflections, elegant contrast, social-ready framing",
-    representativeImage:
-      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1000&auto=format&fit=crop",
-    examples: [
-      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1200&auto=format&fit=crop",
-    ],
-  },
-  {
-    id: "street_luxe",
-    label: "Street Luxe",
-    subtitle: "Modern city chic with premium edge",
-    promptHint: "urban luxury editorial, crisp styling, clean structure, premium street-chic mood",
-    representativeImage:
-      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1000&auto=format&fit=crop",
-    examples: [
-      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1495385794356-15371f348c31?q=80&w=1200&auto=format&fit=crop",
-      "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?q=80&w=1200&auto=format&fit=crop",
-    ],
-  },
-];
 
 function stripDataUriPrefix(base64OrDataUri: string): string {
   const commaIndex = base64OrDataUri.indexOf(",");
@@ -144,7 +53,8 @@ export default function InstaMeScreen() {
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [intensity, setIntensity] = useState<TransformIntensity>("editorial");
-  const [selectedStyleId, setSelectedStyleId] = useState<string>(STYLE_PRESETS[0].id);
+  const [stylePresets, setStylePresets] = useState<InstaMeStylePreset[]>(INSTAME_STYLE_PRESETS);
+  const [selectedStyleId, setSelectedStyleId] = useState<string>(INSTAME_STYLE_PRESETS[0]?.id || "");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
@@ -153,31 +63,50 @@ export default function InstaMeScreen() {
   const [loading, setLoading] = useState(false);
 
   const selectedStylePreset = useMemo(
-    () => STYLE_PRESETS.find((preset) => preset.id === selectedStyleId) || STYLE_PRESETS[0],
-    [selectedStyleId],
+    () => stylePresets.find((preset) => preset.id === selectedStyleId) || stylePresets[0],
+    [stylePresets, selectedStyleId],
   );
 
   const previewStyle = useMemo(
-    () => STYLE_PRESETS.find((preset) => preset.id === previewStyleId) || null,
-    [previewStyleId],
+    () => stylePresets.find((preset) => preset.id === previewStyleId) || null,
+    [stylePresets, previewStyleId],
   );
 
   useEffect(() => {
     let mounted = true;
-    apiClient
-      .getInstaMeStyleLibrary()
-      .then((data) => {
+
+    Promise.allSettled([apiClient.getInstaMeStyleLibrary(), apiClient.getInstaMeStylePresets()]).then(
+      ([styleLibraryResult, stylePresetResult]) => {
         if (!mounted) return;
-        setStyleReferenceCount(data.referenceCount || 0);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setStyleReferenceCount(0);
-      });
+
+        if (styleLibraryResult.status === "fulfilled") {
+          setStyleReferenceCount(styleLibraryResult.value.referenceCount || 0);
+        } else {
+          setStyleReferenceCount(0);
+        }
+
+        if (stylePresetResult.status === "fulfilled" && stylePresetResult.value.presets.length > 0) {
+          setStylePresets(stylePresetResult.value.presets);
+        }
+      },
+    );
+
     return () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedStyleId && stylePresets[0]) {
+      setSelectedStyleId(stylePresets[0].id);
+      return;
+    }
+
+    const exists = stylePresets.some((preset) => preset.id === selectedStyleId);
+    if (!exists && stylePresets[0]) {
+      setSelectedStyleId(stylePresets[0].id);
+    }
+  }, [selectedStyleId, stylePresets]);
 
   const canGenerate = useMemo(
     () => Boolean(photo && !loading && credits >= TRANSFORM_COST),
@@ -243,18 +172,15 @@ export default function InstaMeScreen() {
 
     setLoading(true);
     try {
-      const composedPrompt = [selectedStylePreset.promptHint, customPrompt.trim()]
-        .filter(Boolean)
-        .join(". ");
+      const selectedPreset = selectedStylePreset || stylePresets[0];
+      const composedPrompt = [customPrompt.trim()].filter(Boolean).join(". ");
 
       const result = await apiClient.transformOldMoney({
         photo: { base64: photo.base64, mimeType: photo.mimeType },
         customPrompt: composedPrompt,
         intensity,
         preserveBackground,
-        stylePresetId: selectedStylePreset.id,
-        stylePresetLabel: selectedStylePreset.label,
-        stylePresetPromptHint: selectedStylePreset.promptHint,
+        stylePresetId: selectedPreset?.id,
       });
 
       setResultBase64(result.imageBase64);
@@ -266,7 +192,7 @@ export default function InstaMeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [photo, credits, selectedStylePreset, customPrompt, intensity, preserveBackground, refreshCredits]);
+  }, [photo, credits, selectedStylePreset, stylePresets, customPrompt, intensity, preserveBackground, refreshCredits]);
 
   const handleDownload = useCallback(async () => {
     if (!resultBase64) return;
@@ -341,7 +267,7 @@ export default function InstaMeScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>2. Choose a style</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.styleRow}>
-            {STYLE_PRESETS.map((preset) => {
+            {stylePresets.map((preset) => {
               const active = selectedStyleId === preset.id;
               return (
                 <Pressable
@@ -367,7 +293,7 @@ export default function InstaMeScreen() {
           </ScrollView>
 
           <Text style={styles.selectedStyleText}>
-            Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset.label}</Text>
+            Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
           </Text>
 
           <Text style={styles.cardTitle}>3. Fine tune</Text>
