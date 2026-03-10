@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { router } from "expo-router";
 import { apiClient } from "@/lib/api-client";
+import Colors from "@/constants/colors";
 
 export default function LaunchScreen() {
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function LaunchScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000", justifyContent: "center", alignItems: "center" }}>
-      <ActivityIndicator size="large" color="#C9A96E" />
+      <ActivityIndicator size="large" color={Colors.accent} />
     </View>
   );
 }

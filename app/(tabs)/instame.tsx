@@ -20,6 +20,7 @@ import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
 import { useCredits } from "@/contexts/CreditsContext";
 import { apiClient } from "@/lib/api-client";
+import Colors from "@/constants/colors";
 
 type UploadedPhoto = {
   uri: string;
@@ -187,7 +188,7 @@ export default function InstaMeScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#050505", "#1B1410", "#0A0A0A"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={["#050505", "#1A0E13", "#0A0A0A"]} style={StyleSheet.absoluteFill} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -197,7 +198,7 @@ export default function InstaMeScreen() {
           <Text style={styles.headerEyebrow}>InstaMe</Text>
           <Text style={styles.headerTitle}>Old Money Luxury Transform</Text>
           <View style={styles.creditBadge}>
-            <Ionicons name="sparkles" size={14} color="#C9A96E" />
+            <Ionicons name="sparkles" size={14} color={Colors.accent} />
             <Text style={styles.creditText}>{credits} credite</Text>
           </View>
           <Text style={styles.libraryHint}>
@@ -217,7 +218,7 @@ export default function InstaMeScreen() {
               <Image source={{ uri: photo.uri }} style={styles.uploadImage} contentFit="cover" />
             ) : (
               <View style={styles.uploadPlaceholder}>
-                <Ionicons name="image-outline" size={30} color="#C9A96E" />
+                <Ionicons name="image-outline" size={30} color={Colors.accent} />
                 <Text style={styles.uploadPlaceholderTitle}>Selectează o imagine</Text>
                 <Text style={styles.uploadPlaceholderSubtitle}>
                   Portret sau fotografie full-body pentru rezultate mai bune.
@@ -253,7 +254,7 @@ export default function InstaMeScreen() {
             <Ionicons
               name={preserveBackground ? "checkmark-circle" : "ellipse-outline"}
               size={18}
-              color={preserveBackground ? "#C9A96E" : "#8E8E8E"}
+              color={preserveBackground ? Colors.accent : "#8E8E8E"}
             />
             <Text style={styles.toggleText}>Păstrează fundalul original</Text>
           </Pressable>
@@ -297,7 +298,7 @@ export default function InstaMeScreen() {
               contentFit="cover"
             />
             <Pressable style={styles.downloadButton} onPress={handleDownload}>
-              <Ionicons name="download-outline" size={18} color="#C9A96E" />
+              <Ionicons name="download-outline" size={18} color={Colors.accent} />
               <Text style={styles.downloadText}>Download</Text>
             </Pressable>
           </View>
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   header: { paddingHorizontal: 20, gap: 6, marginBottom: 12 },
   headerEyebrow: {
-    color: "#C9A96E",
+    color: Colors.accent,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 1.5,
     textTransform: "uppercase",
@@ -324,21 +325,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
-    backgroundColor: "rgba(201,169,110,0.16)",
+    backgroundColor: "rgba(255,79,125,0.20)",
     borderWidth: 1,
-    borderColor: "rgba(201,169,110,0.35)",
+    borderColor: "rgba(255,79,125,0.42)",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  creditText: { color: "#F3E0BA", fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  creditText: { color: "#FFD8E4", fontFamily: "Inter_600SemiBold", fontSize: 13 },
   libraryHint: { color: "#CFCFCF", fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
   libraryHintMuted: { color: "#8B8B8B", fontFamily: "Inter_400Regular", fontSize: 11 },
   card: {
     marginHorizontal: 20,
     marginTop: 14,
     borderWidth: 1,
-    borderColor: "rgba(201,169,110,0.25)",
+    borderColor: "rgba(255,79,125,0.30)",
     borderRadius: 18,
     backgroundColor: "rgba(7,7,7,0.86)",
     padding: 14,
@@ -367,11 +368,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   chipActive: {
-    borderColor: "rgba(201,169,110,0.65)",
-    backgroundColor: "rgba(201,169,110,0.16)",
+    borderColor: "rgba(255,79,125,0.70)",
+    backgroundColor: "rgba(255,79,125,0.20)",
   },
   chipLabel: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 13 },
-  chipLabelActive: { color: "#EBD6AA" },
+  chipLabelActive: { color: Colors.accentLight },
   chipSubtitle: { color: "#8D8D8D", fontFamily: "Inter_400Regular", fontSize: 12 },
   chipSubtitleActive: { color: "#D4C09A" },
   toggle: {
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   toggleActive: {
-    borderColor: "rgba(201,169,110,0.6)",
+    borderColor: "rgba(255,79,125,0.62)",
   },
   toggleText: { color: "#FFF", fontFamily: "Inter_500Medium", fontSize: 13 },
   promptInput: {
@@ -406,7 +407,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
     height: 52,
     borderRadius: 13,
-    backgroundColor: "#C9A96E",
+    backgroundColor: Colors.accent,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -437,12 +438,12 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(201,169,110,0.5)",
-    backgroundColor: "rgba(201,169,110,0.08)",
+    borderColor: "rgba(255,79,125,0.55)",
+    backgroundColor: "rgba(255,79,125,0.10)",
     justifyContent: "center",
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
   },
-  downloadText: { color: "#EBD6AA", fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  downloadText: { color: Colors.accentLight, fontFamily: "Inter_600SemiBold", fontSize: 14 },
 });

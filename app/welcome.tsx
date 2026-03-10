@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: "rgba(201,169,110,0.22)",
+    borderColor: "rgba(255,79,125,0.30)",
   },
   badgeText: {
     color: Colors.textSecondary,
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(201,169,110,0.10)",
+    backgroundColor: "rgba(255,79,125,0.14)",
   },
   featureTitle: {
     color: Colors.white,
