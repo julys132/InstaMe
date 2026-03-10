@@ -432,6 +432,9 @@ class ApiClient {
     customPrompt?: string;
     intensity?: "soft" | "editorial" | "dramatic";
     preserveBackground?: boolean;
+    stylePresetId?: string;
+    stylePresetLabel?: string;
+    stylePresetPromptHint?: string;
   }) {
     return this.request<{
       imageBase64: string;
@@ -439,6 +442,7 @@ class ApiClient {
       creditsRemaining: number;
       model: string;
       styleReferenceIds?: string[];
+      stylePresetId?: string | null;
     }>(
       "/instame/transform",
       {

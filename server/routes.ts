@@ -1048,6 +1048,8 @@ function buildOldMoneyTransformPrompt(options: {
   customPrompt: string;
   preserveBackground: boolean;
   styleReferences: SelectedStyleReference[];
+  stylePresetLabel: string;
+  stylePresetPromptHint: string;
 }): string {
   const intensityGuide: Record<TransformIntensity, string> = {
     soft: "subtle upgrade, understated palette, clean tailoring, minimal accessories",
@@ -1062,6 +1064,12 @@ function buildOldMoneyTransformPrompt(options: {
   const userPrompt = options.customPrompt
     ? `User custom direction: ${options.customPrompt}`
     : "No extra user direction.";
+  const stylePresetLine = options.stylePresetLabel
+    ? `Selected style preset: ${options.stylePresetLabel}.`
+    : "No explicit style preset selected.";
+  const stylePresetHintLine = options.stylePresetPromptHint
+    ? `Preset guidance: ${options.stylePresetPromptHint}.`
+    : "No extra preset guidance.";
   const styleReferenceContext = buildStyleReferenceContext(options.styleReferences);
   const styleReferenceCount = options.styleReferences.length;
   const styleOrderLine =
@@ -1082,6 +1090,8 @@ function buildOldMoneyTransformPrompt(options: {
     "Do not create extra people, duplicate limbs, or distorted anatomy.",
     "Preserve realistic skin texture and natural proportions.",
     "Use premium materials and classic old-money fashion cues: cashmere, wool, silk, tailored coats, elegant neutrals.",
+    stylePresetLine,
+    stylePresetHintLine,
     `Intensity: ${intensityGuide[options.intensity]}.`,
     backgroundRule,
     "Internal style-board descriptors:",
@@ -2618,6 +2628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const userId = req.user!.id;
     const body = req.body || {};
     const customPrompt = normalizeStringValue(body.customPrompt);
+    const stylePresetId = normalizeStringValue(body.stylePresetId);
+    const stylePresetLabel = normalizeStringValue(body.stylePresetLabel);
+    const stylePresetPromptHint = normalizeStringValue(body.stylePresetPromptHint);
     const intensity = normalizeTransformIntensity(body.intensity);
     const preserveBackground = body.preserveBackground !== false;
     const transformCost =
@@ -2655,7 +2668,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const selectedStyleReferences = selectStyleReferencesForTransform({
         intensity,
-        customPrompt,
+        customPrompt: [customPrompt, stylePresetId, stylePresetLabel, stylePresetPromptHint]
+          .filter(Boolean)
+          .join(" "),
       });
 
       const prompt = buildOldMoneyTransformPrompt({
@@ -2663,6 +2678,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customPrompt,
         preserveBackground,
         styleReferences: selectedStyleReferences,
+        stylePresetLabel,
+        stylePresetPromptHint,
       });
 
       const imageResponse = await generateGeminiContent({
@@ -2692,6 +2709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         creditsRemaining: updatedUser?.credits ?? 0,
         model: DEFAULT_STYLE_IMAGE_MODEL,
         styleReferenceIds: selectedStyleReferences.map((reference) => reference.id),
+        stylePresetId: stylePresetId || null,
       });
     } catch (error: unknown) {
       console.error("InstaMe transform error:", error);

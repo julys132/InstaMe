@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -30,13 +31,106 @@ type UploadedPhoto = {
 
 type TransformIntensity = "soft" | "editorial" | "dramatic";
 
+type StylePreset = {
+  id: string;
+  label: string;
+  subtitle: string;
+  promptHint: string;
+  representativeImage: string;
+  examples: string[];
+};
+
 const TRANSFORM_COST = 5;
 const MAX_UPLOAD_IMAGE_BASE64_LENGTH = 2_300_000;
 
 const INTENSITY_OPTIONS: { value: TransformIntensity; label: string; subtitle: string }[] = [
   { value: "soft", label: "Soft", subtitle: "Subtle luxury refinement" },
-  { value: "editorial", label: "Editorial", subtitle: "Balanced old money look" },
+  { value: "editorial", label: "Editorial", subtitle: "Balanced premium look" },
   { value: "dramatic", label: "Dramatic", subtitle: "Bold cinematic styling" },
+];
+
+const STYLE_PRESETS: StylePreset[] = [
+  {
+    id: "old_money",
+    label: "Old Money",
+    subtitle: "Timeless tailoring and refined neutrals",
+    promptHint:
+      "quiet old-money elegance, tailored silhouettes, premium fabrics, minimal luxury accessories",
+    representativeImage:
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop",
+    examples: [
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
+    ],
+  },
+  {
+    id: "retro",
+    label: "Retro",
+    subtitle: "Vintage vibe with film-like warmth",
+    promptHint: "retro editorial mood, soft grain feeling, vintage styling cues, analog-inspired color",
+    representativeImage:
+      "https://images.unsplash.com/photo-1464863979621-258859e62245?q=80&w=1000&auto=format&fit=crop",
+    examples: [
+      "https://images.unsplash.com/photo-1464863979621-258859e62245?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?q=80&w=1200&auto=format&fit=crop",
+    ],
+  },
+  {
+    id: "glam",
+    label: "Glam",
+    subtitle: "Polished beauty and statement details",
+    promptHint: "high-end glam editorial, sculpted light, clean skin texture, polished luxury finish",
+    representativeImage:
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1000&auto=format&fit=crop",
+    examples: [
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1488716820095-cbe80883c496?q=80&w=1200&auto=format&fit=crop",
+    ],
+  },
+  {
+    id: "selfie",
+    label: "Selfie",
+    subtitle: "Natural face-first premium selfie look",
+    promptHint:
+      "clean premium selfie aesthetic, flattering light, natural skin texture, subtle makeup refinement",
+    representativeImage:
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1000&auto=format&fit=crop",
+    examples: [
+      "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1521146764736-56c929d59c83?q=80&w=1200&auto=format&fit=crop",
+    ],
+  },
+  {
+    id: "in_car_selfie",
+    label: "In-Car Selfie",
+    subtitle: "Luxury car ambience with elegant light",
+    promptHint:
+      "inside premium car selfie look, realistic in-car reflections, elegant contrast, social-ready framing",
+    representativeImage:
+      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1000&auto=format&fit=crop",
+    examples: [
+      "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1521572267360-ee0c2909d518?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1503376780353-7e6692767b70?q=80&w=1200&auto=format&fit=crop",
+    ],
+  },
+  {
+    id: "street_luxe",
+    label: "Street Luxe",
+    subtitle: "Modern city chic with premium edge",
+    promptHint: "urban luxury editorial, crisp styling, clean structure, premium street-chic mood",
+    representativeImage:
+      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1000&auto=format&fit=crop",
+    examples: [
+      "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1495385794356-15371f348c31?q=80&w=1200&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?q=80&w=1200&auto=format&fit=crop",
+    ],
+  },
 ];
 
 function stripDataUriPrefix(base64OrDataUri: string): string {
@@ -50,11 +144,23 @@ export default function InstaMeScreen() {
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [intensity, setIntensity] = useState<TransformIntensity>("editorial");
+  const [selectedStyleId, setSelectedStyleId] = useState<string>(STYLE_PRESETS[0].id);
+  const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [styleReferenceCount, setStyleReferenceCount] = useState<number>(0);
   const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const selectedStylePreset = useMemo(
+    () => STYLE_PRESETS.find((preset) => preset.id === selectedStyleId) || STYLE_PRESETS[0],
+    [selectedStyleId],
+  );
+
+  const previewStyle = useMemo(
+    () => STYLE_PRESETS.find((preset) => preset.id === previewStyleId) || null,
+    [previewStyleId],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -104,12 +210,12 @@ export default function InstaMeScreen() {
     }
 
     if (!base64) {
-      Alert.alert("Image error", "Nu am putut citi această imagine.");
+      Alert.alert("Image error", "Could not read this image.");
       return;
     }
 
     if (base64.length > MAX_UPLOAD_IMAGE_BASE64_LENGTH) {
-      Alert.alert("Imagine prea mare", "Alege o imagine mai mică sau decupează fotografia.");
+      Alert.alert("Image too large", "Choose a smaller image or crop this photo.");
       return;
     }
 
@@ -127,32 +233,40 @@ export default function InstaMeScreen() {
 
   const handleTransform = useCallback(async () => {
     if (!photo) {
-      Alert.alert("Lipsește imaginea", "Încarcă o fotografie înainte de transformare.");
+      Alert.alert("Missing image", "Upload one photo before transforming.");
       return;
     }
     if (credits < TRANSFORM_COST) {
-      Alert.alert("Credite insuficiente", `Transformarea costă ${TRANSFORM_COST} credite.`);
+      Alert.alert("Not enough credits", `This transform costs ${TRANSFORM_COST} credits.`);
       return;
     }
 
     setLoading(true);
     try {
+      const composedPrompt = [selectedStylePreset.promptHint, customPrompt.trim()]
+        .filter(Boolean)
+        .join(". ");
+
       const result = await apiClient.transformOldMoney({
         photo: { base64: photo.base64, mimeType: photo.mimeType },
-        customPrompt: customPrompt.trim(),
+        customPrompt: composedPrompt,
         intensity,
         preserveBackground,
+        stylePresetId: selectedStylePreset.id,
+        stylePresetLabel: selectedStylePreset.label,
+        stylePresetPromptHint: selectedStylePreset.promptHint,
       });
+
       setResultBase64(result.imageBase64);
       setLastUsedStyleRefs(Array.isArray(result.styleReferenceIds) ? result.styleReferenceIds : []);
       await refreshCredits();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
-      Alert.alert("Eroare", error?.message || "Transformarea a eșuat.");
+      Alert.alert("Error", error?.message || "Transformation failed.");
     } finally {
       setLoading(false);
     }
-  }, [photo, credits, customPrompt, intensity, preserveBackground, refreshCredits]);
+  }, [photo, credits, selectedStylePreset, customPrompt, intensity, preserveBackground, refreshCredits]);
 
   const handleDownload = useCallback(async () => {
     if (!resultBase64) return;
@@ -161,14 +275,14 @@ export default function InstaMeScreen() {
       if (Platform.OS === "web" && typeof document !== "undefined") {
         const link = document.createElement("a");
         link.href = `data:image/png;base64,${resultBase64}`;
-        link.download = `instame-old-money-${Date.now()}.png`;
+        link.download = `instame-style-${Date.now()}.png`;
         document.body.appendChild(link);
         link.click();
         link.remove();
         return;
       }
 
-      const filePath = `${FileSystem.cacheDirectory}instame-old-money-${Date.now()}.png`;
+      const filePath = `${FileSystem.cacheDirectory}instame-style-${Date.now()}.png`;
       await FileSystem.writeAsStringAsync(filePath, resultBase64, {
         encoding: FileSystem.EncodingType.Base64,
       });
@@ -179,10 +293,10 @@ export default function InstaMeScreen() {
           dialogTitle: "Save InstaMe Result",
         });
       } else {
-        Alert.alert("Info", "Sharing nu este disponibil pe acest dispozitiv.");
+        Alert.alert("Info", "Sharing is not available on this device.");
       }
     } catch (error: any) {
-      Alert.alert("Eroare", error?.message || "Nu am putut exporta imaginea.");
+      Alert.alert("Error", error?.message || "Could not export this image.");
     }
   }, [resultBase64]);
 
@@ -196,32 +310,28 @@ export default function InstaMeScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.headerEyebrow}>InstaMe</Text>
-          <Text style={styles.headerTitle}>Old Money Luxury Transform</Text>
+          <Text style={styles.headerTitle}>Luxury Portrait Transformer</Text>
           <View style={styles.creditBadge}>
             <Ionicons name="sparkles" size={14} color={Colors.accent} />
-            <Text style={styles.creditText}>{credits} credite</Text>
+            <Text style={styles.creditText}>{credits} credits</Text>
           </View>
-          <Text style={styles.libraryHint}>
-            Style base: {styleReferenceCount} curated references
-          </Text>
+          <Text style={styles.libraryHint}>Style base: {styleReferenceCount} curated references</Text>
           {lastUsedStyleRefs.length > 0 ? (
-            <Text style={styles.libraryHintMuted}>
-              Last transform anchors: {lastUsedStyleRefs.join(", ")}
-            </Text>
+            <Text style={styles.libraryHintMuted}>Last transform anchors: {lastUsedStyleRefs.join(", ")}</Text>
           ) : null}
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>1. Încarcă fotografia</Text>
+          <Text style={styles.cardTitle}>1. Upload your photo</Text>
           <Pressable style={styles.uploadBox} onPress={pickImage}>
             {photo ? (
               <Image source={{ uri: photo.uri }} style={styles.uploadImage} contentFit="cover" />
             ) : (
               <View style={styles.uploadPlaceholder}>
                 <Ionicons name="image-outline" size={30} color={Colors.accent} />
-                <Text style={styles.uploadPlaceholderTitle}>Selectează o imagine</Text>
+                <Text style={styles.uploadPlaceholderTitle}>Select an image</Text>
                 <Text style={styles.uploadPlaceholderSubtitle}>
-                  Portret sau fotografie full-body pentru rezultate mai bune.
+                  Front-facing portrait selfies work best for identity-preserving edits.
                 </Text>
               </View>
             )}
@@ -229,8 +339,39 @@ export default function InstaMeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>2. Setări de stil</Text>
-          <View style={styles.chipsRow}>
+          <Text style={styles.cardTitle}>2. Choose a style</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.styleRow}>
+            {STYLE_PRESETS.map((preset) => {
+              const active = selectedStyleId === preset.id;
+              return (
+                <Pressable
+                  key={preset.id}
+                  onPress={() => {
+                    setSelectedStyleId(preset.id);
+                    setPreviewStyleId(preset.id);
+                  }}
+                  style={[styles.styleCard, active && styles.styleCardActive]}
+                >
+                  <Image source={{ uri: preset.representativeImage }} style={styles.styleCardImage} contentFit="cover" />
+                  <LinearGradient
+                    colors={["transparent", "rgba(0,0,0,0.9)"]}
+                    style={styles.styleCardOverlay}
+                  />
+                  <Text style={[styles.styleCardTitle, active && styles.styleCardTitleActive]}>{preset.label}</Text>
+                  <Text style={styles.styleCardSubtitle} numberOfLines={2}>
+                    {preset.subtitle}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={styles.selectedStyleText}>
+            Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset.label}</Text>
+          </Text>
+
+          <Text style={styles.cardTitle}>3. Fine tune</Text>
+          <View style={styles.intensityRow}>
             {INTENSITY_OPTIONS.map((option) => (
               <Pressable
                 key={option.value}
@@ -256,13 +397,13 @@ export default function InstaMeScreen() {
               size={18}
               color={preserveBackground ? Colors.accent : "#8E8E8E"}
             />
-            <Text style={styles.toggleText}>Păstrează fundalul original</Text>
+            <Text style={styles.toggleText}>Keep original background</Text>
           </Pressable>
 
           <TextInput
             value={customPrompt}
             onChangeText={setCustomPrompt}
-            placeholder="Instrucțiuni extra (opțional): ex. pearl earrings, wool blazer, warm sunset tone"
+            placeholder="Extra instructions (optional): pearl earrings, soft blush, sunset lighting..."
             placeholderTextColor="#7A7A7A"
             multiline
             style={styles.promptInput}
@@ -282,8 +423,8 @@ export default function InstaMeScreen() {
             ) : (
               <>
                 <Ionicons name="sparkles" size={18} color="#000" />
-                <Text style={styles.generateButtonText}>Transformă Acum</Text>
-                <Text style={styles.costText}>{TRANSFORM_COST} credite</Text>
+                <Text style={styles.generateButtonText}>Transform now</Text>
+                <Text style={styles.costText}>{TRANSFORM_COST} credits</Text>
               </>
             )}
           </Pressable>
@@ -291,7 +432,7 @@ export default function InstaMeScreen() {
 
         {resultBase64 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>3. Rezultat InstaMe</Text>
+            <Text style={styles.cardTitle}>4. Your InstaMe result</Text>
             <Image
               source={{ uri: `data:image/png;base64,${resultBase64}` }}
               style={styles.resultImage}
@@ -304,6 +445,34 @@ export default function InstaMeScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={Boolean(previewStyle)}
+        onRequestClose={() => setPreviewStyleId(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Pressable style={styles.modalCloseButton} onPress={() => setPreviewStyleId(null)}>
+              <Ionicons name="close" size={20} color="#FFF" />
+            </Pressable>
+            <Text style={styles.modalTitle}>{previewStyle?.label}</Text>
+            <Text style={styles.modalSubtitle}>{previewStyle?.subtitle}</Text>
+            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
+              {(previewStyle?.examples || []).map((imageUri, index) => (
+                <View key={`${previewStyle?.id || "style"}-${index}`} style={styles.modalImageWrap}>
+                  <Image source={{ uri: imageUri }} style={styles.modalImage} contentFit="cover" />
+                </View>
+              ))}
+            </ScrollView>
+            <Text style={styles.modalFootnote}>Swipe to view more examples.</Text>
+            <Pressable style={styles.modalApplyButton} onPress={() => setPreviewStyleId(null)}>
+              <Text style={styles.modalApplyButtonText}>Use this style</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -357,7 +526,59 @@ const styles = StyleSheet.create({
   uploadPlaceholder: { height: 220, justifyContent: "center", alignItems: "center", paddingHorizontal: 18, gap: 8 },
   uploadPlaceholderTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 15 },
   uploadPlaceholderSubtitle: { color: "#A3A3A3", fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" },
-  chipsRow: { gap: 8 },
+  styleRow: {
+    gap: 10,
+    paddingRight: 6,
+  },
+  styleCard: {
+    width: 160,
+    height: 200,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#101010",
+    padding: 10,
+    justifyContent: "flex-end",
+  },
+  styleCardActive: {
+    borderColor: "rgba(255,79,125,0.95)",
+    shadowColor: "#FF4F7D",
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  styleCardImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  styleCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  styleCardTitle: {
+    color: "#F8F8F8",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    marginBottom: 3,
+  },
+  styleCardTitleActive: {
+    color: Colors.accentLight,
+  },
+  styleCardSubtitle: {
+    color: "#CFCFCF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  selectedStyleText: {
+    color: "#CFCFCF",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  selectedStyleAccent: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_600SemiBold",
+  },
+  intensityRow: { gap: 8 },
   chip: {
     borderRadius: 12,
     borderWidth: 1,
@@ -374,7 +595,7 @@ const styles = StyleSheet.create({
   chipLabel: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 13 },
   chipLabelActive: { color: Colors.accentLight },
   chipSubtitle: { color: "#8D8D8D", fontFamily: "Inter_400Regular", fontSize: 12 },
-  chipSubtitleActive: { color: "#D4C09A" },
+  chipSubtitleActive: { color: "#FFD3DF" },
   toggle: {
     borderRadius: 12,
     borderWidth: 1,
@@ -446,4 +667,80 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   downloadText: { color: Colors.accentLight, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 520,
+    backgroundColor: "#111111",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,79,125,0.35)",
+    padding: 14,
+    gap: 10,
+  },
+  modalCloseButton: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 5,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 18,
+    paddingRight: 36,
+  },
+  modalSubtitle: {
+    color: "#BFBFBF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    marginTop: -2,
+    marginBottom: 4,
+    paddingRight: 24,
+  },
+  modalImageWrap: {
+    width: 290,
+    height: 360,
+    marginRight: 10,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#0E0E0E",
+  },
+  modalImage: {
+    width: "100%",
+    height: "100%",
+  },
+  modalFootnote: {
+    color: "#8A8A8A",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    textAlign: "center",
+  },
+  modalApplyButton: {
+    marginTop: 2,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalApplyButtonText: {
+    color: "#090909",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
 });
