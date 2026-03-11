@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Modal,
   Platform,
   Pressable,
@@ -60,6 +61,8 @@ export default function InstaMeScreen() {
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [styleReferenceCount, setStyleReferenceCount] = useState<number>(0);
   const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
+  const styleListRef = useRef<ScrollView | FlatList<InstaMeStylePreset> | null>(null);
+  const [canScrollMoreRight, setCanScrollMoreRight] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const selectedStylePreset = useMemo(
@@ -112,6 +115,16 @@ export default function InstaMeScreen() {
     () => Boolean(photo && !loading && credits >= TRANSFORM_COST),
     [photo, loading, credits],
   );
+
+  const handleStyleRowScroll = useCallback((event: any) => {
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const remainingRight = contentSize.width - (contentOffset.x + layoutMeasurement.width);
+    setCanScrollMoreRight(remainingRight > 16);
+  }, []);
+
+  const scrollStylesRight = useCallback(() => {
+    (styleListRef.current as ScrollView | null)?.scrollTo({ x: 220, animated: true });
+  }, []);
 
   const pickImage = useCallback(async () => {
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
@@ -266,31 +279,85 @@ export default function InstaMeScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>2. Choose a style</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.styleRow}>
-            {stylePresets.map((preset) => {
-              const active = selectedStyleId === preset.id;
-              return (
+          <View style={styles.styleCarouselWrap}>
+            <ScrollView
+              ref={styleListRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.styleRow}
+              onScroll={handleStyleRowScroll}
+              scrollEventThrottle={16}
+            >
+              {stylePresets.map((preset, index) => {
+                const active = selectedStyleId === preset.id;
+                const isFirst = index === 0;
+                const isLast = index === stylePresets.length - 1;
+
+                return (
+                  <Pressable
+                    key={preset.id}
+                    onPress={() => {
+                      setSelectedStyleId(preset.id);
+                      setPreviewStyleId(preset.id);
+                    }}
+                    style={[
+                      styles.styleCardOuter,
+                      isFirst && styles.styleCardOuterFirst,
+                      isLast && styles.styleCardOuterLast,
+                      active && styles.styleCardOuterActive,
+                    ]}
+                  >
+                    <View style={[styles.styleCard, active && styles.styleCardActive]}>
+                      <Image
+                        source={{ uri: preset.cover || preset.representativeImage }}
+                        contentFit="cover"
+                        style={styles.styleCardImage}
+                      />
+
+                      <LinearGradient
+                        colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.18)", "rgba(0,0,0,0.78)"]}
+                        locations={[0, 0.45, 1]}
+                        style={styles.styleCardOverlay}
+                      />
+
+                      <View style={styles.styleCardTextWrap}>
+                        <Text style={[styles.styleCardTitle, active && styles.styleCardTitleActive]}>
+                          {preset.label}
+                        </Text>
+
+                        <Text
+                          style={[styles.styleCardSubtitle, active && styles.styleCardSubtitleActive]}
+                          numberOfLines={2}
+                        >
+                          {preset.subtitle}
+                        </Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {canScrollMoreRight ? (
+              <View pointerEvents="box-none" style={styles.styleScrollHintWrap}>
+                <LinearGradient
+                  colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.94)"]}
+                  locations={[0, 0.45, 1]}
+                  style={styles.styleScrollFade}
+                />
+
                 <Pressable
-                  key={preset.id}
-                  onPress={() => {
-                    setSelectedStyleId(preset.id);
-                    setPreviewStyleId(preset.id);
-                  }}
-                  style={[styles.styleCard, active && styles.styleCardActive]}
+                  onPress={scrollStylesRight}
+                  style={({ pressed }) => [
+                    styles.styleScrollArrow,
+                    pressed && { transform: [{ scale: 0.96 }] },
+                  ]}
                 >
-                  <Image source={{ uri: preset.representativeImage }} style={styles.styleCardImage} contentFit="cover" />
-                  <LinearGradient
-                    colors={["transparent", "rgba(0,0,0,0.9)"]}
-                    style={styles.styleCardOverlay}
-                  />
-                  <Text style={[styles.styleCardTitle, active && styles.styleCardTitleActive]}>{preset.label}</Text>
-                  <Text style={styles.styleCardSubtitle} numberOfLines={2}>
-                    {preset.subtitle}
-                  </Text>
+                  <Ionicons name="chevron-forward" size={18} color="#FFD7E3" />
                 </Pressable>
-              );
-            })}
-          </ScrollView>
+              </View>
+            ) : null}
+          </View>
 
           <Text style={styles.selectedStyleText}>
             Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
@@ -452,27 +519,52 @@ const styles = StyleSheet.create({
   uploadPlaceholder: { height: 220, justifyContent: "center", alignItems: "center", paddingHorizontal: 18, gap: 8 },
   uploadPlaceholderTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 15 },
   uploadPlaceholderSubtitle: { color: "#A3A3A3", fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" },
+  styleCarouselWrap: {
+    position: "relative",
+    marginRight: -14,
+  },
   styleRow: {
-    gap: 10,
-    paddingRight: 6,
+    gap: 14,
+    paddingLeft: 2,
+    paddingRight: 74,
+  },
+  styleCardOuter: {
+    width: 168,
+    height: 208,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,79,125,0.08)",
+    padding: 1.5,
+    shadowColor: "#FF4FBE",
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
+  },
+  styleCardOuterFirst: {
+    marginLeft: 2,
+  },
+  styleCardOuterLast: {
+    marginRight: 2,
+  },
+  styleCardOuterActive: {
+    shadowColor: "#FF5CB8",
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 16,
   },
   styleCard: {
-    width: 160,
-    height: 200,
-    borderRadius: 16,
+    flex: 1,
+    borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "#101010",
-    padding: 10,
     justifyContent: "flex-end",
   },
   styleCardActive: {
-    borderColor: "rgba(255,79,125,0.95)",
-    shadowColor: "#FF4F7D",
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
+    borderColor: "rgba(255,132,185,0.95)",
+    backgroundColor: "#121012",
   },
   styleCardImage: {
     ...StyleSheet.absoluteFillObject,
@@ -480,29 +572,65 @@ const styles = StyleSheet.create({
   styleCardOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
+  styleCardTextWrap: {
+    paddingHorizontal: 14,
+    paddingBottom: 13,
+  },
   styleCardTitle: {
-    color: "#F8F8F8",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    marginBottom: 3,
+    color: "#F8F1F4",
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    marginBottom: 4,
   },
   styleCardTitleActive: {
-    color: Colors.accentLight,
+    color: "#FF9EBC",
   },
   styleCardSubtitle: {
-    color: "#CFCFCF",
+    color: "rgba(255,255,255,0.82)",
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  styleCardSubtitleActive: {
+    color: "#FFE1EA",
+  },
+  styleScrollHintWrap: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: 72,
+    justifyContent: "center",
+    alignItems: "flex-end",
+  },
+  styleScrollFade: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  styleScrollArrow: {
+    marginRight: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "rgba(255,79,125,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,140,194,0.48)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#FF5CB8",
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
   },
   selectedStyleText: {
-    color: "#CFCFCF",
+    color: "#D7D7D7",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+    marginTop: 2,
   },
   selectedStyleAccent: {
-    color: Colors.accentLight,
-    fontFamily: "Inter_600SemiBold",
+    color: "#FF9EBC",
+    fontFamily: "Inter_700Bold",
   },
   intensityRow: { gap: 8 },
   chip: {

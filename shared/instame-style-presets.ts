@@ -3,6 +3,7 @@ export type InstaMeStylePreset = {
   label: string;
   subtitle: string;
   promptHint: string;
+  cover?: string;
   representativeImage: string;
   examples: string[];
 };
