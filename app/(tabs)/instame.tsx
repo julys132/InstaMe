@@ -650,8 +650,17 @@ export default function InstaMeScreen() {
                       />
 
                       <LinearGradient
-                        colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.12)", "rgba(0,0,0,0.18)"]}
-                        locations={[0, 0.46, 1]}
+                        colors={
+                          active
+                            ? [theme.glowSoft, "rgba(0,0,0,0.10)", "rgba(0,0,0,0.58)"]
+                            : [theme.ambient, "rgba(0,0,0,0.10)", "rgba(0,0,0,0.62)"]
+                        }
+                        locations={[0, 0.22, 1]}
+                        style={styles.styleCardAtmosphere}
+                      />
+                      <LinearGradient
+                        colors={["rgba(255,255,255,0.10)", "rgba(0,0,0,0.06)", "rgba(0,0,0,0.18)"]}
+                        locations={[0, 0.14, 1]}
                         style={styles.styleCardImageWash}
                       />
                       <View
@@ -664,8 +673,8 @@ export default function InstaMeScreen() {
                         ]}
                       />
                       <LinearGradient
-                        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.76)", "rgba(0,0,0,0.86)"]}
-                        locations={[0, 0.52, 1]}
+                        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.74)", "rgba(0,0,0,0.92)"]}
+                        locations={[0, 0.4, 1]}
                         style={styles.styleCardFooter}
                       />
 
@@ -1025,13 +1034,13 @@ const styles = StyleSheet.create({
     width: 198,
     height: 246,
     borderRadius: 30,
-    backgroundColor: "rgba(255,79,125,0.05)",
+    backgroundColor: "rgba(255,79,125,0.06)",
     padding: 2,
     shadowColor: "#FF4FBE",
-    shadowOpacity: 0.22,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 12,
+    shadowOpacity: 0.32,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 14,
   },
   styleCardOuterFirst: {
     marginLeft: 2,
@@ -1041,10 +1050,10 @@ const styles = StyleSheet.create({
   },
   styleCardOuterActive: {
     shadowColor: "#FF5CB8",
-    shadowOpacity: 0.56,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 14 },
-    elevation: 18,
+    shadowOpacity: 0.7,
+    shadowRadius: 34,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 20,
   },
   styleCard: {
     flex: 1,
@@ -1061,6 +1070,9 @@ const styles = StyleSheet.create({
   styleCardImage: {
     ...StyleSheet.absoluteFillObject,
   },
+  styleCardAtmosphere: {
+    ...StyleSheet.absoluteFillObject,
+  },
   styleCardImageWash: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -1068,17 +1080,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(255,210,228,0.12)",
+    borderColor: "rgba(255,210,228,0.16)",
   },
   styleCardInnerRingActive: {
-    borderColor: "rgba(255,179,210,0.50)",
+    borderColor: "rgba(255,179,210,0.62)",
   },
   styleCardFooter: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    height: 102,
+    height: 114,
   },
   styleCardTextWrap: {
     position: "absolute",
@@ -1086,8 +1098,8 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     paddingHorizontal: 18,
-    paddingBottom: 16,
-    minHeight: 102,
+    paddingBottom: 18,
+    minHeight: 114,
     justifyContent: "flex-end",
   },
   styleCardTitle: {
@@ -1096,6 +1108,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     lineHeight: 20,
     marginBottom: 4,
+    textShadowColor: "rgba(0,0,0,0.75)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
   styleCardTitleActive: {
     color: "#FFE7F0",
@@ -1105,6 +1120,9 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 17,
+    textShadowColor: "rgba(0,0,0,0.72)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
   },
   styleCardSubtitleActive: {
     color: "#FFFFFF",
