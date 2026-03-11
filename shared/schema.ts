@@ -12,6 +12,18 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export type InstaMeUploadedImageRecord = {
+  id: string;
+  name: string;
+  mimeType: string;
+  base64: string;
+  previewBase64: string;
+  width: number;
+  height: number;
+  fileSizeBytes: number;
+  createdAt: string;
+};
+
 export const users = pgTable("users", {
   id: varchar("id")
     .primaryKey()
@@ -31,6 +43,10 @@ export const users = pgTable("users", {
     .$type<Record<string, number>>()
     .notNull()
     .default(sql`'{}'::jsonb`),
+  instameUploadedImages: jsonb("instame_uploaded_images")
+    .$type<InstaMeUploadedImageRecord[]>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

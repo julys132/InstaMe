@@ -64,6 +64,7 @@ var users = (0, import_pg_core.pgTable)("users", {
   stylePreferences: (0, import_pg_core.jsonb)("style_preferences").$type().notNull().default(import_drizzle_orm.sql`'[]'::jsonb`),
   favoriteLooks: (0, import_pg_core.jsonb)("favorite_looks").$type().notNull().default(import_drizzle_orm.sql`'[]'::jsonb`),
   instameStyleUsage: (0, import_pg_core.jsonb)("instame_style_usage").$type().notNull().default(import_drizzle_orm.sql`'{}'::jsonb`),
+  instameUploadedImages: (0, import_pg_core.jsonb)("instame_uploaded_images").$type().notNull().default(import_drizzle_orm.sql`'[]'::jsonb`),
   notificationsEnabled: (0, import_pg_core.boolean)("notifications_enabled").notNull().default(true),
   createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow(),
   updatedAt: (0, import_pg_core.timestamp)("updated_at").notNull().defaultNow()
@@ -1097,6 +1098,10 @@ var MAX_IMAGE_COUNT_BY_MODE = {
   multi_item: 3
 };
 var MAX_IMAGE_BASE64_LENGTH = 25e5;
+var MAX_INSTAME_LIBRARY_IMAGES = 10;
+var MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1e6;
+var MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
+var MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 22e4;
 var STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 var DEFAULT_IAP_PRODUCT_CREDITS = {
   "com.instame.app.credits.5": 5,
@@ -1493,6 +1498,58 @@ function normalizeUploadedImages(input, imageInputMode) {
     console.warn(`Skipped ${skippedCount} oversized uploaded image(s)`);
   }
   return withinSizeLimit;
+}
+function stripDataUriPrefix(base64OrDataUri) {
+  const commaIndex = base64OrDataUri.indexOf(",");
+  return commaIndex >= 0 ? base64OrDataUri.slice(commaIndex + 1) : base64OrDataUri;
+}
+function estimateBase64Bytes(base64) {
+  const sanitized = stripDataUriPrefix(base64).replace(/\s+/g, "");
+  if (!sanitized) return 0;
+  const padding = sanitized.endsWith("==") ? 2 : sanitized.endsWith("=") ? 1 : 0;
+  return Math.floor(sanitized.length * 3 / 4) - padding;
+}
+function normalizeStoredInstaMeUploadedImages(input) {
+  if (!Array.isArray(input)) return [];
+  return input.map((entry) => {
+    if (!entry || typeof entry !== "object") return null;
+    const candidate = entry;
+    const id = normalizeStringValue(candidate.id);
+    const mimeType = typeof candidate.mimeType === "string" && candidate.mimeType.startsWith("image/") ? candidate.mimeType : "image/jpeg";
+    const base64 = normalizeStringValue(candidate.base64);
+    const previewBase64 = normalizeStringValue(candidate.previewBase64);
+    const name = normalizeStringValue(candidate.name) || "Portrait";
+    const width = Number(candidate.width);
+    const height = Number(candidate.height);
+    const fileSizeBytes = Number(candidate.fileSizeBytes);
+    const createdAt = normalizeStringValue(candidate.createdAt);
+    if (!id || !base64 || !previewBase64) return null;
+    if (!Number.isFinite(width) || width <= 0) return null;
+    if (!Number.isFinite(height) || height <= 0) return null;
+    return {
+      id,
+      name,
+      mimeType,
+      base64: stripDataUriPrefix(base64),
+      previewBase64: stripDataUriPrefix(previewBase64),
+      width: Math.min(Math.round(width), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
+      height: Math.min(Math.round(height), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
+      fileSizeBytes: Number.isFinite(fileSizeBytes) && fileSizeBytes > 0 ? Math.round(fileSizeBytes) : estimateBase64Bytes(base64),
+      createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
+    };
+  }).filter((entry) => Boolean(entry)).slice(0, MAX_INSTAME_LIBRARY_IMAGES);
+}
+function toInstaMeUploadedImageSummary(image) {
+  return {
+    id: image.id,
+    name: image.name,
+    mimeType: image.mimeType,
+    width: image.width,
+    height: image.height,
+    fileSizeBytes: image.fileSizeBytes,
+    createdAt: image.createdAt,
+    previewUri: `data:${image.mimeType};base64,${image.previewBase64}`
+  };
 }
 function sanitizeStylingResponse(raw) {
   const fallback = {
@@ -3056,6 +3113,95 @@ async function registerRoutes(app2) {
       editTiers: INSTAME_EDIT_TIERS,
       liveGenerationTierId: getLiveInstaMeGenerationTier().id
     });
+  });
+  app2.get("/api/instame/uploaded-images", authMiddleware, async (req, res) => {
+    const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+    const images = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
+    return res.json({
+      images: images.slice().sort((left, right) => right.createdAt.localeCompare(left.createdAt)).map((image) => toInstaMeUploadedImageSummary(image))
+    });
+  });
+  app2.get("/api/instame/uploaded-images/:imageId", authMiddleware, async (req, res) => {
+    const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+    const images = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
+    const image = images.find((entry) => entry.id === req.params.imageId);
+    if (!image) {
+      return res.status(404).json({ error: "Saved image not found." });
+    }
+    return res.json({
+      image: {
+        ...toInstaMeUploadedImageSummary(image),
+        base64: image.base64,
+        dataUri: `data:${image.mimeType};base64,${image.base64}`
+      }
+    });
+  });
+  app2.post("/api/instame/uploaded-images", authMiddleware, async (req, res) => {
+    const body = req.body || {};
+    const input = body.image && typeof body.image === "object" ? body.image : {};
+    const name = normalizeStringValue(input.name) || "Portrait";
+    const mimeType = typeof input.mimeType === "string" && String(input.mimeType).startsWith("image/") ? String(input.mimeType) : "image/jpeg";
+    const base64 = stripDataUriPrefix(normalizeStringValue(input.base64));
+    const previewBase64 = stripDataUriPrefix(
+      normalizeStringValue(input.previewBase64)
+    );
+    const width = Number(input.width);
+    const height = Number(input.height);
+    const fileSizeBytes = Number(input.fileSizeBytes);
+    if (!base64 || !previewBase64) {
+      return res.status(400).json({ error: "Image payload is required." });
+    }
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return res.status(400).json({ error: "Image dimensions are invalid." });
+    }
+    if (width > MAX_INSTAME_LIBRARY_IMAGE_DIMENSION || height > MAX_INSTAME_LIBRARY_IMAGE_DIMENSION) {
+      return res.status(400).json({ error: "Image must be resized to 1024 x 1024 px or smaller." });
+    }
+    const normalizedFileSize = Number.isFinite(fileSizeBytes) && fileSizeBytes > 0 ? Math.round(fileSizeBytes) : estimateBase64Bytes(base64);
+    if (normalizedFileSize > MAX_INSTAME_LIBRARY_IMAGE_BYTES) {
+      return res.status(400).json({ error: "Image must be 1MB or smaller after optimization." });
+    }
+    if (previewBase64.length > MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH) {
+      return res.status(400).json({ error: "Preview image is too large." });
+    }
+    const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+    const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
+    if (existingImages.length >= MAX_INSTAME_LIBRARY_IMAGES) {
+      return res.status(409).json({
+        error: `You can save up to ${MAX_INSTAME_LIBRARY_IMAGES} uploaded images.`
+      });
+    }
+    const savedImage = {
+      id: (0, import_node_crypto2.randomUUID)(),
+      name,
+      mimeType,
+      base64,
+      previewBase64,
+      width: Math.round(width),
+      height: Math.round(height),
+      fileSizeBytes: normalizedFileSize,
+      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    await db.update(users).set({
+      instameUploadedImages: [savedImage, ...existingImages],
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+    return res.status(201).json({
+      image: toInstaMeUploadedImageSummary(savedImage)
+    });
+  });
+  app2.delete("/api/instame/uploaded-images/:imageId", authMiddleware, async (req, res) => {
+    const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+    const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
+    const nextImages = existingImages.filter((entry) => entry.id !== req.params.imageId);
+    if (nextImages.length === existingImages.length) {
+      return res.status(404).json({ error: "Saved image not found." });
+    }
+    await db.update(users).set({
+      instameUploadedImages: nextImages,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+    return res.json({ success: true });
   });
   app2.post("/api/instame/transform", authMiddleware, async (req, res) => {
     const userId = req.user.id;

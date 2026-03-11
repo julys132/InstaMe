@@ -16,11 +16,16 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
 import { useCredits } from "@/contexts/CreditsContext";
-import { apiClient } from "@/lib/api-client";
+import {
+  apiClient,
+  type InstaMeUploadedImage,
+  type InstaMeUploadedImageAsset,
+} from "@/lib/api-client";
 import Colors from "@/constants/colors";
 import { INSTAME_STYLE_PRESETS, type InstaMeStylePreset } from "@shared/instame-style-presets";
 import {
@@ -34,7 +39,25 @@ type UploadedPhoto = {
   uri: string;
   base64: string;
   mimeType: string;
+  previewBase64?: string;
+  width?: number;
+  height?: number;
+  fileSizeBytes?: number;
+  sourceImageId?: string;
+  name?: string;
 };
+
+type PreparedUploadImage = {
+  uri: string;
+  base64: string;
+  previewBase64: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  fileSizeBytes: number;
+};
+
+type UploadedImageViewMode = "tiny" | "small" | "medium" | "large";
 
 type TransformIntensity = "soft" | "editorial" | "dramatic";
 type GenerationResultMeta = {
@@ -55,7 +78,22 @@ type StyleCardTheme = {
 };
 
 const DEFAULT_TRANSFORM_COST = 5;
-const MAX_UPLOAD_IMAGE_BASE64_LENGTH = 2_300_000;
+const MAX_STORED_UPLOADS = 10;
+const MAX_LIBRARY_IMAGE_BYTES = 1_000_000;
+const MAX_LIBRARY_IMAGE_DIMENSION = 1024;
+const LIBRARY_PREVIEW_DIMENSION = 360;
+const VIEW_MODE_OPTIONS: { value: UploadedImageViewMode; label: string }[] = [
+  { value: "tiny", label: "XS" },
+  { value: "small", label: "S" },
+  { value: "medium", label: "M" },
+  { value: "large", label: "L" },
+];
+const VIEW_MODE_TILE_SIZE: Record<UploadedImageViewMode, number> = {
+  tiny: 72,
+  small: 96,
+  medium: 124,
+  large: 164,
+};
 
 const INTENSITY_OPTIONS: { value: TransformIntensity; label: string; subtitle: string }[] = [
   { value: "soft", label: "Soft", subtitle: "Subtle luxury refinement" },
@@ -239,6 +277,93 @@ function stripDataUriPrefix(base64OrDataUri: string): string {
   return commaIndex >= 0 ? base64OrDataUri.slice(commaIndex + 1) : base64OrDataUri;
 }
 
+function estimateBase64Bytes(base64: string): number {
+  const sanitized = stripDataUriPrefix(base64).replace(/\s+/g, "");
+  if (!sanitized) return 0;
+
+  const padding =
+    sanitized.endsWith("==") ? 2 : sanitized.endsWith("=") ? 1 : 0;
+  return Math.floor((sanitized.length * 3) / 4) - padding;
+}
+
+function buildDataUri(base64: string, mimeType: string): string {
+  return `data:${mimeType};base64,${stripDataUriPrefix(base64)}`;
+}
+
+async function optimizeImageAsset(
+  asset: ImagePicker.ImagePickerAsset,
+  previewDimension: number = LIBRARY_PREVIEW_DIMENSION,
+): Promise<PreparedUploadImage> {
+  const sourceWidth = Math.max(asset.width || 0, 1);
+  const sourceHeight = Math.max(asset.height || 0, 1);
+  const largestSide = Math.max(sourceWidth, sourceHeight);
+  const resizeAction =
+    largestSide > MAX_LIBRARY_IMAGE_DIMENSION
+      ? sourceWidth >= sourceHeight
+        ? [{ resize: { width: MAX_LIBRARY_IMAGE_DIMENSION } }]
+        : [{ resize: { height: MAX_LIBRARY_IMAGE_DIMENSION } }]
+      : [];
+
+  const compressSteps = [0.82, 0.72, 0.62, 0.52, 0.42];
+  let optimizedBase64 = "";
+  let optimizedUri = asset.uri;
+  let optimizedWidth = sourceWidth;
+  let optimizedHeight = sourceHeight;
+  let optimizedBytes = asset.fileSize || 0;
+
+  for (const compress of compressSteps) {
+    const result = await manipulateAsync(asset.uri, resizeAction, {
+      compress,
+      format: SaveFormat.JPEG,
+      base64: true,
+    });
+    const candidateBase64 = stripDataUriPrefix(result.base64 || "");
+    const candidateBytes = estimateBase64Bytes(candidateBase64);
+
+    optimizedBase64 = candidateBase64;
+    optimizedUri = result.uri;
+    optimizedWidth = result.width;
+    optimizedHeight = result.height;
+    optimizedBytes = candidateBytes;
+
+    if (candidateBase64 && candidateBytes <= MAX_LIBRARY_IMAGE_BYTES) {
+      break;
+    }
+  }
+
+  if (!optimizedBase64) {
+    throw new Error("Could not optimize this image.");
+  }
+
+  if (optimizedBytes > MAX_LIBRARY_IMAGE_BYTES) {
+    throw new Error("This photo is still larger than 1MB after optimization.");
+  }
+
+  const previewResizeAction =
+    Math.max(optimizedWidth, optimizedHeight) > previewDimension
+      ? optimizedWidth >= optimizedHeight
+        ? [{ resize: { width: previewDimension } }]
+        : [{ resize: { height: previewDimension } }]
+      : [];
+
+  const previewResult = await manipulateAsync(optimizedUri, previewResizeAction, {
+    compress: 0.62,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
+  const previewBase64 = stripDataUriPrefix(previewResult.base64 || optimizedBase64);
+
+  return {
+    uri: optimizedUri,
+    base64: optimizedBase64,
+    previewBase64,
+    mimeType: "image/jpeg",
+    width: optimizedWidth,
+    height: optimizedHeight,
+    fileSizeBytes: optimizedBytes,
+  };
+}
+
 export default function InstaMeScreen() {
   const insets = useSafeAreaInsets();
   const { credits, refreshCredits } = useCredits();
@@ -261,6 +386,10 @@ export default function InstaMeScreen() {
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
   const [styleReferenceCount, setStyleReferenceCount] = useState<number>(0);
   const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<InstaMeUploadedImage[]>([]);
+  const [uploadedImagesLoading, setUploadedImagesLoading] = useState(true);
+  const [libraryActionLoading, setLibraryActionLoading] = useState(false);
+  const [imageViewMode, setImageViewMode] = useState<UploadedImageViewMode>("medium");
   const styleListRef = useRef<ScrollView | null>(null);
   const [canScrollMoreRight, setCanScrollMoreRight] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -290,6 +419,20 @@ export default function InstaMeScreen() {
     [editTiers, selectedEditTierId],
   );
 
+  const selectedLibraryImageId = photo?.sourceImageId || null;
+  const selectedImageTileSize = VIEW_MODE_TILE_SIZE[imageViewMode];
+
+  const loadUploadedImages = useCallback(async () => {
+    try {
+      const result = await apiClient.getInstaMeUploadedImages();
+      setUploadedImages(Array.isArray(result.images) ? result.images : []);
+    } catch {
+      setUploadedImages([]);
+    } finally {
+      setUploadedImagesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -297,7 +440,8 @@ export default function InstaMeScreen() {
       apiClient.getInstaMeStyleLibrary(),
       apiClient.getInstaMeStylePresets(),
       apiClient.getInstaMePricing(),
-    ]).then(([styleLibraryResult, stylePresetResult, pricingResult]) => {
+      apiClient.getInstaMeUploadedImages(),
+    ]).then(([styleLibraryResult, stylePresetResult, pricingResult, uploadedImagesResult]) => {
         if (!mounted) return;
 
         if (styleLibraryResult.status === "fulfilled") {
@@ -321,6 +465,13 @@ export default function InstaMeScreen() {
             setSelectedGenerationTierId(pricingResult.value.liveGenerationTierId);
           }
         }
+
+        if (uploadedImagesResult.status === "fulfilled") {
+          setUploadedImages(Array.isArray(uploadedImagesResult.value.images) ? uploadedImagesResult.value.images : []);
+        } else {
+          setUploadedImages([]);
+        }
+        setUploadedImagesLoading(false);
       });
 
     return () => {
@@ -367,54 +518,200 @@ export default function InstaMeScreen() {
     (styleListRef.current as ScrollView | null)?.scrollTo({ x: 220, animated: true });
   }, []);
 
-  const pickImage = useCallback(async () => {
+  const pickRawImage = useCallback(async (): Promise<ImagePicker.ImagePickerAsset | null> => {
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
-      quality: 0.7,
-      base64: true,
+      quality: 0.9,
+      base64: false,
     });
 
     if (pickerResult.canceled || !pickerResult.assets[0]) {
-      return;
+      return null;
     }
 
-    const asset = pickerResult.assets[0];
-    let base64 = typeof asset.base64 === "string" ? stripDataUriPrefix(asset.base64) : "";
+    return pickerResult.assets[0];
+  }, []);
 
-    if (!base64 && asset.uri?.startsWith("file://")) {
-      try {
-        base64 = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-      } catch {
-        base64 = "";
-      }
-    }
+  const pickImage = useCallback(async () => {
+    const asset = await pickRawImage();
+    if (!asset) return;
 
-    if (!base64) {
-      Alert.alert("Image error", "Could not read this image.");
-      return;
-    }
-
-    if (base64.length > MAX_UPLOAD_IMAGE_BASE64_LENGTH) {
-      Alert.alert("Image too large", "Choose a smaller image or crop this photo.");
+    let prepared: PreparedUploadImage;
+    try {
+      prepared = await optimizeImageAsset(asset);
+    } catch (error: any) {
+      Alert.alert("Image error", error?.message || "Could not optimize this image.");
       return;
     }
 
     setPhoto({
-      uri: asset.uri,
-      base64,
-      mimeType:
-        typeof asset.mimeType === "string" && asset.mimeType.startsWith("image/")
-          ? asset.mimeType
-          : "image/jpeg",
+      uri: prepared.uri,
+      base64: prepared.base64,
+      previewBase64: prepared.previewBase64,
+      mimeType: prepared.mimeType,
+      width: prepared.width,
+      height: prepared.height,
+      fileSizeBytes: prepared.fileSizeBytes,
+      sourceImageId: undefined,
+      name: asset.fileName || "Portrait",
     });
     setResultBase64(null);
     setResultMeta(null);
     setShowEditComposer(false);
-    Haptics.selectionAsync();
+    setEditInstruction("");
+    await Haptics.selectionAsync();
+  }, [pickRawImage]);
+
+  const savePreparedToLibrary = useCallback(
+    async (prepared: PreparedUploadImage, name?: string) => {
+      if (uploadedImages.length >= MAX_STORED_UPLOADS) {
+        Alert.alert("Limit reached", `You can save up to ${MAX_STORED_UPLOADS} portraits.`);
+        return null;
+      }
+
+      setLibraryActionLoading(true);
+      try {
+        const result = await apiClient.saveInstaMeUploadedImage({
+          image: {
+            name: name || "Portrait",
+            mimeType: prepared.mimeType,
+            base64: prepared.base64,
+            previewBase64: prepared.previewBase64,
+            width: prepared.width,
+            height: prepared.height,
+            fileSizeBytes: prepared.fileSizeBytes,
+          },
+        });
+        await loadUploadedImages();
+        return result.image;
+      } catch (error: any) {
+        Alert.alert("Save failed", error?.message || "Could not save this portrait.");
+        return null;
+      } finally {
+        setLibraryActionLoading(false);
+      }
+    },
+    [loadUploadedImages, uploadedImages.length],
+  );
+
+  const handleSaveCurrentPhoto = useCallback(async () => {
+    if (!photo) {
+      Alert.alert("Missing image", "Upload a portrait before saving it.");
+      return;
+    }
+    if (photo.sourceImageId) {
+      Alert.alert("Already saved", "This portrait is already in your uploaded images.");
+      return;
+    }
+
+    const saved = await savePreparedToLibrary(
+      {
+        uri: photo.uri,
+        base64: photo.base64,
+        previewBase64: photo.previewBase64 || photo.base64,
+        mimeType: photo.mimeType,
+        width: photo.width || MAX_LIBRARY_IMAGE_DIMENSION,
+        height: photo.height || MAX_LIBRARY_IMAGE_DIMENSION,
+        fileSizeBytes: photo.fileSizeBytes || estimateBase64Bytes(photo.base64),
+      },
+      photo.name,
+    );
+
+    if (!saved) return;
+
+    setPhoto((prev) =>
+      prev
+        ? {
+            ...prev,
+            sourceImageId: saved.id,
+            previewBase64: prev.previewBase64 || photo.previewBase64,
+          }
+        : prev,
+    );
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [photo, savePreparedToLibrary]);
+
+  const handleAddImageToLibrary = useCallback(async () => {
+    const asset = await pickRawImage();
+    if (!asset) return;
+
+    let prepared: PreparedUploadImage;
+    try {
+      prepared = await optimizeImageAsset(asset);
+    } catch (error: any) {
+      Alert.alert("Image error", error?.message || "Could not optimize this image.");
+      return;
+    }
+
+    const saved = await savePreparedToLibrary(prepared, asset.fileName || "Portrait");
+    if (!saved) return;
+
+    setPhoto({
+      uri: buildDataUri(prepared.previewBase64, prepared.mimeType),
+      base64: prepared.base64,
+      previewBase64: prepared.previewBase64,
+      mimeType: prepared.mimeType,
+      width: prepared.width,
+      height: prepared.height,
+      fileSizeBytes: prepared.fileSizeBytes,
+      sourceImageId: saved.id,
+      name: saved.name,
+    });
+    setResultBase64(null);
+    setResultMeta(null);
+    setShowEditComposer(false);
+    setEditInstruction("");
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [pickRawImage, savePreparedToLibrary]);
+
+  const handleSelectUploadedImage = useCallback(async (imageId: string) => {
+    setLibraryActionLoading(true);
+    try {
+      const result = await apiClient.getInstaMeUploadedImage(imageId);
+      const image: InstaMeUploadedImageAsset = result.image;
+      setPhoto({
+        uri: image.previewUri || image.dataUri,
+        base64: image.base64,
+        previewBase64: stripDataUriPrefix(image.previewUri || image.dataUri),
+        mimeType: image.mimeType,
+        width: image.width,
+        height: image.height,
+        fileSizeBytes: image.fileSizeBytes,
+        sourceImageId: image.id,
+        name: image.name,
+      });
+      setResultBase64(null);
+      setResultMeta(null);
+      setShowEditComposer(false);
+      setEditInstruction("");
+      await Haptics.selectionAsync();
+    } catch (error: any) {
+      Alert.alert("Load failed", error?.message || "Could not load this saved portrait.");
+    } finally {
+      setLibraryActionLoading(false);
+    }
   }, []);
+
+  const handleDeleteUploadedImage = useCallback(async (imageId: string) => {
+    setLibraryActionLoading(true);
+    try {
+      await apiClient.deleteInstaMeUploadedImage(imageId);
+      if (photo?.sourceImageId === imageId) {
+        setPhoto(null);
+        setResultBase64(null);
+        setResultMeta(null);
+        setShowEditComposer(false);
+        setEditInstruction("");
+      }
+      await loadUploadedImages();
+      await Haptics.selectionAsync();
+    } catch (error: any) {
+      Alert.alert("Delete failed", error?.message || "Could not remove this saved portrait.");
+    } finally {
+      setLibraryActionLoading(false);
+    }
+  }, [loadUploadedImages, photo?.sourceImageId]);
 
   const handleTransform = useCallback(async () => {
     if (!photo) {
@@ -590,6 +887,159 @@ export default function InstaMeScreen() {
               </View>
             )}
           </Pressable>
+
+          <View style={styles.uploadActionRow}>
+            <Pressable
+              onPress={pickImage}
+              style={({ pressed }) => [
+                styles.secondaryActionButton,
+                pressed && { opacity: 0.88 },
+              ]}
+            >
+              <Ionicons name="cloud-upload-outline" size={16} color="#FFE1EA" />
+              <Text style={styles.secondaryActionButtonText}>Upload from device</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleSaveCurrentPhoto}
+              disabled={!photo || Boolean(photo?.sourceImageId) || uploadedImages.length >= MAX_STORED_UPLOADS || libraryActionLoading}
+              style={({ pressed }) => [
+                styles.secondaryActionButton,
+                styles.secondaryActionButtonAccent,
+                (!photo || Boolean(photo?.sourceImageId) || uploadedImages.length >= MAX_STORED_UPLOADS || libraryActionLoading) &&
+                  styles.secondaryActionButtonDisabled,
+                pressed && photo && !photo.sourceImageId ? { opacity: 0.9 } : undefined,
+              ]}
+            >
+              <Ionicons name="bookmark-outline" size={16} color={Colors.accentLight} />
+              <Text style={[styles.secondaryActionButtonText, styles.secondaryActionButtonTextAccent]}>
+                Save current
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleAddImageToLibrary}
+              disabled={uploadedImages.length >= MAX_STORED_UPLOADS || libraryActionLoading}
+              style={({ pressed }) => [
+                styles.secondaryActionButton,
+                uploadedImages.length >= MAX_STORED_UPLOADS && styles.secondaryActionButtonDisabled,
+                pressed && uploadedImages.length < MAX_STORED_UPLOADS ? { opacity: 0.88 } : undefined,
+              ]}
+            >
+              <Ionicons name="images-outline" size={16} color="#FFE1EA" />
+              <Text style={styles.secondaryActionButtonText}>Add to library</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.uploadMetaText}>
+            Portraits saved here are automatically optimized to max 1024 x 1024 px and 1MB before generation.
+          </Text>
+
+          <View style={styles.uploadedImagesSection}>
+            <View style={styles.uploadedImagesHeader}>
+              <View>
+                <Text style={styles.uploadedImagesTitle}>Uploaded Images</Text>
+                <Text style={styles.uploadedImagesSubtitle}>
+                  Tap any saved portrait to reuse it instantly.
+                </Text>
+              </View>
+              <View style={styles.uploadedImagesHeaderRight}>
+                {libraryActionLoading ? <ActivityIndicator color={Colors.accent} size="small" /> : null}
+                <Text style={styles.uploadedImagesCount}>
+                  {uploadedImages.length}/{MAX_STORED_UPLOADS}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.viewModeRow}>
+              {VIEW_MODE_OPTIONS.map((option) => (
+                <Pressable
+                  key={option.value}
+                  onPress={() => setImageViewMode(option.value)}
+                  style={[
+                    styles.viewModeChip,
+                    imageViewMode === option.value && styles.viewModeChipActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.viewModeChipText,
+                      imageViewMode === option.value && styles.viewModeChipTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {uploadedImagesLoading ? (
+              <View style={styles.uploadedImagesEmptyState}>
+                <ActivityIndicator color={Colors.accent} />
+                <Text style={styles.uploadedImagesEmptyTitle}>Loading saved portraits...</Text>
+              </View>
+            ) : uploadedImages.length === 0 ? (
+              <View style={styles.uploadedImagesEmptyState}>
+                <Ionicons name="images-outline" size={24} color={Colors.accent} />
+                <Text style={styles.uploadedImagesEmptyTitle}>No saved portraits yet</Text>
+                <Text style={styles.uploadedImagesEmptySubtitle}>
+                  Save up to 10 portraits here so you do not have to browse your phone every time.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.uploadedImagesGrid}>
+                {uploadedImages.map((image) => {
+                  const isSelected = selectedLibraryImageId === image.id;
+                  return (
+                    <View
+                      key={image.id}
+                      style={[
+                        styles.uploadedImageTileWrap,
+                        {
+                          width: selectedImageTileSize,
+                          height: Math.round(selectedImageTileSize * 1.28),
+                        },
+                      ]}
+                    >
+                      <Pressable
+                        onPress={() => handleSelectUploadedImage(image.id)}
+                        style={[
+                          styles.uploadedImageTile,
+                          isSelected && styles.uploadedImageTileActive,
+                        ]}
+                      >
+                        <Image source={{ uri: image.previewUri }} style={styles.uploadedImageTileImage} contentFit="cover" />
+                        <LinearGradient
+                          colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.18)", "rgba(0,0,0,0.84)"]}
+                          locations={[0, 0.5, 1]}
+                          style={styles.uploadedImageTileOverlay}
+                        />
+                        {isSelected ? (
+                          <View style={styles.uploadedImageSelectedBadge}>
+                            <Ionicons name="checkmark" size={12} color="#050505" />
+                          </View>
+                        ) : null}
+                        <View style={styles.uploadedImageTileMeta}>
+                          <Text style={styles.uploadedImageTileName} numberOfLines={1}>
+                            {image.name}
+                          </Text>
+                          <Text style={styles.uploadedImageTileInfo}>
+                            {image.width} x {image.height}
+                          </Text>
+                        </View>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleDeleteUploadedImage(image.id)}
+                        style={styles.uploadedImageDeleteButton}
+                      >
+                        <Ionicons name="close" size={14} color="#FFF" />
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.card}>
@@ -1021,6 +1471,209 @@ const styles = StyleSheet.create({
   uploadPlaceholder: { height: 220, justifyContent: "center", alignItems: "center", paddingHorizontal: 18, gap: 8 },
   uploadPlaceholderTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 15 },
   uploadPlaceholderSubtitle: { color: "#A3A3A3", fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" },
+  uploadActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 12,
+  },
+  secondaryActionButton: {
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  secondaryActionButtonAccent: {
+    borderColor: "rgba(255,79,125,0.35)",
+    backgroundColor: "rgba(255,79,125,0.08)",
+  },
+  secondaryActionButtonDisabled: {
+    opacity: 0.45,
+  },
+  secondaryActionButtonText: {
+    color: "#FFE1EA",
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+  },
+  secondaryActionButtonTextAccent: {
+    color: Colors.accentLight,
+  },
+  uploadMetaText: {
+    color: "#A8A8A8",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 12,
+  },
+  uploadedImagesSection: {
+    marginTop: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.025)",
+    padding: 12,
+    gap: 12,
+  },
+  uploadedImagesHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  uploadedImagesHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  uploadedImagesTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  uploadedImagesSubtitle: {
+    color: "#AFAFAF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  uploadedImagesCount: {
+    color: "#FFB6CC",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  viewModeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  viewModeChip: {
+    minWidth: 40,
+    height: 34,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  viewModeChipActive: {
+    borderColor: "rgba(255,79,125,0.64)",
+    backgroundColor: "rgba(255,79,125,0.14)",
+  },
+  viewModeChipText: {
+    color: "#D4D4D4",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  viewModeChipTextActive: {
+    color: "#FFE1EA",
+  },
+  uploadedImagesEmptyState: {
+    minHeight: 124,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  uploadedImagesEmptyTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  uploadedImagesEmptySubtitle: {
+    color: "#9B9B9B",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  uploadedImagesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  uploadedImageTileWrap: {
+    position: "relative",
+  },
+  uploadedImageTile: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "#0B0B0B",
+  },
+  uploadedImageTileActive: {
+    borderColor: "rgba(255,79,125,0.82)",
+    shadowColor: "#FF5CB8",
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  uploadedImageTileImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  uploadedImageTileOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  uploadedImageSelectedBadge: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uploadedImageTileMeta: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    paddingTop: 18,
+  },
+  uploadedImageTileName: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  uploadedImageTileInfo: {
+    color: "#D5D5D5",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    marginTop: 2,
+  },
+  uploadedImageDeleteButton: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.68)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   styleCarouselWrap: {
     position: "relative",
     marginRight: -14,

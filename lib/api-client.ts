@@ -9,6 +9,22 @@ export const STORAGE_KEYS = {
   REFRESH_TOKEN: "@instame_refresh_token",
 };
 
+export type InstaMeUploadedImage = {
+  id: string;
+  name: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  fileSizeBytes: number;
+  createdAt: string;
+  previewUri: string;
+};
+
+export type InstaMeUploadedImageAsset = InstaMeUploadedImage & {
+  base64: string;
+  dataUri: string;
+};
+
 export type SocialLoginPayload =
   | {
       provider: "google";
@@ -482,6 +498,51 @@ class ApiClient {
       editTiers: InstaMeEditTier[];
       liveGenerationTierId: string;
     }>("/instame/pricing", {}, true);
+  }
+
+  async getInstaMeUploadedImages() {
+    return this.request<{
+      images: InstaMeUploadedImage[];
+    }>("/instame/uploaded-images", {}, true);
+  }
+
+  async getInstaMeUploadedImage(imageId: string) {
+    return this.request<{
+      image: InstaMeUploadedImageAsset;
+    }>(`/instame/uploaded-images/${encodeURIComponent(imageId)}`, {}, true);
+  }
+
+  async saveInstaMeUploadedImage(payload: {
+    image: {
+      name?: string;
+      mimeType?: string;
+      base64: string;
+      previewBase64: string;
+      width: number;
+      height: number;
+      fileSizeBytes: number;
+    };
+  }) {
+    return this.request<{
+      image: InstaMeUploadedImage;
+    }>(
+      "/instame/uploaded-images",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      true,
+    );
+  }
+
+  async deleteInstaMeUploadedImage(imageId: string) {
+    return this.request<{ success: boolean }>(
+      `/instame/uploaded-images/${encodeURIComponent(imageId)}`,
+      {
+        method: "DELETE",
+      },
+      true,
+    );
   }
 
   async editInstaMeImage(payload: {
