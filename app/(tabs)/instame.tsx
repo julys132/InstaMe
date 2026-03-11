@@ -650,23 +650,9 @@ export default function InstaMeScreen() {
                       />
 
                       <LinearGradient
-                        colors={["rgba(255,255,255,0.34)", "rgba(255,255,255,0.08)", "rgba(255,255,255,0)"]}
-                        locations={[0, 0.16, 1]}
-                        style={styles.styleCardSpecular}
-                      />
-                      <LinearGradient
-                        colors={
-                          active
-                            ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.58)"]
-                            : [theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.62)"]
-                        }
-                        locations={[0, 0.22, 1]}
-                        style={styles.styleCardGlow}
-                      />
-                      <LinearGradient
-                        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.03)", "rgba(0,0,0,0.56)"]}
-                        locations={[0, 0.58, 1]}
-                        style={styles.styleCardImageFade}
+                        colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.12)", "rgba(0,0,0,0.18)"]}
+                        locations={[0, 0.46, 1]}
+                        style={styles.styleCardImageWash}
                       />
                       <View
                         style={[
@@ -678,27 +664,9 @@ export default function InstaMeScreen() {
                         ]}
                       />
                       <LinearGradient
-                        colors={[theme.footerTop, theme.footerBottom]}
-                        locations={[0, 1]}
+                        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.76)", "rgba(0,0,0,0.86)"]}
+                        locations={[0, 0.52, 1]}
                         style={styles.styleCardFooter}
-                      />
-                      <LinearGradient
-                        colors={["rgba(255,255,255,0.12)", "rgba(255,255,255,0)"]}
-                        locations={[0, 1]}
-                        style={styles.styleCardFooterShine}
-                      />
-                      <View
-                        style={[
-                          styles.styleCardBottomGlow,
-                          {
-                            shadowColor: theme.glow,
-                            backgroundColor: theme.glowSoft,
-                          },
-                          active && {
-                            shadowOpacity: 0.72,
-                            shadowRadius: 26,
-                          },
-                        ]}
                       />
 
                       <View style={styles.styleCardTextWrap}>
@@ -755,13 +723,8 @@ export default function InstaMeScreen() {
           </Text>
 
           <View style={styles.pricingSection}>
-            <View style={styles.pricingHeaderRow}>
-              <Text style={styles.pricingSectionTitle}>Current pricing</Text>
-              <Text style={styles.pricingSectionNote}>Download included</Text>
-            </View>
-
-            <Text style={styles.pricingGroupTitle}>Generate</Text>
-            <View style={styles.pricingStack}>
+            <Text style={styles.pricingSectionTitle}>Generate</Text>
+            <View style={styles.pricingCardsRow}>
               {generationTiers.map((tier) => {
                 const isLiveTier = tier.id === liveGenerationTier?.id;
                 return (
@@ -794,44 +757,9 @@ export default function InstaMeScreen() {
                       <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
                       <Text style={styles.pricingMetaText}>{tier.output}</Text>
                     </View>
-                    <Text style={styles.pricingModelText}>
-                      {tier.provider} · {tier.model}
-                    </Text>
                   </Pressable>
                 );
               })}
-            </View>
-
-            <Text style={styles.pricingGroupTitle}>Edit after generation</Text>
-            <View style={styles.pricingStack}>
-              {editTiers.map((tier) => (
-                <Pressable
-                  key={tier.id}
-                  onPress={() => setSelectedEditTierId(tier.id)}
-                  style={[
-                    styles.pricingCard,
-                    selectedEditTier?.id === tier.id && styles.pricingCardActive,
-                  ]}
-                >
-                  <View style={styles.pricingTopRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pricingLabel}>{tier.label}</Text>
-                      <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
-                    </View>
-                    <View style={[styles.pricingBadge, styles.pricingBadgeSoon]}>
-                      <Text style={styles.pricingBadgeText}>{tier.badge || "Soon"}</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.pricingMetaRow}>
-                    <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
-                    <Text style={styles.pricingMetaText}>{tier.output}</Text>
-                  </View>
-                  <Text style={styles.pricingModelText}>
-                    {tier.provider} · {tier.model}
-                  </Text>
-                </Pressable>
-              ))}
             </View>
           </View>
 
@@ -906,11 +834,48 @@ export default function InstaMeScreen() {
             <View style={styles.resultMetaCard}>
               <Text style={styles.resultMetaTitle}>Generation details</Text>
               <Text style={styles.resultMetaText}>
-                {resultMeta?.provider || liveGenerationTier?.provider || "Provider"} · {resultMeta?.model || liveGenerationTier?.model || "Model"}
+                Style: {selectedStylePreset?.label || "InstaMe"} - Export: {liveGenerationTier?.label || "Preview"}
               </Text>
               <Text style={styles.resultMetaText}>
-                Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} · Tier: {resultMeta?.generationTierId || selectedGenerationTierId}
+                Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {liveGenerationTier?.output || "512 x 512"}
               </Text>
+            </View>
+            <View style={styles.postGenerationSection}>
+              <Text style={styles.pricingSectionTitle}>Edit after generation</Text>
+              <View style={styles.pricingCardsRow}>
+                {editTiers.map((tier) => (
+                  <Pressable
+                    key={tier.id}
+                    onPress={() => setSelectedEditTierId(tier.id)}
+                    style={[
+                      styles.pricingCard,
+                      selectedEditTier?.id === tier.id && styles.pricingCardActive,
+                    ]}
+                  >
+                    <View style={styles.pricingTopRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.pricingLabel}>{tier.label}</Text>
+                        <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.pricingBadge,
+                          tier.availability === "live"
+                            ? styles.pricingBadgeLive
+                            : styles.pricingBadgeSoon,
+                        ]}
+                      >
+                        <Text style={styles.pricingBadgeText}>{tier.badge || tier.availability}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.pricingMetaRow}>
+                      <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
+                      <Text style={styles.pricingMetaText}>{tier.output}</Text>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
             </View>
             <View style={styles.resultActionRow}>
               <Pressable style={[styles.resultActionButton, styles.resultActionButtonPrimary]} onPress={handleDownload}>
@@ -929,7 +894,7 @@ export default function InstaMeScreen() {
               <View style={styles.editComposer}>
                 <Text style={styles.editComposerTitle}>Refine this result</Text>
                 <Text style={styles.editComposerSubtitle}>
-                  Selected tier: {selectedEditTier?.label || "Edit"} · {selectedEditTier?.credits ?? 0} credits
+                  Selected option: {selectedEditTier?.label || "Edit"} - {selectedEditTier?.credits ?? 0} credits
                 </Text>
                 <TextInput
                   value={editInstruction}
@@ -1060,10 +1025,10 @@ const styles = StyleSheet.create({
     width: 198,
     height: 246,
     borderRadius: 30,
-    backgroundColor: "rgba(255,79,125,0.08)",
+    backgroundColor: "rgba(255,79,125,0.05)",
     padding: 2,
     shadowColor: "#FF4FBE",
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.22,
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
@@ -1087,27 +1052,16 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,180,215,0.28)",
-    backgroundColor: "#101010",
-    justifyContent: "flex-end",
+    backgroundColor: "#050505",
   },
   styleCardActive: {
     borderColor: "rgba(255,132,185,0.98)",
-    backgroundColor: "#121012",
+    backgroundColor: "#050505",
   },
   styleCardImage: {
     ...StyleSheet.absoluteFillObject,
   },
-  styleCardSpecular: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 82,
-  },
-  styleCardGlow: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  styleCardImageFade: {
+  styleCardImageWash: {
     ...StyleSheet.absoluteFillObject,
   },
   styleCardInnerRing: {
@@ -1124,39 +1078,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 82,
+    height: 102,
   },
-  styleCardFooterShine: {
+  styleCardTextWrap: {
     position: "absolute",
     left: 0,
     right: 0,
-    bottom: 52,
-    height: 28,
-  },
-  styleCardBottomGlow: {
-    position: "absolute",
-    left: 18,
-    right: 18,
-    bottom: -2,
-    height: 18,
-    borderRadius: 999,
-    shadowOpacity: 0.56,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
-  },
-  styleCardTextWrap: {
+    bottom: 0,
     paddingHorizontal: 18,
     paddingBottom: 16,
-    minHeight: 82,
+    minHeight: 102,
     justifyContent: "flex-end",
   },
   styleCardTitle: {
     color: "#FFD9E5",
     fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    lineHeight: 22,
-    marginBottom: 6,
+    fontSize: 17,
+    lineHeight: 20,
+    marginBottom: 4,
   },
   styleCardTitleActive: {
     color: "#FFE7F0",
@@ -1164,8 +1103,8 @@ const styles = StyleSheet.create({
   styleCardSubtitle: {
     color: "rgba(255,255,255,0.92)",
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 17,
   },
   styleCardSubtitleActive: {
     color: "#FFFFFF",
@@ -1212,40 +1151,27 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
-  pricingHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
   pricingSectionTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 15,
   },
-  pricingSectionNote: {
-    color: "#A9A9A9",
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-  },
-  pricingGroupTitle: {
-    color: "#FFB8CD",
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    letterSpacing: 0.3,
-    marginTop: 4,
-  },
-  pricingStack: {
-    gap: 8,
+  pricingCardsRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 10,
   },
   pricingCard: {
+    flex: 1,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
     backgroundColor: "rgba(255,255,255,0.03)",
     paddingHorizontal: 12,
     paddingVertical: 12,
-    gap: 8,
+    minHeight: 132,
+    justifyContent: "space-between",
+    gap: 12,
   },
   pricingCardActive: {
     borderColor: "rgba(255,79,125,0.62)",
@@ -1264,13 +1190,13 @@ const styles = StyleSheet.create({
   pricingLabel: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 15,
   },
   pricingSubtitle: {
     color: "#BEBEBE",
     fontFamily: "Inter_400Regular",
     fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 17,
     marginTop: 2,
   },
   pricingBadge: {
@@ -1310,10 +1236,8 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 12,
   },
-  pricingModelText: {
-    color: "#8E8E8E",
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
+  postGenerationSection: {
+    gap: 10,
   },
   intensityRow: { gap: 8 },
   chip: {
