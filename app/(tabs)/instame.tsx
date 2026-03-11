@@ -44,6 +44,16 @@ type GenerationResultMeta = {
   generationTierId?: string;
 };
 
+type StyleCardTheme = {
+  glow: string;
+  glowSoft: string;
+  border: string;
+  text: string;
+  footerTop: string;
+  footerBottom: string;
+  ambient: string;
+};
+
 const DEFAULT_TRANSFORM_COST = 5;
 const MAX_UPLOAD_IMAGE_BASE64_LENGTH = 2_300_000;
 
@@ -52,6 +62,176 @@ const INTENSITY_OPTIONS: { value: TransformIntensity; label: string; subtitle: s
   { value: "editorial", label: "Editorial", subtitle: "Balanced premium look" },
   { value: "dramatic", label: "Dramatic", subtitle: "Bold cinematic styling" },
 ];
+
+const STYLE_CARD_THEME_MAP: Record<string, StyleCardTheme> = {
+  analog_night_flash: {
+    glow: "#8FF5C2",
+    glowSoft: "rgba(143,245,194,0.35)",
+    border: "rgba(182,255,216,0.46)",
+    text: "#D8FFE9",
+    footerTop: "#052615",
+    footerBottom: "#020E08",
+    ambient: "rgba(143,245,194,0.12)",
+  },
+  old_money: {
+    glow: "#F0D2AA",
+    glowSoft: "rgba(240,210,170,0.32)",
+    border: "rgba(255,227,191,0.42)",
+    text: "#FFF1DA",
+    footerTop: "#23170E",
+    footerBottom: "#0C0907",
+    ambient: "rgba(240,210,170,0.10)",
+  },
+  minimalistic_chic: {
+    glow: "#E7CFFF",
+    glowSoft: "rgba(231,207,255,0.34)",
+    border: "rgba(244,219,255,0.46)",
+    text: "#F8E9FF",
+    footerTop: "#24112B",
+    footerBottom: "#09040D",
+    ambient: "rgba(231,207,255,0.12)",
+  },
+  minimalist_chic: {
+    glow: "#E7CFFF",
+    glowSoft: "rgba(231,207,255,0.34)",
+    border: "rgba(244,219,255,0.46)",
+    text: "#F8E9FF",
+    footerTop: "#24112B",
+    footerBottom: "#09040D",
+    ambient: "rgba(231,207,255,0.12)",
+  },
+  edgy_editorial_minimalism: {
+    glow: "#FF70D6",
+    glowSoft: "rgba(255,112,214,0.40)",
+    border: "rgba(255,162,231,0.52)",
+    text: "#FFD7F5",
+    footerTop: "#290728",
+    footerBottom: "#0A030A",
+    ambient: "rgba(255,112,214,0.14)",
+  },
+  retro: {
+    glow: "#FF70D6",
+    glowSoft: "rgba(255,112,214,0.40)",
+    border: "rgba(255,162,231,0.52)",
+    text: "#FFD7F5",
+    footerTop: "#290728",
+    footerBottom: "#0A030A",
+    ambient: "rgba(255,112,214,0.14)",
+  },
+  glam: {
+    glow: "#FF6EC7",
+    glowSoft: "rgba(255,110,199,0.40)",
+    border: "rgba(255,165,224,0.54)",
+    text: "#FFD9F0",
+    footerTop: "#2A0822",
+    footerBottom: "#090309",
+    ambient: "rgba(255,110,199,0.14)",
+  },
+  luxurious_mediterranean_glamour: {
+    glow: "#FF6EC7",
+    glowSoft: "rgba(255,110,199,0.40)",
+    border: "rgba(255,165,224,0.54)",
+    text: "#FFD9F0",
+    footerTop: "#2A0822",
+    footerBottom: "#090309",
+    ambient: "rgba(255,110,199,0.14)",
+  },
+  selfie: {
+    glow: "#FF6CC6",
+    glowSoft: "rgba(255,108,198,0.40)",
+    border: "rgba(255,159,221,0.52)",
+    text: "#FFD8F0",
+    footerTop: "#280722",
+    footerBottom: "#080308",
+    ambient: "rgba(255,108,198,0.14)",
+  },
+  selfie_glamour_dark: {
+    glow: "#FF67BE",
+    glowSoft: "rgba(255,103,190,0.42)",
+    border: "rgba(255,158,220,0.54)",
+    text: "#FFD9EF",
+    footerTop: "#26061D",
+    footerBottom: "#080307",
+    ambient: "rgba(255,103,190,0.14)",
+  },
+  in_car_selfie: {
+    glow: "#21F3FF",
+    glowSoft: "rgba(33,243,255,0.36)",
+    border: "rgba(135,252,255,0.46)",
+    text: "#D8FCFF",
+    footerTop: "#032A29",
+    footerBottom: "#020B0C",
+    ambient: "rgba(33,243,255,0.12)",
+  },
+  street_luxe: {
+    glow: "#FF6AC8",
+    glowSoft: "rgba(255,106,200,0.38)",
+    border: "rgba(255,164,226,0.48)",
+    text: "#FFD8EF",
+    footerTop: "#290822",
+    footerBottom: "#090309",
+    ambient: "rgba(255,106,200,0.13)",
+  },
+  monochromatic_urban_elegance: {
+    glow: "#FF68C7",
+    glowSoft: "rgba(255,104,199,0.40)",
+    border: "rgba(255,159,224,0.50)",
+    text: "#FFD9EF",
+    footerTop: "#290822",
+    footerBottom: "#090309",
+    ambient: "rgba(255,104,199,0.13)",
+  },
+  natural_glam_portrait: {
+    glow: "#7CFFB3",
+    glowSoft: "rgba(124,255,179,0.34)",
+    border: "rgba(182,255,214,0.44)",
+    text: "#DFFFF0",
+    footerTop: "#062718",
+    footerBottom: "#020D08",
+    ambient: "rgba(124,255,179,0.12)",
+  },
+  polished_urban_chic: {
+    glow: "#FF70D6",
+    glowSoft: "rgba(255,112,214,0.40)",
+    border: "rgba(255,162,231,0.52)",
+    text: "#FFD7F5",
+    footerTop: "#290728",
+    footerBottom: "#0A030A",
+    ambient: "rgba(255,112,214,0.14)",
+  },
+  soft_dreamy_editorial: {
+    glow: "#FFD66F",
+    glowSoft: "rgba(255,214,111,0.36)",
+    border: "rgba(255,234,171,0.46)",
+    text: "#FFF0C8",
+    footerTop: "#2A2007",
+    footerBottom: "#0C0903",
+    ambient: "rgba(255,214,111,0.12)",
+  },
+  timeless_cinematic_chic: {
+    glow: "#9EFF7B",
+    glowSoft: "rgba(158,255,123,0.34)",
+    border: "rgba(205,255,187,0.46)",
+    text: "#EAFFD9",
+    footerTop: "#132709",
+    footerBottom: "#060B03",
+    ambient: "rgba(158,255,123,0.12)",
+  },
+};
+
+const DEFAULT_STYLE_CARD_THEME: StyleCardTheme = {
+  glow: "#FF6BC6",
+  glowSoft: "rgba(255,107,198,0.38)",
+  border: "rgba(255,164,225,0.48)",
+  text: "#FFD8EF",
+  footerTop: "#26071F",
+  footerBottom: "#080308",
+  ambient: "rgba(255,107,198,0.12)",
+};
+
+function getStyleCardTheme(styleId: string): StyleCardTheme {
+  return STYLE_CARD_THEME_MAP[styleId] || DEFAULT_STYLE_CARD_THEME;
+}
 
 
 function stripDataUriPrefix(base64OrDataUri: string): string {
@@ -427,6 +607,7 @@ export default function InstaMeScreen() {
                 const active = selectedStyleId === preset.id;
                 const isFirst = index === 0;
                 const isLast = index === stylePresets.length - 1;
+                const theme = getStyleCardTheme(preset.id);
 
                 return (
                   <Pressable
@@ -439,10 +620,29 @@ export default function InstaMeScreen() {
                       styles.styleCardOuter,
                       isFirst && styles.styleCardOuterFirst,
                       isLast && styles.styleCardOuterLast,
+                      {
+                        backgroundColor: theme.ambient,
+                        shadowColor: theme.glow,
+                      },
                       active && styles.styleCardOuterActive,
+                      active && {
+                        shadowColor: theme.glow,
+                      },
                     ]}
                   >
-                    <View style={[styles.styleCard, active && styles.styleCardActive]}>
+                    <View
+                      style={[
+                        styles.styleCard,
+                        {
+                          borderColor: theme.border,
+                          backgroundColor: theme.footerBottom,
+                        },
+                        active && styles.styleCardActive,
+                        active && {
+                          borderColor: theme.glow,
+                        },
+                      ]}
+                    >
                       <Image
                         source={{ uri: preset.cover || preset.representativeImage }}
                         contentFit="cover"
@@ -450,28 +650,74 @@ export default function InstaMeScreen() {
                       />
 
                       <LinearGradient
-                        colors={["rgba(255,130,180,0.18)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.82)"]}
-                        locations={[0, 0.34, 1]}
-                        style={styles.styleCardOverlay}
+                        colors={["rgba(255,255,255,0.34)", "rgba(255,255,255,0.08)", "rgba(255,255,255,0)"]}
+                        locations={[0, 0.16, 1]}
+                        style={styles.styleCardSpecular}
                       />
                       <LinearGradient
                         colors={
                           active
-                            ? ["rgba(255,96,160,0.26)", "rgba(255,96,160,0.08)", "rgba(0,0,0,0)"]
-                            : ["rgba(255,96,160,0.12)", "rgba(255,96,160,0.04)", "rgba(0,0,0,0)"]
+                            ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.58)"]
+                            : [theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.62)"]
                         }
-                        locations={[0, 0.35, 1]}
+                        locations={[0, 0.22, 1]}
                         style={styles.styleCardGlow}
                       />
-                      <View style={[styles.styleCardInnerRing, active && styles.styleCardInnerRingActive]} />
+                      <LinearGradient
+                        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.03)", "rgba(0,0,0,0.56)"]}
+                        locations={[0, 0.58, 1]}
+                        style={styles.styleCardImageFade}
+                      />
+                      <View
+                        style={[
+                          styles.styleCardInnerRing,
+                          {
+                            borderColor: active ? theme.border : "rgba(255,255,255,0.12)",
+                          },
+                          active && styles.styleCardInnerRingActive,
+                        ]}
+                      />
+                      <LinearGradient
+                        colors={[theme.footerTop, theme.footerBottom]}
+                        locations={[0, 1]}
+                        style={styles.styleCardFooter}
+                      />
+                      <LinearGradient
+                        colors={["rgba(255,255,255,0.12)", "rgba(255,255,255,0)"]}
+                        locations={[0, 1]}
+                        style={styles.styleCardFooterShine}
+                      />
+                      <View
+                        style={[
+                          styles.styleCardBottomGlow,
+                          {
+                            shadowColor: theme.glow,
+                            backgroundColor: theme.glowSoft,
+                          },
+                          active && {
+                            shadowOpacity: 0.72,
+                            shadowRadius: 26,
+                          },
+                        ]}
+                      />
 
                       <View style={styles.styleCardTextWrap}>
-                        <Text style={[styles.styleCardTitle, active && styles.styleCardTitleActive]}>
+                        <Text
+                          style={[
+                            styles.styleCardTitle,
+                            { color: theme.text },
+                            active && styles.styleCardTitleActive,
+                            active && { color: theme.text },
+                          ]}
+                        >
                           {preset.label}
                         </Text>
 
                         <Text
-                          style={[styles.styleCardSubtitle, active && styles.styleCardSubtitleActive]}
+                          style={[
+                            styles.styleCardSubtitle,
+                            active && styles.styleCardSubtitleActive,
+                          ]}
                           numberOfLines={2}
                         >
                           {preset.subtitle}
@@ -806,21 +1052,21 @@ const styles = StyleSheet.create({
     marginRight: -14,
   },
   styleRow: {
-    gap: 14,
+    gap: 18,
     paddingLeft: 2,
-    paddingRight: 74,
+    paddingRight: 86,
   },
   styleCardOuter: {
-    width: 168,
-    height: 208,
-    borderRadius: 22,
+    width: 198,
+    height: 246,
+    borderRadius: 30,
     backgroundColor: "rgba(255,79,125,0.08)",
-    padding: 1.5,
+    padding: 2,
     shadowColor: "#FF4FBE",
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
   },
   styleCardOuterFirst: {
     marginLeft: 2,
@@ -830,14 +1076,14 @@ const styles = StyleSheet.create({
   },
   styleCardOuterActive: {
     shadowColor: "#FF5CB8",
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 16,
+    shadowOpacity: 0.56,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 18,
   },
   styleCard: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 28,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,180,215,0.28)",
@@ -851,49 +1097,85 @@ const styles = StyleSheet.create({
   styleCardImage: {
     ...StyleSheet.absoluteFillObject,
   },
-  styleCardOverlay: {
-    ...StyleSheet.absoluteFillObject,
+  styleCardSpecular: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 82,
   },
   styleCardGlow: {
     ...StyleSheet.absoluteFillObject,
   },
+  styleCardImageFade: {
+    ...StyleSheet.absoluteFillObject,
+  },
   styleCardInnerRing: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+    borderRadius: 28,
     borderWidth: 1,
     borderColor: "rgba(255,210,228,0.12)",
   },
   styleCardInnerRingActive: {
-    borderColor: "rgba(255,179,210,0.42)",
+    borderColor: "rgba(255,179,210,0.50)",
+  },
+  styleCardFooter: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 82,
+  },
+  styleCardFooterShine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 52,
+    height: 28,
+  },
+  styleCardBottomGlow: {
+    position: "absolute",
+    left: 18,
+    right: 18,
+    bottom: -2,
+    height: 18,
+    borderRadius: 999,
+    shadowOpacity: 0.56,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
   styleCardTextWrap: {
-    paddingHorizontal: 14,
-    paddingBottom: 13,
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+    minHeight: 82,
+    justifyContent: "flex-end",
   },
   styleCardTitle: {
     color: "#FFD9E5",
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    marginBottom: 4,
+    fontSize: 18,
+    lineHeight: 22,
+    marginBottom: 6,
   },
   styleCardTitleActive: {
-    color: "#FF8DB4",
+    color: "#FFE7F0",
   },
   styleCardSubtitle: {
-    color: "rgba(255,255,255,0.82)",
+    color: "rgba(255,255,255,0.92)",
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
   },
   styleCardSubtitleActive: {
-    color: "#FFE1EA",
+    color: "#FFFFFF",
   },
   styleScrollHintWrap: {
     position: "absolute",
     top: 0,
     right: 0,
     bottom: 0,
-    width: 72,
+    width: 96,
     justifyContent: "center",
     alignItems: "flex-end",
   },
@@ -901,20 +1183,20 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   styleScrollArrow: {
-    marginRight: 12,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,79,125,0.18)",
+    marginRight: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,79,125,0.22)",
     borderWidth: 1,
-    borderColor: "rgba(255,140,194,0.48)",
+    borderColor: "rgba(255,173,212,0.58)",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#FF5CB8",
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
+    shadowOpacity: 0.48,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
   },
   selectedStyleText: {
     color: "#D7D7D7",
