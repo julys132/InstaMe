@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   Platform,
   Pressable,
@@ -24,6 +23,12 @@ import { useCredits } from "@/contexts/CreditsContext";
 import { apiClient } from "@/lib/api-client";
 import Colors from "@/constants/colors";
 import { INSTAME_STYLE_PRESETS, type InstaMeStylePreset } from "@shared/instame-style-presets";
+import {
+  INSTAME_EDIT_TIERS,
+  INSTAME_GENERATION_TIERS,
+  type InstaMeEditTier,
+  type InstaMeGenerationTier,
+} from "@shared/instame-pricing";
 
 type UploadedPhoto = {
   uri: string;
@@ -32,8 +37,14 @@ type UploadedPhoto = {
 };
 
 type TransformIntensity = "soft" | "editorial" | "dramatic";
+type GenerationResultMeta = {
+  model: string;
+  provider?: string;
+  promptOnlyMode?: boolean;
+  generationTierId?: string;
+};
 
-const TRANSFORM_COST = 5;
+const DEFAULT_TRANSFORM_COST = 5;
 const MAX_UPLOAD_IMAGE_BASE64_LENGTH = 2_300_000;
 
 const INTENSITY_OPTIONS: { value: TransformIntensity; label: string; subtitle: string }[] = [
@@ -55,15 +66,27 @@ export default function InstaMeScreen() {
   const [customPrompt, setCustomPrompt] = useState("");
   const [intensity, setIntensity] = useState<TransformIntensity>("editorial");
   const [stylePresets, setStylePresets] = useState<InstaMeStylePreset[]>(INSTAME_STYLE_PRESETS);
+  const [generationTiers, setGenerationTiers] = useState<InstaMeGenerationTier[]>(INSTAME_GENERATION_TIERS);
+  const [editTiers, setEditTiers] = useState<InstaMeEditTier[]>(INSTAME_EDIT_TIERS);
+  const [selectedGenerationTierId, setSelectedGenerationTierId] = useState<string>(
+    INSTAME_GENERATION_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_GENERATION_TIERS[0]?.id || "preview",
+  );
+  const [selectedEditTierId, setSelectedEditTierId] = useState<string>(
+    INSTAME_EDIT_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_EDIT_TIERS[0]?.id || "basic_edit",
+  );
   const [selectedStyleId, setSelectedStyleId] = useState<string>(INSTAME_STYLE_PRESETS[0]?.id || "");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
+  const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
   const [styleReferenceCount, setStyleReferenceCount] = useState<number>(0);
   const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
-  const styleListRef = useRef<ScrollView | FlatList<InstaMeStylePreset> | null>(null);
+  const styleListRef = useRef<ScrollView | null>(null);
   const [canScrollMoreRight, setCanScrollMoreRight] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [showEditComposer, setShowEditComposer] = useState(false);
+  const [editInstruction, setEditInstruction] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
 
   const selectedStylePreset = useMemo(
     () => stylePresets.find((preset) => preset.id === selectedStyleId) || stylePresets[0],
@@ -75,11 +98,26 @@ export default function InstaMeScreen() {
     [stylePresets, previewStyleId],
   );
 
+  const liveGenerationTier = useMemo(
+    () => generationTiers.find((tier) => tier.id === selectedGenerationTierId) || generationTiers[0],
+    [generationTiers, selectedGenerationTierId],
+  );
+
+  const transformCost = liveGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST;
+
+  const selectedEditTier = useMemo(
+    () => editTiers.find((tier) => tier.id === selectedEditTierId) || editTiers[0],
+    [editTiers, selectedEditTierId],
+  );
+
   useEffect(() => {
     let mounted = true;
 
-    Promise.allSettled([apiClient.getInstaMeStyleLibrary(), apiClient.getInstaMeStylePresets()]).then(
-      ([styleLibraryResult, stylePresetResult]) => {
+    Promise.allSettled([
+      apiClient.getInstaMeStyleLibrary(),
+      apiClient.getInstaMeStylePresets(),
+      apiClient.getInstaMePricing(),
+    ]).then(([styleLibraryResult, stylePresetResult, pricingResult]) => {
         if (!mounted) return;
 
         if (styleLibraryResult.status === "fulfilled") {
@@ -91,8 +129,19 @@ export default function InstaMeScreen() {
         if (stylePresetResult.status === "fulfilled" && stylePresetResult.value.presets.length > 0) {
           setStylePresets(stylePresetResult.value.presets);
         }
-      },
-    );
+
+        if (pricingResult.status === "fulfilled") {
+          if (pricingResult.value.generationTiers.length > 0) {
+            setGenerationTiers(pricingResult.value.generationTiers);
+          }
+          if (pricingResult.value.editTiers.length > 0) {
+            setEditTiers(pricingResult.value.editTiers);
+          }
+          if (pricingResult.value.liveGenerationTierId) {
+            setSelectedGenerationTierId(pricingResult.value.liveGenerationTierId);
+          }
+        }
+      });
 
     return () => {
       mounted = false;
@@ -111,9 +160,21 @@ export default function InstaMeScreen() {
     }
   }, [selectedStyleId, stylePresets]);
 
+  useEffect(() => {
+    if (!generationTiers.some((tier) => tier.id === selectedGenerationTierId) && generationTiers[0]) {
+      setSelectedGenerationTierId(generationTiers[0].id);
+    }
+  }, [generationTiers, selectedGenerationTierId]);
+
+  useEffect(() => {
+    if (!editTiers.some((tier) => tier.id === selectedEditTierId) && editTiers[0]) {
+      setSelectedEditTierId(editTiers[0].id);
+    }
+  }, [editTiers, selectedEditTierId]);
+
   const canGenerate = useMemo(
-    () => Boolean(photo && !loading && credits >= TRANSFORM_COST),
-    [photo, loading, credits],
+    () => Boolean(photo && !loading && credits >= transformCost),
+    [photo, loading, credits, transformCost],
   );
 
   const handleStyleRowScroll = useCallback((event: any) => {
@@ -170,6 +231,8 @@ export default function InstaMeScreen() {
           : "image/jpeg",
     });
     setResultBase64(null);
+    setResultMeta(null);
+    setShowEditComposer(false);
     Haptics.selectionAsync();
   }, []);
 
@@ -178,8 +241,8 @@ export default function InstaMeScreen() {
       Alert.alert("Missing image", "Upload one photo before transforming.");
       return;
     }
-    if (credits < TRANSFORM_COST) {
-      Alert.alert("Not enough credits", `This transform costs ${TRANSFORM_COST} credits.`);
+    if (credits < transformCost) {
+      Alert.alert("Not enough credits", `This transform costs ${transformCost} credits.`);
       return;
     }
 
@@ -194,10 +257,19 @@ export default function InstaMeScreen() {
         intensity,
         preserveBackground,
         stylePresetId: selectedPreset?.id,
+        generationTierId: selectedGenerationTierId,
       });
 
       setResultBase64(result.imageBase64);
+      setResultMeta({
+        model: result.model,
+        provider: result.provider,
+        promptOnlyMode: result.promptOnlyMode,
+        generationTierId: result.generationTierId,
+      });
       setLastUsedStyleRefs(Array.isArray(result.styleReferenceIds) ? result.styleReferenceIds : []);
+      setShowEditComposer(false);
+      setEditInstruction("");
       await refreshCredits();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
@@ -205,7 +277,70 @@ export default function InstaMeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [photo, credits, selectedStylePreset, stylePresets, customPrompt, intensity, preserveBackground, refreshCredits]);
+  }, [
+    photo,
+    credits,
+    transformCost,
+    selectedStylePreset,
+    stylePresets,
+    customPrompt,
+    intensity,
+    preserveBackground,
+    refreshCredits,
+    selectedGenerationTierId,
+  ]);
+
+  const handleEditResult = useCallback(async () => {
+    if (!resultBase64) {
+      Alert.alert("Missing image", "Generate an image before editing it.");
+      return;
+    }
+    if (!editInstruction.trim()) {
+      Alert.alert("Missing edit", "Tell InstaMe what you want to change.");
+      return;
+    }
+    if (credits < (selectedEditTier?.credits ?? 0)) {
+      Alert.alert(
+        "Not enough credits",
+        `This edit costs ${selectedEditTier?.credits ?? 0} credits.`,
+      );
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const result = await apiClient.editInstaMeImage({
+        currentImage: { base64: resultBase64, mimeType: "image/png" },
+        originalPhoto: photo ? { base64: photo.base64, mimeType: photo.mimeType } : undefined,
+        editInstruction: editInstruction.trim(),
+        customPrompt: customPrompt.trim(),
+        editTierId: selectedEditTierId,
+      });
+
+      setResultBase64(result.imageBase64);
+      setResultMeta({
+        model: result.model,
+        provider: result.provider,
+      });
+      await refreshCredits();
+      setShowEditComposer(false);
+      setEditInstruction("");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      Alert.alert("Error", error?.message || "Edit failed.");
+    } finally {
+      setEditLoading(false);
+    }
+  }, [
+    resultBase64,
+    editInstruction,
+    credits,
+    selectedEditTier,
+    selectedEditTierId,
+    photo,
+    customPrompt,
+    refreshCredits,
+  ]);
 
   const handleDownload = useCallback(async () => {
     if (!resultBase64) return;
@@ -315,10 +450,20 @@ export default function InstaMeScreen() {
                       />
 
                       <LinearGradient
-                        colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.18)", "rgba(0,0,0,0.78)"]}
-                        locations={[0, 0.45, 1]}
+                        colors={["rgba(255,130,180,0.18)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.82)"]}
+                        locations={[0, 0.34, 1]}
                         style={styles.styleCardOverlay}
                       />
+                      <LinearGradient
+                        colors={
+                          active
+                            ? ["rgba(255,96,160,0.26)", "rgba(255,96,160,0.08)", "rgba(0,0,0,0)"]
+                            : ["rgba(255,96,160,0.12)", "rgba(255,96,160,0.04)", "rgba(0,0,0,0)"]
+                        }
+                        locations={[0, 0.35, 1]}
+                        style={styles.styleCardGlow}
+                      />
+                      <View style={[styles.styleCardInnerRing, active && styles.styleCardInnerRingActive]} />
 
                       <View style={styles.styleCardTextWrap}>
                         <Text style={[styles.styleCardTitle, active && styles.styleCardTitleActive]}>
@@ -362,6 +507,87 @@ export default function InstaMeScreen() {
           <Text style={styles.selectedStyleText}>
             Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
           </Text>
+
+          <View style={styles.pricingSection}>
+            <View style={styles.pricingHeaderRow}>
+              <Text style={styles.pricingSectionTitle}>Current pricing</Text>
+              <Text style={styles.pricingSectionNote}>Download included</Text>
+            </View>
+
+            <Text style={styles.pricingGroupTitle}>Generate</Text>
+            <View style={styles.pricingStack}>
+              {generationTiers.map((tier) => {
+                const isLiveTier = tier.id === liveGenerationTier?.id;
+                return (
+                  <Pressable
+                    key={tier.id}
+                    onPress={() => setSelectedGenerationTierId(tier.id)}
+                    style={[
+                      styles.pricingCard,
+                      isLiveTier && styles.pricingCardActive,
+                    ]}
+                  >
+                    <View style={styles.pricingTopRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.pricingLabel}>{tier.label}</Text>
+                        <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.pricingBadge,
+                          tier.availability === "live"
+                            ? styles.pricingBadgeLive
+                            : styles.pricingBadgeSoon,
+                        ]}
+                      >
+                        <Text style={styles.pricingBadgeText}>{tier.badge || tier.availability}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.pricingMetaRow}>
+                      <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
+                      <Text style={styles.pricingMetaText}>{tier.output}</Text>
+                    </View>
+                    <Text style={styles.pricingModelText}>
+                      {tier.provider} · {tier.model}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.pricingGroupTitle}>Edit after generation</Text>
+            <View style={styles.pricingStack}>
+              {editTiers.map((tier) => (
+                <Pressable
+                  key={tier.id}
+                  onPress={() => setSelectedEditTierId(tier.id)}
+                  style={[
+                    styles.pricingCard,
+                    selectedEditTier?.id === tier.id && styles.pricingCardActive,
+                  ]}
+                >
+                  <View style={styles.pricingTopRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pricingLabel}>{tier.label}</Text>
+                      <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
+                    </View>
+                    <View style={[styles.pricingBadge, styles.pricingBadgeSoon]}>
+                      <Text style={styles.pricingBadgeText}>{tier.badge || "Soon"}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.pricingMetaRow}>
+                    <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
+                    <Text style={styles.pricingMetaText}>{tier.output}</Text>
+                  </View>
+                  <Text style={styles.pricingModelText}>
+                    {tier.provider} · {tier.model}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
 
           <Text style={styles.cardTitle}>3. Fine tune</Text>
           <View style={styles.intensityRow}>
@@ -417,7 +643,7 @@ export default function InstaMeScreen() {
               <>
                 <Ionicons name="sparkles" size={18} color="#000" />
                 <Text style={styles.generateButtonText}>Transform now</Text>
-                <Text style={styles.costText}>{TRANSFORM_COST} credits</Text>
+                <Text style={styles.costText}>{transformCost} credits</Text>
               </>
             )}
           </Pressable>
@@ -431,10 +657,66 @@ export default function InstaMeScreen() {
               style={styles.resultImage}
               contentFit="cover"
             />
-            <Pressable style={styles.downloadButton} onPress={handleDownload}>
-              <Ionicons name="download-outline" size={18} color={Colors.accent} />
-              <Text style={styles.downloadText}>Download</Text>
-            </Pressable>
+            <View style={styles.resultMetaCard}>
+              <Text style={styles.resultMetaTitle}>Generation details</Text>
+              <Text style={styles.resultMetaText}>
+                {resultMeta?.provider || liveGenerationTier?.provider || "Provider"} · {resultMeta?.model || liveGenerationTier?.model || "Model"}
+              </Text>
+              <Text style={styles.resultMetaText}>
+                Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} · Tier: {resultMeta?.generationTierId || selectedGenerationTierId}
+              </Text>
+            </View>
+            <View style={styles.resultActionRow}>
+              <Pressable style={[styles.resultActionButton, styles.resultActionButtonPrimary]} onPress={handleDownload}>
+                <Ionicons name="download-outline" size={18} color={Colors.accent} />
+                <Text style={styles.downloadText}>Download</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.resultActionButton, styles.resultActionButtonSecondary]}
+                onPress={() => setShowEditComposer((prev) => !prev)}
+              >
+                <Ionicons name="create-outline" size={18} color="#FFD6E3" />
+                <Text style={styles.editButtonText}>Edit</Text>
+              </Pressable>
+            </View>
+            {showEditComposer ? (
+              <View style={styles.editComposer}>
+                <Text style={styles.editComposerTitle}>Refine this result</Text>
+                <Text style={styles.editComposerSubtitle}>
+                  Selected tier: {selectedEditTier?.label || "Edit"} · {selectedEditTier?.credits ?? 0} credits
+                </Text>
+                <TextInput
+                  value={editInstruction}
+                  onChangeText={setEditInstruction}
+                  placeholder="Example: soften makeup, keep outfit, make the background more cinematic..."
+                  placeholderTextColor="#7A7A7A"
+                  multiline
+                  style={styles.promptInput}
+                />
+                <Pressable
+                  onPress={handleEditResult}
+                  disabled={editLoading}
+                  style={({ pressed }) => [
+                    styles.generateButton,
+                    editLoading && styles.generateButtonDisabled,
+                    pressed && !editLoading ? { opacity: 0.9 } : undefined,
+                  ]}
+                >
+                  {editLoading ? (
+                    <ActivityIndicator color="#000" />
+                  ) : (
+                    <>
+                      <Ionicons name="create-outline" size={18} color="#000" />
+                      <Text style={styles.generateButtonText}>Apply edit</Text>
+                      <Text style={styles.costText}>{selectedEditTier?.credits ?? 0} credits</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
+            <Text style={styles.resultFootnote}>
+              Download is free. Every edit is charged separately based on the selected tier.
+            </Text>
           </View>
         ) : null}
       </ScrollView>
@@ -558,12 +840,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
+    borderColor: "rgba(255,180,215,0.28)",
     backgroundColor: "#101010",
     justifyContent: "flex-end",
   },
   styleCardActive: {
-    borderColor: "rgba(255,132,185,0.95)",
+    borderColor: "rgba(255,132,185,0.98)",
     backgroundColor: "#121012",
   },
   styleCardImage: {
@@ -572,18 +854,30 @@ const styles = StyleSheet.create({
   styleCardOverlay: {
     ...StyleSheet.absoluteFillObject,
   },
+  styleCardGlow: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  styleCardInnerRing: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,210,228,0.12)",
+  },
+  styleCardInnerRingActive: {
+    borderColor: "rgba(255,179,210,0.42)",
+  },
   styleCardTextWrap: {
     paddingHorizontal: 14,
     paddingBottom: 13,
   },
   styleCardTitle: {
-    color: "#F8F1F4",
+    color: "#FFD9E5",
     fontFamily: "Inter_700Bold",
     fontSize: 15,
     marginBottom: 4,
   },
   styleCardTitleActive: {
-    color: "#FF9EBC",
+    color: "#FF8DB4",
   },
   styleCardSubtitle: {
     color: "rgba(255,255,255,0.82)",
@@ -631,6 +925,113 @@ const styles = StyleSheet.create({
   selectedStyleAccent: {
     color: "#FF9EBC",
     fontFamily: "Inter_700Bold",
+  },
+  pricingSection: {
+    gap: 10,
+    marginTop: 4,
+  },
+  pricingHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  pricingSectionTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  pricingSectionNote: {
+    color: "#A9A9A9",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+  },
+  pricingGroupTitle: {
+    color: "#FFB8CD",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 0.3,
+    marginTop: 4,
+  },
+  pricingStack: {
+    gap: 8,
+  },
+  pricingCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  pricingCardActive: {
+    borderColor: "rgba(255,79,125,0.62)",
+    backgroundColor: "rgba(255,79,125,0.10)",
+    shadowColor: "#FF5CB8",
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  pricingTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  pricingLabel: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  pricingSubtitle: {
+    color: "#BEBEBE",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  pricingBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+  },
+  pricingBadgeLive: {
+    backgroundColor: "rgba(255,79,125,0.18)",
+    borderColor: "rgba(255,79,125,0.42)",
+  },
+  pricingBadgeSoon: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  pricingBadgeText: {
+    color: "#FFD8E4",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+  },
+  pricingMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  pricingCredits: {
+    color: "#FF9EBC",
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  pricingMetaText: {
+    color: "#D2D2D2",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  pricingModelText: {
+    color: "#8E8E8E",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
   },
   intensityRow: { gap: 8 },
   chip: {
@@ -709,18 +1110,79 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
   },
-  downloadButton: {
+  resultMetaCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  resultMetaTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  resultMetaText: {
+    color: "#C7C7C7",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  resultActionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  resultActionButton: {
     height: 44,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.55)",
-    backgroundColor: "rgba(255,79,125,0.10)",
     justifyContent: "center",
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
+    flex: 1,
+  },
+  resultActionButtonPrimary: {
+    borderColor: "rgba(255,79,125,0.55)",
+    backgroundColor: "rgba(255,79,125,0.10)",
+  },
+  resultActionButtonSecondary: {
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
   downloadText: { color: Colors.accentLight, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  editButtonText: {
+    color: "#FFE1EA",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  editComposer: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,79,125,0.28)",
+    backgroundColor: "rgba(255,79,125,0.06)",
+    padding: 12,
+    gap: 10,
+  },
+  editComposerTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  editComposerSubtitle: {
+    color: "#C7C7C7",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  resultFootnote: {
+    color: "#8F8F8F",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.75)",

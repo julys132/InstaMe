@@ -19,6 +19,11 @@ import {
   type InstaMeStylePreset,
 } from "../shared/instame-style-presets";
 import {
+  INSTAME_EDIT_TIERS,
+  INSTAME_GENERATION_TIERS,
+  getLiveInstaMeGenerationTier,
+} from "../shared/instame-pricing";
+import {
   authMiddleware,
   createSession,
   generateAccessToken,
@@ -33,6 +38,23 @@ import {
   createStripeCheckoutSession,
   retrieveStripeCheckoutSession,
 } from "./lib/stripe";
+import {
+  choosePromptVariant,
+  chooseRequestedModel,
+  findCatalogStylePresetById,
+  getCatalogAssetAbsolutePath,
+  getCatalogRelativeAssetParts,
+  getInstaMeStylePresetsFromCatalog,
+} from "./lib/instame-style-catalog";
+import {
+  createRuntimeAsset,
+  getRuntimeAsset,
+} from "./lib/instame-runtime-assets";
+import {
+  generateOpenAiImage,
+  generateTogetherImage,
+  type RuntimeImageInput,
+} from "./lib/instame-image";
 
 function getGeminiApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -348,7 +370,10 @@ const STYLE_COSTS: Record<StyleOutputMode, number> = {
   text: 2,
   image: 5,
 };
-const INSTAME_TRANSFORM_COST = Number.parseInt(process.env.INSTAME_TRANSFORM_COST || "5", 10);
+const INSTAME_TRANSFORM_COST = Number.parseInt(
+  process.env.INSTAME_TRANSFORM_COST || String(getLiveInstaMeGenerationTier().credits),
+  10,
+);
 const DEFAULT_INITIAL_CREDITS = Number.parseInt(process.env.DEFAULT_INITIAL_CREDITS || "3", 10);
 const DEFAULT_DEV_CREDIT_GRANT = Number.parseInt(process.env.DEV_CREDIT_GRANT_AMOUNT || "50", 10);
 const MAX_DEV_CREDIT_GRANT = 500;
@@ -725,11 +750,19 @@ function normalizeTransformIntensity(input: unknown): TransformIntensity {
 
 function resolveInstaMeStylePreset(input: unknown): InstaMeStylePreset | null {
   const presetId = normalizeStringValue(input);
+  const catalogPresets = getInstaMeStylePresetsFromCatalog();
+  const catalogDefault = catalogPresets[0];
   if (!presetId) {
-    return INSTAME_STYLE_PRESETS[0] || null;
+    return catalogDefault || INSTAME_STYLE_PRESETS[0] || null;
   }
 
-  return findInstaMeStylePresetById(presetId) || INSTAME_STYLE_PRESETS[0] || null;
+  return (
+    findCatalogStylePresetById(presetId) ||
+    findInstaMeStylePresetById(presetId) ||
+    catalogDefault ||
+    INSTAME_STYLE_PRESETS[0] ||
+    null
+  );
 }
 
 function normalizeStringValue(input: unknown): string {
@@ -739,6 +772,79 @@ function normalizeStringValue(input: unknown): string {
     return first ? first.trim() : "";
   }
   return "";
+}
+
+function normalizeUsageMap(input: unknown): Record<string, number> {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return {};
+  }
+
+  return Object.entries(input as Record<string, unknown>).reduce<Record<string, number>>(
+    (accumulator, [key, value]) => {
+      const amount = Number(value);
+      if (key.trim() && Number.isFinite(amount) && amount >= 0) {
+        accumulator[key.trim()] = Math.floor(amount);
+      }
+      return accumulator;
+    },
+    {},
+  );
+}
+
+function getRequestOrigin(req: Request): string {
+  const forwardedProto = normalizeStringValue(firstHeaderValue(req.headers["x-forwarded-proto"]));
+  const forwardedHost = normalizeStringValue(firstHeaderValue(req.headers["x-forwarded-host"]));
+  const host = forwardedHost || normalizeStringValue(req.get("host"));
+  const protocol = forwardedProto || req.protocol || "https";
+
+  if (process.env.PUBLIC_APP_URL) {
+    return process.env.PUBLIC_APP_URL.replace(/\/+$/, "");
+  }
+
+  if (!host) {
+    return "";
+  }
+
+  return `${protocol}://${host}`;
+}
+
+function toCatalogAssetUrl(req: Request, relativePath: string): string {
+  const assetParts = getCatalogRelativeAssetParts(relativePath);
+  if (!assetParts) {
+    return relativePath;
+  }
+
+  const origin = getRequestOrigin(req);
+  if (!origin) {
+    return relativePath;
+  }
+
+  return `${origin}/api/instame/style-asset/${encodeURIComponent(assetParts.styleId)}/${encodeURIComponent(
+    assetParts.filename,
+  )}`;
+}
+
+function toRuntimeAssetUrl(req: Request, image: UploadedReferenceImage): string {
+  const runtimeAsset = createRuntimeAsset({
+    base64: image.base64,
+    mimeType: image.mimeType,
+  });
+  const origin = getRequestOrigin(req);
+  if (!origin) {
+    throw new Error("PUBLIC_APP_URL is required for Together image operations on private images.");
+  }
+  return `${origin}/api/instame/runtime-image/${encodeURIComponent(runtimeAsset.token)}`;
+}
+
+function resolveGenerationResolution(generationTierId: string): { width: number; height: number; sizeLabel: string } {
+  if (generationTierId === "high_res") {
+    return { width: 1024, height: 1024, sizeLabel: "1024x1024" };
+  }
+  return { width: 512, height: 512, sizeLabel: "512x512" };
+}
+
+function resolveOpenAiSize(generationTierId: string): "1024x1024" {
+  return "1024x1024";
 }
 
 function normalizeStringList(input: unknown): string[] {
@@ -1064,6 +1170,7 @@ function buildOldMoneyTransformPrompt(options: {
   styleReferences: SelectedStyleReference[];
   stylePresetLabel: string;
   stylePresetPromptHint: string;
+  sizeLabel?: string;
 }): string {
   const intensityGuide: Record<TransformIntensity, string> = {
     soft: "subtle upgrade, understated palette, clean tailoring, minimal accessories",
@@ -1111,7 +1218,52 @@ function buildOldMoneyTransformPrompt(options: {
     "Internal style-board descriptors:",
     ...styleReferenceContext,
     userPrompt,
-    `Output one photorealistic image, ${STYLE_IMAGE_SIZE}, with coherent light and color grading.`,
+    `Output one photorealistic image, ${options.sizeLabel || STYLE_IMAGE_SIZE}, with coherent light and color grading.`,
+  ].join("\n");
+}
+
+function buildPromptOnlyPresetTransformPrompt(options: {
+  presetLabel: string;
+  variantPrompt: string;
+  customPrompt: string;
+  preserveBackground: boolean;
+  generationTierId: string;
+}): string {
+  const extraUserDirection = options.customPrompt
+    ? `Extra user direction: ${options.customPrompt}.`
+    : "No extra user direction.";
+
+  return [
+    `Use the uploaded face photo as the only visual identity source for the ${options.presetLabel} transformation.`,
+    "Preserve the exact facial identity, skin tone, facial structure, and the original hair color of the uploaded subject.",
+    "Do not copy another person's facial traits. Keep the same person recognizable.",
+    "Use the uploaded photo only as the identity anchor; do not use any external style-reference images for this generation.",
+    "Hair guidance: you may adapt styling structure only if the prompt asks for it, but never recolor the subject's hair.",
+    "Wardrobe guidance: only make tasteful, realistic outfit changes.",
+    options.preserveBackground
+      ? "Keep the original environment recognizable unless the prompt strongly requires a different scene."
+      : "You may adapt the environment to match the prompt more closely.",
+    extraUserDirection,
+    `Requested output tier: ${options.generationTierId === "high_res" ? "High Res" : "Preview"}.`,
+    options.variantPrompt,
+  ].join("\n");
+}
+
+function buildInstaMeEditPrompt(options: {
+  editInstruction: string;
+  customPrompt: string;
+}): string {
+  const extraUserDirection = options.customPrompt
+    ? `Original generation notes: ${options.customPrompt}.`
+    : "No original generation notes.";
+
+  return [
+    "Edit the provided InstaMe portrait while keeping the same person fully recognizable.",
+    "Preserve face shape, skin tone, facial features, hair color, age appearance, and overall identity.",
+    "Do not add extra people, text, watermarks, duplicate limbs, or distorted anatomy.",
+    "Keep the result photorealistic and premium.",
+    extraUserDirection,
+    `Requested edit: ${options.editInstruction}`,
   ].join("\n");
 }
 
@@ -1248,6 +1400,214 @@ async function generateGeminiContent(options: {
   }
 
   return parsed;
+}
+
+type InstaMeGenerationMode = "preview" | "high_res";
+
+function resolveGenerationTierById(input: unknown) {
+  const generationTierId = normalizeStringValue(input);
+  return (
+    INSTAME_GENERATION_TIERS.find((tier) => tier.id === generationTierId) ||
+    getLiveInstaMeGenerationTier()
+  );
+}
+
+function resolveEditTierById(input: unknown) {
+  const editTierId = normalizeStringValue(input);
+  return INSTAME_EDIT_TIERS.find((tier) => tier.id === editTierId) || INSTAME_EDIT_TIERS[0];
+}
+
+function resolveGenerationMode(generationTierId: string): InstaMeGenerationMode {
+  return generationTierId === "high_res" ? "high_res" : "preview";
+}
+
+async function generatePromptOnlyPresetImage(options: {
+  req: Request;
+  uploadedImages: UploadedReferenceImage[];
+  preset: InstaMeStylePreset;
+  variant: NonNullable<ReturnType<typeof choosePromptVariant>>;
+  generationMode: InstaMeGenerationMode;
+  preserveBackground: boolean;
+  customPrompt: string;
+}): Promise<{ imageBase64: string; model: string; provider: string }> {
+  const selectedModel = chooseRequestedModel(options.variant, options.generationMode);
+  const prompt = buildPromptOnlyPresetTransformPrompt({
+    presetLabel: options.preset.label,
+    variantPrompt: options.variant.prompt,
+    customPrompt: options.customPrompt,
+    preserveBackground: options.preserveBackground,
+    generationTierId: options.generationMode,
+  });
+
+  if (selectedModel?.provider === "together") {
+    const { width, height } = resolveGenerationResolution(options.generationMode);
+    const referenceImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
+    const imageBase64 = await generateTogetherImage({
+      model: selectedModel.model,
+      prompt,
+      referenceImages: [referenceImageUrl],
+      width,
+      height,
+    });
+    return {
+      imageBase64,
+      model: selectedModel.displayName,
+      provider: "Together",
+    };
+  }
+
+  const openAiModel = selectedModel?.model || "gpt-image-1.5";
+  const imageBase64 = await generateOpenAiImage({
+    model: openAiModel,
+    prompt,
+    images: options.uploadedImages,
+    size: resolveOpenAiSize(options.generationMode),
+    quality: options.generationMode === "high_res" ? "high" : "low",
+  });
+
+  return {
+    imageBase64,
+    model: selectedModel?.displayName || openAiModel,
+    provider: "OpenAI",
+  };
+}
+
+async function generateReferenceGuidedHighResImage(options: {
+  req: Request;
+  uploadedImages: UploadedReferenceImage[];
+  selectedStyleReferences: SelectedStyleReference[];
+  intensity: TransformIntensity;
+  customPrompt: string;
+  preserveBackground: boolean;
+  stylePresetLabel: string;
+  stylePresetPromptHint: string;
+}): Promise<{ imageBase64: string; model: string; provider: string }> {
+  const { width, height, sizeLabel } = resolveGenerationResolution("high_res");
+  const referenceImageUrls = options.selectedStyleReferences
+    .map((reference) => loadStyleReferenceImage(reference))
+    .filter((image): image is UploadedReferenceImage => Boolean(image))
+    .map((image) => toRuntimeAssetUrl(options.req, image));
+  const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
+  const prompt = buildOldMoneyTransformPrompt({
+    intensity: options.intensity,
+    customPrompt: options.customPrompt,
+    preserveBackground: options.preserveBackground,
+    styleReferences: options.selectedStyleReferences,
+    stylePresetLabel: options.stylePresetLabel,
+    stylePresetPromptHint: options.stylePresetPromptHint,
+    sizeLabel,
+  });
+
+  const imageBase64 = await generateTogetherImage({
+    model: "black-forest-labs/FLUX.2-pro",
+    prompt,
+    referenceImages: [...referenceImageUrls, userImageUrl],
+    width,
+    height,
+  });
+
+  return {
+    imageBase64,
+    model: "FLUX.2 Pro",
+    provider: "Together",
+  };
+}
+
+async function generateReferenceGuidedPreviewImage(options: {
+  uploadedImages: UploadedReferenceImage[];
+  selectedStyleReferences: SelectedStyleReference[];
+  intensity: TransformIntensity;
+  customPrompt: string;
+  preserveBackground: boolean;
+  stylePresetLabel: string;
+  stylePresetPromptHint: string;
+}): Promise<{ imageBase64: string; model: string; provider: string }> {
+  const imageResponse = await generateGeminiContent({
+    model: DEFAULT_STYLE_IMAGE_MODEL,
+    parts: [
+      {
+        text: buildOldMoneyTransformPrompt({
+          intensity: options.intensity,
+          customPrompt: options.customPrompt,
+          preserveBackground: options.preserveBackground,
+          styleReferences: options.selectedStyleReferences,
+          stylePresetLabel: options.stylePresetLabel,
+          stylePresetPromptHint: options.stylePresetPromptHint,
+          sizeLabel: "512x512",
+        }),
+      },
+      ...toStyleReferenceImageParts(options.selectedStyleReferences),
+      ...toGeminiInlineImageParts(options.uploadedImages),
+    ],
+    responseModalities: ["IMAGE", "TEXT"],
+    maxOutputTokens: 800,
+  });
+
+  const imageBase64 = extractGeminiImageBase64(imageResponse);
+  if (!imageBase64) {
+    throw new Error("Image generation failed. No image data returned.");
+  }
+
+  return {
+    imageBase64,
+    model: DEFAULT_STYLE_IMAGE_MODEL,
+    provider: "Google",
+  };
+}
+
+async function generateInstaMeEditImage(options: {
+  req: Request;
+  currentImage: UploadedReferenceImage;
+  originalPhoto?: UploadedReferenceImage | null;
+  editTierId: string;
+  editInstruction: string;
+  customPrompt: string;
+}): Promise<{ imageBase64: string; model: string; provider: string }> {
+  const tier = resolveEditTierById(options.editTierId);
+  const prompt = buildInstaMeEditPrompt({
+    editInstruction: options.editInstruction,
+    customPrompt: options.customPrompt,
+  });
+
+  if (tier.id === "basic_edit") {
+    const images: RuntimeImageInput[] = [options.currentImage];
+    if (options.originalPhoto) {
+      images.push(options.originalPhoto);
+    }
+
+    const imageBase64 = await generateOpenAiImage({
+      model: "gpt-image-1-mini",
+      prompt,
+      images,
+      size: "1024x1024",
+      quality: "low",
+    });
+
+    return {
+      imageBase64,
+      model: "gpt-image-1-mini",
+      provider: "OpenAI",
+    };
+  }
+
+  const currentImageUrl = toRuntimeAssetUrl(options.req, options.currentImage);
+  const togetherModel =
+    tier.id === "premium_edit"
+      ? "black-forest-labs/FLUX.1-kontext-max"
+      : "black-forest-labs/FLUX.1-kontext-pro";
+  const imageBase64 = await generateTogetherImage({
+    model: togetherModel,
+    prompt,
+    imageUrl: currentImageUrl,
+    width: 1024,
+    height: 1024,
+  });
+
+  return {
+    imageBase64,
+    model: tier.model,
+    provider: "Together",
+  };
 }
 
 async function createStylingPlan({
@@ -2638,9 +2998,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/instame/style-presets", authMiddleware, async (_req, res) => {
+  app.get("/api/instame/style-asset/:styleId/:filename", async (req, res) => {
+    const styleId = normalizeStringValue(req.params.styleId);
+    const filename = normalizeStringValue(req.params.filename);
+    const absolutePath = getCatalogAssetAbsolutePath(styleId, filename);
+
+    if (!absolutePath) {
+      return res.status(404).json({ error: "Style asset not found." });
+    }
+
+    return res.sendFile(absolutePath);
+  });
+
+  app.get("/api/instame/runtime-image/:token", async (req, res) => {
+    const token = normalizeStringValue(req.params.token);
+    const asset = getRuntimeAsset(token);
+    if (!asset) {
+      return res.status(404).json({ error: "Runtime image not found." });
+    }
+
+    res.setHeader("Content-Type", asset.mimeType);
+    return res.sendFile(asset.absolutePath);
+  });
+
+  app.get("/api/instame/style-presets", authMiddleware, async (req, res) => {
+    const catalogPresets = getInstaMeStylePresetsFromCatalog();
+    const resolvedPresets = (catalogPresets.length > 0 ? catalogPresets : INSTAME_STYLE_PRESETS).map((preset) => ({
+      ...preset,
+      cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
+      representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
+      examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
+    }));
+
     return res.json({
-      presets: INSTAME_STYLE_PRESETS,
+      presets: resolvedPresets,
+    });
+  });
+
+  app.get("/api/instame/pricing", authMiddleware, async (_req, res) => {
+    return res.json({
+      generationTiers: INSTAME_GENERATION_TIERS,
+      editTiers: INSTAME_EDIT_TIERS,
+      liveGenerationTierId: getLiveInstaMeGenerationTier().id,
     });
   });
 
@@ -2654,10 +3053,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const stylePresetPromptHint = resolvedStylePreset?.promptHint || "";
     const intensity = normalizeTransformIntensity(body.intensity);
     const preserveBackground = body.preserveBackground !== false;
+    const generationTier = resolveGenerationTierById(body.generationTierId);
+    const generationMode = resolveGenerationMode(generationTier.id);
     const transformCost =
-      Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0
-        ? INSTAME_TRANSFORM_COST
-        : 5;
+      Number.isInteger(generationTier.credits) && generationTier.credits > 0
+        ? generationTier.credits
+        : Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0
+          ? INSTAME_TRANSFORM_COST
+          : 5;
 
     const photoInput = body.photo
       ? [body.photo]
@@ -2678,6 +3081,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     let creditsConsumed = false;
     try {
+      const [userBeforeTransform] = await db
+        .select({
+          instameStyleUsage: users.instameStyleUsage,
+        })
+        .from(users)
+        .where(eq(users.id, userId));
+      const styleUsageMap = normalizeUsageMap(userBeforeTransform?.instameStyleUsage);
+      const priorStyleUseCount = stylePresetId ? styleUsageMap[stylePresetId] || 0 : 0;
+      const promptVariant = choosePromptVariant(resolvedStylePreset || undefined, priorStyleUseCount);
+      const shouldUsePromptOnly =
+        Boolean(stylePresetId) &&
+        resolvedStylePreset?.promptOnlyAfterFirstUse === true &&
+        priorStyleUseCount >= 1 &&
+        Boolean(promptVariant);
+
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
       if (!consumed) {
         return res.status(402).json({
@@ -2687,36 +3105,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       creditsConsumed = true;
 
-      const selectedStyleReferences = selectStyleReferencesForTransform({
-        intensity,
-        customPrompt: [customPrompt, stylePresetId, stylePresetLabel, stylePresetPromptHint]
-          .filter(Boolean)
-          .join(" "),
-      });
+      const selectedStyleReferences = shouldUsePromptOnly
+        ? []
+        : selectStyleReferencesForTransform({
+            intensity,
+            customPrompt: [customPrompt, stylePresetId, stylePresetLabel, stylePresetPromptHint]
+              .filter(Boolean)
+              .join(" "),
+          });
 
-      const prompt = buildOldMoneyTransformPrompt({
-        intensity,
-        customPrompt,
-        preserveBackground,
-        styleReferences: selectedStyleReferences,
-        stylePresetLabel,
-        stylePresetPromptHint,
-      });
+      const generationResult = shouldUsePromptOnly && promptVariant
+        ? await generatePromptOnlyPresetImage({
+            req,
+            uploadedImages,
+            preset: resolvedStylePreset!,
+            variant: promptVariant,
+            generationMode,
+            preserveBackground,
+            customPrompt,
+          })
+        : generationMode === "high_res"
+          ? await generateReferenceGuidedHighResImage({
+              req,
+              uploadedImages,
+              selectedStyleReferences,
+              intensity,
+              customPrompt,
+              preserveBackground,
+              stylePresetLabel,
+              stylePresetPromptHint,
+            })
+          : await generateReferenceGuidedPreviewImage({
+              uploadedImages,
+              selectedStyleReferences,
+              intensity,
+              customPrompt,
+              preserveBackground,
+              stylePresetLabel,
+              stylePresetPromptHint,
+            });
 
-      const imageResponse = await generateGeminiContent({
-        model: DEFAULT_STYLE_IMAGE_MODEL,
-        parts: [
-          { text: prompt },
-          ...toStyleReferenceImageParts(selectedStyleReferences),
-          ...toGeminiInlineImageParts(uploadedImages),
-        ],
-        responseModalities: ["IMAGE", "TEXT"],
-        maxOutputTokens: 800,
-      });
+      if (stylePresetId) {
+        const nextUsageMap = {
+          ...styleUsageMap,
+          [stylePresetId]: priorStyleUseCount + 1,
+        };
 
-      const imageBase64 = extractGeminiImageBase64(imageResponse);
-      if (!imageBase64) {
-        throw new Error("Image generation failed. No image data returned.");
+        await db
+          .update(users)
+          .set({
+            instameStyleUsage: nextUsageMap,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, userId));
       }
 
       const [updatedUser] = await db
@@ -2725,12 +3166,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(users.id, userId));
 
       return res.json({
-        imageBase64,
+        imageBase64: generationResult.imageBase64,
         creditsCharged: transformCost,
         creditsRemaining: updatedUser?.credits ?? 0,
-        model: DEFAULT_STYLE_IMAGE_MODEL,
+        model: generationResult.model,
+        provider: generationResult.provider,
         styleReferenceIds: selectedStyleReferences.map((reference) => reference.id),
         stylePresetId: stylePresetId || null,
+        promptOnlyMode: shouldUsePromptOnly,
+        generationTierId: generationTier.id,
       });
     } catch (error: unknown) {
       console.error("InstaMe transform error:", error);
@@ -2741,6 +3185,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (errorMessage.startsWith("AI_NOT_CONFIGURED:")) {
         return res.status(503).json({ error: errorMessage.replace("AI_NOT_CONFIGURED: ", "") });
       }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  app.post("/api/instame/edit", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+    const currentImagePayload = body.currentImage || body.image;
+    const originalPhotoPayload = body.originalPhoto || body.photo;
+    const editInstruction = normalizeStringValue(body.editInstruction || body.modifyRequest);
+    const customPrompt = normalizeStringValue(body.customPrompt);
+    const editTier = resolveEditTierById(body.editTierId);
+
+    if (!editInstruction) {
+      return res.status(400).json({ error: "Edit instruction is required." });
+    }
+
+    let currentImages: UploadedReferenceImage[] = [];
+    let originalPhotos: UploadedReferenceImage[] = [];
+    try {
+      currentImages = normalizeUploadedImages(currentImagePayload ? [currentImagePayload] : [], "single_item");
+      originalPhotos = normalizeUploadedImages(
+        originalPhotoPayload ? [originalPhotoPayload] : [],
+        "single_item",
+      );
+    } catch (error: unknown) {
+      return res.status(400).json({ error: toErrorMessage(error, "Invalid image payload") });
+    }
+
+    if (currentImages.length === 0) {
+      return res.status(400).json({ error: "A generated image is required before editing." });
+    }
+
+    let creditsConsumed = false;
+    try {
+      const consumed = await consumeCredits(userId, editTier.credits, `instame_edit_${editTier.id}`);
+      if (!consumed) {
+        return res.status(402).json({
+          error: `Not enough credits. This edit costs ${editTier.credits} credits.`,
+          requiredCredits: editTier.credits,
+        });
+      }
+      creditsConsumed = true;
+
+      const editResult = await generateInstaMeEditImage({
+        req,
+        currentImage: currentImages[0],
+        originalPhoto: originalPhotos[0] || null,
+        editTierId: editTier.id,
+        editInstruction,
+        customPrompt,
+      });
+
+      const [updatedUser] = await db
+        .select({ credits: users.credits })
+        .from(users)
+        .where(eq(users.id, userId));
+
+      return res.json({
+        imageBase64: editResult.imageBase64,
+        creditsCharged: editTier.credits,
+        creditsRemaining: updatedUser?.credits ?? 0,
+        model: editResult.model,
+        provider: editResult.provider,
+        editTierId: editTier.id,
+      });
+    } catch (error: unknown) {
+      console.error("InstaMe edit error:", error);
+      if (creditsConsumed) {
+        await refundCredits(userId, editTier.credits, `instame_edit_${editTier.id}_failed`);
+      }
+
+      const errorMessage = toErrorMessage(error, "Failed to edit image");
       return res.status(500).json({ error: errorMessage });
     }
   });

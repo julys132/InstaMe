@@ -27,6 +27,10 @@ export const users = pgTable("users", {
   styleGender: text("style_gender"),
   stylePreferences: jsonb("style_preferences").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   favoriteLooks: jsonb("favorite_looks").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  instameStyleUsage: jsonb("instame_style_usage")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default(sql`'{}'::jsonb`),
   notificationsEnabled: boolean("notifications_enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

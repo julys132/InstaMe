@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import type { InstaMeStylePreset } from "@shared/instame-style-presets";
+import type { InstaMeEditTier, InstaMeGenerationTier } from "@shared/instame-pricing";
 
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: "@instame_access_token",
@@ -434,14 +435,18 @@ class ApiClient {
     intensity?: "soft" | "editorial" | "dramatic";
     preserveBackground?: boolean;
     stylePresetId?: string;
+    generationTierId?: string;
   }) {
     return this.request<{
       imageBase64: string;
       creditsCharged: number;
       creditsRemaining: number;
       model: string;
+      provider?: string;
       styleReferenceIds?: string[];
       stylePresetId?: string | null;
+      promptOnlyMode?: boolean;
+      generationTierId?: string;
     }>(
       "/instame/transform",
       {
@@ -469,6 +474,38 @@ class ApiClient {
     return this.request<{
       presets: InstaMeStylePreset[];
     }>("/instame/style-presets", {}, true);
+  }
+
+  async getInstaMePricing() {
+    return this.request<{
+      generationTiers: InstaMeGenerationTier[];
+      editTiers: InstaMeEditTier[];
+      liveGenerationTierId: string;
+    }>("/instame/pricing", {}, true);
+  }
+
+  async editInstaMeImage(payload: {
+    currentImage: { base64: string; mimeType?: string };
+    originalPhoto?: { base64: string; mimeType?: string };
+    editInstruction: string;
+    customPrompt?: string;
+    editTierId?: string;
+  }) {
+    return this.request<{
+      imageBase64: string;
+      creditsCharged: number;
+      creditsRemaining: number;
+      model: string;
+      provider?: string;
+      editTierId?: string;
+    }>(
+      "/instame/edit",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      true,
+    );
   }
 
   async generateStyle(payload: {

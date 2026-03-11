@@ -1,3 +1,16 @@
+export type InstaMeRequestedModel = {
+  provider: "openai" | "together";
+  model: string;
+  displayName: string;
+};
+
+export type InstaMePromptVariant = {
+  id: string;
+  label: string;
+  prompt: string;
+  requestedModels: InstaMeRequestedModel[];
+};
+
 export type InstaMeStylePreset = {
   id: string;
   label: string;
@@ -6,6 +19,9 @@ export type InstaMeStylePreset = {
   cover?: string;
   representativeImage: string;
   examples: string[];
+  promptFile?: string;
+  promptVariants?: InstaMePromptVariant[];
+  promptOnlyAfterFirstUse?: boolean;
 };
 
 export const INSTAME_STYLE_PRESETS: InstaMeStylePreset[] = [

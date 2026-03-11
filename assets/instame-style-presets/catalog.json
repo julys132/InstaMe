@@ -1,0 +1,330 @@
+{
+  "generatedAt": "2026-03-11T16:08:05.745448+00:00",
+  "sourceFolder": "C:\\Users\\stiul\\OneDrive\\Pictures\\Screenshots\\Styles\\Styles Representative Image",
+  "presetCount": 11,
+  "presets": [
+    {
+      "id": "analog_night_flash",
+      "label": "Analog Night Flash",
+      "subtitle": "Prompt-led portrait transformation preset",
+      "promptHint": "Analog Night Flash",
+      "cover": "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160604.png",
+      "representativeImage": "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160604.png",
+      "examples": [
+        "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160604.png",
+        "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160611.png",
+        "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160617.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/analog_night_flash/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "1. Edit the image, keeping 1:1 facial features, apply a pose where the body leans slightly forward, with the head tilted subtly down. Position the right hand elegantly so it gently touches and supports the jawline and chin, with the fingers softly curled inward and a delicate thin ring on the ring finger. The lower left arm should be visible in the frame, adorned with a classic silver metal link watch. Dress the subject in a thick, cozy, fuzzy white knit cardigan with soft textured details, layered over a light, semi-sheer white turtleneck top. Give the hair a long, gently wavy, and slightly messy texture that naturally frames the face. The facial expression should be relaxed, intimate, and softly alluring. Set the scene at night with a pitch-dark background featuring scattered, warm-toned blurred city lights creating a soft bokeh effect in the far distance. Render this with a strong nostalgic late 90s analog film aesthetic. Use direct on-camera flash lighting that brightly illuminates the subject with a soft highlight on the skin, while dropping the background into heavy darkness. Incorporate visible film grain, a soft vintage lens effect, slightly washed-out black tones for low contrast in the shadows, and a warm, peachy color palette with smooth, semi-matte skin textures. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-pro",
+              "displayName": "FLUX.2 Pro"
+            },
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-max",
+              "displayName": "FLUX.2 Max"
+            }
+          ]
+        },
+        {
+          "id": "prompt_2",
+          "label": "Prompt 2",
+          "prompt": "2. Edit the image, keeping 1:1 facial features, apply a pose where the body leans slightly forward, with the head tilted subtly down. Position the right hand elegantly so it gently touches and supports the jawline and chin, with the fingers softly curled inward and a delicate thin ring on the ring finger. The lower left arm should be visible in the frame, adorned with a classic silver metal link watch. Dress the subject in a thick, cozy, fuzzy white knit cardigan with soft textured details, layered over a light, semi-sheer white turtleneck top. Give the hair a long, gently natural relaxed , and slightly messy texture that naturally frames the face. The facial expression should be relaxed, intimate, and softly alluring. Set the scene at night with a pitch-dark background featuring scattered, warm-toned blurred city lights creating a soft bokeh effect in the far distance. Render this with a strong nostalgic late 90s analog grain film aesthetic. Use direct on-camera flash lighting that brightly illuminates the subject with a soft highlight on the skin, while dropping the background into heavy darkness. Incorporate visible film grain, a soft vintage lens effect, slightly washed-out black tones for low contrast in the shadows, and a warm, peachy color palette with smooth, semi-matte skin textures. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-pro",
+              "displayName": "FLUX.2 Pro"
+            },
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-max",
+              "displayName": "FLUX.2 Max"
+            }
+          ]
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "edgy_editorial_minimalism",
+      "label": "Edgy Editorial Minimalism",
+      "subtitle": "Curated editorial portrait preset",
+      "promptHint": "Edgy Editorial Minimalism",
+      "cover": "assets/instame-style-presets/styles/edgy_editorial_minimalism/Screenshot 2026-03-10 141548.png",
+      "representativeImage": "assets/instame-style-presets/styles/edgy_editorial_minimalism/Screenshot 2026-03-10 141548.png",
+      "examples": [
+        "assets/instame-style-presets/styles/edgy_editorial_minimalism/Screenshot 2026-03-10 141548.png",
+        "assets/instame-style-presets/styles/edgy_editorial_minimalism/Screenshot 2026-03-10 141557.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/edgy_editorial_minimalism/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Cel basic pe care il folosim cu imagine de stil ptr referinta",
+          "requestedModels": []
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "luxurious_mediterranean_glamour",
+      "label": "Luxurious Mediterranean Glamour",
+      "subtitle": "Curated glam portrait preset",
+      "promptHint": "Luxurious Mediterranean Glamour",
+      "cover": "assets/instame-style-presets/styles/luxurious_mediterranean_glamour/Screenshot 2026-03-10 142112.png",
+      "representativeImage": "assets/instame-style-presets/styles/luxurious_mediterranean_glamour/Screenshot 2026-03-10 142112.png",
+      "examples": [
+        "assets/instame-style-presets/styles/luxurious_mediterranean_glamour/Screenshot 2026-03-10 142112.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/luxurious_mediterranean_glamour/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Prompt 1.\n\nEdit the image, keeping 1:1 facial features, apply a luxurious Mediterranean summer aesthetic. The subject is captured in a semi-reclined, relaxed pose on the beige leather seating of a high-end modern yacht. One arm is elegantly bent with fingers softly touching the temple and brushing through the hair, while the other hand rests naturally in the lap. The subject wears a crisp white linen summer dress with a deep V-neckline and subtle ribbed texture. The lighting is intense, direct golden sunlight that creates a radiant, sun-kissed glow on the skin with satin highlights. The background features a vast, sparkling turquoise ocean under a clear, pale blue sky, with a distant boat visible on the horizon to add depth. The color palette is a sophisticated mix of bronze skin tones, bright whites, and deep teal waters. The hair has a wind-swept, voluminous texture, flowing naturally. The overall vibe is cinematic old money vube high-end fashion editorial, glamorous and serene, rendered in ultra-high 8k resolution with sharp focus and vibrant, warm tones. Ensure the image is completely clean of all logos, text, or watermarks. (image model reve v1.1)\n\n\nPrompt 2.\n\nEdit the image, keeping 1:1 facial features, apply a luxurious Mediterranean summer aesthetic. The subject is captured in a semi-reclined, relaxed pose on the beige leather seating of a high-end modern yacht. One arm is elegantly bent with fingers softly touching the temple and brushing through the hair, while the other hand rests naturally in the lap. The subject wears a crisp linen long summer dress with a deep V-neckline and subtle ribbed texture.. The background features a vast, sparkling muted ocean under a clear, pale sky, with a distant boat visible on the horizon to add depth. The hair has a wind-swept, voluminous texture, flowing naturally. The overall vibe is cinematic old money vube high-end fashion editorial, glamorous and serene, rendered in ultra-high 8k resolution with sharp focus and vibrant, warm tones. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-max",
+              "displayName": "FLUX.2 Max"
+            }
+          ]
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "minimalist_chic",
+      "label": "Minimalist Chic",
+      "subtitle": "Prompt-led portrait transformation preset",
+      "promptHint": "Minimalist Chic",
+      "cover": "assets/instame-style-presets/styles/minimalist_chic/Screenshot 2026-03-10 141405.png",
+      "representativeImage": "assets/instame-style-presets/styles/minimalist_chic/Screenshot 2026-03-10 141405.png",
+      "examples": [
+        "assets/instame-style-presets/styles/minimalist_chic/Screenshot 2026-03-10 141405.png",
+        "assets/instame-style-presets/styles/minimalist_chic/Screenshot 2026-03-10 141647.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/minimalist_chic/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "1. Edit the image, keeping 1:1 facial features, and apply a sophisticated editorial photography style. Apply soft, diffused directional studio lighting to create a dimensional, flattering look, combined with a very shallow depth of field that renders the light-grey textured concrete background as a soft bokeh. Introduce a subtle, fine film grain overlay and a muted, matte color palette. seated pose with hands crossed in the lap and the composed, subtle smile expression. Ensure the new subject wears the precise one-color cashmere-like turtleneck and trousers with their current texture and deep color.  The structure of the wavy hair framing the face is precisely maintained., and wavy, , but must preserve the new subject's individual hair and eye color and unique facial features without change. The overall feel should be refined, understated, and tactile, avoiding overly saturated colors.",
+          "requestedModels": []
+        },
+        {
+          "id": "prompt_2",
+          "label": "Prompt 2",
+          "prompt": "2.Edit the image, keeping 1:1 facial features. Apply soft, diffused high-key studio lighting that creates a flattering and even skin texture. The color palette must be strictly monochromatic warm creams and whites, applied across all elements. The background is a clean, minimalist light-grey studio backdrop with soft fall-off. A serene and confident facial expression is applied. The subject is seated in a modern, curved armchair, leaning back slightly in a relaxed yet elegant posture. Her left arm rests softly across her lap, and her right arm is supported by the armrest, with the hand and fingers resting naturally and elegantly over the edge. She wears a simple gold ring. The subject is dressed in a luxurious, thick-knit, fuzzy cream turtleneck sweater and matching cream wide-leg trousers. The structure of the wavy hair framing the face is precisely maintained. A very subtle, premium digital film grain is applied across the entire composition for a polished print quality. Ensure the image is completely clean of all logos or text.\" (image model :  reve-v1.1, p-image-edit image model)",
+          "requestedModels": []
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "monochromatic_urban_elegance",
+      "label": "Monochromatic Urban Elegance",
+      "subtitle": "Prompt-led portrait transformation preset",
+      "promptHint": "Monochromatic Urban Elegance",
+      "cover": "assets/instame-style-presets/styles/monochromatic_urban_elegance/Screenshot 2026-03-10 141629.png",
+      "representativeImage": "assets/instame-style-presets/styles/monochromatic_urban_elegance/Screenshot 2026-03-10 141629.png",
+      "examples": [
+        "assets/instame-style-presets/styles/monochromatic_urban_elegance/Screenshot 2026-03-10 141629.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/monochromatic_urban_elegance/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a dynamic walking posture on an elegant European city street. Grany cinematic vintage style, The subject is confidently stepping forward, front view , with the head slightly tilted and turned to the side,. The left hand is casually tucked into the trouser pocket, while the right arm rests naturally by the side. Clothe the subject in a sophisticated, monochromatic tailored grey outfit: a long, structured thick wool overcoat with peak lapels and dark buttons, layered over a matching tailored waistcoat and wide-leg wool trousers. Emphasize the rich, heavy texture of the fabrics and their elegant drape. The hair should be styled in voluminous, flowing layers cascading naturally over the shoulders. Set the scene with soft, diffused overcast natural lighting. The background should feature classic, slightly out-of-focus stone architecture and a cobblestone-like pavement to create a high-end fashion editorial vibe. The color palette must be muted, cool-toned, and heavily reliant on greys and architectural neutrals. Apply a matte aesthetic to the skin and environment, mimicking medium-format analog photography with low contrast, soft shadows, a slight film grain, and an 85mm lens depth of field. The overall aesthetic is \"quiet luxury\" and cinematic urban chic. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-pro",
+              "displayName": "FLUX.2 Pro"
+            }
+          ]
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "natural_glam_portrait",
+      "label": "Natural glam portrait",
+      "subtitle": "Curated glam portrait preset",
+      "promptHint": "Natural glam portrait",
+      "cover": "assets/instame-style-presets/styles/natural_glam_portrait/Screenshot 2026-03-10 134746.png",
+      "representativeImage": "assets/instame-style-presets/styles/natural_glam_portrait/Screenshot 2026-03-10 134746.png",
+      "examples": [
+        "assets/instame-style-presets/styles/natural_glam_portrait/Screenshot 2026-03-10 134746.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/natural_glam_portrait/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Edit the image, keeping 1:1 facial features, and enhance with the following details for a stunning portrait effect:\n\nStyle & Lighting: Apply soft, diffused natural lighting to create a warm, inviting glow. The colors should be richly saturated, enhancing the natural tones of the skin and hair, with a focus on natural, subtle beauty that leans into soft glam.\n\nFacial Features & Expression: Sharpen the focus and enhance the brightness of the brilliant eyes, ensuring they are clear and captivating. Maintain the soft, subtle, almost neutral yet slightly sweet smile. Keep the existing makeup, focusing on a flawless complexion with slightly dewy skin\n\nHair: Add enhanced texture and volume to the long, flowing hair. Capture the specific style: side-parted, swept loosely over one shoulder, showcasing natural highlights and realistic strand definition with a slightly wind-swept, effortless feel.\n\nPose & Composition: Recreate the relaxed, confident 3/4 turn pose. One hand should be subtly placed near the lap or hip, and the other slightly supporting the pose, maintaining a natural and casual feel (avoiding forced positions).\n\nAttire: Replicate the black, long-sleeved turtleneck sweatshirt, ensuring the specific white and orange \"FLY\" or similar graphic logo with a star is prominently and accurately rendered on the chest.\n\nBackground: Recreate the soft, blurred (bokeh) background of the rustic room with wood paneling and the framed picture, ensuring it remains out of focus to keep all attention on the subject.",
+          "requestedModels": []
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "polished_urban_chic",
+      "label": "Polished Urban Chic",
+      "subtitle": "Prompt-led portrait transformation preset",
+      "promptHint": "Polished Urban Chic",
+      "cover": "assets/instame-style-presets/styles/polished_urban_chic/Screenshot 2026-03-10 141353.png",
+      "representativeImage": "assets/instame-style-presets/styles/polished_urban_chic/Screenshot 2026-03-10 141353.png",
+      "examples": [
+        "assets/instame-style-presets/styles/polished_urban_chic/Screenshot 2026-03-10 141353.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/polished_urban_chic/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Edit the image, ensuring the new target face's features are preserved exactly (1:1 mapping), while applying the specific styling and composition of the original. Retain the precise same sage washed woolen coat, the light shirt left , the cream-colored high-waisted trousers, and the statement dark leather belt with the large gold buckle. Maintain the pose, including the subtle confident smile and the relaxed hands-in-pockets posture and head sligly tilted to one side. . The background must be the identical reflective metal-lined elevator interior with the horizontal LED lights. The overall feel should be one of vintage cinematic grainy  luxurious, effortless sophistication, achieved through a refined high-definition polish with subtle film grain texture. Crucially, do not alter the inherent hair or eye color of the target face.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-max",
+              "displayName": "FLUX.2 Max"
+            },
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-pro",
+              "displayName": "FLUX.2 Pro"
+            }
+          ]
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "selfie",
+      "label": "Selfie",
+      "subtitle": "Curated selfie portrait preset",
+      "promptHint": "Selfie",
+      "cover": "assets/instame-style-presets/styles/selfie/Screenshot 2026-03-10 155808.png",
+      "representativeImage": "assets/instame-style-presets/styles/selfie/Screenshot 2026-03-10 155808.png",
+      "examples": [
+        "assets/instame-style-presets/styles/selfie/Screenshot 2026-03-10 155808.png",
+        "assets/instame-style-presets/styles/selfie/Screenshot 2026-03-10 161643.png",
+        "assets/instame-style-presets/styles/selfie/Screenshot 2026-03-10 161716.png",
+        "assets/instame-style-presets/styles/selfie/Screenshot 2026-03-10 162910.png",
+        "assets/instame-style-presets/styles/selfie/Screenshot 2026-03-10 162916.png",
+        "assets/instame-style-presets/styles/selfie/Screenshot 2026-03-10 163117.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/selfie/Prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "1 .Edit the image, keeping 1:1 facial features, apply a modern mirror-selfie composition. The subject is posing with their head slightly tilted to one side, maintaining a relaxed, neutral facial expression with gently parted lips. The right hand is raised, holding a white smartphone with a prominent triple-camera module in front of the lower face and chest area, with fingers gently gripping the phone, showcasing dark-painted nails. The left arm is slightly bent, gently resting with fingertips visible at the bottom left edge of the frame. The subject is wearing a dark, ribbed knit long-sleeve top featuring a delicate lace-up V-neck detail, with a small silver cross necklace resting on the collarbone. The hair is styled in long, voluminous, loose waves cascading down the shoulders, framing the face with a soft, feathery structure. The background is a bright, minimalist white interior, featuring a softly blurred white wooden door with top glass panels and architectural wall molding. The lighting is soft, evenly diffused, and flat, creating a bright, high-key background while providing rich, sharp contrast against the subject's clothing. The color palette emphasizes cool, crisp whites paired with deep, earthy tones, creating a modern, clean digital aesthetic with smooth, matte skin textures, crisp details, and zero film grain. High-resolution 8k portrait photography, sharp focus on the subject and the phone. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-pro",
+              "displayName": "FLUX.2 Pro"
+            }
+          ]
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "selfie_glamour_dark",
+      "label": "Selfie Glamour Dark",
+      "subtitle": "Curated selfie portrait preset",
+      "promptHint": "Selfie Glamour Dark",
+      "cover": "assets/instame-style-presets/styles/selfie_glamour_dark/Screenshot 2026-03-10 142119.png",
+      "representativeImage": "assets/instame-style-presets/styles/selfie_glamour_dark/Screenshot 2026-03-10 142119.png",
+      "examples": [
+        "assets/instame-style-presets/styles/selfie_glamour_dark/Screenshot 2026-03-10 142119.png",
+        "assets/instame-style-presets/styles/selfie_glamour_dark/Screenshot 2026-03-10 142309.png",
+        "assets/instame-style-presets/styles/selfie_glamour_dark/Screenshot 2026-03-10 142339.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/selfie_glamour_dark/Prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Edit the image, keeping 1:1 facial features, slighly upper view , apply a sultry glamour, dark aesthetic using a warm, muted color palette of rich ochres, gold, deep charcoal, and earth tones. The subject, an individual, is in a, low-light interior setting. . A rich, textured mane of long, flowing dark hair is parted at the side and falls naturally over the shoulders. the hand holding a sophisticated, multi-lens dark grey smartphone at shoulder height, fingers extended on the phone's back, positioned for a mirror selfie.The subject is wearing a black silk camisole top with intricate, delicate black lace trim along the deep V-neckline. They are adorned with classic gold hoop earrings and a delicate gold chain necklace featuring a square, polished gold and light turquoise stone pendant. The lighting is soft and directional, creating a warm, moody glow that highlights skin texture and materials. The overall image has a beautiful, fine film grain and the subtle color shifts of analog photography. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-pro",
+              "displayName": "FLUX.2 Pro"
+            }
+          ]
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "soft_dreamy_editorial",
+      "label": "Soft Dreamy Editorial",
+      "subtitle": "Curated editorial portrait preset",
+      "promptHint": "Soft Dreamy Editorial",
+      "cover": "assets/instame-style-presets/styles/soft_dreamy_editorial/Screenshot 2026-03-10 142522.png",
+      "representativeImage": "assets/instame-style-presets/styles/soft_dreamy_editorial/Screenshot 2026-03-10 142522.png",
+      "examples": [
+        "assets/instame-style-presets/styles/soft_dreamy_editorial/Screenshot 2026-03-10 142522.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/soft_dreamy_editorial/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a pose where the subject is resting their chin softly on their right palm and index finger, with the right elbow propped on a dark, leather-clad horizontal surface. Wearing a simple, deep-v black spaghetti strap top made of a soft, slightly-lustrous material (satin-like), paired with dark brown leather trousers. The subject has voluminous, long, hair flows freely, cascading around the face and shoulders, highlighting the texture without defining a specific color. The subject holds a soft, direct gaze towards the camera. The skin has realistic texture, showing pore details and a subtle, healthy glow from soft, diffused studio lighting that provides gentle highlights and soft shadows. The background is a clean, neutral, light-grey studio backdrop. The entire scene has a palette of warm skin tones, deep browns, and deep blacks against the soft grey, exuding an atmosphere of intimacy and natural beauty. The image quality is extremely high, washed retro  professional fashion portraiture. Ensure the image is completely clean of all logos, text, or watermarks. (reve v1.1",
+          "requestedModels": []
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    },
+    {
+      "id": "timeless_cinematic_chic",
+      "label": "Timeless Cinematic Chic",
+      "subtitle": "Prompt-led portrait transformation preset",
+      "promptHint": "Timeless Cinematic Chic",
+      "cover": "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 133556.png",
+      "representativeImage": "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 133556.png",
+      "examples": [
+        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 133556.png",
+        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 134133.png",
+        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141412.png",
+        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141543.png",
+        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141548.png",
+        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141557.png",
+        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141943.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/timeless_cinematic_chic/Prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Edit the image, keep her facial features  to achive: \"A stunning, high-definition black and white photograph captured in a sophisticated, low-contrast cinematic style. The model poses looking slightly off-camera with engaging, detailed eyes and prominent catchlights. Her pose is a specific three-quarter composition, arms self-crossed at the waist, one hand resting subtly on the other arm near the jeans, creating an elegant, relaxed-yet-confident silhouette. The clothing is a dark, blazer  paired with dark, slightly textured denim jeans. Her hair is voluminous, textured, and styled with natural waves and soft movement, giving it a 'blown' effect that suggests a gentle breeze. Background elements (urban architecture/stairs) are rendered in a beautiful, soft bokeh with a very shallow depth of field, keeping the focus razor-sharp on the model's face and hands. Lighting is diffused natural light, soft and flattering, creating a timeless, classic fashion editorial look. Photorealistic, high detail",
+          "requestedModels": [
+            {
+              "provider": "openai",
+              "model": "gpt-image-1.5",
+              "displayName": "GPT Image 1.5"
+            }
+          ]
+        }
+      ],
+      "promptOnlyAfterFirstUse": true
+    }
+  ]
+}
