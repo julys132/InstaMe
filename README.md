@@ -65,10 +65,18 @@ Repo-ul este pregatit pentru Railway cu:
    - `DATABASE_URL`
    - `SESSION_SECRET`
    - `GEMINI_API_KEY`
+   - `OPENAI_API_KEY`
+   - `TOGETHER_API_KEY`
+   - `REVE_API_KEY`
    - `STRIPE_SECRET_KEY`
    - `STRIPE_WEBHOOK_SECRET`
    - `PUBLIC_WEB_URL` = URL-ul public Railway (ex: `https://instame-production.up.railway.app`)
+   - `PUBLIC_APP_URL` = acelasi URL public Railway, folosit pentru imagini private temporare in Together
    - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (obligatoriu daca vrei Google auth pe web)
+   - optional pentru Reve:
+     - `REVE_API_BASE_URL=https://api.reve.com`
+     - `REVE_EDIT_VERSION_REVE_V1_1_PREVIEW=latest-fast`
+     - `REVE_EDIT_VERSION_REVE_V1_1_HIGH_RES=latest`
 4. Optional pentru CORS:
    - `CORS_ORIGINS` (lista separata prin virgula)
    - `CORS_ALLOW_ALL=true` (doar temporar pentru debugging)
@@ -94,6 +102,15 @@ Request:
   "preserveBackground": true
 }
 ```
+
+## Prompt-Only Style Presets
+
+Stilurile importate din `assets/instame-style-presets` pot avea propriul `Prompt.txt`, cu modelul implicit specificat in acel fisier.
+
+- La prima utilizare a unui stil: aplicatia poate folosi flow cu style references.
+- De la a doua utilizare a aceluiasi stil: aplicatia foloseste promptul din folderul stilului.
+- Modelul implicit este luat in ordinea definita in `Prompt.txt`.
+- Daca promptul cere `Reve v1.1`, backendul foloseste direct `Reve API` pentru `image edit`, pastrand fotografia userului ca sursa de identitate.
 
 Response:
 

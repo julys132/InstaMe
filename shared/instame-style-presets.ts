@@ -1,5 +1,5 @@
 export type InstaMeRequestedModel = {
-  provider: "openai" | "together";
+  provider: "openai" | "together" | "reve";
   model: string;
   displayName: string;
 };

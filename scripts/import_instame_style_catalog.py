@@ -10,6 +10,60 @@ from pathlib import Path
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 PROMPT_FILE_PATTERN = re.compile(r"^prompt.*\.txt$", re.IGNORECASE)
+MODEL_RULES: list[tuple[re.Pattern[str], dict[str, str]]] = [
+    (
+        re.compile(r"flux\s*2\s*max", re.IGNORECASE),
+        {
+            "provider": "together",
+            "model": "black-forest-labs/FLUX.2-max",
+            "displayName": "FLUX.2 Max",
+        },
+    ),
+    (
+        re.compile(r"flux\s*2\s*(?:-\s*)?pro", re.IGNORECASE),
+        {
+            "provider": "together",
+            "model": "black-forest-labs/FLUX.2-pro",
+            "displayName": "FLUX.2 Pro",
+        },
+    ),
+    (
+        re.compile(r"flux\s*2\s*flex", re.IGNORECASE),
+        {
+            "provider": "together",
+            "model": "black-forest-labs/FLUX.2-Flex",
+            "displayName": "FLUX.2 Flex",
+        },
+    ),
+    (
+        re.compile(r"reve(?:\s|-)?v?\s*1\.1|reve(?:\s|-)?1\.1", re.IGNORECASE),
+        {
+            "provider": "reve",
+            "model": "reve-v1.1",
+            "displayName": "Reve v1.1",
+        },
+    ),
+    (
+        re.compile(r"chat\s*gpt\s*1\.5\s*image\s*model|gpt(?:-|\s*)image\s*1\.5", re.IGNORECASE),
+        {
+            "provider": "openai",
+            "model": "gpt-image-1.5",
+            "displayName": "GPT Image 1.5",
+        },
+    ),
+    (
+        re.compile(r"gpt(?:-|\s*)image\s*1(?!\.\d)|chat\s*gpt\s*image\s*model", re.IGNORECASE),
+        {
+            "provider": "openai",
+            "model": "gpt-image-1",
+            "displayName": "GPT Image 1",
+        },
+    ),
+]
+MODEL_ANNOTATION_PATTERN = re.compile(
+    r'[\s"“”\']*\(\s*[^()\n]*(?:flux\s*2|reve(?:\s|-)?v?\s*1\.1|gpt(?:-|\s*)image|chat\s*gpt)[^()\n]*\)?\s*$',
+    re.IGNORECASE,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,62 +85,49 @@ def slugify(value: str) -> str:
 
 
 def normalize_model_token(raw: str) -> dict[str, str] | None:
-    token = raw.strip().lower()
+    token = raw.strip()
     if not token:
         return None
 
-    cleaned = re.sub(r"\s+", " ", token)
-    if "flux 2 max" in cleaned:
-        return {
-            "provider": "together",
-            "model": "black-forest-labs/FLUX.2-max",
-            "displayName": "FLUX.2 Max",
-        }
-    if "flux 2 pro" in cleaned or "flux 2 -pro" in cleaned:
-        return {
-            "provider": "together",
-            "model": "black-forest-labs/FLUX.2-pro",
-            "displayName": "FLUX.2 Pro",
-        }
-    if "flux 2 flex" in cleaned:
-        return {
-            "provider": "together",
-            "model": "black-forest-labs/FLUX.2-Flex",
-            "displayName": "FLUX.2 Flex",
-        }
-    if "reve v1.1" in cleaned or "reve-v1.1" in cleaned or "reve 1.1" in cleaned:
-        return {
-            "provider": "together",
-            "model": "reve-v1.1",
-            "displayName": "Reve v1.1",
-        }
-    if "chat gpt 1.5 image model" in cleaned or "gpt image 1.5" in cleaned or "gpt-image-1.5" in cleaned:
-        return {
-            "provider": "openai",
-            "model": "gpt-image-1.5",
-            "displayName": "GPT Image 1.5",
-        }
-    if "gpt-image-1" in cleaned or "gpt image 1" in cleaned or "chat gpt image model" in cleaned:
-        return {
-            "provider": "openai",
-            "model": "gpt-image-1",
-            "displayName": "GPT Image 1",
-        }
+    for pattern, descriptor in MODEL_RULES:
+        if pattern.search(token):
+            return descriptor.copy()
     return None
 
 
+def extract_models_from_text(prompt_text: str) -> list[dict[str, str]]:
+    matches: list[tuple[int, dict[str, str]]] = []
+    for pattern, descriptor in MODEL_RULES:
+        for match in pattern.finditer(prompt_text):
+            matches.append((match.start(), descriptor.copy()))
+
+    seen: set[tuple[str, str]] = set()
+    ordered: list[dict[str, str]] = []
+    for _, descriptor in sorted(matches, key=lambda item: item[0]):
+        key = (descriptor["provider"], descriptor["model"])
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(descriptor)
+    return ordered
+
+
+def strip_model_annotation(prompt_text: str) -> str:
+    cleaned = prompt_text.strip()
+    while True:
+        updated = MODEL_ANNOTATION_PATTERN.sub("", cleaned).strip()
+        if updated == cleaned:
+            return cleaned
+        cleaned = updated
+
+
+def strip_variant_prefix(prompt_text: str) -> str:
+    return re.sub(r"(?im)^\s*(?:prompt\s*)?\d+\s*[:.)-]?\s*", "", prompt_text.strip(), count=1).strip()
+
+
 def extract_models(prompt_text: str) -> tuple[str, list[dict[str, str]]]:
-    matches = list(re.finditer(r"\(([^()]*)\)\s*$", prompt_text.strip(), re.MULTILINE))
-    if not matches:
-        return prompt_text.strip(), []
-
-    last_match = matches[-1]
-    model_tokens = [normalize_model_token(token) for token in last_match.group(1).split(",")]
-    models = [token for token in model_tokens if token is not None]
-    if not models:
-        return prompt_text.strip(), []
-
-    cleaned_prompt = prompt_text[: last_match.start()].strip()
+    cleaned_prompt = strip_variant_prefix(strip_model_annotation(prompt_text))
+    models = extract_models_from_text(prompt_text)
     return cleaned_prompt, models
 
 
@@ -95,7 +136,7 @@ def split_prompt_variants(prompt_text: str) -> list[dict[str, object]]:
     if not prompt_text:
         return []
 
-    marker_pattern = re.compile(r"(?im)^\s*prompt\s*(\d+)\s*:?\s*$")
+    marker_pattern = re.compile(r"(?im)^\s*prompt\s*(\d+)\s*[:.)-]?\s*")
     matches = list(marker_pattern.finditer(prompt_text))
 
     if not matches:
@@ -110,6 +151,19 @@ def split_prompt_variants(prompt_text: str) -> list[dict[str, object]]:
         ]
 
     variants: list[dict[str, object]] = []
+    first_block = prompt_text[: matches[0].start()].strip()
+    if first_block:
+        cleaned_body, models = extract_models(first_block)
+        if cleaned_body:
+            variants.append(
+                {
+                    "id": "prompt_1",
+                    "label": "Prompt 1",
+                    "prompt": cleaned_body,
+                    "requestedModels": models,
+                }
+            )
+
     for index, match in enumerate(matches):
         start = match.end()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(prompt_text)

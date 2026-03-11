@@ -8,6 +8,7 @@ export type RuntimeImageInput = {
 };
 
 type OpenAiImageSize = "1024x1024" | "1536x1024" | "1024x1536" | "auto";
+type ReveGenerationMode = "preview" | "high_res";
 
 function normalizeMimeType(input: string | undefined): string {
   if (typeof input === "string" && input.startsWith("image/")) {
@@ -36,12 +37,102 @@ function getTogetherApiKey(): string {
   return apiKey;
 }
 
-function resolveTogetherModelAlias(model: string): string {
-  const normalized = model.trim().toLowerCase();
-  if (normalized === "reve-v1.1" || normalized === "reve v1.1") {
-    return process.env.TOGETHER_MODEL_REVE_V1_1 || model;
+function getReveApiKey(): string {
+  const apiKey = process.env.REVE_API_KEY;
+  if (!apiKey) {
+    throw new Error("REVE_API_KEY is required for Reve image generation.");
   }
+  return apiKey;
+}
+
+function getReveBaseUrl(): string {
+  return process.env.REVE_API_BASE_URL || "https://api.reve.com";
+}
+
+function resolveTogetherModelAlias(model: string): string {
   return model;
+}
+
+function normalizeReveModelEnvKey(model: string): string {
+  return model
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+}
+
+function readFirstEnv(keys: string[]): string | null {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+function resolveReveVersion(options: {
+  model: string;
+  operation: "create" | "edit";
+  mode: ReveGenerationMode;
+}): string {
+  const alias = normalizeReveModelEnvKey(options.model);
+  const qualityKey = options.mode === "high_res" ? "HIGH_RES" : "PREVIEW";
+  const operationKey = options.operation.toUpperCase();
+  const defaultVersion =
+    options.operation === "edit"
+      ? options.mode === "high_res"
+        ? "latest"
+        : "latest-fast"
+      : "latest";
+
+  return (
+    readFirstEnv([
+      `REVE_${operationKey}_VERSION_${alias}_${qualityKey}`,
+      `REVE_${operationKey}_VERSION_${alias}`,
+      `REVE_${operationKey}_VERSION_${qualityKey}`,
+      `REVE_${operationKey}_VERSION`,
+      `REVE_VERSION_${alias}_${qualityKey}`,
+      `REVE_VERSION_${alias}`,
+      "REVE_VERSION",
+    ]) || defaultVersion
+  );
+}
+
+function sanitizeBase64Image(input: string): string {
+  return input.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "").trim();
+}
+
+function extractReveImageBase64(payload: any): string | null {
+  const directCandidates = [
+    payload?.image,
+    payload?.b64_json,
+    payload?.data?.image,
+    payload?.data?.b64_json,
+  ];
+  for (const candidate of directCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return sanitizeBase64Image(candidate);
+    }
+  }
+
+  const arrayCandidates = [
+    Array.isArray(payload?.data) ? payload.data : [],
+    Array.isArray(payload?.images) ? payload.images : [],
+  ];
+
+  for (const items of arrayCandidates) {
+    for (const item of items) {
+      if (typeof item?.image === "string" && item.image.trim()) {
+        return sanitizeBase64Image(item.image);
+      }
+      if (typeof item?.b64_json === "string" && item.b64_json.trim()) {
+        return sanitizeBase64Image(item.b64_json);
+      }
+    }
+  }
+
+  return null;
 }
 
 async function toOpenAiUpload(input: RuntimeImageInput, fallbackName: string) {
@@ -152,6 +243,89 @@ export async function generateTogetherImage(options: {
   const base64 = data[0]?.b64_json;
   if (!base64) {
     throw new Error("Together image generation returned no image data.");
+  }
+  return base64;
+}
+
+export async function generateReveImage(options: {
+  model: string;
+  prompt: string;
+  referenceImage?: RuntimeImageInput;
+  aspectRatio?: "16:9" | "9:16" | "3:2" | "2:3" | "4:3" | "3:4" | "1:1" | "auto";
+  mode?: ReveGenerationMode;
+  testTimeScaling?: number;
+  postprocessing?: Array<Record<string, unknown>>;
+}): Promise<string> {
+  const apiKey = getReveApiKey();
+  const baseUrl = getReveBaseUrl();
+  const mode = options.mode || "preview";
+  const isEdit = Boolean(options.referenceImage);
+  const endpoint = isEdit ? "/v1/image/edit" : "/v1/image/create";
+  const version = resolveReveVersion({
+    model: options.model,
+    operation: isEdit ? "edit" : "create",
+    mode,
+  });
+
+  const payload: Record<string, unknown> = {
+    version,
+  };
+
+  if (options.aspectRatio && options.aspectRatio !== "auto") {
+    payload.aspect_ratio = options.aspectRatio;
+  }
+
+  if (
+    typeof options.testTimeScaling === "number" &&
+    Number.isFinite(options.testTimeScaling) &&
+    options.testTimeScaling >= 1 &&
+    options.testTimeScaling <= 15
+  ) {
+    payload.test_time_scaling = Math.round(options.testTimeScaling);
+  }
+
+  if (Array.isArray(options.postprocessing) && options.postprocessing.length > 0) {
+    payload.postprocessing = options.postprocessing;
+  }
+
+  if (isEdit) {
+    payload.edit_instruction = options.prompt;
+    payload.reference_image = sanitizeBase64Image(options.referenceImage!.base64);
+  } else {
+    payload.prompt = options.prompt;
+  }
+
+  const response = await fetch(`${baseUrl}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseText = await response.text();
+  let parsed: any = null;
+  try {
+    parsed = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    parsed = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      parsed?.message ||
+      parsed?.error ||
+      parsed?.error_code ||
+      responseText ||
+      `Reve API returned status ${response.status}`;
+    throw new Error(message);
+  }
+
+  const base64 = extractReveImageBase64(parsed);
+  if (!base64) {
+    throw new Error("Reve image generation returned no image data.");
   }
   return base64;
 }

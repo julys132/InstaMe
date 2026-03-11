@@ -472,7 +472,7 @@ function normalizeRequestedModel(input) {
   const model = typeof record?.model === "string" ? record.model : "";
   const displayName = typeof record?.displayName === "string" ? record.displayName : "";
   if (!provider || !model || !displayName) return null;
-  if (provider !== "openai" && provider !== "together") return null;
+  if (provider !== "openai" && provider !== "together" && provider !== "reve") return null;
   return { provider, model, displayName };
 }
 function normalizePromptVariant(input) {
@@ -583,15 +583,10 @@ function choosePromptVariant(preset, usageCount) {
   const index = usageCount <= 0 ? 0 : usageCount % variants.length;
   return variants[index] || variants[0] || null;
 }
-function chooseRequestedModel(variant, mode) {
+function chooseRequestedModel(variant, _mode) {
   const models = variant?.requestedModels || [];
   if (models.length === 0) return null;
-  const togetherModels = models.filter((entry) => entry.provider === "together");
-  const openAiModels = models.filter((entry) => entry.provider === "openai");
-  if (mode === "high_res") {
-    return togetherModels[togetherModels.length - 1] || openAiModels[openAiModels.length - 1] || models[models.length - 1];
-  }
-  return togetherModels[0] || openAiModels[0] || models[0];
+  return models[0] || null;
 }
 
 // server/lib/instame-runtime-assets.ts
@@ -677,12 +672,76 @@ function getTogetherApiKey() {
   }
   return apiKey;
 }
-function resolveTogetherModelAlias(model) {
-  const normalized = model.trim().toLowerCase();
-  if (normalized === "reve-v1.1" || normalized === "reve v1.1") {
-    return process.env.TOGETHER_MODEL_REVE_V1_1 || model;
+function getReveApiKey() {
+  const apiKey = process.env.REVE_API_KEY;
+  if (!apiKey) {
+    throw new Error("REVE_API_KEY is required for Reve image generation.");
   }
+  return apiKey;
+}
+function getReveBaseUrl() {
+  return process.env.REVE_API_BASE_URL || "https://api.reve.com";
+}
+function resolveTogetherModelAlias(model) {
   return model;
+}
+function normalizeReveModelEnvKey(model) {
+  return model.trim().replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").toUpperCase();
+}
+function readFirstEnv(keys) {
+  for (const key of keys) {
+    const value = process.env[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+function resolveReveVersion(options) {
+  const alias = normalizeReveModelEnvKey(options.model);
+  const qualityKey = options.mode === "high_res" ? "HIGH_RES" : "PREVIEW";
+  const operationKey = options.operation.toUpperCase();
+  const defaultVersion = options.operation === "edit" ? options.mode === "high_res" ? "latest" : "latest-fast" : "latest";
+  return readFirstEnv([
+    `REVE_${operationKey}_VERSION_${alias}_${qualityKey}`,
+    `REVE_${operationKey}_VERSION_${alias}`,
+    `REVE_${operationKey}_VERSION_${qualityKey}`,
+    `REVE_${operationKey}_VERSION`,
+    `REVE_VERSION_${alias}_${qualityKey}`,
+    `REVE_VERSION_${alias}`,
+    "REVE_VERSION"
+  ]) || defaultVersion;
+}
+function sanitizeBase64Image(input) {
+  return input.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "").trim();
+}
+function extractReveImageBase64(payload) {
+  const directCandidates = [
+    payload?.image,
+    payload?.b64_json,
+    payload?.data?.image,
+    payload?.data?.b64_json
+  ];
+  for (const candidate of directCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return sanitizeBase64Image(candidate);
+    }
+  }
+  const arrayCandidates = [
+    Array.isArray(payload?.data) ? payload.data : [],
+    Array.isArray(payload?.images) ? payload.images : []
+  ];
+  for (const items of arrayCandidates) {
+    for (const item of items) {
+      if (typeof item?.image === "string" && item.image.trim()) {
+        return sanitizeBase64Image(item.image);
+      }
+      if (typeof item?.b64_json === "string" && item.b64_json.trim()) {
+        return sanitizeBase64Image(item.b64_json);
+      }
+    }
+  }
+  return null;
 }
 async function toOpenAiUpload(input, fallbackName) {
   const mimeType = normalizeMimeType2(input.mimeType);
@@ -763,6 +822,61 @@ async function generateTogetherImage(options) {
   const base64 = data[0]?.b64_json;
   if (!base64) {
     throw new Error("Together image generation returned no image data.");
+  }
+  return base64;
+}
+async function generateReveImage(options) {
+  const apiKey = getReveApiKey();
+  const baseUrl = getReveBaseUrl();
+  const mode = options.mode || "preview";
+  const isEdit = Boolean(options.referenceImage);
+  const endpoint = isEdit ? "/v1/image/edit" : "/v1/image/create";
+  const version = resolveReveVersion({
+    model: options.model,
+    operation: isEdit ? "edit" : "create",
+    mode
+  });
+  const payload = {
+    version
+  };
+  if (options.aspectRatio && options.aspectRatio !== "auto") {
+    payload.aspect_ratio = options.aspectRatio;
+  }
+  if (typeof options.testTimeScaling === "number" && Number.isFinite(options.testTimeScaling) && options.testTimeScaling >= 1 && options.testTimeScaling <= 15) {
+    payload.test_time_scaling = Math.round(options.testTimeScaling);
+  }
+  if (Array.isArray(options.postprocessing) && options.postprocessing.length > 0) {
+    payload.postprocessing = options.postprocessing;
+  }
+  if (isEdit) {
+    payload.edit_instruction = options.prompt;
+    payload.reference_image = sanitizeBase64Image(options.referenceImage.base64);
+  } else {
+    payload.prompt = options.prompt;
+  }
+  const response = await fetch(`${baseUrl}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload)
+  });
+  const responseText = await response.text();
+  let parsed = null;
+  try {
+    parsed = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    parsed = null;
+  }
+  if (!response.ok) {
+    const message = parsed?.message || parsed?.error || parsed?.error_code || responseText || `Reve API returned status ${response.status}`;
+    throw new Error(message);
+  }
+  const base64 = extractReveImageBase64(parsed);
+  if (!base64) {
+    throw new Error("Reve image generation returned no image data.");
   }
   return base64;
 }
@@ -1735,6 +1849,20 @@ async function generatePromptOnlyPresetImage(options) {
       imageBase64: imageBase642,
       model: selectedModel.displayName,
       provider: "Together"
+    };
+  }
+  if (selectedModel?.provider === "reve") {
+    const imageBase642 = await generateReveImage({
+      model: selectedModel.model,
+      prompt,
+      referenceImage: options.uploadedImages[0],
+      aspectRatio: "1:1",
+      mode: options.generationMode
+    });
+    return {
+      imageBase64: imageBase642,
+      model: selectedModel.displayName,
+      provider: "Reve"
     };
   }
   const openAiModel = selectedModel?.model || "gpt-image-1.5";

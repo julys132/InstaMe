@@ -32,7 +32,7 @@ function normalizeRequestedModel(input: unknown): InstaMeRequestedModel | null {
   const displayName = typeof record?.displayName === "string" ? record.displayName : "";
 
   if (!provider || !model || !displayName) return null;
-  if (provider !== "openai" && provider !== "together") return null;
+  if (provider !== "openai" && provider !== "together" && provider !== "reve") return null;
 
   return { provider, model, displayName };
 }
@@ -182,17 +182,9 @@ export function choosePromptVariant(
 
 export function chooseRequestedModel(
   variant: InstaMePromptVariant | null,
-  mode: "preview" | "high_res",
+  _mode: "preview" | "high_res",
 ): InstaMeRequestedModel | null {
   const models = variant?.requestedModels || [];
   if (models.length === 0) return null;
-
-  const togetherModels = models.filter((entry) => entry.provider === "together");
-  const openAiModels = models.filter((entry) => entry.provider === "openai");
-
-  if (mode === "high_res") {
-    return togetherModels[togetherModels.length - 1] || openAiModels[openAiModels.length - 1] || models[models.length - 1];
-  }
-
-  return togetherModels[0] || openAiModels[0] || models[0];
+  return models[0] || null;
 }

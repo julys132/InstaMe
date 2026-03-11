@@ -52,6 +52,7 @@ import {
 } from "./lib/instame-runtime-assets";
 import {
   generateOpenAiImage,
+  generateReveImage,
   generateTogetherImage,
   type RuntimeImageInput,
 } from "./lib/instame-image";
@@ -1453,6 +1454,22 @@ async function generatePromptOnlyPresetImage(options: {
       imageBase64,
       model: selectedModel.displayName,
       provider: "Together",
+    };
+  }
+
+  if (selectedModel?.provider === "reve") {
+    const imageBase64 = await generateReveImage({
+      model: selectedModel.model,
+      prompt,
+      referenceImage: options.uploadedImages[0],
+      aspectRatio: "1:1",
+      mode: options.generationMode,
+    });
+
+    return {
+      imageBase64,
+      model: selectedModel.displayName,
+      provider: "Reve",
     };
   }
 

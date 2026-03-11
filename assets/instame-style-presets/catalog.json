@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-11T16:30:34.573660+00:00",
+  "generatedAt": "2026-03-11T17:11:59.762743+00:00",
   "sourceFolder": "C:\\Users\\stiul\\OneDrive\\Pictures\\Screenshots\\Styles\\Styles Representative Image",
   "presetCount": 11,
   "presets": [
@@ -20,7 +20,7 @@
         {
           "id": "prompt_1",
           "label": "Prompt 1",
-          "prompt": "1. Edit the image, keeping 1:1 facial features, apply a pose where the body leans slightly forward, with the head tilted subtly down. Position the right hand elegantly so it gently touches and supports the jawline and chin, with the fingers softly curled inward and a delicate thin ring on the ring finger. The lower left arm should be visible in the frame, adorned with a classic silver metal link watch. Dress the subject in a thick, cozy, fuzzy white knit cardigan with soft textured details, layered over a light, semi-sheer white turtleneck top. Give the hair a long, gently wavy, and slightly messy texture that naturally frames the face. The facial expression should be relaxed, intimate, and softly alluring. Set the scene at night with a pitch-dark background featuring scattered, warm-toned blurred city lights creating a soft bokeh effect in the far distance. Render this with a strong nostalgic late 90s analog film aesthetic. Use direct on-camera flash lighting that brightly illuminates the subject with a soft highlight on the skin, while dropping the background into heavy darkness. Incorporate visible film grain, a soft vintage lens effect, slightly washed-out black tones for low contrast in the shadows, and a warm, peachy color palette with smooth, semi-matte skin textures. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a pose where the body leans slightly forward, with the head tilted subtly down. Position the right hand elegantly so it gently touches and supports the jawline and chin, with the fingers softly curled inward and a delicate thin ring on the ring finger. The lower left arm should be visible in the frame, adorned with a classic silver metal link watch. Dress the subject in a thick, cozy, fuzzy white knit cardigan with soft textured details, layered over a light, semi-sheer white turtleneck top. Give the hair a long, gently wavy, and slightly messy texture that naturally frames the face. The facial expression should be relaxed, intimate, and softly alluring. Set the scene at night with a pitch-dark background featuring scattered, warm-toned blurred city lights creating a soft bokeh effect in the far distance. Render this with a strong nostalgic late 90s analog film aesthetic. Use direct on-camera flash lighting that brightly illuminates the subject with a soft highlight on the skin, while dropping the background into heavy darkness. Incorporate visible film grain, a soft vintage lens effect, slightly washed-out black tones for low contrast in the shadows, and a warm, peachy color palette with smooth, semi-matte skin textures. Ensure the image is completely clean of all logos, text, or watermarks.",
           "requestedModels": [
             {
               "provider": "together",
@@ -37,7 +37,7 @@
         {
           "id": "prompt_2",
           "label": "Prompt 2",
-          "prompt": "2. Edit the image, keeping 1:1 facial features, apply a pose where the body leans slightly forward, with the head tilted subtly down. Position the right hand elegantly so it gently touches and supports the jawline and chin, with the fingers softly curled inward and a delicate thin ring on the ring finger. The lower left arm should be visible in the frame, adorned with a classic silver metal link watch. Dress the subject in a thick, cozy, fuzzy white knit cardigan with soft textured details, layered over a light, semi-sheer white turtleneck top. Give the hair a long, gently natural relaxed , and slightly messy texture that naturally frames the face. The facial expression should be relaxed, intimate, and softly alluring. Set the scene at night with a pitch-dark background featuring scattered, warm-toned blurred city lights creating a soft bokeh effect in the far distance. Render this with a strong nostalgic late 90s analog grain film aesthetic. Use direct on-camera flash lighting that brightly illuminates the subject with a soft highlight on the skin, while dropping the background into heavy darkness. Incorporate visible film grain, a soft vintage lens effect, slightly washed-out black tones for low contrast in the shadows, and a warm, peachy color palette with smooth, semi-matte skin textures. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a pose where the body leans slightly forward, with the head tilted subtly down. Position the right hand elegantly so it gently touches and supports the jawline and chin, with the fingers softly curled inward and a delicate thin ring on the ring finger. The lower left arm should be visible in the frame, adorned with a classic silver metal link watch. Dress the subject in a thick, cozy, fuzzy white knit cardigan with soft textured details, layered over a light, semi-sheer white turtleneck top. Give the hair a long, gently natural relaxed , and slightly messy texture that naturally frames the face. The facial expression should be relaxed, intimate, and softly alluring. Set the scene at night with a pitch-dark background featuring scattered, warm-toned blurred city lights creating a soft bokeh effect in the far distance. Render this with a strong nostalgic late 90s analog grain film aesthetic. Use direct on-camera flash lighting that brightly illuminates the subject with a soft highlight on the skin, while dropping the background into heavy darkness. Incorporate visible film grain, a soft vintage lens effect, slightly washed-out black tones for low contrast in the shadows, and a warm, peachy color palette with smooth, semi-matte skin textures. Ensure the image is completely clean of all logos, text, or watermarks.",
           "requestedModels": [
             {
               "provider": "together",
@@ -91,8 +91,25 @@
         {
           "id": "prompt_1",
           "label": "Prompt 1",
-          "prompt": "Prompt 1.\n\nEdit the image, keeping 1:1 facial features, apply a luxurious Mediterranean summer aesthetic. The subject is captured in a semi-reclined, relaxed pose on the beige leather seating of a high-end modern yacht. One arm is elegantly bent with fingers softly touching the temple and brushing through the hair, while the other hand rests naturally in the lap. The subject wears a crisp white linen summer dress with a deep V-neckline and subtle ribbed texture. The lighting is intense, direct golden sunlight that creates a radiant, sun-kissed glow on the skin with satin highlights. The background features a vast, sparkling turquoise ocean under a clear, pale blue sky, with a distant boat visible on the horizon to add depth. The color palette is a sophisticated mix of bronze skin tones, bright whites, and deep teal waters. The hair has a wind-swept, voluminous texture, flowing naturally. The overall vibe is cinematic old money vube high-end fashion editorial, glamorous and serene, rendered in ultra-high 8k resolution with sharp focus and vibrant, warm tones. Ensure the image is completely clean of all logos, text, or watermarks. (image model reve v1.1)\n\n\nPrompt 2.\n\nEdit the image, keeping 1:1 facial features, apply a luxurious Mediterranean summer aesthetic. The subject is captured in a semi-reclined, relaxed pose on the beige leather seating of a high-end modern yacht. One arm is elegantly bent with fingers softly touching the temple and brushing through the hair, while the other hand rests naturally in the lap. The subject wears a crisp linen long summer dress with a deep V-neckline and subtle ribbed texture.. The background features a vast, sparkling muted ocean under a clear, pale sky, with a distant boat visible on the horizon to add depth. The hair has a wind-swept, voluminous texture, flowing naturally. The overall vibe is cinematic old money vube high-end fashion editorial, glamorous and serene, rendered in ultra-high 8k resolution with sharp focus and vibrant, warm tones. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a luxurious Mediterranean summer aesthetic. The subject is captured in a semi-reclined, relaxed pose on the beige leather seating of a high-end modern yacht. One arm is elegantly bent with fingers softly touching the temple and brushing through the hair, while the other hand rests naturally in the lap. The subject wears a crisp white linen summer dress with a deep V-neckline and subtle ribbed texture. The lighting is intense, direct golden sunlight that creates a radiant, sun-kissed glow on the skin with satin highlights. The background features a vast, sparkling turquoise ocean under a clear, pale blue sky, with a distant boat visible on the horizon to add depth. The color palette is a sophisticated mix of bronze skin tones, bright whites, and deep teal waters. The hair has a wind-swept, voluminous texture, flowing naturally. The overall vibe is cinematic old money vube high-end fashion editorial, glamorous and serene, rendered in ultra-high 8k resolution with sharp focus and vibrant, warm tones. Ensure the image is completely clean of all logos, text, or watermarks.",
           "requestedModels": [
+            {
+              "provider": "reve",
+              "model": "reve-v1.1",
+              "displayName": "Reve v1.1"
+            }
+          ]
+        },
+        {
+          "id": "prompt_2",
+          "label": "Prompt 2",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a luxurious Mediterranean summer aesthetic. The subject is captured in a semi-reclined, relaxed pose on the beige leather seating of a high-end modern yacht. One arm is elegantly bent with fingers softly touching the temple and brushing through the hair, while the other hand rests naturally in the lap. The subject wears a crisp linen long summer dress with a deep V-neckline and subtle ribbed texture.. The background features a vast, sparkling muted ocean under a clear, pale sky, with a distant boat visible on the horizon to add depth. The hair has a wind-swept, voluminous texture, flowing naturally. The overall vibe is cinematic old money vube high-end fashion editorial, glamorous and serene, rendered in ultra-high 8k resolution with sharp focus and vibrant, warm tones. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-pro",
+              "displayName": "FLUX.2 Pro"
+            },
             {
               "provider": "together",
               "model": "black-forest-labs/FLUX.2-max",
@@ -119,16 +136,16 @@
         {
           "id": "prompt_1",
           "label": "Prompt 1",
-          "prompt": "1. Edit the image, keeping 1:1 facial features, and apply a sophisticated editorial photography style. Apply soft, diffused directional studio lighting to create a dimensional, flattering look, combined with a very shallow depth of field that renders the light-grey textured concrete background as a soft bokeh. Introduce a subtle, fine film grain overlay and a muted, matte color palette. seated pose with hands crossed in the lap and the composed, subtle smile expression. Ensure the new subject wears the precise one-color cashmere-like turtleneck and trousers with their current texture and deep color.  The structure of the wavy hair framing the face is precisely maintained., and wavy, , but must preserve the new subject's individual hair and eye color and unique facial features without change. The overall feel should be refined, understated, and tactile, avoiding overly saturated colors.",
+          "prompt": "Edit the image, keeping 1:1 facial features, and apply a sophisticated editorial photography style. Apply soft, diffused directional studio lighting to create a dimensional, flattering look, combined with a very shallow depth of field that renders the light-grey textured concrete background as a soft bokeh. Introduce a subtle, fine film grain overlay and a muted, matte color palette. seated pose with hands crossed in the lap and the composed, subtle smile expression. Ensure the new subject wears the precise one-color cashmere-like turtleneck and trousers with their current texture and deep color.  The structure of the wavy hair framing the face is precisely maintained., and wavy, , but must preserve the new subject's individual hair and eye color and unique facial features without change. The overall feel should be refined, understated, and tactile, avoiding overly saturated colors.",
           "requestedModels": []
         },
         {
           "id": "prompt_2",
           "label": "Prompt 2",
-          "prompt": "2.Edit the image, keeping 1:1 facial features. Apply soft, diffused high-key studio lighting that creates a flattering and even skin texture. The color palette must be strictly monochromatic warm creams and whites, applied across all elements. The background is a clean, minimalist light-grey studio backdrop with soft fall-off. A serene and confident facial expression is applied. The subject is seated in a modern, curved armchair, leaning back slightly in a relaxed yet elegant posture. Her left arm rests softly across her lap, and her right arm is supported by the armrest, with the hand and fingers resting naturally and elegantly over the edge. She wears a simple gold ring. The subject is dressed in a luxurious, thick-knit, fuzzy cream turtleneck sweater and matching cream wide-leg trousers. The structure of the wavy hair framing the face is precisely maintained. A very subtle, premium digital film grain is applied across the entire composition for a polished print quality. Ensure the image is completely clean of all logos or text.\"",
+          "prompt": "Edit the image, keeping 1:1 facial features. Apply soft, diffused high-key studio lighting that creates a flattering and even skin texture. The color palette must be strictly monochromatic warm creams and whites, applied across all elements. The background is a clean, minimalist light-grey studio backdrop with soft fall-off. A serene and confident facial expression is applied. The subject is seated in a modern, curved armchair, leaning back slightly in a relaxed yet elegant posture. Her left arm rests softly across her lap, and her right arm is supported by the armrest, with the hand and fingers resting naturally and elegantly over the edge. She wears a simple gold ring. The subject is dressed in a luxurious, thick-knit, fuzzy cream turtleneck sweater and matching cream wide-leg trousers. The structure of the wavy hair framing the face is precisely maintained. A very subtle, premium digital film grain is applied across the entire composition for a polished print quality. Ensure the image is completely clean of all logos or text.",
           "requestedModels": [
             {
-              "provider": "together",
+              "provider": "reve",
               "model": "reve-v1.1",
               "displayName": "Reve v1.1"
             }
@@ -160,7 +177,7 @@
               "displayName": "FLUX.2 Pro"
             },
             {
-              "provider": "together",
+              "provider": "reve",
               "model": "reve-v1.1",
               "displayName": "Reve v1.1"
             }
@@ -242,7 +259,7 @@
         {
           "id": "prompt_1",
           "label": "Prompt 1",
-          "prompt": "1 .Edit the image, keeping 1:1 facial features, apply a modern mirror-selfie composition. The subject is posing with their head slightly tilted to one side, maintaining a relaxed, neutral facial expression with gently parted lips. The right hand is raised, holding a white smartphone with a prominent triple-camera module in front of the lower face and chest area, with fingers gently gripping the phone, showcasing dark-painted nails. The left arm is slightly bent, gently resting with fingertips visible at the bottom left edge of the frame. The subject is wearing a dark, ribbed knit long-sleeve top featuring a delicate lace-up V-neck detail, with a small silver cross necklace resting on the collarbone. The hair is styled in long, voluminous, loose waves cascading down the shoulders, framing the face with a soft, feathery structure. The background is a bright, minimalist white interior, featuring a softly blurred white wooden door with top glass panels and architectural wall molding. The lighting is soft, evenly diffused, and flat, creating a bright, high-key background while providing rich, sharp contrast against the subject's clothing. The color palette emphasizes cool, crisp whites paired with deep, earthy tones, creating a modern, clean digital aesthetic with smooth, matte skin textures, crisp details, and zero film grain. High-resolution 8k portrait photography, sharp focus on the subject and the phone. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a modern mirror-selfie composition. The subject is posing with their head slightly tilted to one side, maintaining a relaxed, neutral facial expression with gently parted lips. The right hand is raised, holding a white smartphone with a prominent triple-camera module in front of the lower face and chest area, with fingers gently gripping the phone, showcasing dark-painted nails. The left arm is slightly bent, gently resting with fingertips visible at the bottom left edge of the frame. The subject is wearing a dark, ribbed knit long-sleeve top featuring a delicate lace-up V-neck detail, with a small silver cross necklace resting on the collarbone. The hair is styled in long, voluminous, loose waves cascading down the shoulders, framing the face with a soft, feathery structure. The background is a bright, minimalist white interior, featuring a softly blurred white wooden door with top glass panels and architectural wall molding. The lighting is soft, evenly diffused, and flat, creating a bright, high-key background while providing rich, sharp contrast against the subject's clothing. The color palette emphasizes cool, crisp whites paired with deep, earthy tones, creating a modern, clean digital aesthetic with smooth, matte skin textures, crisp details, and zero film grain. High-resolution 8k portrait photography, sharp focus on the subject and the phone. Ensure the image is completely clean of all logos, text, or watermarks.",
           "requestedModels": [
             {
               "provider": "together",
@@ -250,6 +267,12 @@
               "displayName": "FLUX.2 Pro"
             }
           ]
+        },
+        {
+          "id": "prompt_2",
+          "label": "Prompt 2",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a modern mirror-selfie composition. The subject is posing with their head slightly tilted to one side, maintaining a relaxed, neutral facial expression with gently parted lips. The right hand is raised, holding a white smartphone with a prominent triple-camera module in front of the lower face and chest area, with fingers gently gripping the phone, showcasing dark-painted nails. The left arm is slightly bent, gently resting with fingertips visible at the bottom left edge of the frame. The subject is wearing a dark, ribbed knit long-sleeve top featuring a delicate lace-up V-neck detail, with a small silver cross necklace resting on the collarbone. The hair is styled in long, voluminous, . The background is a bright, minimalist white interior, featuring a softly blurred white wooden door with top glass panels and architectural wall molding. The lighting is soft, evenly diffused, and flat, creating a bright, high-key background while providing rich, sharp contrast against the subject's clothing. The color palette emphasizes cool, crisp whites paired with deep, earthy tones, creating a modern, clean digital aesthetic with smooth, matte skin textures, crisp details, and zero film grain. High-resolution 8k portrait photography, sharp focus on the subject and the phone. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": []
         }
       ],
       "promptOnlyAfterFirstUse": true
@@ -279,7 +302,7 @@
               "displayName": "FLUX.2 Pro"
             },
             {
-              "provider": "together",
+              "provider": "reve",
               "model": "reve-v1.1",
               "displayName": "Reve v1.1"
             }
@@ -303,8 +326,14 @@
         {
           "id": "prompt_1",
           "label": "Prompt 1",
-          "prompt": "Edit the image, keeping 1:1 facial features, apply a pose where the subject is resting their chin softly on their right palm and index finger, with the right elbow propped on a dark, leather-clad horizontal surface. Wearing a simple, deep-v black spaghetti strap top made of a soft, slightly-lustrous material (satin-like), paired with dark brown leather trousers. The subject has voluminous, long, hair flows freely, cascading around the face and shoulders, highlighting the texture without defining a specific color. The subject holds a soft, direct gaze towards the camera. The skin has realistic texture, showing pore details and a subtle, healthy glow from soft, diffused studio lighting that provides gentle highlights and soft shadows. The background is a clean, neutral, light-grey studio backdrop. The entire scene has a palette of warm skin tones, deep browns, and deep blacks against the soft grey, exuding an atmosphere of intimacy and natural beauty. The image quality is extremely high, washed retro  professional fashion portraiture. Ensure the image is completely clean of all logos, text, or watermarks. (reve v1.1",
-          "requestedModels": []
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a pose where the subject is resting their chin softly on their right palm and index finger, with the right elbow propped on a dark, leather-clad horizontal surface. Wearing a simple, deep-v black spaghetti strap top made of a soft, slightly-lustrous material (satin-like), paired with dark brown leather trousers. The subject has voluminous, long, hair flows freely, cascading around the face and shoulders, highlighting the texture without defining a specific color. The subject holds a soft, direct gaze towards the camera. The skin has realistic texture, showing pore details and a subtle, healthy glow from soft, diffused studio lighting that provides gentle highlights and soft shadows. The background is a clean, neutral, light-grey studio backdrop. The entire scene has a palette of warm skin tones, deep browns, and deep blacks against the soft grey, exuding an atmosphere of intimacy and natural beauty. The image quality is extremely high, washed retro  professional fashion portraiture. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "reve",
+              "model": "reve-v1.1",
+              "displayName": "Reve v1.1"
+            }
+          ]
         }
       ],
       "promptOnlyAfterFirstUse": true
