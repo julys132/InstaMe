@@ -36,6 +36,14 @@ function getTogetherApiKey(): string {
   return apiKey;
 }
 
+function resolveTogetherModelAlias(model: string): string {
+  const normalized = model.trim().toLowerCase();
+  if (normalized === "reve-v1.1" || normalized === "reve v1.1") {
+    return process.env.TOGETHER_MODEL_REVE_V1_1 || model;
+  }
+  return model;
+}
+
 async function toOpenAiUpload(input: RuntimeImageInput, fallbackName: string) {
   const mimeType = normalizeMimeType(input.mimeType);
   const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
@@ -101,7 +109,7 @@ export async function generateTogetherImage(options: {
   const apiKey = getTogetherApiKey();
   const baseUrl = process.env.TOGETHER_BASE_URL || "https://api.together.xyz/v1";
   const payload: Record<string, unknown> = {
-    model: options.model,
+    model: resolveTogetherModelAlias(options.model),
     prompt: options.prompt,
     width: options.width,
     height: options.height,

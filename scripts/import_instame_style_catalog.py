@@ -54,6 +54,12 @@ def normalize_model_token(raw: str) -> dict[str, str] | None:
             "model": "black-forest-labs/FLUX.2-Flex",
             "displayName": "FLUX.2 Flex",
         }
+    if "reve v1.1" in cleaned or "reve-v1.1" in cleaned or "reve 1.1" in cleaned:
+        return {
+            "provider": "together",
+            "model": "reve-v1.1",
+            "displayName": "Reve v1.1",
+        }
     if "chat gpt 1.5 image model" in cleaned or "gpt image 1.5" in cleaned or "gpt-image-1.5" in cleaned:
         return {
             "provider": "openai",

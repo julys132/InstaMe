@@ -677,6 +677,13 @@ function getTogetherApiKey() {
   }
   return apiKey;
 }
+function resolveTogetherModelAlias(model) {
+  const normalized = model.trim().toLowerCase();
+  if (normalized === "reve-v1.1" || normalized === "reve v1.1") {
+    return process.env.TOGETHER_MODEL_REVE_V1_1 || model;
+  }
+  return model;
+}
 async function toOpenAiUpload(input, fallbackName) {
   const mimeType = normalizeMimeType2(input.mimeType);
   const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
@@ -721,7 +728,7 @@ async function generateTogetherImage(options) {
   const apiKey = getTogetherApiKey();
   const baseUrl = process.env.TOGETHER_BASE_URL || "https://api.together.xyz/v1";
   const payload = {
-    model: options.model,
+    model: resolveTogetherModelAlias(options.model),
     prompt: options.prompt,
     width: options.width,
     height: options.height,

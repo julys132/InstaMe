@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-11T16:08:05.745448+00:00",
+  "generatedAt": "2026-03-11T16:30:34.573660+00:00",
   "sourceFolder": "C:\\Users\\stiul\\OneDrive\\Pictures\\Screenshots\\Styles\\Styles Representative Image",
   "presetCount": 11,
   "presets": [
@@ -125,8 +125,14 @@
         {
           "id": "prompt_2",
           "label": "Prompt 2",
-          "prompt": "2.Edit the image, keeping 1:1 facial features. Apply soft, diffused high-key studio lighting that creates a flattering and even skin texture. The color palette must be strictly monochromatic warm creams and whites, applied across all elements. The background is a clean, minimalist light-grey studio backdrop with soft fall-off. A serene and confident facial expression is applied. The subject is seated in a modern, curved armchair, leaning back slightly in a relaxed yet elegant posture. Her left arm rests softly across her lap, and her right arm is supported by the armrest, with the hand and fingers resting naturally and elegantly over the edge. She wears a simple gold ring. The subject is dressed in a luxurious, thick-knit, fuzzy cream turtleneck sweater and matching cream wide-leg trousers. The structure of the wavy hair framing the face is precisely maintained. A very subtle, premium digital film grain is applied across the entire composition for a polished print quality. Ensure the image is completely clean of all logos or text.\" (image model :  reve-v1.1, p-image-edit image model)",
-          "requestedModels": []
+          "prompt": "2.Edit the image, keeping 1:1 facial features. Apply soft, diffused high-key studio lighting that creates a flattering and even skin texture. The color palette must be strictly monochromatic warm creams and whites, applied across all elements. The background is a clean, minimalist light-grey studio backdrop with soft fall-off. A serene and confident facial expression is applied. The subject is seated in a modern, curved armchair, leaning back slightly in a relaxed yet elegant posture. Her left arm rests softly across her lap, and her right arm is supported by the armrest, with the hand and fingers resting naturally and elegantly over the edge. She wears a simple gold ring. The subject is dressed in a luxurious, thick-knit, fuzzy cream turtleneck sweater and matching cream wide-leg trousers. The structure of the wavy hair framing the face is precisely maintained. A very subtle, premium digital film grain is applied across the entire composition for a polished print quality. Ensure the image is completely clean of all logos or text.\"",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "reve-v1.1",
+              "displayName": "Reve v1.1"
+            }
+          ]
         }
       ],
       "promptOnlyAfterFirstUse": true
@@ -152,6 +158,11 @@
               "provider": "together",
               "model": "black-forest-labs/FLUX.2-pro",
               "displayName": "FLUX.2 Pro"
+            },
+            {
+              "provider": "together",
+              "model": "reve-v1.1",
+              "displayName": "Reve v1.1"
             }
           ]
         }
@@ -266,6 +277,11 @@
               "provider": "together",
               "model": "black-forest-labs/FLUX.2-pro",
               "displayName": "FLUX.2 Pro"
+            },
+            {
+              "provider": "together",
+              "model": "reve-v1.1",
+              "displayName": "Reve v1.1"
             }
           ]
         }
