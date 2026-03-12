@@ -15,184 +15,123 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { INSTAME_STYLE_PRESETS } from "@shared/instame-style-presets";
 
-const HERO_FRAMES = [
-  {
-    id: "mono",
-    title: "Archive Mono",
-    subtitle: "Quiet luxury portrait",
-    image:
-      INSTAME_STYLE_PRESETS.find((preset) => preset.id === "old_money")?.representativeImage ||
-      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop",
-    glow: "rgba(255,255,255,0.08)",
-    frame: "rgba(255,255,255,0.14)",
-    accent: "#F1E9EE",
-    x: -24,
-    y: 18,
-    rotation: -7,
-    scale: 0.98,
-  },
-  {
-    id: "rose",
-    title: "Rose Edit",
-    subtitle: "Soft glam narrative",
-    image:
-      INSTAME_STYLE_PRESETS.find((preset) => preset.id === "glam")?.representativeImage ||
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
-    glow: "rgba(255,79,125,0.28)",
-    frame: "rgba(255,142,182,0.30)",
-    accent: "#FFD6E1",
-    x: 16,
-    y: -6,
-    rotation: 4,
-    scale: 1.03,
-  },
-  {
-    id: "grey",
-    title: "Grey Film",
-    subtitle: "Retro portrait styling",
-    image:
-      INSTAME_STYLE_PRESETS.find((preset) => preset.id === "retro")?.representativeImage ||
-      "https://images.unsplash.com/photo-1464863979621-258859e62245?q=80&w=1200&auto=format&fit=crop",
-    glow: "rgba(158,158,158,0.16)",
-    frame: "rgba(222,222,222,0.18)",
-    accent: "#ECE7EA",
-    x: 34,
-    y: 56,
-    rotation: -3,
-    scale: 0.97,
-  },
+const FRAME_SOURCES = [
+  INSTAME_STYLE_PRESETS.find((preset) => preset.id === "retro")?.representativeImage,
+  INSTAME_STYLE_PRESETS.find((preset) => preset.id === "glam")?.representativeImage,
+  INSTAME_STYLE_PRESETS.find((preset) => preset.id === "old_money")?.representativeImage,
+  INSTAME_STYLE_PRESETS.find((preset) => preset.id === "street_luxe")?.representativeImage,
+].filter(Boolean) as string[];
+
+const FRAME_LAYOUT = [
+  { x: -76, y: 12, rotate: "-9deg", scale: 0.9, tint: "rgba(8,8,10,0.68)", border: "rgba(255,255,255,0.06)", z: 1 },
+  { x: 70, y: 22, rotate: "7deg", scale: 0.88, tint: "rgba(10,10,12,0.70)", border: "rgba(255,255,255,0.06)", z: 1 },
+  { x: -18, y: 68, rotate: "-4deg", scale: 0.96, tint: "rgba(82,10,36,0.46)", border: "rgba(255,92,146,0.16)", z: 2 },
+  { x: 18, y: -10, rotate: "4deg", scale: 1.03, tint: "rgba(102,8,40,0.54)", border: "rgba(255,108,163,0.22)", z: 3 },
 ] as const;
 
-const SIGNALS = ["Old Money", "Retro", "Glam", "Selfie-ready"] as const;
+const SIGNAL_WORDS = ["Editorials", "Authentic", "Swift"] as const;
 
 export default function WelcomeScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      <LinearGradient colors={["#040404", "#140C11", "#070707"]} style={StyleSheet.absoluteFill} />
-      <View style={styles.topGlow} />
-      <View style={styles.bottomGlow} />
-      <View style={styles.sideGlow} />
+      <LinearGradient colors={["#020202", "#0C070A", "#030303"]} style={StyleSheet.absoluteFill} />
+      <View style={styles.vignette} />
+      <View style={styles.accentGlow} />
 
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.heroHeader}>
-            <View style={styles.brandRow}>
-              <View style={styles.brandMark}>
-                <Text style={styles.brandMarkText}>C</Text>
-              </View>
-              <View style={styles.brandTextWrap}>
-                <Text style={styles.brandEyebrow}>Portrait Style Studio</Text>
-                <Text style={styles.brand}>CHICOO</Text>
-              </View>
-            </View>
-
-            <View style={styles.badge}>
-              <Ionicons name="sparkles" size={13} color={Colors.accentLight} />
-              <Text style={styles.badgeText}>Trending portrait styling</Text>
-            </View>
-
-            <Text style={styles.title}>Your face, styled better.</Text>
-            <Text style={styles.subtitle}>
-              Luxury-inspired portrait styling with a softer, trend-driven edge.
-              Upload once, refine the vibe, and get a polished result in seconds.
+          <View style={styles.hero}>
+            <Text style={styles.brand}>CHICOO</Text>
+            <Text style={styles.tagline}>YOUR FACE, STYLED BETTER.</Text>
+            <Text style={styles.subline}>
+              TRANSFORM YOUR PORTRAITS{"\n"}
+              INTO A TREND-LED LOOK{"\n"}
+              WITH ONE TOUCH.
             </Text>
           </View>
 
-          <View style={styles.collageWrap}>
-            <View style={styles.collageFrame}>
-              <LinearGradient
-                colors={["rgba(255,255,255,0.03)", "rgba(255,255,255,0)", "rgba(255,79,125,0.05)"]}
-                style={styles.collageSurface}
-              />
-              {HERO_FRAMES.map((frame) => (
-                <View
-                  key={frame.id}
-                  style={[
-                    styles.heroCardOuter,
-                    {
-                      transform: [
-                        { translateX: frame.x },
-                        { translateY: frame.y },
-                        { rotate: `${frame.rotation}deg` },
-                        { scale: frame.scale },
-                      ],
-                      shadowColor: frame.glow,
-                      backgroundColor: frame.glow,
-                    },
-                  ]}
-                >
-                  <View style={[styles.heroCard, { borderColor: frame.frame }]}>
-                    <Image source={{ uri: frame.image }} style={styles.heroCardImage} contentFit="cover" />
-                    <LinearGradient
-                      colors={["rgba(255,255,255,0.10)", "rgba(0,0,0,0.08)", "rgba(0,0,0,0.22)"]}
-                      locations={[0, 0.15, 1]}
-                      style={styles.heroCardImageWash}
-                    />
-                    <LinearGradient
-                      colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.38)", "rgba(0,0,0,0.88)"]}
-                      locations={[0, 0.52, 1]}
-                      style={styles.heroCardFooter}
-                    />
-                    <View style={styles.heroCardMeta}>
-                      <Text style={[styles.heroCardTitle, { color: frame.accent }]}>{frame.title}</Text>
-                      <Text style={styles.heroCardSubtitle}>{frame.subtitle}</Text>
-                    </View>
-                  </View>
+          <View style={styles.collageArea}>
+            {FRAME_LAYOUT.map((frame, index) => (
+              <View
+                key={`frame-${index}`}
+                style={[
+                  styles.frameOuter,
+                  {
+                    transform: [
+                      { translateX: frame.x },
+                      { translateY: frame.y },
+                      { rotate: frame.rotate },
+                      { scale: frame.scale },
+                    ],
+                    zIndex: frame.z,
+                    shadowColor: frame.tint,
+                  },
+                ]}
+              >
+                <View style={[styles.frameCard, { borderColor: frame.border }]}>
+                  <Image
+                    source={{ uri: FRAME_SOURCES[index % FRAME_SOURCES.length] }}
+                    style={styles.frameImage}
+                    contentFit="cover"
+                  />
+                  <LinearGradient
+                    colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.04)", frame.tint]}
+                    locations={[0, 0.2, 1]}
+                    style={styles.frameTint}
+                  />
+                  <View style={styles.innerPanel} />
+                  <View style={styles.centerRing} />
+                  <Text style={styles.frameIndex}>{String(index + 1).padStart(2, "0")}</Text>
                 </View>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.signalRow}>
-            {SIGNALS.map((item) => (
-              <View key={item} style={styles.signalPill}>
-                <Text style={styles.signalText}>{item}</Text>
               </View>
             ))}
           </View>
 
-          <View style={styles.copyCard}>
-            <Text style={styles.copyCardTitle}>Built for portraits that still feel like you.</Text>
-            <Text style={styles.copyCardText}>
-              Chicoo keeps identity first, then layers on style direction,
-              lighting mood, and editorial finish without turning the result
-              into someone else.
-            </Text>
+          <View style={styles.signalRow}>
+            {SIGNAL_WORDS.map((word) => (
+              <Text key={word} style={styles.signalText}>
+                {word}
+              </Text>
+            ))}
           </View>
 
-          <View style={styles.ctaBlock}>
-            <Pressable
-              onPress={() => router.push("/(auth)/register")}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.buttonPressed,
-              ]}
-            >
-              <Text style={styles.primaryButtonText}>Create Account</Text>
-            </Pressable>
+          <Pressable
+            onPress={() => router.push("/(auth)/register")}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={styles.primaryButtonText}>CREATE ACCOUNT</Text>
+          </Pressable>
 
+          <View style={styles.signInBlock}>
             <Pressable
               onPress={() => router.push("/(auth)/login")}
               style={({ pressed }) => [
-                styles.secondaryButton,
+                styles.signInCircle,
                 pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.secondaryButtonText}>Sign In</Text>
+              <LinearGradient
+                colors={["rgba(255,255,255,0.05)", "rgba(255,79,125,0.12)", "rgba(0,0,0,0.12)"]}
+                style={StyleSheet.absoluteFill}
+              />
+              <Ionicons name="person-outline" size={18} color="#FFD9E5" />
             </Pressable>
 
-            <Pressable onPress={() => router.push("/launch")} style={styles.openLink}>
-              <Text style={styles.openLinkText}>Already signed in? Open Chicoo</Text>
-            </Pressable>
-
-            <Text style={styles.footnote}>
-              Vintage mono. Grey film. Rose glow. One portrait, styled better.
+            <Text style={styles.signInText}>
+              Existing account? Tap the circle{"\n"}to sign in.
             </Text>
           </View>
+
+          <Pressable onPress={() => router.push("/launch")} style={styles.openLink}>
+            <Text style={styles.openLinkText}>Open Chicoo</Text>
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -208,266 +147,192 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    paddingHorizontal: 22,
-    paddingTop: 12,
-    paddingBottom: 36,
-    gap: 24,
+    minHeight: "100%",
+    paddingHorizontal: 24,
+    paddingTop: 18,
+    paddingBottom: 30,
+    alignItems: "center",
   },
-  topGlow: {
-    position: "absolute",
-    top: -80,
-    right: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 220,
-    backgroundColor: "rgba(255,79,125,0.14)",
+  vignette: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.34)",
   },
-  bottomGlow: {
+  accentGlow: {
     position: "absolute",
-    bottom: -90,
-    left: -40,
+    bottom: -120,
+    left: "15%",
     width: 240,
     height: 240,
     borderRadius: 240,
-    backgroundColor: "rgba(255,79,125,0.10)",
+    backgroundColor: "rgba(255,79,125,0.08)",
   },
-  sideGlow: {
-    position: "absolute",
-    top: "30%",
-    left: -70,
-    width: 180,
-    height: 180,
-    borderRadius: 180,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  heroHeader: {
-    gap: 14,
-  },
-  brandRow: {
-    flexDirection: "row",
+  hero: {
+    marginTop: 28,
     alignItems: "center",
     gap: 12,
   },
-  brandMark: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,79,125,0.16)",
-    borderWidth: 1,
-    borderColor: "rgba(255,150,183,0.30)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  brandMarkText: {
-    color: "#FFF4F7",
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 22,
-    lineHeight: 24,
-    marginTop: -1,
-  },
-  brandTextWrap: {
-    gap: 2,
-  },
-  brandEyebrow: {
-    color: "#A9A1A5",
-    fontFamily: "Inter_500Medium",
-    fontSize: 10,
-    letterSpacing: 1.5,
+  brand: {
+    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 34,
+    letterSpacing: 10,
+    textAlign: "center",
     textTransform: "uppercase",
   },
-  brand: {
-    color: "#FFF",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 17,
-    letterSpacing: 3.4,
-  },
-  badge: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.25)",
-  },
-  badgeText: {
-    color: "#D3CCD0",
+  tagline: {
+    color: "#F8F1F4",
     fontFamily: "Inter_500Medium",
     fontSize: 11,
-    letterSpacing: 0.4,
+    letterSpacing: 6,
+    textAlign: "center",
+    textTransform: "uppercase",
   },
-  title: {
-    color: "#FFF8FB",
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 42,
-    lineHeight: 46,
-    maxWidth: 300,
-  },
-  subtitle: {
-    color: "#B2AAAE",
+  subline: {
+    color: "#7D7780",
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 22,
-    maxWidth: 360,
+    fontSize: 10.5,
+    lineHeight: 24,
+    letterSpacing: 4.2,
+    textAlign: "center",
+    textTransform: "uppercase",
   },
-  collageWrap: {
-    paddingTop: 6,
-  },
-  collageFrame: {
-    height: 388,
-    borderRadius: 34,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(10,10,10,0.78)",
-    overflow: "hidden",
+  collageArea: {
+    position: "relative",
+    width: "100%",
+    height: 470,
+    marginTop: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  collageSurface: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  heroCardOuter: {
+  frameOuter: {
     position: "absolute",
-    width: "58%",
+    width: 218,
     aspectRatio: 4 / 5,
-    borderRadius: 22,
+    borderRadius: 24,
     padding: 2,
-    shadowOpacity: 0.3,
-    shadowRadius: 18,
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
     shadowOffset: { width: 0, height: 10 },
     elevation: 12,
   },
-  heroCard: {
+  frameCard: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: "hidden",
     borderWidth: 1,
-    backgroundColor: "#0F0F0F",
+    backgroundColor: "#070709",
   },
-  heroCardImage: {
+  frameImage: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.22,
+  },
+  frameTint: {
     ...StyleSheet.absoluteFillObject,
   },
-  heroCardImageWash: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  heroCardFooter: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  heroCardMeta: {
+  innerPanel: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    paddingTop: 18,
+    width: "32%",
+    height: "38%",
+    left: "24%",
+    top: "18%",
+    borderRadius: 16,
+    backgroundColor: "rgba(255,79,125,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,120,170,0.12)",
   },
-  heroCardTitle: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 20,
-    lineHeight: 22,
-    marginBottom: 4,
-    textShadowColor: "rgba(0,0,0,0.70)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
+  centerRing: {
+    position: "absolute",
+    width: 64,
+    height: 64,
+    left: "50%",
+    top: "50%",
+    marginLeft: -32,
+    marginTop: -18,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: "rgba(255,79,125,0.06)",
   },
-  heroCardSubtitle: {
-    color: "rgba(255,255,255,0.88)",
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 17,
-    textShadowColor: "rgba(0,0,0,0.65)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
+  frameIndex: {
+    position: "absolute",
+    right: 14,
+    bottom: 12,
+    color: "rgba(255,255,255,0.18)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    letterSpacing: 1.2,
   },
   signalRow: {
+    width: "100%",
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  signalPill: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    justifyContent: "space-between",
+    marginTop: -8,
+    marginBottom: 10,
+    paddingHorizontal: 10,
   },
   signalText: {
-    color: "#D7D0D4",
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    letterSpacing: 0.6,
+    color: "#5F5A62",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    letterSpacing: 3.1,
     textTransform: "uppercase",
   },
-  copyCard: {
-    borderRadius: 22,
+  primaryButton: {
+    width: "100%",
+    maxWidth: 352,
+    height: 58,
+    borderRadius: 29,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    padding: 16,
-    gap: 8,
-  },
-  copyCardTitle: {
-    color: "#FFF",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-  },
-  copyCardText: {
-    color: "#AEA7AB",
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  ctaBlock: {
-    gap: 12,
-  },
-  primaryButton: {
-    height: 58,
-    borderRadius: 16,
-    backgroundColor: Colors.accent,
+    backgroundColor: "rgba(7,8,12,0.86)",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "rgba(0,0,0,0.8)",
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
   primaryButtonText: {
-    color: "#090909",
+    color: "#EEE6EA",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
+    fontSize: 14,
+    letterSpacing: 4,
+    textTransform: "uppercase",
   },
-  secondaryButton: {
-    height: 56,
-    borderRadius: 16,
+  signInBlock: {
+    marginTop: 22,
+    alignItems: "center",
+    gap: 12,
+  },
+  signInCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#0B0B0E",
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryButtonText: {
-    color: "#FFF",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+  signInText: {
+    color: "#66616A",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 20,
+    letterSpacing: 1.1,
+    textAlign: "center",
   },
   openLink: {
-    alignItems: "center",
-    justifyContent: "center",
+    marginTop: 18,
     paddingVertical: 6,
   },
   openLinkText: {
-    color: Colors.accentLight,
+    color: "#7A7480",
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
-  },
-  footnote: {
-    color: "#7F777B",
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 18,
-    textAlign: "center",
-    marginTop: 6,
+    fontSize: 11,
+    letterSpacing: 2.2,
+    textTransform: "uppercase",
   },
   buttonPressed: {
     opacity: 0.9,
