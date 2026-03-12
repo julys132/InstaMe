@@ -31,6 +31,7 @@ module.exports = () => {
   const plugins = Array.isArray(baseExpoConfig.plugins) ? [...baseExpoConfig.plugins] : [];
   const androidConfig = { ...(baseExpoConfig.android || {}) };
   const intentFilters = Array.isArray(androidConfig.intentFilters) ? [...androidConfig.intentFilters] : [];
+  const extra = { ...(baseExpoConfig.extra || {}) };
 
   if (!hasPlugin(plugins, "@react-native-google-signin/google-signin")) {
     plugins.push("@react-native-google-signin/google-signin");
@@ -48,6 +49,13 @@ module.exports = () => {
     process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || process.env.GOOGLE_ANDROID_CLIENT_ID || "";
   const googleRedirectScheme = toGoogleRedirectScheme(googleAndroidClientId);
 
+  const configuredApiBaseUrl =
+    process.env.EXPO_PUBLIC_API_BASE_URL ||
+    process.env.PUBLIC_APP_URL ||
+    process.env.PUBLIC_WEB_URL ||
+    extra.apiBaseUrl ||
+    "https://instame.up.railway.app";
+
   if (googleRedirectScheme && !hasIntentFilter(intentFilters, googleRedirectScheme, "/oauth2redirect")) {
     intentFilters.push({
       action: "VIEW",
@@ -64,6 +72,10 @@ module.exports = () => {
   return {
     ...baseExpoConfig,
     plugins,
+    extra: {
+      ...extra,
+      apiBaseUrl: configuredApiBaseUrl,
+    },
     android: {
       ...androidConfig,
       intentFilters,

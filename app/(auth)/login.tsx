@@ -160,7 +160,7 @@ export default function LoginScreen() {
       router.replace("/(tabs)/instame");
     } catch (e: any) {
       if (e.code !== "ERR_REQUEST_CANCELED") {
-        Alert.alert("Error", "Apple Sign-In failed. Please try again.");
+        Alert.alert("Error", e?.message || "Apple Sign-In failed. Please try again.");
       }
     }
   }
