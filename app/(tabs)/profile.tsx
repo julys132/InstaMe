@@ -1,4 +1,5 @@
-import { View, Text, Pressable, ScrollView, StyleSheet, Platform, Alert } from "react-native";
+import { useState } from "react";
+import { View, Text, Pressable, ScrollView, StyleSheet, Platform, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -9,6 +10,8 @@ import ChicooBackground from "@/components/ChicooBackground";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useCredits, SUBSCRIPTION_PLANS } from "@/contexts/CreditsContext";
+
+const DEV_TEST_EMAIL = "iuliastarcean@gmail.com";
 
 function StatCard({ label, value, icon }: { label: string; value: string; icon: string }) {
   return (
@@ -37,11 +40,13 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout, deleteAccount } = useAuth();
   const { items, outfits } = useWardrobe();
-  const { credits, subscription } = useCredits();
+  const { credits, subscription, grantDevCredits } = useCredits();
+  const [devCreditLoading, setDevCreditLoading] = useState(false);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
   const activeSub = SUBSCRIPTION_PLANS.find(p => p.id === subscription);
+  const isDeveloperAccount = user?.email?.toLowerCase() === DEV_TEST_EMAIL;
   const styleGenderLabel =
     user?.styleGender === "female"
       ? "Woman"
@@ -112,6 +117,19 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleGrantDeveloperCredits = async () => {
+    setDevCreditLoading(true);
+    try {
+      const result = await grantDevCredits(100);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Test credits added", `${result.grantedCredits} credits added. Current balance: ${result.credits}.`);
+    } catch (error: any) {
+      Alert.alert("Error", error?.message || "Could not add developer test credits.");
+    } finally {
+      setDevCreditLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ChicooBackground />
@@ -169,6 +187,26 @@ export default function ProfileScreen() {
               <Text style={styles.subBadgeText}>{activeSub.name} Plan Active</Text>
             </View>
           )}
+          {isDeveloperAccount ? (
+            <Pressable
+              onPress={handleGrantDeveloperCredits}
+              disabled={devCreditLoading}
+              style={({ pressed }) => [
+                styles.devCreditsButton,
+                pressed && !devCreditLoading ? { opacity: 0.88 } : undefined,
+                devCreditLoading ? { opacity: 0.7 } : undefined,
+              ]}
+            >
+              {devCreditLoading ? (
+                <ActivityIndicator color="#0A0A0A" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="flask-outline" size={16} color="#0A0A0A" />
+                  <Text style={styles.devCreditsButtonText}>Add 100 test credits</Text>
+                </>
+              )}
+            </Pressable>
+          ) : null}
         </Animated.View>
 
         <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.statsRow}>
@@ -323,6 +361,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     color: Colors.accent,
+  },
+  devCreditsButton: {
+    marginTop: 4,
+    alignSelf: "flex-start",
+    minHeight: 42,
+    borderRadius: 14,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  devCreditsButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#0A0A0A",
   },
   statsRow: {
     flexDirection: "row",

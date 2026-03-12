@@ -12,7 +12,6 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
-import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
@@ -27,7 +26,6 @@ import {
   type InstaMeUploadedImageAsset,
 } from "@/lib/api-client";
 import {
-  MAX_STORED_UPLOADS,
   optimizeImageAsset,
   type PreparedUploadImage,
 } from "@/lib/instame-uploaded-images";
@@ -272,8 +270,6 @@ export default function InstaMeScreen() {
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
   const [styleReferenceCount, setStyleReferenceCount] = useState<number>(0);
   const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
-  const [uploadedImagesCount, setUploadedImagesCount] = useState(0);
-  const [savedImageLoading, setSavedImageLoading] = useState(false);
   const styleListRef = useRef<ScrollView | null>(null);
   const [canScrollMoreRight, setCanScrollMoreRight] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -310,15 +306,6 @@ export default function InstaMeScreen() {
     ? params.uploadedImageNonce[0]
     : params.uploadedImageNonce;
 
-  const refreshUploadedImageCount = useCallback(async () => {
-    try {
-      const result = await apiClient.getInstaMeUploadedImages();
-      setUploadedImagesCount(Array.isArray(result.images) ? result.images.length : 0);
-    } catch {
-      setUploadedImagesCount(0);
-    }
-  }, []);
-
   useEffect(() => {
     let mounted = true;
 
@@ -326,8 +313,7 @@ export default function InstaMeScreen() {
       apiClient.getInstaMeStyleLibrary(),
       apiClient.getInstaMeStylePresets(),
       apiClient.getInstaMePricing(),
-      apiClient.getInstaMeUploadedImages(),
-    ]).then(([styleLibraryResult, stylePresetResult, pricingResult, uploadedImagesResult]) => {
+    ]).then(([styleLibraryResult, stylePresetResult, pricingResult]) => {
         if (!mounted) return;
 
         if (styleLibraryResult.status === "fulfilled") {
@@ -351,12 +337,6 @@ export default function InstaMeScreen() {
             setSelectedGenerationTierId(pricingResult.value.liveGenerationTierId);
           }
         }
-
-        if (uploadedImagesResult.status === "fulfilled") {
-          setUploadedImagesCount(Array.isArray(uploadedImagesResult.value.images) ? uploadedImagesResult.value.images.length : 0);
-        } else {
-          setUploadedImagesCount(0);
-        }
       });
 
     return () => {
@@ -364,19 +344,12 @@ export default function InstaMeScreen() {
     };
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshUploadedImageCount();
-    }, [refreshUploadedImageCount]),
-  );
-
   useEffect(() => {
     if (!uploadedImageIdParam || !uploadedImageNonce) {
       return;
     }
 
     let cancelled = false;
-    setSavedImageLoading(true);
 
     apiClient
       .getInstaMeUploadedImage(uploadedImageIdParam)
@@ -405,9 +378,7 @@ export default function InstaMeScreen() {
         }
       })
       .finally(() => {
-        if (!cancelled) {
-          setSavedImageLoading(false);
-        }
+        // no-op
       });
 
     return () => {
@@ -708,20 +679,6 @@ export default function InstaMeScreen() {
             </Pressable>
           </View>
 
-          <Text style={styles.uploadMetaText}>
-            Saved portraits live in a dedicated page and are automatically optimized to max 1024 x 1024 px and 1MB.
-          </Text>
-          <View style={styles.uploadedLibrarySummary}>
-            <View style={styles.uploadedLibrarySummaryTextWrap}>
-              <Text style={styles.uploadedLibrarySummaryTitle}>Uploaded Images</Text>
-              <Text style={styles.uploadedLibrarySummarySubtitle}>
-                {uploadedImagesCount > 0
-                  ? `${uploadedImagesCount}/${MAX_STORED_UPLOADS} saved portraits ready to reuse`
-                  : "Open the dedicated page to save and manage portraits"}
-              </Text>
-            </View>
-            {savedImageLoading ? <ActivityIndicator color={Colors.accent} size="small" /> : null}
-          </View>
         </View>
 
         <View style={styles.card}>
@@ -1155,11 +1112,11 @@ const styles = StyleSheet.create({
   uploadPlaceholderSubtitle: { color: "#A3A3A3", fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" },
   uploadActionRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 10,
     marginTop: 12,
   },
   secondaryActionButton: {
+    flex: 1,
     minHeight: 44,
     borderRadius: 12,
     borderWidth: 1,
@@ -1185,41 +1142,6 @@ const styles = StyleSheet.create({
   },
   secondaryActionButtonTextAccent: {
     color: Colors.accentLight,
-  },
-  uploadMetaText: {
-    color: "#A8A8A8",
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 12,
-  },
-  uploadedLibrarySummary: {
-    marginTop: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.025)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  uploadedLibrarySummaryTextWrap: {
-    flex: 1,
-    gap: 3,
-  },
-  uploadedLibrarySummaryTitle: {
-    color: "#FFF",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-  },
-  uploadedLibrarySummarySubtitle: {
-    color: "#AFAFAF",
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 18,
   },
   uploadedImagesSection: {
     marginTop: 16,
