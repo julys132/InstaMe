@@ -1,146 +1,285 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { Image } from "expo-image";
+import { router } from "expo-router";
 import React from "react";
 import {
   Pressable,
   SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { INSTAME_STYLE_PRESETS } from "@shared/instame-style-presets";
 
-const FEATURES = [
+const HERO_FRAMES = [
   {
-    icon: "sparkles-outline",
-    title: "Luxury editorial finish",
-    text: "Elevate any photo with polished contrast, refined tones and a premium old-money mood.",
+    id: "mono",
+    title: "Archive Mono",
+    subtitle: "Quiet luxury portrait",
+    image:
+      INSTAME_STYLE_PRESETS.find((preset) => preset.id === "old_money")?.representativeImage ||
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop",
+    glow: "rgba(255,255,255,0.08)",
+    frame: "rgba(255,255,255,0.14)",
+    accent: "#F1E9EE",
+    x: -24,
+    y: 18,
+    rotation: -7,
+    scale: 0.98,
   },
   {
-    icon: "person-outline",
-    title: "Preserve your identity",
-    text: "Keep the same person, pose and feeling while enhancing the overall aesthetic.",
+    id: "rose",
+    title: "Rose Edit",
+    subtitle: "Soft glam narrative",
+    image:
+      INSTAME_STYLE_PRESETS.find((preset) => preset.id === "glam")?.representativeImage ||
+      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1200&auto=format&fit=crop",
+    glow: "rgba(255,79,125,0.28)",
+    frame: "rgba(255,142,182,0.30)",
+    accent: "#FFD6E1",
+    x: 16,
+    y: -6,
+    rotation: 4,
+    scale: 1.03,
   },
   {
-    icon: "flash-outline",
-    title: "Fast and simple",
-    text: "Upload, choose intensity and get a beautifully transformed result in seconds.",
+    id: "grey",
+    title: "Grey Film",
+    subtitle: "Retro portrait styling",
+    image:
+      INSTAME_STYLE_PRESETS.find((preset) => preset.id === "retro")?.representativeImage ||
+      "https://images.unsplash.com/photo-1464863979621-258859e62245?q=80&w=1200&auto=format&fit=crop",
+    glow: "rgba(158,158,158,0.16)",
+    frame: "rgba(222,222,222,0.18)",
+    accent: "#ECE7EA",
+    x: 34,
+    y: 56,
+    rotation: -3,
+    scale: 0.97,
   },
 ] as const;
 
+const SIGNALS = ["Old Money", "Retro", "Glam", "Selfie-ready"] as const;
+
 export default function WelcomeScreen() {
   return (
-    <LinearGradient
-      colors={["#000000", "#0A0A0A", "#121212"]}
-      style={styles.container}
-    >
-      <StatusBar barStyle="light-content" />
+    <View style={styles.container}>
+      <StatusBar style="light" />
+      <LinearGradient colors={["#040404", "#140C11", "#070707"]} style={StyleSheet.absoluteFill} />
+      <View style={styles.topGlow} />
+      <View style={styles.bottomGlow} />
+      <View style={styles.sideGlow} />
+
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.hero}>
-            <View style={styles.badge}>
-              <Ionicons name="sparkles" size={14} color={Colors.accent} />
-              <Text style={styles.badgeText}>Luxury image transformation</Text>
+          <View style={styles.heroHeader}>
+            <View style={styles.brandRow}>
+              <View style={styles.brandMark}>
+                <Text style={styles.brandMarkText}>C</Text>
+              </View>
+              <View style={styles.brandTextWrap}>
+                <Text style={styles.brandEyebrow}>Portrait Style Studio</Text>
+                <Text style={styles.brand}>CHICOO</Text>
+              </View>
             </View>
 
-            <Text style={styles.brand}>InstaMe</Text>
+            <View style={styles.badge}>
+              <Ionicons name="sparkles" size={13} color={Colors.accentLight} />
+              <Text style={styles.badgeText}>Trending portrait styling</Text>
+            </View>
 
-            <Text style={styles.title}>
-              Make every photo look quietly expensive.
-            </Text>
-
+            <Text style={styles.title}>Your face, styled better.</Text>
             <Text style={styles.subtitle}>
-              Transform your images into a refined luxury-editorial aesthetic
-              with elegant light, polished contrast and timeless mood.
+              Luxury-inspired portrait styling with a softer, trend-driven edge.
+              Upload once, refine the vibe, and get a polished result in seconds.
             </Text>
+          </View>
 
-            <View style={styles.previewCard}>
-              <Image
-                source={{
-                  uri: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1200&auto=format&fit=crop",
-                }}
-                style={styles.previewImage}
-                contentFit="cover"
+          <View style={styles.collageWrap}>
+            <View style={styles.collageFrame}>
+              <LinearGradient
+                colors={["rgba(255,255,255,0.03)", "rgba(255,255,255,0)", "rgba(255,79,125,0.05)"]}
+                style={styles.collageSurface}
               />
-              <View style={styles.previewOverlay} />
-              <View style={styles.previewLabel}>
-                <Text style={styles.previewLabelText}>Soft - Editorial - Dramatic</Text>
-              </View>
+              {HERO_FRAMES.map((frame) => (
+                <View
+                  key={frame.id}
+                  style={[
+                    styles.heroCardOuter,
+                    {
+                      transform: [
+                        { translateX: frame.x },
+                        { translateY: frame.y },
+                        { rotate: `${frame.rotation}deg` },
+                        { scale: frame.scale },
+                      ],
+                      shadowColor: frame.glow,
+                      backgroundColor: frame.glow,
+                    },
+                  ]}
+                >
+                  <View style={[styles.heroCard, { borderColor: frame.frame }]}>
+                    <Image source={{ uri: frame.image }} style={styles.heroCardImage} contentFit="cover" />
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0.10)", "rgba(0,0,0,0.08)", "rgba(0,0,0,0.22)"]}
+                      locations={[0, 0.15, 1]}
+                      style={styles.heroCardImageWash}
+                    />
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.38)", "rgba(0,0,0,0.88)"]}
+                      locations={[0, 0.52, 1]}
+                      style={styles.heroCardFooter}
+                    />
+                    <View style={styles.heroCardMeta}>
+                      <Text style={[styles.heroCardTitle, { color: frame.accent }]}>{frame.title}</Text>
+                      <Text style={styles.heroCardSubtitle}>{frame.subtitle}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
             </View>
           </View>
 
-          <View style={styles.features}>
-            {FEATURES.map((item) => (
-              <View key={item.title} style={styles.featureCard}>
-                <View style={styles.featureIconWrap}>
-                  <Ionicons name={item.icon as any} size={18} color={Colors.accent} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.featureTitle}>{item.title}</Text>
-                  <Text style={styles.featureText}>{item.text}</Text>
-                </View>
+          <View style={styles.signalRow}>
+            {SIGNALS.map((item) => (
+              <View key={item} style={styles.signalPill}>
+                <Text style={styles.signalText}>{item}</Text>
               </View>
             ))}
+          </View>
+
+          <View style={styles.copyCard}>
+            <Text style={styles.copyCardTitle}>Built for portraits that still feel like you.</Text>
+            <Text style={styles.copyCardText}>
+              Chicoo keeps identity first, then layers on style direction,
+              lighting mood, and editorial finish without turning the result
+              into someone else.
+            </Text>
           </View>
 
           <View style={styles.ctaBlock}>
             <Pressable
               onPress={() => router.push("/(auth)/register")}
               style={({ pressed }) => [
-                styles.primaryBtn,
-                pressed && { opacity: 0.9, transform: [{ scale: 0.985 }] },
+                styles.primaryButton,
+                pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.primaryBtnText}>Create Account</Text>
+              <Text style={styles.primaryButtonText}>Create Account</Text>
             </Pressable>
 
             <Pressable
               onPress={() => router.push("/(auth)/login")}
               style={({ pressed }) => [
-                styles.secondaryBtn,
-                pressed && { opacity: 0.85 },
+                styles.secondaryButton,
+                pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.secondaryBtnText}>Sign In</Text>
+              <Text style={styles.secondaryButtonText}>Sign In</Text>
             </Pressable>
 
-            <Pressable onPress={() => router.push("/launch")} style={styles.launchLink}>
-              <Text style={styles.launchLinkText}>Already signed in? Open app</Text>
+            <Pressable onPress={() => router.push("/launch")} style={styles.openLink}>
+              <Text style={styles.openLinkText}>Already signed in? Open Chicoo</Text>
             </Pressable>
 
             <Text style={styles.footnote}>
-              Create luxury-looking edits with a cleaner, faster workflow.
+              Vintage mono. Grey film. Rose glow. One portrait, styled better.
             </Text>
           </View>
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#000",
   },
   safeArea: {
     flex: 1,
   },
   content: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 32,
-    gap: 28,
+    paddingHorizontal: 22,
+    paddingTop: 12,
+    paddingBottom: 36,
+    gap: 24,
   },
-  hero: {
-    gap: 18,
+  topGlow: {
+    position: "absolute",
+    top: -80,
+    right: -40,
+    width: 220,
+    height: 220,
+    borderRadius: 220,
+    backgroundColor: "rgba(255,79,125,0.14)",
+  },
+  bottomGlow: {
+    position: "absolute",
+    bottom: -90,
+    left: -40,
+    width: 240,
+    height: 240,
+    borderRadius: 240,
+    backgroundColor: "rgba(255,79,125,0.10)",
+  },
+  sideGlow: {
+    position: "absolute",
+    top: "30%",
+    left: -70,
+    width: 180,
+    height: 180,
+    borderRadius: 180,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  heroHeader: {
+    gap: 14,
+  },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  brandMark: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "rgba(255,79,125,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,150,183,0.30)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  brandMarkText: {
+    color: "#FFF4F7",
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 22,
+    lineHeight: 24,
+    marginTop: -1,
+  },
+  brandTextWrap: {
+    gap: 2,
+  },
+  brandEyebrow: {
+    color: "#A9A1A5",
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  brand: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 17,
+    letterSpacing: 3.4,
   },
   badge: {
     alignSelf: "flex-start",
@@ -152,118 +291,153 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.30)",
+    borderColor: "rgba(255,79,125,0.25)",
   },
   badgeText: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-    letterSpacing: 0.6,
+    color: "#D3CCD0",
     fontFamily: "Inter_500Medium",
-  },
-  brand: {
-    color: Colors.accent,
-    fontSize: 14,
-    letterSpacing: 3,
-    textTransform: "uppercase",
-    fontFamily: "Inter_600SemiBold",
-    marginTop: 8,
+    fontSize: 11,
+    letterSpacing: 0.4,
   },
   title: {
-    color: Colors.white,
-    fontSize: 42,
-    lineHeight: 48,
+    color: "#FFF8FB",
     fontFamily: "PlayfairDisplay_700Bold",
-    maxWidth: 330,
+    fontSize: 42,
+    lineHeight: 46,
+    maxWidth: 300,
   },
   subtitle: {
-    color: Colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 24,
+    color: "#B2AAAE",
     fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 22,
     maxWidth: 360,
   },
-  previewCard: {
-    height: 320,
-    borderRadius: 28,
-    overflow: "hidden",
-    backgroundColor: Colors.card,
+  collageWrap: {
+    paddingTop: 6,
+  },
+  collageFrame: {
+    height: 388,
+    borderRadius: 34,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    marginTop: 8,
+    backgroundColor: "rgba(10,10,10,0.78)",
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  previewImage: {
-    width: "100%",
-    height: "100%",
-  },
-  previewOverlay: {
+  collageSurface: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.18)",
   },
-  previewLabel: {
+  heroCardOuter: {
     position: "absolute",
-    left: 14,
-    bottom: 14,
+    width: "58%",
+    aspectRatio: 4 / 5,
+    borderRadius: 22,
+    padding: 2,
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 12,
+  },
+  heroCard: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    backgroundColor: "#0F0F0F",
+  },
+  heroCardImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  heroCardImageWash: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  heroCardFooter: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  heroCardMeta: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingTop: 18,
+  },
+  heroCardTitle: {
+    fontFamily: "PlayfairDisplay_700Bold",
+    fontSize: 20,
+    lineHeight: 22,
+    marginBottom: 4,
+    textShadowColor: "rgba(0,0,0,0.70)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
+  },
+  heroCardSubtitle: {
+    color: "rgba(255,255,255,0.88)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+    textShadowColor: "rgba(0,0,0,0.65)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  signalRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  signalPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
   },
-  previewLabelText: {
-    color: Colors.white,
-    fontSize: 12,
+  signalText: {
+    color: "#D7D0D4",
     fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
   },
-  features: {
-    gap: 12,
-  },
-  featureCard: {
-    flexDirection: "row",
-    gap: 14,
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: "#101010",
+  copyCard: {
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    padding: 16,
+    gap: 8,
   },
-  featureIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,79,125,0.14)",
-  },
-  featureTitle: {
-    color: Colors.white,
-    fontSize: 15,
-    marginBottom: 4,
+  copyCardTitle: {
+    color: "#FFF",
     fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
   },
-  featureText: {
-    color: Colors.textSecondary,
+  copyCardText: {
+    color: "#AEA7AB",
+    fontFamily: "Inter_400Regular",
     fontSize: 13,
     lineHeight: 20,
-    fontFamily: "Inter_400Regular",
   },
   ctaBlock: {
     gap: 12,
-    paddingTop: 4,
   },
-  primaryBtn: {
+  primaryButton: {
     height: 58,
     borderRadius: 16,
     backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
-  primaryBtnText: {
-    color: Colors.black,
-    fontSize: 16,
+  primaryButtonText: {
+    color: "#090909",
     fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
   },
-  secondaryBtn: {
+  secondaryButton: {
     height: 56,
     borderRadius: 16,
     borderWidth: 1,
@@ -272,27 +446,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  secondaryBtnText: {
-    color: Colors.white,
-    fontSize: 15,
+  secondaryButtonText: {
+    color: "#FFF",
     fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
   },
-  launchLink: {
+  openLink: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 6,
   },
-  launchLinkText: {
-    color: Colors.accent,
-    fontSize: 13,
+  openLinkText: {
+    color: Colors.accentLight,
     fontFamily: "Inter_500Medium",
+    fontSize: 13,
   },
   footnote: {
-    textAlign: "center",
-    color: Colors.textMuted,
+    color: "#7F777B",
+    fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
+    textAlign: "center",
     marginTop: 6,
-    fontFamily: "Inter_400Regular",
+  },
+  buttonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.985 }],
   },
 });
