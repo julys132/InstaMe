@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-nati
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 import { useCredits } from "@/contexts/CreditsContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -68,6 +69,7 @@ export default function PaymentSuccessScreen() {
 
   return (
     <View style={styles.container}>
+      <ChicooBackground />
       {status === "loading" ? (
         <ActivityIndicator size="large" color={Colors.accent} />
       ) : (
@@ -117,14 +119,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
     height: 48,
     paddingHorizontal: 22,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
+    borderRadius: 24,
+    backgroundColor: "rgba(7,8,12,0.90)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
     justifyContent: "center",
     alignItems: "center",
   },
   buttonText: {
     fontFamily: "Inter_600SemiBold",
-    color: Colors.black,
-    fontSize: 15,
+    color: "#F5E9EE",
+    fontSize: 13,
+    letterSpacing: 2,
+    textTransform: "uppercase",
   },
 });

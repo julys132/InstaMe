@@ -18,6 +18,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
 import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 import { useWardrobe, ClothingItem } from "@/contexts/WardrobeContext";
 
 const CATEGORIES = ["Top", "Bottom", "Dress", "Outerwear", "Shoes", "Accessory", "Bag"];
@@ -153,9 +154,10 @@ export default function WardrobeScreen() {
 
   return (
     <View style={styles.container}>
+      <ChicooBackground />
       <Animated.View entering={FadeIn.duration(600)} style={[styles.header, { paddingTop: insets.top + webTopInset + 12 }]}>
         <View>
-          <Text style={styles.headerLabel}>Digital Wardrobe</Text>
+          <Text style={styles.headerLabel}>Chicoo Wardrobe</Text>
           <Text style={styles.headerTitle}>My Closet</Text>
         </View>
         <Pressable
@@ -336,7 +338,7 @@ const styles = StyleSheet.create({
   },
   clothingCard: {
     flex: 1,
-    backgroundColor: Colors.card,
+    backgroundColor: "rgba(10,10,14,0.84)",
     borderRadius: 16,
     overflow: "hidden",
     marginBottom: 10,
@@ -379,7 +381,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   modalContainer: {
-    backgroundColor: Colors.surface,
+    backgroundColor: "rgba(10,10,14,0.98)",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: "90%",

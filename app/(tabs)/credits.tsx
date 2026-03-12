@@ -17,6 +17,7 @@ import * as Linking from "expo-linking";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 import { resolveIapProductId, useIAP } from "@/hooks/useIAP";
 import {
   useCredits,
@@ -312,13 +313,14 @@ export default function CreditsScreen() {
 
   return (
     <View style={styles.container}>
+      <ChicooBackground />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <Animated.View entering={FadeIn.duration(600)} style={[styles.header, { paddingTop: insets.top + webTopInset + 12 }]}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color={Colors.white} />
           </Pressable>
           <View>
-            <Text style={styles.headerLabel}>Credits & Plans</Text>
+            <Text style={styles.headerLabel}>Chicoo Credits</Text>
             <Text style={styles.headerTitle}>Get Credits</Text>
           </View>
         </Animated.View>
@@ -605,7 +607,7 @@ const styles = StyleSheet.create({
   },
   packageCardPopular: {
     borderColor: Colors.accent,
-    backgroundColor: "rgba(201, 169, 110, 0.08)",
+    backgroundColor: "rgba(255, 79, 125, 0.08)",
   },
   popularBadge: {
     backgroundColor: Colors.accent,
@@ -662,7 +664,7 @@ const styles = StyleSheet.create({
   },
   subCardPopular: {
     borderColor: Colors.accent,
-    backgroundColor: "rgba(201, 169, 110, 0.06)",
+    backgroundColor: "rgba(255, 79, 125, 0.06)",
   },
   subCardActive: {
     borderColor: Colors.success,

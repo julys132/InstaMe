@@ -559,7 +559,7 @@ export default function InstaMeScreen() {
       return;
     }
     if (!editInstruction.trim()) {
-      Alert.alert("Missing edit", "Tell InstaMe what you want to change.");
+      Alert.alert("Missing edit", "Tell Chicoo what you want to change.");
       return;
     }
     if (credits < (selectedEditTier?.credits ?? 0)) {
@@ -627,7 +627,7 @@ export default function InstaMeScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(filePath, {
           mimeType: "image/png",
-          dialogTitle: "Save InstaMe Result",
+          dialogTitle: "Save Chicoo Result",
         });
       } else {
         Alert.alert("Info", "Sharing is not available on this device.");
@@ -646,8 +646,8 @@ export default function InstaMeScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: 120 }}
       >
         <View style={styles.header}>
-          <Text style={styles.headerEyebrow}>InstaMe</Text>
-          <Text style={styles.headerTitle}>Luxury Portrait Transformer</Text>
+          <Text style={styles.headerEyebrow}>Chicoo</Text>
+          <Text style={styles.headerTitle}>Portrait Studio</Text>
           <View style={styles.creditBadge}>
             <Ionicons name="sparkles" size={14} color={Colors.accent} />
             <Text style={styles.creditText}>{credits} credits</Text>
@@ -966,7 +966,7 @@ export default function InstaMeScreen() {
 
         {resultBase64 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>4. Your InstaMe result</Text>
+            <Text style={styles.cardTitle}>4. Your Chicoo result</Text>
             <Image
               source={{ uri: `data:image/png;base64,${resultBase64}` }}
               style={styles.resultImage}
@@ -975,7 +975,7 @@ export default function InstaMeScreen() {
             <View style={styles.resultMetaCard}>
               <Text style={styles.resultMetaTitle}>Generation details</Text>
               <Text style={styles.resultMetaText}>
-                Style: {selectedStylePreset?.label || "InstaMe"} - Export: {liveGenerationTier?.label || "Preview"}
+                Style: {selectedStylePreset?.label || "Chicoo"} - Export: {liveGenerationTier?.label || "Preview"}
               </Text>
               <Text style={styles.resultMetaText}>
                 Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {liveGenerationTier?.output || "512 x 512"}

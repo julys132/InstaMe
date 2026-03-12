@@ -5,6 +5,7 @@ import * as Haptics from "expo-haptics";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useCredits, SUBSCRIPTION_PLANS } from "@/contexts/CreditsContext";
@@ -113,9 +114,10 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
+      <ChicooBackground />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
         <Animated.View entering={FadeIn.duration(600)} style={[styles.header, { paddingTop: insets.top + webTopInset + 12 }]}>
-          <Text style={styles.headerLabel}>Personal</Text>
+          <Text style={styles.headerLabel}>Chicoo ID</Text>
           <Text style={styles.headerTitle}>Profile</Text>
         </Animated.View>
 
@@ -254,7 +256,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(201, 169, 110, 0.12)",
+    backgroundColor: "rgba(255, 79, 125, 0.12)",
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -311,7 +313,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(201, 169, 110, 0.12)",
+    backgroundColor: "rgba(255, 79, 125, 0.12)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,

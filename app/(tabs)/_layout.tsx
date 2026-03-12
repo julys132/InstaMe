@@ -27,7 +27,7 @@ export default function MainTabLayout() {
       <Tabs.Screen
         name="instame"
         options={{
-          title: "InstaMe",
+          title: "Chicoo",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="camera-outline" size={size} color={color} />
           ),

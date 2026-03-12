@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 
 function SupportCard({
   icon,
@@ -32,13 +33,14 @@ export default function HelpSupportScreen() {
 
   return (
     <View style={styles.container}>
+      <ChicooBackground />
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={22} color={Colors.white} />
           </Pressable>
           <View>
-            <Text style={styles.headerLabel}>My Profile</Text>
+            <Text style={styles.headerLabel}>Chicoo Support</Text>
             <Text style={styles.headerTitle}>Help & Support</Text>
           </View>
         </View>
@@ -92,7 +94,7 @@ const styles = StyleSheet.create({
   },
   section: {
     marginHorizontal: 20,
-    backgroundColor: Colors.card,
+    backgroundColor: "rgba(10,10,14,0.84)",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.cardBorder,

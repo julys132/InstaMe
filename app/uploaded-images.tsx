@@ -25,6 +25,7 @@ import {
   type UploadedImageViewMode,
 } from "@/lib/instame-uploaded-images";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 
 export default function UploadedImagesScreen() {
   const insets = useSafeAreaInsets();
@@ -162,7 +163,7 @@ export default function UploadedImagesScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#050505", "#170C12", "#080808"]} style={StyleSheet.absoluteFill} />
+      <ChicooBackground />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
@@ -179,7 +180,7 @@ export default function UploadedImagesScreen() {
           </Pressable>
 
           <View style={styles.headerTextWrap}>
-            <Text style={styles.headerEyebrow}>InstaMe Library</Text>
+            <Text style={styles.headerEyebrow}>Chicoo Library</Text>
             <Text style={styles.headerTitle}>Uploaded Images</Text>
             <Text style={styles.headerSubtitle}>
               Save up to 10 optimized portraits and reuse them instantly in generation.
@@ -325,8 +326,8 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: 21,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -372,8 +373,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(7,7,7,0.86)",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(10,10,14,0.84)",
     padding: 16,
     gap: 14,
   },

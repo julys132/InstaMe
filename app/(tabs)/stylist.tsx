@@ -23,6 +23,7 @@ import * as Sharing from "expo-sharing";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 import { useWardrobe, ClothingItem, OutfitResult } from "@/contexts/WardrobeContext";
 import { useCredits } from "@/contexts/CreditsContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -850,6 +851,7 @@ export default function StylistScreen() {
 
   return (
     <View style={styles.container}>
+      <ChicooBackground />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 120 }}
@@ -857,7 +859,7 @@ export default function StylistScreen() {
       >
         <Animated.View entering={FadeIn.duration(600)} style={[styles.header, { paddingTop: insets.top + webTopInset + 12 }]}>
           <View>
-            <Text style={styles.headerLabel}>AI Personal Stylist</Text>
+            <Text style={styles.headerLabel}>Chicoo Stylist</Text>
             <Text style={styles.headerTitle}>Style Me</Text>
           </View>
           <View style={styles.creditsBadge}>
@@ -1507,7 +1509,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(201, 169, 110, 0.15)",
+    backgroundColor: "rgba(255, 79, 125, 0.15)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -1537,7 +1539,7 @@ const styles = StyleSheet.create({
   },
   preferenceSummaryCardActive: {
     borderColor: Colors.accent,
-    backgroundColor: "rgba(201, 169, 110, 0.1)",
+    backgroundColor: "rgba(255, 79, 125, 0.1)",
   },
   preferenceSummaryHeaderRow: {
     flexDirection: "row",
@@ -1615,7 +1617,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   modeChipActive: {
-    backgroundColor: "rgba(201, 169, 110, 0.18)",
+    backgroundColor: "rgba(255, 79, 125, 0.18)",
     borderColor: Colors.accent,
   },
   modeChipTitle: {
@@ -1968,7 +1970,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(201, 169, 110, 0.15)",
+    backgroundColor: "rgba(255, 79, 125, 0.15)",
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,

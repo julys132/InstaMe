@@ -1,12 +1,14 @@
 import { Link, Stack } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 
 export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: "Not Found", headerShown: false }} />
       <View style={styles.container}>
+        <ChicooBackground />
         <Text style={styles.title}>Page not found</Text>
         <Link href="/" style={styles.link}>
           <Text style={styles.linkText}>Go home</Text>

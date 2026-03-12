@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function NotificationsScreen() {
@@ -30,13 +31,14 @@ export default function NotificationsScreen() {
 
   return (
     <View style={styles.container}>
+      <ChicooBackground />
       <ScrollView contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={22} color={Colors.white} />
           </Pressable>
           <View>
-            <Text style={styles.headerLabel}>My Profile</Text>
+            <Text style={styles.headerLabel}>Chicoo Profile</Text>
             <Text style={styles.headerTitle}>Notifications</Text>
           </View>
         </View>
@@ -53,7 +55,7 @@ export default function NotificationsScreen() {
               value={enabled}
               onValueChange={setEnabled}
               thumbColor={enabled ? Colors.accent : "#888"}
-              trackColor={{ false: "#444", true: "rgba(201, 169, 110, 0.4)" }}
+              trackColor={{ false: "#444", true: "rgba(255, 79, 125, 0.4)" }}
             />
           </View>
         </View>
@@ -94,7 +96,7 @@ const styles = StyleSheet.create({
   },
   section: {
     marginHorizontal: 20,
-    backgroundColor: Colors.card,
+    backgroundColor: "rgba(10,10,14,0.84)",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
@@ -120,15 +122,19 @@ const styles = StyleSheet.create({
   saveButton: {
     marginHorizontal: 20,
     marginTop: 18,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
+    borderRadius: 26,
+    backgroundColor: "rgba(7,8,12,0.90)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
     height: 52,
     justifyContent: "center",
     alignItems: "center",
   },
   saveButtonText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.black,
+    fontSize: 13,
+    color: "#F5E9EE",
+    letterSpacing: 2,
+    textTransform: "uppercase",
   },
 });

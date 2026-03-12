@@ -9,6 +9,7 @@ import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import Colors from "@/constants/colors";
 import { useWardrobe, OutfitResult } from "@/contexts/WardrobeContext";
 import { useCallback } from "react";
+import ChicooBackground from "@/components/ChicooBackground";
 
 function EmptyOutfits() {
   return (
@@ -155,8 +156,9 @@ export default function OutfitsScreen() {
 
   return (
     <View style={styles.container}>
+      <ChicooBackground />
       <Animated.View entering={FadeIn.duration(600)} style={[styles.header, { paddingTop: insets.top + webTopInset + 12 }]}>
-        <Text style={styles.headerLabel}>Collection</Text>
+        <Text style={styles.headerLabel}>Chicoo Archive</Text>
         <Text style={styles.headerTitle}>My Outfits</Text>
       </Animated.View>
 
@@ -233,7 +235,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   occasionBadge: {
-    backgroundColor: "rgba(201, 169, 110, 0.15)",
+    backgroundColor: "rgba(255, 79, 125, 0.15)",
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -300,7 +302,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: "rgba(201, 169, 110, 0.1)",
+    backgroundColor: "rgba(255, 79, 125, 0.1)",
   },
   cardDeleteBtn: {
     backgroundColor: "rgba(255, 68, 68, 0.1)",

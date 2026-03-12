@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -21,6 +20,7 @@ import * as Google from "expo-auth-session/providers/google";
 import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 import { useAuth } from "@/contexts/AuthContext";
 import * as Haptics from "expo-haptics";
 import { apiClient } from "@/lib/api-client";
@@ -288,10 +288,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={["#000000", "#0A0A0A", "#111111"]}
-        style={StyleSheet.absoluteFill}
-      />
+      <ChicooBackground />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -303,11 +300,11 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Animated.View entering={FadeIn.duration(800)} style={styles.brandSection}>
-            <Text style={styles.brandLabel}>AI Luxury Image Studio</Text>
-            <Text style={styles.brandTitle}>InstaMe</Text>
+            <Text style={styles.brandLabel}>Chicoo Access</Text>
+            <Text style={styles.brandTitle}>Chicoo</Text>
             <View style={styles.brandLine} />
             <Text style={styles.brandQuote}>
-              &quot;Style is the art of being yourself.&quot;
+              Your face, styled better.
             </Text>
           </Animated.View>
 
@@ -481,39 +478,43 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   keyboardView: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: 28 },
-  brandSection: { marginBottom: 40 },
+  brandSection: { marginBottom: 40, gap: 2 },
   brandLabel: {
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: Colors.accent,
-    letterSpacing: 3,
+    fontSize: 11,
+    color: "#F3DDE5",
+    letterSpacing: 4.4,
     textTransform: "uppercase",
     marginBottom: 8,
   },
   brandTitle: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 42,
-    color: Colors.white,
-    marginBottom: 16,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 34,
+    color: Colors.accent,
+    marginBottom: 12,
+    letterSpacing: 9,
+    textTransform: "uppercase",
   },
   brandLine: {
-    width: 40,
-    height: 2,
-    backgroundColor: Colors.accent,
-    marginBottom: 16,
+    width: 54,
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    marginBottom: 14,
   },
   brandQuote: {
-    fontFamily: "PlayfairDisplay_400Regular",
-    fontSize: 16,
-    color: Colors.textSecondary,
-    fontStyle: "italic",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#8B8189",
+    letterSpacing: 3.1,
+    lineHeight: 22,
+    textTransform: "uppercase",
   },
   formSection: { gap: 16 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.inputBg,
-    borderRadius: 12,
+    backgroundColor: "rgba(8,9,13,0.82)",
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.inputBorder,
     paddingHorizontal: 16,
@@ -538,17 +539,21 @@ const styles = StyleSheet.create({
     color: Colors.accent,
   },
   loginButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: 12,
-    height: 56,
+    backgroundColor: "rgba(7,8,12,0.9)",
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    height: 58,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 8,
   },
   loginButtonText: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: Colors.black,
+    fontSize: 14,
+    color: "#EEE6EA",
+    letterSpacing: 3.2,
+    textTransform: "uppercase",
   },
   errorText: {
     fontFamily: "Inter_400Regular",
@@ -569,8 +574,10 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textMuted,
+    fontSize: 12,
+    color: "#7E747C",
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
   },
   socialButtons: {
     flexDirection: "row",
@@ -583,16 +590,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     height: 52,
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
   },
   appleButton: {
-    backgroundColor: "#1A1A1A",
-    borderColor: "#333",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(255,255,255,0.10)",
   },
   googleButton: {
-    backgroundColor: "#1A1A1A",
-    borderColor: "#333",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(255,255,255,0.10)",
   },
   socialButtonText: {
     fontFamily: "Inter_600SemiBold",
@@ -623,11 +630,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: "rgba(10,10,14,0.98)",
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: "rgba(255,255,255,0.10)",
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 24,

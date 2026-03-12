@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from "react-native";
 import { router } from "expo-router";
 import { apiClient } from "@/lib/api-client";
 import Colors from "@/constants/colors";
+import ChicooBackground from "@/components/ChicooBackground";
 
 export default function LaunchScreen() {
   useEffect(() => {
@@ -32,6 +33,7 @@ export default function LaunchScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#000", justifyContent: "center", alignItems: "center" }}>
+      <ChicooBackground />
       <ActivityIndicator size="large" color={Colors.accent} />
     </View>
   );
