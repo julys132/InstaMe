@@ -778,16 +778,6 @@ export default function InstaMeScreen() {
                         >
                           {preset.label}
                         </Text>
-
-                        <Text
-                          style={[
-                            styles.styleCardSubtitle,
-                            active && styles.styleCardSubtitleActive,
-                          ]}
-                          numberOfLines={2}
-                        >
-                          {preset.subtitle}
-                        </Text>
                       </View>
                     </View>
                   </Pressable>
@@ -1375,7 +1365,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 114,
+    height: 92,
   },
   styleCardTextWrap: {
     position: "absolute",
@@ -1384,7 +1374,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 18,
     paddingBottom: 18,
-    minHeight: 114,
+    minHeight: 92,
     justifyContent: "flex-end",
   },
   styleCardTitle: {
@@ -1392,25 +1382,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 17,
     lineHeight: 20,
-    marginBottom: 4,
     textShadowColor: "rgba(0,0,0,0.75)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
   },
   styleCardTitleActive: {
     color: "#FFE7F0",
-  },
-  styleCardSubtitle: {
-    color: "rgba(255,255,255,0.92)",
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 17,
-    textShadowColor: "rgba(0,0,0,0.72)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-  styleCardSubtitleActive: {
-    color: "#FFFFFF",
   },
   styleScrollHintWrap: {
     position: "absolute",
