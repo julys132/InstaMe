@@ -382,6 +382,7 @@ const INSTAME_TRANSFORM_COST = Number.parseInt(
 const DEFAULT_INITIAL_CREDITS = Number.parseInt(process.env.DEFAULT_INITIAL_CREDITS || "3", 10);
 const DEFAULT_DEV_CREDIT_GRANT = Number.parseInt(process.env.DEV_CREDIT_GRANT_AMOUNT || "50", 10);
 const MAX_DEV_CREDIT_GRANT = 500;
+const DEFAULT_ALLOWED_DEV_CREDIT_EMAILS = ["iuliastarcean@gmail.com"];
 
 const GEMINI_API_BASE_URL =
   process.env.GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
@@ -870,6 +871,29 @@ function isDevCreditGrantEnabled(): boolean {
     return true;
   }
   return process.env.NODE_ENV !== "production";
+}
+
+function getAllowedDevCreditGrantEmails(): string[] {
+  const configured = normalizeStringList(
+    (process.env.DEV_CREDIT_GRANT_EMAILS || "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  return Array.from(
+    new Set(
+      [...DEFAULT_ALLOWED_DEV_CREDIT_EMAILS, ...configured]
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function isDevCreditGrantAllowedForEmail(email: string | null | undefined): boolean {
+  const normalizedEmail = normalizeStringValue(email).toLowerCase();
+  if (!normalizedEmail) return false;
+  return getAllowedDevCreditGrantEmails().includes(normalizedEmail);
 }
 
 function resolveDevCreditGrantAmount(input: unknown): number {
@@ -2583,17 +2607,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/credits/dev-grant", authMiddleware, async (req, res) => {
     try {
-      if (!isDevCreditGrantEnabled()) {
-        return res.status(403).json({ error: "Developer credit grants are disabled." });
-      }
-
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const grantAmount = resolveDevCreditGrantAmount(req.body?.amount);
-      const [user] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
+      const [user] = await db
+        .select({ credits: users.credits, email: users.email })
+        .from(users)
+        .where(eq(users.id, userId));
       if (!user) {
         return res.status(404).json({ error: "User not found" });
+      }
+
+      const canUseDeveloperGrant =
+        isDevCreditGrantEnabled() || isDevCreditGrantAllowedForEmail(user.email);
+
+      if (!canUseDeveloperGrant) {
+        return res.status(403).json({ error: "Developer credit grants are disabled for this account." });
       }
 
       const nextCredits = user.credits + grantAmount;
