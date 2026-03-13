@@ -55,6 +55,12 @@ module.exports = () => {
     process.env.PUBLIC_WEB_URL ||
     extra.apiBaseUrl ||
     "https://instame.up.railway.app";
+  const configuredPublicWebUrl =
+    process.env.EXPO_PUBLIC_WEB_BASE_URL ||
+    process.env.PUBLIC_WEB_URL ||
+    process.env.PUBLIC_APP_URL ||
+    extra.publicWebUrl ||
+    "https://instame.up.railway.app";
 
   if (googleRedirectScheme && !hasIntentFilter(intentFilters, googleRedirectScheme, "/oauth2redirect")) {
     intentFilters.push({
@@ -75,6 +81,7 @@ module.exports = () => {
     extra: {
       ...extra,
       apiBaseUrl: configuredApiBaseUrl,
+      publicWebUrl: configuredPublicWebUrl.replace(/\/+$/, ""),
     },
     android: {
       ...androidConfig,

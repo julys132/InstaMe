@@ -373,6 +373,20 @@ export default function RegisterScreen() {
             </View>
           </Animated.View>
 
+          <View style={styles.legalTextWrap}>
+            <Text style={styles.legalText}>
+              By creating an account, you agree to our{" "}
+              <Text style={styles.legalLink} onPress={() => router.push("/terms" as any)}>
+                Terms
+              </Text>
+              {" "}and{" "}
+              <Text style={styles.legalLink} onPress={() => router.push("/privacy" as any)}>
+                Privacy Policy
+              </Text>
+              .
+            </Text>
+          </View>
+
           <Animated.View entering={FadeInDown.delay(400).duration(600)} style={[styles.footer, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20) }]}>
             <Text style={styles.footerText}>Already have an account?</Text>
             <Pressable onPress={() => router.back()}>
@@ -492,6 +506,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: Colors.white,
+  },
+  legalTextWrap: {
+    marginTop: 18,
+    alignItems: "center",
+    paddingHorizontal: 8,
+  },
+  legalText: {
+    color: Colors.textSecondary,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+  },
+  legalLink: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_500Medium",
   },
   footer: {
     flexDirection: "row",

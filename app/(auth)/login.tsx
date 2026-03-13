@@ -400,6 +400,20 @@ export default function LoginScreen() {
             </View>
           </Animated.View>
 
+          <View style={styles.legalLinksRow}>
+            <Pressable onPress={() => router.push("/terms" as any)}>
+              <Text style={styles.legalLink}>Terms</Text>
+            </Pressable>
+            <Text style={styles.legalDivider}>•</Text>
+            <Pressable onPress={() => router.push("/privacy" as any)}>
+              <Text style={styles.legalLink}>Privacy</Text>
+            </Pressable>
+            <Text style={styles.legalDivider}>•</Text>
+            <Pressable onPress={() => router.push("/contact" as any)}>
+              <Text style={styles.legalLink}>Support</Text>
+            </Pressable>
+          </View>
+
           <Animated.View entering={FadeInDown.delay(500).duration(600)} style={[styles.footer, { paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 20) }]}>
             <Text style={styles.footerText}>Don&apos;t have an account?</Text>
             <Pressable onPress={() => router.push("/(auth)/register")}>
@@ -605,6 +619,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: Colors.white,
+  },
+  legalLinksRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 20,
+  },
+  legalLink: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  legalDivider: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
   },
   footer: {
     flexDirection: "row",

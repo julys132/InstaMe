@@ -4,6 +4,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import ChicooBackground from "@/components/ChicooBackground";
+import {
+  CHICOO_BILLING_EMAIL,
+  CHICOO_PRIVACY_EMAIL,
+  CHICOO_SUPPORT_EMAIL,
+} from "@/lib/public-site";
 
 function SupportCard({
   icon,
@@ -47,22 +52,46 @@ export default function HelpSupportScreen() {
 
         <View style={styles.section}>
           <SupportCard
+            icon="shield-outline"
+            title="Privacy Policy"
+            description="Read how Chicoo collects, uses, and deletes data."
+            onPress={() => router.push("/privacy" as any)}
+          />
+          <SupportCard
+            icon="document-text-outline"
+            title="Terms of Service"
+            description="Review account, payment, and content usage terms."
+            onPress={() => router.push("/terms" as any)}
+          />
+          <SupportCard
+            icon="chatbubble-ellipses-outline"
+            title="Contact Us"
+            description="Open the public support and contact page."
+            onPress={() => router.push("/contact" as any)}
+          />
+          <SupportCard
+            icon="trash-outline"
+            title="Delete Account"
+            description="See the public account deletion instructions and contact path."
+            onPress={() => router.push("/delete-account" as any)}
+          />
+          <SupportCard
             icon="mail-outline"
             title="Email Support"
             description="Contact us for account, billing, or technical issues."
-            onPress={() => Linking.openURL("mailto:support@instame.app")}
+            onPress={() => Linking.openURL(`mailto:${CHICOO_SUPPORT_EMAIL}`)}
           />
           <SupportCard
             icon="document-text-outline"
             title="Billing Questions"
             description="Learn how credits, subscriptions, and payments work."
-            onPress={() => Linking.openURL("mailto:billing@instame.app?subject=Billing%20Question")}
+            onPress={() => Linking.openURL(`mailto:${CHICOO_BILLING_EMAIL}?subject=Billing%20Question`)}
           />
           <SupportCard
             icon="shield-checkmark-outline"
             title="Privacy & Security"
             description="Request account data export or account deletion help."
-            onPress={() => Linking.openURL("mailto:privacy@instame.app?subject=Privacy%20Request")}
+            onPress={() => Linking.openURL(`mailto:${CHICOO_PRIVACY_EMAIL}?subject=Privacy%20Request`)}
           />
         </View>
       </ScrollView>
