@@ -182,10 +182,19 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
           {activeSub && (
-            <View style={styles.subBadge}>
-              <Ionicons name="diamond" size={14} color={Colors.accent} />
-              <Text style={styles.subBadgeText}>{activeSub.name} Plan Active</Text>
-            </View>
+            <>
+              <View style={styles.subBadge}>
+                <Ionicons name="diamond" size={14} color={Colors.accent} />
+                <Text style={styles.subBadgeText}>{activeSub.name} Plan Active</Text>
+              </View>
+              <Pressable
+                onPress={() => router.push("/(tabs)/credits" as any)}
+                style={({ pressed }) => [styles.manageBillingButton, pressed && { opacity: 0.85 }]}
+              >
+                <Ionicons name="settings-outline" size={16} color={Colors.white} />
+                <Text style={styles.manageBillingButtonText}>Manage Billing</Text>
+              </Pressable>
+            </>
           )}
           {isDeveloperAccount ? (
             <Pressable
@@ -361,6 +370,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     color: Colors.accent,
+  },
+  manageBillingButton: {
+    alignSelf: "flex-start",
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.surfaceLight,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  manageBillingButtonText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.white,
   },
   devCreditsButton: {
     marginTop: 4,

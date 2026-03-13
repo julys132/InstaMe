@@ -411,6 +411,17 @@ class ApiClient {
     );
   }
 
+  async createBillingPortalSession(returnUrl?: string) {
+    return this.request<{ url: string; hasActiveSubscription: boolean }>(
+      "/credits/billing-portal",
+      {
+        method: "POST",
+        body: JSON.stringify(returnUrl ? { returnUrl } : {}),
+      },
+      true,
+    );
+  }
+
   async verifyPaymentSession(sessionId: string | string[]) {
     const normalizedSessionId = Array.isArray(sessionId) ? sessionId[0] : sessionId;
     if (!normalizedSessionId) {

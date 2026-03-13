@@ -134,6 +134,7 @@ export default function CreditsScreen() {
     subscription,
     purchasePackage,
     subscribeToPlan,
+    createBillingPortalSession,
     verifyPaymentSession,
     grantDevCredits,
     refreshCredits,
@@ -143,6 +144,7 @@ export default function CreditsScreen() {
   const [subLoading, setSubLoading] = useState<string | null>(null);
   const [devGrantLoading, setDevGrantLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
+  const [billingPortalLoading, setBillingPortalLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"credits" | "subscription">("credits");
   const showDevCreditTools = __DEV__ || process.env.EXPO_PUBLIC_ENABLE_DEV_CREDITS === "true";
   const nativePlatform = Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : null;
@@ -171,6 +173,13 @@ export default function CreditsScreen() {
       cancelUrl: `${redirectUrl}${separator}cancelled=1`,
       redirectUrl,
     };
+  }
+
+  function getBillingPortalReturnUrl() {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      return `${window.location.origin}/credits`;
+    }
+    return undefined;
   }
 
   async function runCheckout(
@@ -328,6 +337,30 @@ export default function CreditsScreen() {
     }
   }
 
+  async function handleManageBilling() {
+    setBillingPortalLoading(true);
+    try {
+      const portal = await createBillingPortalSession(getBillingPortalReturnUrl());
+      if (!portal.url) {
+        throw new Error("Billing portal URL unavailable");
+      }
+
+      if (Platform.OS === "web") {
+        if (typeof window !== "undefined") {
+          window.location.assign(portal.url);
+        }
+        return;
+      }
+
+      await WebBrowser.openBrowserAsync(portal.url);
+      await refreshCredits();
+    } catch (error: any) {
+      Alert.alert("Billing Portal", error?.message || "Could not open subscription management.");
+    } finally {
+      setBillingPortalLoading(false);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <ChicooBackground />
@@ -471,6 +504,26 @@ export default function CreditsScreen() {
               ? "Credit packs use Apple or Google in-app purchase on mobile. Subscriptions are available on web checkout only."
               : "Secure Stripe checkout for web credit packs and subscriptions."}
           </Text>
+          {subscription ? (
+            <Pressable
+              onPress={handleManageBilling}
+              disabled={billingPortalLoading}
+              style={({ pressed }) => [
+                styles.manageBillingButton,
+                pressed && { opacity: 0.85 },
+                billingPortalLoading && { opacity: 0.7 },
+              ]}
+            >
+              {billingPortalLoading ? (
+                <ActivityIndicator color={Colors.white} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="settings-outline" size={16} color={Colors.white} />
+                  <Text style={styles.manageBillingButtonText}>Manage Billing</Text>
+                </>
+              )}
+            </Pressable>
+          ) : null}
           {nativePlatform && !iap.isLoading && !iap.isAvailable && iap.error ? (
             <Text style={styles.paymentWarning}>{iap.error}</Text>
           ) : null}
@@ -810,6 +863,23 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   restoreButtonText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.white,
+  },
+  manageBillingButton: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.surfaceLight,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  manageBillingButtonText: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     color: Colors.white,

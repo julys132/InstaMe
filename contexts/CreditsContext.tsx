@@ -65,6 +65,7 @@ interface CreditsContextValue {
     planId: string,
     urls?: { successUrl?: string; cancelUrl?: string },
   ) => Promise<{ url: string; sessionId: string }>;
+  createBillingPortalSession: (returnUrl?: string) => Promise<{ url: string; hasActiveSubscription: boolean }>;
   verifyPaymentSession: (
     sessionId: string | string[],
   ) => Promise<{ success: boolean; credits: number; subscription: string | null }>;
@@ -139,6 +140,10 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function createBillingPortalSession(returnUrl?: string) {
+    return apiClient.createBillingPortalSession(returnUrl);
+  }
+
   async function verifyPaymentSession(sessionId: string | string[]) {
     const result = await apiClient.verifyPaymentSession(sessionId);
     setCredits(result.credits ?? 0);
@@ -161,6 +166,7 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
       useCredit,
       purchasePackage,
       subscribeToPlan,
+      createBillingPortalSession,
       verifyPaymentSession,
       grantDevCredits,
     }),

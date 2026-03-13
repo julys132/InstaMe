@@ -466,6 +466,16 @@ async function retrieveStripeCheckoutSession(sessionId) {
     path: `/checkout/sessions/${encoded}`
   });
 }
+async function createStripeBillingPortalSession(params) {
+  const form = new URLSearchParams();
+  form.set("customer", params.customerId);
+  form.set("return_url", params.returnUrl);
+  return stripeRequest({
+    method: "POST",
+    path: "/billing_portal/sessions",
+    body: form
+  });
+}
 
 // server/lib/instame-style-catalog.ts
 var fs = __toESM(require("node:fs"));
@@ -2190,6 +2200,10 @@ function isAllowedCheckoutRedirectUrl(req, candidateUrl) {
 function sanitizeCheckoutRedirectUrl(req, candidateUrl, fallbackUrl) {
   return candidateUrl && isAllowedCheckoutRedirectUrl(req, candidateUrl) ? candidateUrl : fallbackUrl;
 }
+function sanitizePortalReturnUrl(req, candidateUrl, fallbackUrl) {
+  const safeUrl = sanitizeCheckoutRedirectUrl(req, candidateUrl, fallbackUrl);
+  return isNativeCheckoutRedirect(safeUrl) ? fallbackUrl : safeUrl;
+}
 function isNativeCheckoutRedirect(url) {
   try {
     const protocol = new URL(url).protocol.toLowerCase();
@@ -2895,6 +2909,39 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Get transactions error:", error);
       res.status(500).json({ error: "Failed to load transactions" });
+    }
+  });
+  app2.post("/api/credits/billing-portal", authMiddleware, async (req, res) => {
+    try {
+      const returnUrlInput = normalizeStringValue(req.body?.returnUrl);
+      const [user] = await db.select({
+        stripeCustomerId: users.stripeCustomerId,
+        subscriptionPlan: users.subscriptionPlan
+      }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (!user.stripeCustomerId) {
+        return res.status(409).json({
+          error: "No Stripe billing profile is attached to this account yet."
+        });
+      }
+      const defaultReturnUrl = `${getDefaultBaseUrl(req)}/credits`;
+      const returnUrl = sanitizePortalReturnUrl(req, returnUrlInput, defaultReturnUrl);
+      const session = await createStripeBillingPortalSession({
+        customerId: user.stripeCustomerId,
+        returnUrl
+      });
+      if (!session.url) {
+        return res.status(500).json({ error: "Billing portal URL unavailable" });
+      }
+      return res.json({
+        url: session.url,
+        hasActiveSubscription: Boolean(user.subscriptionPlan)
+      });
+    } catch (error) {
+      console.error("Billing portal error:", error);
+      return res.status(500).json({ error: toErrorMessage(error, "Failed to open billing portal") });
     }
   });
   app2.post("/api/credits/subscription", authMiddleware, async (req, res) => {

@@ -39,6 +39,7 @@ import {
   verifyPassword,
 } from "./lib/auth";
 import {
+  createStripeBillingPortalSession,
   createStripeCheckoutSession,
   retrieveStripeCheckoutSession,
 } from "./lib/stripe";
@@ -1910,6 +1911,11 @@ function sanitizeCheckoutRedirectUrl(req: Request, candidateUrl: string, fallbac
   return candidateUrl && isAllowedCheckoutRedirectUrl(req, candidateUrl) ? candidateUrl : fallbackUrl;
 }
 
+function sanitizePortalReturnUrl(req: Request, candidateUrl: string, fallbackUrl: string): string {
+  const safeUrl = sanitizeCheckoutRedirectUrl(req, candidateUrl, fallbackUrl);
+  return isNativeCheckoutRedirect(safeUrl) ? fallbackUrl : safeUrl;
+}
+
 function isNativeCheckoutRedirect(url: string): boolean {
   try {
     const protocol = new URL(url).protocol.toLowerCase();
@@ -2860,6 +2866,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get transactions error:", error);
       res.status(500).json({ error: "Failed to load transactions" });
+    }
+  });
+
+  app.post("/api/credits/billing-portal", authMiddleware, async (req, res) => {
+    try {
+      const returnUrlInput = normalizeStringValue(req.body?.returnUrl);
+      const [user] = await db
+        .select({
+          stripeCustomerId: users.stripeCustomerId,
+          subscriptionPlan: users.subscriptionPlan,
+        })
+        .from(users)
+        .where(eq(users.id, req.user!.id));
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (!user.stripeCustomerId) {
+        return res.status(409).json({
+          error: "No Stripe billing profile is attached to this account yet.",
+        });
+      }
+
+      const defaultReturnUrl = `${getDefaultBaseUrl(req)}/credits`;
+      const returnUrl = sanitizePortalReturnUrl(req, returnUrlInput, defaultReturnUrl);
+
+      const session = await createStripeBillingPortalSession({
+        customerId: user.stripeCustomerId,
+        returnUrl,
+      });
+
+      if (!session.url) {
+        return res.status(500).json({ error: "Billing portal URL unavailable" });
+      }
+
+      return res.json({
+        url: session.url,
+        hasActiveSubscription: Boolean(user.subscriptionPlan),
+      });
+    } catch (error: unknown) {
+      console.error("Billing portal error:", error);
+      return res.status(500).json({ error: toErrorMessage(error, "Failed to open billing portal") });
     }
   });
 

@@ -105,3 +105,18 @@ export async function retrieveStripeCheckoutSession(sessionId: string): Promise<
     path: `/checkout/sessions/${encoded}`,
   });
 }
+
+export async function createStripeBillingPortalSession(params: {
+  customerId: string;
+  returnUrl: string;
+}): Promise<{ id: string; url: string | null }> {
+  const form = new URLSearchParams();
+  form.set("customer", params.customerId);
+  form.set("return_url", params.returnUrl);
+
+  return stripeRequest({
+    method: "POST",
+    path: "/billing_portal/sessions",
+    body: form,
+  });
+}
