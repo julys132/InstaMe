@@ -60,6 +60,8 @@ var users = (0, import_pg_core.pgTable)("users", {
   credits: (0, import_pg_core.integer)("credits").notNull().default(3),
   subscriptionPlan: (0, import_pg_core.text)("subscription_plan"),
   subscriptionRenewAt: (0, import_pg_core.timestamp)("subscription_renew_at"),
+  stripeCustomerId: (0, import_pg_core.text)("stripe_customer_id"),
+  stripeSubscriptionId: (0, import_pg_core.text)("stripe_subscription_id"),
   styleGender: (0, import_pg_core.text)("style_gender"),
   stylePreferences: (0, import_pg_core.jsonb)("style_preferences").$type().notNull().default(import_drizzle_orm.sql`'[]'::jsonb`),
   favoriteLooks: (0, import_pg_core.jsonb)("favorite_looks").$type().notNull().default(import_drizzle_orm.sql`'[]'::jsonb`),
@@ -77,20 +79,31 @@ var sessions = (0, import_pg_core.pgTable)("sessions", {
   revokedAt: (0, import_pg_core.timestamp)("revoked_at"),
   createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
 });
-var creditTransactions = (0, import_pg_core.pgTable)("credit_transactions", {
-  id: (0, import_pg_core.serial)("id").primaryKey(),
-  userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  type: (0, import_pg_core.text)("type").notNull(),
-  // purchase | subscription | usage | refund
-  amountCredits: (0, import_pg_core.integer)("amount_credits").notNull(),
-  amountUsdCents: (0, import_pg_core.integer)("amount_usd_cents"),
-  source: (0, import_pg_core.text)("source"),
-  // stripe | manual | app
-  description: (0, import_pg_core.text)("description"),
-  stripeSessionId: (0, import_pg_core.text)("stripe_session_id"),
-  stripePaymentIntentId: (0, import_pg_core.text)("stripe_payment_intent_id"),
-  createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
-});
+var creditTransactions = (0, import_pg_core.pgTable)(
+  "credit_transactions",
+  {
+    id: (0, import_pg_core.serial)("id").primaryKey(),
+    userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    type: (0, import_pg_core.text)("type").notNull(),
+    // purchase | subscription | usage | refund
+    amountCredits: (0, import_pg_core.integer)("amount_credits").notNull(),
+    amountUsdCents: (0, import_pg_core.integer)("amount_usd_cents"),
+    source: (0, import_pg_core.text)("source"),
+    // stripe | manual | app
+    description: (0, import_pg_core.text)("description"),
+    stripeSessionId: (0, import_pg_core.text)("stripe_session_id"),
+    stripePaymentIntentId: (0, import_pg_core.text)("stripe_payment_intent_id"),
+    createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
+  },
+  (table) => ({
+    stripeSessionIdUnique: (0, import_pg_core.uniqueIndex)("credit_transactions_stripe_session_id_unique").on(
+      table.stripeSessionId
+    ),
+    stripePaymentIntentIdUnique: (0, import_pg_core.uniqueIndex)("credit_transactions_stripe_payment_intent_id_unique").on(
+      table.stripePaymentIntentId
+    )
+  })
+);
 var conversations = (0, import_pg_core.pgTable)("conversations", {
   id: (0, import_pg_core.serial)("id").primaryKey(),
   title: (0, import_pg_core.text)("title").notNull(),
@@ -2124,6 +2137,67 @@ function getDefaultBaseUrl(req) {
   const host = firstHeaderValue(req.headers["x-forwarded-host"]) || req.get("host") || "localhost:5000";
   return `${proto}://${host}`.replace(/\/+$/, "");
 }
+function getAllowedCheckoutOrigins(req) {
+  const origins = /* @__PURE__ */ new Set();
+  const candidates = [
+    process.env.PUBLIC_WEB_URL,
+    process.env.PUBLIC_APP_URL,
+    process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN.trim()}` : "",
+    getDefaultBaseUrl(req)
+  ];
+  for (const entry of candidates) {
+    const value = normalizeStringValue(entry);
+    if (!value) continue;
+    try {
+      origins.add(new URL(value).origin);
+    } catch {
+      if (value.startsWith("http://") || value.startsWith("https://")) {
+        origins.add(value.replace(/\/+$/, ""));
+      }
+    }
+  }
+  if (process.env.CORS_ORIGINS) {
+    for (const entry of process.env.CORS_ORIGINS.split(",")) {
+      const value = normalizeStringValue(entry);
+      if (!value) continue;
+      try {
+        origins.add(new URL(value).origin);
+      } catch {
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+          origins.add(value.replace(/\/+$/, ""));
+        }
+      }
+    }
+  }
+  return origins;
+}
+function isAllowedCheckoutRedirectUrl(req, candidateUrl) {
+  try {
+    const parsed = new URL(candidateUrl);
+    const protocol = parsed.protocol.toLowerCase();
+    if (protocol === "http:" || protocol === "https:") {
+      const allowedOrigins = getAllowedCheckoutOrigins(req);
+      if (allowedOrigins.has(parsed.origin)) return true;
+      const isLocalDevOrigin = process.env.NODE_ENV !== "production" && (parsed.origin.startsWith("http://localhost:") || parsed.origin.startsWith("http://127.0.0.1:"));
+      return isLocalDevOrigin;
+    }
+    const allowedSchemes = /* @__PURE__ */ new Set(["instame", "exp", "exps"]);
+    return allowedSchemes.has(protocol.replace(/:$/, ""));
+  } catch {
+    return false;
+  }
+}
+function sanitizeCheckoutRedirectUrl(req, candidateUrl, fallbackUrl) {
+  return candidateUrl && isAllowedCheckoutRedirectUrl(req, candidateUrl) ? candidateUrl : fallbackUrl;
+}
+function isNativeCheckoutRedirect(url) {
+  try {
+    const protocol = new URL(url).protocol.toLowerCase();
+    return protocol !== "http:" && protocol !== "https:";
+  } catch {
+    return false;
+  }
+}
 function getRawBodyText(req) {
   const rawBody = req.rawBody;
   if (Buffer.isBuffer(rawBody)) return rawBody.toString("utf8");
@@ -2179,6 +2253,15 @@ function extractStripeInvoiceMetadata(invoice) {
   }
   return merged;
 }
+function getNextMonthRenewalDate() {
+  const renewal = /* @__PURE__ */ new Date();
+  renewal.setMonth(renewal.getMonth() + 1);
+  return renewal;
+}
+function unixSecondsToDate(input) {
+  if (!Number.isFinite(input) || !input || input <= 0) return null;
+  return new Date(input * 1e3);
+}
 async function processPaidStripeSession(session) {
   if (session.payment_status !== "paid") return;
   const metadata = session.metadata ?? {};
@@ -2187,39 +2270,31 @@ async function processPaidStripeSession(session) {
   const itemType = normalizeStringValue(metadata.itemType);
   const itemId = normalizeStringValue(metadata.itemId);
   const paymentIntentId = normalizeStringValue(session.payment_intent || "") || null;
-  const [existingBySession] = await db.select({ id: creditTransactions.id }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripeSessionId, session.id));
-  if (existingBySession) return;
-  if (paymentIntentId) {
-    const [existingByIntent] = await db.select({ id: creditTransactions.id, stripeSessionId: creditTransactions.stripeSessionId }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, paymentIntentId));
-    if (existingByIntent) {
-      if (!existingByIntent.stripeSessionId) {
-        await db.update(creditTransactions).set({ stripeSessionId: session.id }).where((0, import_drizzle_orm3.eq)(creditTransactions.id, existingByIntent.id));
-      }
-      return;
-    }
-  }
-  const [user] = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
-  if (!user) return;
+  const stripeCustomerId = normalizeStringValue(session.customer || "") || null;
+  const stripeSubscriptionId = normalizeStringValue(session.subscription || "") || null;
   if (itemType === "subscription") {
     const plan = SUBSCRIPTION_PLANS.find((entry) => entry.id === itemId);
     if (!plan) return;
-    const renewal = /* @__PURE__ */ new Date();
-    renewal.setMonth(renewal.getMonth() + 1);
-    await db.update(users).set({
-      credits: user.credits + plan.creditsPerMonth,
-      subscriptionPlan: plan.id,
-      subscriptionRenewAt: renewal,
-      updatedAt: /* @__PURE__ */ new Date()
-    }).where((0, import_drizzle_orm3.eq)(users.id, user.id));
-    await db.insert(creditTransactions).values({
-      userId: user.id,
-      type: "subscription",
-      amountCredits: plan.creditsPerMonth,
-      amountUsdCents: plan.priceCents,
-      source: "stripe",
-      description: `${plan.name} subscription`,
-      stripeSessionId: session.id,
-      stripePaymentIntentId: paymentIntentId
+    await db.transaction(async (tx) => {
+      const inserted = await tx.insert(creditTransactions).values({
+        userId,
+        type: "subscription",
+        amountCredits: plan.creditsPerMonth,
+        amountUsdCents: plan.priceCents,
+        source: "stripe",
+        description: `${plan.name} subscription`,
+        stripeSessionId: session.id,
+        stripePaymentIntentId: paymentIntentId
+      }).onConflictDoNothing().returning({ id: creditTransactions.id });
+      if (inserted.length === 0) return;
+      await tx.update(users).set({
+        credits: import_drizzle_orm3.sql`${users.credits} + ${plan.creditsPerMonth}`,
+        subscriptionPlan: plan.id,
+        subscriptionRenewAt: getNextMonthRenewalDate(),
+        stripeCustomerId,
+        stripeSubscriptionId,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where((0, import_drizzle_orm3.eq)(users.id, userId));
     });
     return;
   }
@@ -2227,19 +2302,23 @@ async function processPaidStripeSession(session) {
   const creditsFromMetadata = Number.parseInt(metadata.credits || "0", 10);
   const creditsToAdd = pkg?.credits ?? creditsFromMetadata;
   if (!Number.isInteger(creditsToAdd) || creditsToAdd < 1) return;
-  await db.update(users).set({
-    credits: user.credits + creditsToAdd,
-    updatedAt: /* @__PURE__ */ new Date()
-  }).where((0, import_drizzle_orm3.eq)(users.id, user.id));
-  await db.insert(creditTransactions).values({
-    userId: user.id,
-    type: "purchase",
-    amountCredits: creditsToAdd,
-    amountUsdCents: pkg?.priceCents ?? null,
-    source: "stripe",
-    description: "Credit package purchase",
-    stripeSessionId: session.id,
-    stripePaymentIntentId: paymentIntentId
+  await db.transaction(async (tx) => {
+    const inserted = await tx.insert(creditTransactions).values({
+      userId,
+      type: "purchase",
+      amountCredits: creditsToAdd,
+      amountUsdCents: pkg?.priceCents ?? null,
+      source: "stripe",
+      description: "Credit package purchase",
+      stripeSessionId: session.id,
+      stripePaymentIntentId: paymentIntentId
+    }).onConflictDoNothing().returning({ id: creditTransactions.id });
+    if (inserted.length === 0) return;
+    await tx.update(users).set({
+      credits: import_drizzle_orm3.sql`${users.credits} + ${creditsToAdd}`,
+      stripeCustomerId,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm3.eq)(users.id, userId));
   });
 }
 async function processPaidStripeInvoice(invoice) {
@@ -2247,8 +2326,6 @@ async function processPaidStripeInvoice(invoice) {
   if (billingReason !== "subscription_cycle") return;
   const paymentIntentId = normalizeStringValue(invoice.payment_intent || "");
   if (!paymentIntentId) return;
-  const [existing] = await db.select({ id: creditTransactions.id }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, paymentIntentId));
-  if (existing) return;
   const metadata = extractStripeInvoiceMetadata(invoice);
   const userId = normalizeStringValue(metadata.userId);
   if (!userId) return;
@@ -2257,62 +2334,113 @@ async function processPaidStripeInvoice(invoice) {
   const creditsFromMetadata = Number.parseInt(metadata.credits || "", 10);
   const creditsToAdd = plan?.creditsPerMonth ?? creditsFromMetadata;
   if (!Number.isInteger(creditsToAdd) || creditsToAdd < 1) return;
-  const [user] = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
-  if (!user) return;
-  const renewal = /* @__PURE__ */ new Date();
-  renewal.setMonth(renewal.getMonth() + 1);
-  await db.update(users).set({
-    credits: user.credits + creditsToAdd,
-    subscriptionPlan: plan?.id ?? user.subscriptionPlan,
-    subscriptionRenewAt: renewal,
-    updatedAt: /* @__PURE__ */ new Date()
-  }).where((0, import_drizzle_orm3.eq)(users.id, user.id));
-  await db.insert(creditTransactions).values({
-    userId: user.id,
-    type: "subscription",
-    amountCredits: creditsToAdd,
-    amountUsdCents: typeof invoice.amount_paid === "number" && invoice.amount_paid > 0 ? invoice.amount_paid : plan?.priceCents ?? null,
-    source: "stripe",
-    description: plan ? `${plan.name} subscription renewal` : "Subscription renewal",
-    stripeSessionId: invoice.id,
-    stripePaymentIntentId: paymentIntentId
+  await db.transaction(async (tx) => {
+    const inserted = await tx.insert(creditTransactions).values({
+      userId,
+      type: "subscription",
+      amountCredits: creditsToAdd,
+      amountUsdCents: typeof invoice.amount_paid === "number" && invoice.amount_paid > 0 ? invoice.amount_paid : plan?.priceCents ?? null,
+      source: "stripe",
+      description: plan ? `${plan.name} subscription renewal` : "Subscription renewal",
+      stripeSessionId: invoice.id,
+      stripePaymentIntentId: paymentIntentId
+    }).onConflictDoNothing().returning({ id: creditTransactions.id });
+    if (inserted.length === 0) return;
+    const userUpdate = {
+      credits: import_drizzle_orm3.sql`${users.credits} + ${creditsToAdd}`,
+      subscriptionRenewAt: getNextMonthRenewalDate(),
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    if (plan?.id) {
+      userUpdate.subscriptionPlan = plan.id;
+    }
+    await tx.update(users).set(userUpdate).where((0, import_drizzle_orm3.eq)(users.id, userId));
   });
 }
 async function processStripeCreditReversal(paymentIntentId, reversalType) {
   const markerId = `${reversalType}_${paymentIntentId}`;
-  const [alreadyProcessed] = await db.select({ id: creditTransactions.id }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, markerId));
-  if (alreadyProcessed) return;
-  const originalTransactions = await db.select().from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, paymentIntentId));
-  const original = originalTransactions.find(
-    (entry) => (entry.type === "purchase" || entry.type === "subscription") && entry.amountCredits > 0
-  );
-  if (!original) return;
-  const [user] = await db.select({
-    id: users.id,
-    credits: users.credits,
-    subscriptionPlan: users.subscriptionPlan
-  }).from(users).where((0, import_drizzle_orm3.eq)(users.id, original.userId));
-  if (!user) return;
-  const creditsToDeduct = Math.max(original.amountCredits, 0);
-  const nextCredits = Math.max(user.credits - creditsToDeduct, 0);
-  const shouldClearSubscription = original.type === "subscription";
-  const userUpdate = {
-    credits: nextCredits,
+  await db.transaction(async (tx) => {
+    const originalTransactions = await tx.select().from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, paymentIntentId));
+    const original = originalTransactions.find(
+      (entry) => (entry.type === "purchase" || entry.type === "subscription") && entry.amountCredits > 0
+    );
+    if (!original) return;
+    const creditsToDeduct = Math.max(original.amountCredits, 0);
+    const shouldClearSubscription = original.type === "subscription";
+    const inserted = await tx.insert(creditTransactions).values({
+      userId: original.userId,
+      type: "refund",
+      amountCredits: -creditsToDeduct,
+      amountUsdCents: typeof original.amountUsdCents === "number" && original.amountUsdCents > 0 ? -Math.abs(original.amountUsdCents) : null,
+      source: "stripe",
+      description: reversalType === "refund" ? "Stripe refund" : "Stripe dispute chargeback",
+      stripePaymentIntentId: markerId
+    }).onConflictDoNothing().returning({ id: creditTransactions.id });
+    if (inserted.length === 0) return;
+    const userUpdate = {
+      credits: import_drizzle_orm3.sql`GREATEST(${users.credits} - ${creditsToDeduct}, 0)`,
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    if (shouldClearSubscription) {
+      userUpdate.subscriptionPlan = null;
+      userUpdate.subscriptionRenewAt = null;
+      userUpdate.stripeSubscriptionId = null;
+    }
+    await tx.update(users).set(userUpdate).where((0, import_drizzle_orm3.eq)(users.id, original.userId));
+  });
+}
+async function processStripeSubscriptionStateChange(subscription) {
+  const metadata = subscription.metadata ?? {};
+  const subscriptionId = normalizeStringValue(subscription.id);
+  const customerId = normalizeStringValue(subscription.customer || "") || null;
+  const userId = normalizeStringValue(metadata.userId);
+  const planId = normalizeStringValue(metadata.itemId || metadata.planId);
+  const status = normalizeStringValue(subscription.status).toLowerCase();
+  const targetUserId = userId || (subscriptionId ? (await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm3.eq)(users.stripeSubscriptionId, subscriptionId)).limit(1))[0]?.id : "");
+  if (!targetUserId) return;
+  const renewal = unixSecondsToDate(subscription.current_period_end);
+  const isActiveStatus = (/* @__PURE__ */ new Set(["active", "trialing", "past_due"])).has(status);
+  await db.update(users).set({
+    subscriptionPlan: isActiveStatus ? planId || null : null,
+    subscriptionRenewAt: isActiveStatus ? renewal : null,
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: isActiveStatus ? subscriptionId || null : null,
     updatedAt: /* @__PURE__ */ new Date()
-  };
-  if (shouldClearSubscription) {
-    userUpdate.subscriptionPlan = null;
-    userUpdate.subscriptionRenewAt = null;
-  }
-  await db.update(users).set(userUpdate).where((0, import_drizzle_orm3.eq)(users.id, user.id));
-  await db.insert(creditTransactions).values({
-    userId: user.id,
-    type: "refund",
-    amountCredits: -creditsToDeduct,
-    amountUsdCents: typeof original.amountUsdCents === "number" && original.amountUsdCents > 0 ? -Math.abs(original.amountUsdCents) : null,
-    source: "stripe",
-    description: reversalType === "refund" ? "Stripe refund" : "Stripe dispute chargeback",
-    stripePaymentIntentId: markerId
+  }).where((0, import_drizzle_orm3.eq)(users.id, targetUserId));
+}
+async function grantVerifiedInAppCredits(params) {
+  return db.transaction(async (tx) => {
+    const [user] = await tx.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+    if (!user) {
+      return { status: "missing_user", credits: 0 };
+    }
+    const inserted = await tx.insert(creditTransactions).values({
+      userId: params.userId,
+      type: "purchase",
+      amountCredits: params.credits,
+      amountUsdCents: null,
+      source: "app",
+      description: params.description,
+      stripePaymentIntentId: params.transactionId
+    }).onConflictDoNothing().returning({ id: creditTransactions.id });
+    if (inserted.length === 0) {
+      const [existingTransaction] = await tx.select({ userId: creditTransactions.userId }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, params.transactionId));
+      const [existingUser] = await tx.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+      return {
+        status: "duplicate",
+        credits: existingUser?.credits ?? user.credits,
+        existingOwnerId: existingTransaction?.userId ?? null
+      };
+    }
+    await tx.update(users).set({
+      credits: import_drizzle_orm3.sql`${users.credits} + ${params.credits}`,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+    const [updatedUser] = await tx.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+    return {
+      status: "granted",
+      credits: updatedUser?.credits ?? user.credits + params.credits
+    };
   });
 }
 async function createGoogleJwt(serviceAccount) {
@@ -2673,6 +2801,8 @@ async function registerRoutes(app2) {
         await processPaidStripeSession(payload);
       } else if (eventType === "invoice.paid") {
         await processPaidStripeInvoice(payload);
+      } else if (eventType === "customer.subscription.updated" || eventType === "customer.subscription.deleted") {
+        await processStripeSubscriptionStateChange(payload);
       } else if (eventType === "charge.refunded") {
         const paymentIntentId = normalizeStringValue(payload.payment_intent);
         if (paymentIntentId) {
@@ -2791,8 +2921,16 @@ async function registerRoutes(app2) {
       if (!user) return res.status(404).json({ error: "User not found" });
       const defaultBaseUrl = getDefaultBaseUrl(req);
       const mode = itemType === "subscription" ? "subscription" : "payment";
-      const safeSuccessUrl = successUrl.length > 0 ? successUrl : `${defaultBaseUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
-      const safeCancelUrl = cancelUrl.length > 0 ? cancelUrl : `${defaultBaseUrl}/credits`;
+      const defaultSuccessUrl = `${defaultBaseUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
+      const defaultCancelUrl = `${defaultBaseUrl}/credits`;
+      const safeSuccessUrl = sanitizeCheckoutRedirectUrl(req, successUrl, defaultSuccessUrl);
+      const safeCancelUrl = sanitizeCheckoutRedirectUrl(req, cancelUrl, defaultCancelUrl);
+      const nativeCheckoutRedirect = isNativeCheckoutRedirect(safeSuccessUrl) || isNativeCheckoutRedirect(safeCancelUrl);
+      if (nativeCheckoutRedirect) {
+        return res.status(400).json({
+          error: mode === "subscription" ? "Mobile subscriptions are not available in-app yet. Use the web checkout flow." : "Mobile credit purchases must use Apple or Google in-app purchase."
+        });
+      }
       if (mode === "payment") {
         const pkg = CREDIT_PACKAGES.find((p) => p.id === itemId);
         if (!pkg) return res.status(400).json({ error: "Invalid package" });
@@ -2816,6 +2954,11 @@ async function registerRoutes(app2) {
       }
       const plan = SUBSCRIPTION_PLANS.find((p) => p.id === itemId);
       if (!plan) return res.status(400).json({ error: "Invalid subscription plan" });
+      if (user.subscriptionPlan) {
+        return res.status(409).json({
+          error: "An active subscription is already attached to this account."
+        });
+      }
       const session = await createStripeCheckoutSession({
         mode: "subscription",
         customerEmail: user.email,
@@ -2915,43 +3058,31 @@ async function registerRoutes(app2) {
       if (matchingTransactions.length === 0) {
         return res.status(400).json({ success: false, error: "Product ID mismatch in Apple receipt" });
       }
-      let transactionId = "";
       for (const transaction of matchingTransactions) {
         const candidateId = normalizeStringValue(transaction?.transaction_id);
         if (!candidateId) continue;
-        const [existing] = await db.select({ id: creditTransactions.id }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, candidateId));
-        if (!existing) {
-          transactionId = candidateId;
-          break;
+        const grantResult = await grantVerifiedInAppCredits({
+          userId,
+          transactionId: candidateId,
+          credits: expectedCredits,
+          description: "Apple in-app credit purchase"
+        });
+        if (grantResult.status === "missing_user") {
+          return res.status(404).json({ success: false, error: "User not found" });
+        }
+        if (grantResult.status === "granted") {
+          return res.json({ success: true, credits: grantResult.credits });
+        }
+        if (grantResult.existingOwnerId && grantResult.existingOwnerId !== userId) {
+          return res.status(409).json({ success: false, error: "This Apple purchase was already claimed." });
         }
       }
-      if (!transactionId) {
-        const [existingUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
-        return res.json({
-          success: true,
-          credits: existingUser?.credits ?? 0,
-          message: "Apple transaction already processed"
-        });
-      }
-      const [user] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
-      if (!user) {
-        return res.status(404).json({ success: false, error: "User not found" });
-      }
-      await db.update(users).set({
-        credits: user.credits + expectedCredits,
-        updatedAt: /* @__PURE__ */ new Date()
-      }).where((0, import_drizzle_orm3.eq)(users.id, userId));
-      await db.insert(creditTransactions).values({
-        userId,
-        type: "purchase",
-        amountCredits: expectedCredits,
-        amountUsdCents: null,
-        source: "app",
-        description: "Apple in-app credit purchase",
-        stripePaymentIntentId: transactionId
+      const [existingUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
+      return res.json({
+        success: true,
+        credits: existingUser?.credits ?? 0,
+        message: "Apple transaction already processed"
       });
-      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
-      return res.json({ success: true, credits: updatedUser?.credits ?? user.credits + expectedCredits });
     } catch (error) {
       console.error("Apple verify error:", error);
       return res.status(500).json({ success: false, error: "Failed to verify Apple purchase" });
@@ -2969,8 +3100,11 @@ async function registerRoutes(app2) {
       if (!expectedCredits) {
         return res.status(400).json({ success: false, error: "Unknown Google product ID" });
       }
-      const [existingTransaction] = await db.select({ id: creditTransactions.id }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, purchaseToken));
+      const [existingTransaction] = await db.select({ userId: creditTransactions.userId }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, purchaseToken));
       if (existingTransaction) {
+        if (existingTransaction.userId && existingTransaction.userId !== userId) {
+          return res.status(409).json({ success: false, error: "This Google Play purchase was already claimed." });
+        }
         const [existingUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
         return res.json({
           success: true,
@@ -2983,27 +3117,21 @@ async function registerRoutes(app2) {
       const serviceAccountJson = normalizeStringValue(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT);
       const useDevBypass = isDev && (allowBypass || !serviceAccountJson);
       if (useDevBypass) {
-        const [user2] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
-        if (!user2) {
+        const grantResult2 = await grantVerifiedInAppCredits({
+          userId,
+          transactionId: purchaseToken,
+          credits: expectedCredits,
+          description: allowBypass ? "Google Play purchase (dev bypass)" : "Google Play purchase (dev fallback: missing service account)"
+        });
+        if (grantResult2.status === "missing_user") {
           return res.status(404).json({ success: false, error: "User not found" });
         }
-        await db.update(users).set({
-          credits: user2.credits + expectedCredits,
-          updatedAt: /* @__PURE__ */ new Date()
-        }).where((0, import_drizzle_orm3.eq)(users.id, userId));
-        await db.insert(creditTransactions).values({
-          userId,
-          type: "purchase",
-          amountCredits: expectedCredits,
-          amountUsdCents: null,
-          source: "app",
-          description: allowBypass ? "Google Play purchase (dev bypass)" : "Google Play purchase (dev fallback: missing service account)",
-          stripePaymentIntentId: purchaseToken
-        });
-        const [updatedUser2] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
+        if (grantResult2.status === "duplicate" && grantResult2.existingOwnerId && grantResult2.existingOwnerId !== userId) {
+          return res.status(409).json({ success: false, error: "This Google Play purchase was already claimed." });
+        }
         return res.json({
           success: true,
-          credits: updatedUser2?.credits ?? user2.credits + expectedCredits,
+          credits: grantResult2.credits,
           bypass: true
         });
       }
@@ -3052,25 +3180,19 @@ async function registerRoutes(app2) {
           }
         });
       }
-      const [user] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
-      if (!user) {
+      const grantResult = await grantVerifiedInAppCredits({
+        userId,
+        transactionId: purchaseToken,
+        credits: expectedCredits,
+        description: "Google Play credit purchase"
+      });
+      if (grantResult.status === "missing_user") {
         return res.status(404).json({ success: false, error: "User not found" });
       }
-      await db.update(users).set({
-        credits: user.credits + expectedCredits,
-        updatedAt: /* @__PURE__ */ new Date()
-      }).where((0, import_drizzle_orm3.eq)(users.id, userId));
-      await db.insert(creditTransactions).values({
-        userId,
-        type: "purchase",
-        amountCredits: expectedCredits,
-        amountUsdCents: null,
-        source: "app",
-        description: "Google Play credit purchase",
-        stripePaymentIntentId: purchaseToken
-      });
-      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
-      return res.json({ success: true, credits: updatedUser?.credits ?? user.credits + expectedCredits });
+      if (grantResult.status === "duplicate" && grantResult.existingOwnerId && grantResult.existingOwnerId !== userId) {
+        return res.status(409).json({ success: false, error: "This Google Play purchase was already claimed." });
+      }
+      return res.json({ success: true, credits: grantResult.credits });
     } catch (error) {
       console.error("Google verify error:", error);
       return res.status(500).json({ success: false, error: "Failed to verify Google purchase" });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -31,10 +31,14 @@ WebBrowser.maybeCompleteAuthSession();
 
 function PackageCard({
   pkg,
+  priceLabel,
+  priceSubLabel,
   onPurchase,
   loading,
 }: {
   pkg: CreditPackage;
+  priceLabel: string;
+  priceSubLabel?: string | null;
   onPurchase: () => void;
   loading: boolean;
 }) {
@@ -57,10 +61,8 @@ function PackageCard({
       <Text style={styles.packageCredits}>{pkg.credits}</Text>
       <Text style={styles.packageCreditsLabel}>credits</Text>
       <View style={styles.packagePriceRow}>
-        <Text style={styles.packagePrice}>${pkg.price.toFixed(2)}</Text>
-        <Text style={styles.packagePerCredit}>
-          ${(pkg.price / pkg.credits).toFixed(2)}/credit
-        </Text>
+        <Text style={styles.packagePrice}>{priceLabel}</Text>
+        {priceSubLabel ? <Text style={styles.packagePerCredit}>{priceSubLabel}</Text> : null}
       </View>
     </Pressable>
   );
@@ -144,6 +146,11 @@ export default function CreditsScreen() {
   const [activeTab, setActiveTab] = useState<"credits" | "subscription">("credits");
   const showDevCreditTools = __DEV__ || process.env.EXPO_PUBLIC_ENABLE_DEV_CREDITS === "true";
   const nativePlatform = Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : null;
+  const subscriptionsAvailable = Platform.OS === "web";
+  const iapPriceLookup = useMemo(
+    () => new Map(iap.products.map((product) => [product.productId, product])),
+    [iap.products],
+  );
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
@@ -224,6 +231,12 @@ export default function CreditsScreen() {
           Alert.alert("Success", `${pkg.credits} credits added to your account!`);
           return;
         }
+
+        throw new Error(
+          nativePlatform === "ios"
+            ? "Apple in-app purchases are not available on this build yet."
+            : "Google Play billing is not available on this build yet.",
+        );
       }
 
       const checkoutUrls = getCheckoutUrls();
@@ -257,6 +270,10 @@ export default function CreditsScreen() {
   async function handleSubscribe(plan: SubscriptionPlan) {
     setSubLoading(plan.id);
     try {
+      if (!subscriptionsAvailable) {
+        throw new Error("Subscriptions are currently available on web checkout only.");
+      }
+
       const checkoutUrls = getCheckoutUrls();
       const checkout = await subscribeToPlan(plan.id, {
         successUrl: checkoutUrls.successUrl,
@@ -370,23 +387,39 @@ export default function CreditsScreen() {
           >
             <Text style={[styles.tabText, activeTab === "credits" && styles.tabTextActive]}>Credit Packs</Text>
           </Pressable>
-          <Pressable
-            onPress={() => setActiveTab("subscription")}
-            style={[styles.tab, activeTab === "subscription" && styles.tabActive]}
-          >
-            <Text style={[styles.tabText, activeTab === "subscription" && styles.tabTextActive]}>Subscriptions</Text>
-          </Pressable>
+          {subscriptionsAvailable ? (
+            <Pressable
+              onPress={() => setActiveTab("subscription")}
+              style={[styles.tab, activeTab === "subscription" && styles.tabActive]}
+            >
+              <Text style={[styles.tabText, activeTab === "subscription" && styles.tabTextActive]}>Subscriptions</Text>
+            </Pressable>
+          ) : null}
         </View>
 
-        {activeTab === "credits" ? (
+        {activeTab === "credits" || !subscriptionsAvailable ? (
           <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.packagesGrid}>
             {CREDIT_PACKAGES.map((pkg) => (
+              (() => {
+                const productId = nativePlatform ? resolveIapProductId(pkg.id, nativePlatform) : null;
+                const product = productId ? iapPriceLookup.get(productId) : null;
+                const priceLabel = product?.localizedPrice || `$${pkg.price.toFixed(2)}`;
+                const priceSubLabel =
+                  product?.localizedPrice && nativePlatform
+                    ? "Store price"
+                    : `$${(pkg.price / pkg.credits).toFixed(2)}/credit`;
+
+                return (
               <PackageCard
                 key={pkg.id}
                 pkg={pkg}
+                priceLabel={priceLabel}
+                priceSubLabel={priceSubLabel}
                 onPurchase={() => handlePurchase(pkg)}
                 loading={purchaseLoading === pkg.id || iap.isPurchasing}
               />
+                );
+              })()
             ))}
           </Animated.View>
         ) : (
@@ -414,10 +447,6 @@ export default function CreditsScreen() {
                     {iap.isAvailable ? "Apple In-App Purchase" : "Apple IAP (not configured)"}
                   </Text>
                 </View>
-                <View style={styles.paymentMethod}>
-                  <Ionicons name="card-outline" size={20} color={Colors.white} />
-                  <Text style={styles.paymentMethodText}>Stripe</Text>
-                </View>
               </>
             ) : nativePlatform === "android" ? (
               <>
@@ -426,10 +455,6 @@ export default function CreditsScreen() {
                   <Text style={styles.paymentMethodText}>
                     {iap.isAvailable ? "Google Play Billing" : "Google Play IAP (not configured)"}
                   </Text>
-                </View>
-                <View style={styles.paymentMethod}>
-                  <Ionicons name="card-outline" size={20} color={Colors.white} />
-                  <Text style={styles.paymentMethodText}>Stripe</Text>
                 </View>
               </>
             ) : (
@@ -443,8 +468,8 @@ export default function CreditsScreen() {
           </View>
           <Text style={styles.paymentNote}>
             {nativePlatform
-              ? "In-app purchases are used on mobile when configured. Stripe checkout remains available as fallback."
-              : "Secure Stripe checkout for web purchases."}
+              ? "Credit packs use Apple or Google in-app purchase on mobile. Subscriptions are available on web checkout only."
+              : "Secure Stripe checkout for web credit packs and subscriptions."}
           </Text>
           {nativePlatform && !iap.isLoading && !iap.isAvailable && iap.error ? (
             <Text style={styles.paymentWarning}>{iap.error}</Text>

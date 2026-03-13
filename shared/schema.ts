@@ -7,6 +7,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -36,6 +37,8 @@ export const users = pgTable("users", {
   credits: integer("credits").notNull().default(3),
   subscriptionPlan: text("subscription_plan"),
   subscriptionRenewAt: timestamp("subscription_renew_at"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
   styleGender: text("style_gender"),
   stylePreferences: jsonb("style_preferences").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   favoriteLooks: jsonb("favorite_looks").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
@@ -65,20 +68,31 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const creditTransactions = pgTable("credit_transactions", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  type: text("type").notNull(), // purchase | subscription | usage | refund
-  amountCredits: integer("amount_credits").notNull(),
-  amountUsdCents: integer("amount_usd_cents"),
-  source: text("source"), // stripe | manual | app
-  description: text("description"),
-  stripeSessionId: text("stripe_session_id"),
-  stripePaymentIntentId: text("stripe_payment_intent_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const creditTransactions = pgTable(
+  "credit_transactions",
+  {
+    id: serial("id").primaryKey(),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: text("type").notNull(), // purchase | subscription | usage | refund
+    amountCredits: integer("amount_credits").notNull(),
+    amountUsdCents: integer("amount_usd_cents"),
+    source: text("source"), // stripe | manual | app
+    description: text("description"),
+    stripeSessionId: text("stripe_session_id"),
+    stripePaymentIntentId: text("stripe_payment_intent_id"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    stripeSessionIdUnique: uniqueIndex("credit_transactions_stripe_session_id_unique").on(
+      table.stripeSessionId,
+    ),
+    stripePaymentIntentIdUnique: uniqueIndex("credit_transactions_stripe_payment_intent_id_unique").on(
+      table.stripePaymentIntentId,
+    ),
+  }),
+);
 
 export const conversations = pgTable("conversations", {
   id: serial("id").primaryKey(),
