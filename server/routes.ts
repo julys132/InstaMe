@@ -25,6 +25,7 @@ import {
 import {
   INSTAME_EDIT_TIERS,
   INSTAME_GENERATION_TIERS,
+  INSTAME_PORTRAIT_ENHANCE_TIER,
   getLiveInstaMeGenerationTier,
 } from "../shared/instame-pricing";
 import {
@@ -402,6 +403,18 @@ const GEMINI_API_BASE_URL =
 const DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 const STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
+const INSTAME_PORTRAIT_ENHANCE_MODEL =
+  process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || INSTAME_PORTRAIT_ENHANCE_TIER.model;
+const INSTAME_PORTRAIT_ENHANCE_SIZE =
+  (process.env.INSTAME_PORTRAIT_ENHANCE_SIZE || INSTAME_PORTRAIT_ENHANCE_TIER.output).trim() ||
+  "1024 x 1024";
+const INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path.resolve(
+  process.cwd(),
+  "assets",
+  "instame-style-presets",
+  "base-prompt",
+  "prompt.txt",
+);
 const EXPOSE_STYLE_DEBUG_PROMPT =
   normalizeStringValue(process.env.EXPOSE_STYLE_DEBUG_PROMPT).toLowerCase() === "true";
 const MAX_IMAGE_COUNT_BY_MODE: Record<ImageInputMode, number> = {
@@ -1383,6 +1396,41 @@ function buildInstaMeEditPrompt(options: {
   ].join("\n");
 }
 
+let cachedPortraitEnhancePrompt = "";
+
+function getPortraitEnhancePromptTemplate(): string {
+  if (cachedPortraitEnhancePrompt) {
+    return cachedPortraitEnhancePrompt;
+  }
+
+  try {
+    cachedPortraitEnhancePrompt = fs
+      .readFileSync(INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH, "utf8")
+      .replace(/\u00C2/g, "")
+      .trim();
+  } catch (error) {
+    throw new Error(
+      `Portrait enhance prompt file is missing at ${INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH}: ${toErrorMessage(error, "Could not read prompt file")}`,
+    );
+  }
+
+  return cachedPortraitEnhancePrompt;
+}
+
+function buildPortraitEnhancePrompt(): string {
+  const basePrompt = getPortraitEnhancePromptTemplate();
+
+  return [
+    "Edit the uploaded selfie into a cleaner, more AI-stable portrait base image for future styled generations.",
+    "Use only the uploaded selfie as the source image.",
+    "Preserve the same person exactly: keep identity, hair color, age appearance, face shape, skin tone, expression, pose, outfit, framing, and background recognizable.",
+    "Do not change camera angle, crop, clothing, or background details.",
+    "Do not add extra people, text, jewelry, accessories, watermarks, or anatomy distortions.",
+    `Output one premium photorealistic portrait at ${INSTAME_PORTRAIT_ENHANCE_SIZE}.`,
+    basePrompt,
+  ].join("\n\n");
+}
+
 function getObjectRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
@@ -1739,6 +1787,28 @@ async function generateInstaMeEditImage(options: {
     imageBase64,
     model: tier.model,
     provider: "Together",
+  };
+}
+
+async function generateInstaMePortraitEnhance(options: {
+  photo: UploadedReferenceImage;
+}): Promise<{ imageBase64: string; model: string; provider: string }> {
+  const response = await generateGeminiContent({
+    model: INSTAME_PORTRAIT_ENHANCE_MODEL,
+    parts: [{ text: buildPortraitEnhancePrompt() }, ...toGeminiInlineImageParts([options.photo])],
+    responseModalities: ["IMAGE", "TEXT"],
+    maxOutputTokens: 1200,
+  });
+
+  const imageBase64 = extractGeminiImageBase64(response);
+  if (!imageBase64) {
+    throw new Error("Portrait enhancement failed. No image data returned.");
+  }
+
+  return {
+    imageBase64,
+    model: INSTAME_PORTRAIT_ENHANCE_MODEL,
+    provider: INSTAME_PORTRAIT_ENHANCE_TIER.provider,
   };
 }
 
@@ -3352,6 +3422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json({
       generationTiers: INSTAME_GENERATION_TIERS,
       editTiers: INSTAME_EDIT_TIERS,
+      portraitEnhanceTier: INSTAME_PORTRAIT_ENHANCE_TIER,
       liveGenerationTierId: getLiveInstaMeGenerationTier().id,
     });
   });
@@ -3632,6 +3703,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await refundCredits(userId, transformCost, "instame_old_money_transform_failed");
       }
       const errorMessage = toErrorMessage(error, "Failed to transform image");
+      if (errorMessage.startsWith("AI_NOT_CONFIGURED:")) {
+        return res.status(503).json({ error: errorMessage.replace("AI_NOT_CONFIGURED: ", "") });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  app.post("/api/instame/enhance-portrait", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+    const enhanceCost =
+      Number.isInteger(INSTAME_PORTRAIT_ENHANCE_TIER.credits) && INSTAME_PORTRAIT_ENHANCE_TIER.credits > 0
+        ? INSTAME_PORTRAIT_ENHANCE_TIER.credits
+        : 3;
+
+    const photoInput = body.photo
+      ? [body.photo]
+      : Array.isArray(body.photos) && body.photos.length > 0
+        ? [body.photos[0]]
+        : [];
+
+    let uploadedImages: UploadedReferenceImage[] = [];
+    try {
+      uploadedImages = normalizeUploadedImages(photoInput, "single_item");
+    } catch (error: unknown) {
+      return res.status(400).json({ error: toErrorMessage(error, "Invalid image payload") });
+    }
+
+    if (uploadedImages.length === 0) {
+      return res.status(400).json({ error: "Upload one portrait image to enhance." });
+    }
+
+    let creditsConsumed = false;
+    try {
+      const consumed = await consumeCredits(userId, enhanceCost, "instame_portrait_enhance");
+      if (!consumed) {
+        return res.status(402).json({
+          error: `Not enough credits. Portrait Enhance costs ${enhanceCost} credits.`,
+          requiredCredits: enhanceCost,
+        });
+      }
+      creditsConsumed = true;
+
+      const enhanceResult = await generateInstaMePortraitEnhance({
+        photo: uploadedImages[0],
+      });
+
+      const [updatedUser] = await db
+        .select({ credits: users.credits })
+        .from(users)
+        .where(eq(users.id, userId));
+
+      return res.json({
+        imageBase64: enhanceResult.imageBase64,
+        creditsCharged: enhanceCost,
+        creditsRemaining: updatedUser?.credits ?? 0,
+        model: enhanceResult.model,
+        provider: enhanceResult.provider,
+        output: INSTAME_PORTRAIT_ENHANCE_SIZE,
+      });
+    } catch (error: unknown) {
+      console.error("InstaMe portrait enhance error:", error);
+      if (creditsConsumed) {
+        await refundCredits(userId, enhanceCost, "instame_portrait_enhance_failed");
+      }
+      const errorMessage = toErrorMessage(error, "Failed to enhance portrait");
       if (errorMessage.startsWith("AI_NOT_CONFIGURED:")) {
         return res.status(503).json({ error: errorMessage.replace("AI_NOT_CONFIGURED: ", "") });
       }

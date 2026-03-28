@@ -34,8 +34,10 @@ import { INSTAME_STYLE_PRESETS, type InstaMeStylePreset } from "@shared/instame-
 import {
   INSTAME_EDIT_TIERS,
   INSTAME_GENERATION_TIERS,
+  INSTAME_PORTRAIT_ENHANCE_TIER,
   type InstaMeEditTier,
   type InstaMeGenerationTier,
+  type InstaMePortraitEnhanceTier,
 } from "@shared/instame-pricing";
 
 type UploadedPhoto = {
@@ -257,6 +259,9 @@ export default function InstaMeScreen() {
   const [stylePresets, setStylePresets] = useState<InstaMeStylePreset[]>(INSTAME_STYLE_PRESETS);
   const [generationTiers, setGenerationTiers] = useState<InstaMeGenerationTier[]>(INSTAME_GENERATION_TIERS);
   const [editTiers, setEditTiers] = useState<InstaMeEditTier[]>(INSTAME_EDIT_TIERS);
+  const [portraitEnhanceTier, setPortraitEnhanceTier] = useState<InstaMePortraitEnhanceTier>(
+    INSTAME_PORTRAIT_ENHANCE_TIER,
+  );
   const [selectedGenerationTierId, setSelectedGenerationTierId] = useState<string>(
     INSTAME_GENERATION_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_GENERATION_TIERS[0]?.id || "preview",
   );
@@ -270,6 +275,9 @@ export default function InstaMeScreen() {
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
   const [styleReferenceCount, setStyleReferenceCount] = useState<number>(0);
   const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
+  const [portraitEnhanceCandidate, setPortraitEnhanceCandidate] = useState<UploadedPhoto | null>(null);
+  const [portraitEnhanceLoading, setPortraitEnhanceLoading] = useState(false);
+  const [usingEnhancedPortrait, setUsingEnhancedPortrait] = useState(false);
   const styleListRef = useRef<ScrollView | null>(null);
   const [canScrollMoreRight, setCanScrollMoreRight] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -293,6 +301,7 @@ export default function InstaMeScreen() {
   );
 
   const transformCost = liveGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST;
+  const portraitEnhanceCost = portraitEnhanceTier?.credits ?? INSTAME_PORTRAIT_ENHANCE_TIER.credits;
 
   const selectedEditTier = useMemo(
     () => editTiers.find((tier) => tier.id === selectedEditTierId) || editTiers[0],
@@ -333,6 +342,9 @@ export default function InstaMeScreen() {
           if (pricingResult.value.editTiers.length > 0) {
             setEditTiers(pricingResult.value.editTiers);
           }
+          if (pricingResult.value.portraitEnhanceTier) {
+            setPortraitEnhanceTier(pricingResult.value.portraitEnhanceTier);
+          }
           if (pricingResult.value.liveGenerationTierId) {
             setSelectedGenerationTierId(pricingResult.value.liveGenerationTierId);
           }
@@ -367,6 +379,8 @@ export default function InstaMeScreen() {
           sourceImageId: image.id,
           name: image.name,
         });
+        setPortraitEnhanceCandidate(null);
+        setUsingEnhancedPortrait(false);
         setResultBase64(null);
         setResultMeta(null);
         setShowEditComposer(false);
@@ -463,12 +477,63 @@ export default function InstaMeScreen() {
       sourceImageId: undefined,
       name: asset.fileName || "Portrait",
     });
+    setPortraitEnhanceCandidate(null);
+    setUsingEnhancedPortrait(false);
     setResultBase64(null);
     setResultMeta(null);
     setShowEditComposer(false);
     setEditInstruction("");
     await Haptics.selectionAsync();
   }, [pickRawImage]);
+
+  const handleEnhancePortrait = useCallback(async () => {
+    if (!photo) {
+      Alert.alert("Missing image", "Upload one portrait before enhancing it.");
+      return;
+    }
+
+    if (credits < portraitEnhanceCost) {
+      Alert.alert(
+        "Not enough credits",
+        `Portrait Enhance costs ${portraitEnhanceCost} credits.`,
+      );
+      return;
+    }
+
+    setPortraitEnhanceLoading(true);
+    try {
+      const result = await apiClient.enhanceInstaMePortrait({
+        photo: { base64: photo.base64, mimeType: photo.mimeType },
+      });
+
+      setPortraitEnhanceCandidate({
+        uri: `data:image/png;base64,${result.imageBase64}`,
+        base64: result.imageBase64,
+        previewBase64: result.imageBase64,
+        mimeType: "image/png",
+        width: 1024,
+        height: 1024,
+        name: `${photo.name || "Portrait"} Enhanced`,
+      });
+      await refreshCredits();
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      Alert.alert("Error", error?.message || "Portrait enhancement failed.");
+    } finally {
+      setPortraitEnhanceLoading(false);
+    }
+  }, [credits, photo, portraitEnhanceCost, refreshCredits]);
+
+  const handleKeepEnhancedPortrait = useCallback(async () => {
+    if (!portraitEnhanceCandidate) {
+      return;
+    }
+
+    setPhoto(portraitEnhanceCandidate);
+    setPortraitEnhanceCandidate(null);
+    setUsingEnhancedPortrait(true);
+    await Haptics.selectionAsync();
+  }, [portraitEnhanceCandidate]);
 
   const handleTransform = useCallback(async () => {
     if (!photo) {
@@ -678,6 +743,72 @@ export default function InstaMeScreen() {
               </Text>
             </Pressable>
           </View>
+
+          <Pressable
+            onPress={handleEnhancePortrait}
+            disabled={!photo || portraitEnhanceLoading}
+            style={({ pressed }) => [
+              styles.enhanceButton,
+              (!photo || portraitEnhanceLoading) && styles.enhanceButtonDisabled,
+              pressed && photo && !portraitEnhanceLoading ? { opacity: 0.9 } : undefined,
+            ]}
+          >
+            {portraitEnhanceLoading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <>
+                <Ionicons name="sparkles-outline" size={18} color="#000" />
+                <Text style={styles.enhanceButtonText}>Enhance portrait first</Text>
+                <Text style={styles.enhanceButtonCost}>{portraitEnhanceCost} credits</Text>
+              </>
+            )}
+          </Pressable>
+
+          <Text style={styles.enhanceHintText}>
+            Improve the selfie first to reduce face distortion in later styled generations.
+          </Text>
+          {usingEnhancedPortrait ? (
+            <Text style={styles.enhanceSelectedText}>
+              Enhanced portrait selected as your current base image.
+            </Text>
+          ) : null}
+
+          {portraitEnhanceCandidate ? (
+            <View style={styles.enhancePreviewCard}>
+              <Text style={styles.enhancePreviewTitle}>Enhanced portrait preview</Text>
+              <Text style={styles.enhancePreviewSubtitle}>
+                If you like this improved version, keep it as your new base image.
+              </Text>
+              <Image
+                source={{ uri: portraitEnhanceCandidate.uri }}
+                style={styles.enhancePreviewImage}
+                contentFit="cover"
+              />
+              <View style={styles.enhanceDecisionRow}>
+                <Pressable
+                  onPress={handleEnhancePortrait}
+                  disabled={portraitEnhanceLoading}
+                  style={({ pressed }) => [
+                    styles.enhanceDecisionButton,
+                    styles.enhanceRetryButton,
+                    pressed && !portraitEnhanceLoading ? { opacity: 0.88 } : undefined,
+                  ]}
+                >
+                  <Text style={styles.enhanceRetryButtonText}>I don&apos;t like it / Try again</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleKeepEnhancedPortrait}
+                  style={({ pressed }) => [
+                    styles.enhanceDecisionButton,
+                    styles.enhanceKeepButton,
+                    pressed ? { opacity: 0.9 } : undefined,
+                  ]}
+                >
+                  <Text style={styles.enhanceKeepButtonText}>Yes, I like it / Keep this one</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
 
         </View>
 
@@ -1104,6 +1235,105 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     marginTop: 12,
+  },
+  enhanceButton: {
+    marginTop: 12,
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  enhanceButtonDisabled: {
+    opacity: 0.55,
+  },
+  enhanceButtonText: {
+    color: "#000",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  enhanceButtonCost: {
+    color: "#111",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    backgroundColor: "rgba(0,0,0,0.12)",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  enhanceHintText: {
+    color: "#A8A0A6",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  enhanceSelectedText: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  enhancePreviewCard: {
+    marginTop: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,79,125,0.24)",
+    backgroundColor: "rgba(255,79,125,0.06)",
+    padding: 12,
+    gap: 10,
+  },
+  enhancePreviewTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  enhancePreviewSubtitle: {
+    color: "#C9C0C6",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  enhancePreviewImage: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  enhanceDecisionRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  enhanceDecisionButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  enhanceRetryButton: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  enhanceKeepButton: {
+    backgroundColor: Colors.accent,
+  },
+  enhanceRetryButtonText: {
+    color: "#F5E7EC",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 17,
+  },
+  enhanceKeepButtonText: {
+    color: "#050505",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 17,
   },
   secondaryActionButton: {
     flex: 1,
