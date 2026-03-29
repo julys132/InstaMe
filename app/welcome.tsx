@@ -78,7 +78,9 @@ export default function WelcomeScreen() {
                   />
                   <View style={styles.innerPanel} />
                   <View style={styles.centerRing} />
-                  <Text style={styles.frameIndex}>{String(index + 1).padStart(2, "0")}</Text>
+                  <Text style={styles.frameIndex}>
+                    {String(FRAME_LAYOUT.length - index).padStart(2, "0")}
+                  </Text>
                 </View>
               </View>
             ))}
