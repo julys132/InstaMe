@@ -18,8 +18,8 @@ import { INSTAME_WELCOME_CARD_SOURCES } from "@/constants/instameArtStyles";
 const FRAME_LAYOUT = [
   { x: -76, y: 12, rotate: "-9deg", scale: 0.9, tint: "rgba(8,8,10,0.68)", border: "rgba(255,255,255,0.06)", z: 1 },
   { x: 70, y: 22, rotate: "7deg", scale: 0.88, tint: "rgba(10,10,12,0.70)", border: "rgba(255,255,255,0.06)", z: 1 },
-  { x: -18, y: 68, rotate: "-4deg", scale: 0.96, tint: "rgba(82,10,36,0.46)", border: "rgba(255,92,146,0.16)", z: 2 },
-  { x: 18, y: -10, rotate: "4deg", scale: 1.03, tint: "rgba(102,8,40,0.54)", border: "rgba(255,108,163,0.22)", z: 3 },
+  { x: -18, y: 68, rotate: "-4deg", scale: 0.96, tint: "rgba(16,12,18,0.38)", border: "rgba(255,255,255,0.08)", z: 2 },
+  { x: 18, y: -10, rotate: "4deg", scale: 1.03, tint: "rgba(18,14,20,0.32)", border: "rgba(255,255,255,0.10)", z: 3 },
 ] as const;
 
 const SIGNAL_WORDS = ["Editorials", "Authentic", "Swift"] as const;
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     marginTop: -18,
     borderRadius: 32,
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.06)",
+    borderColor: "rgba(255,255,255,0.08)",
   },
   frameIndex: {
     position: "absolute",
