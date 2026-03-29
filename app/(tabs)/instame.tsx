@@ -53,6 +53,7 @@ type UploadedPhoto = {
 };
 
 type TransformIntensity = "soft" | "editorial" | "dramatic";
+type OptionalTransformIntensity = TransformIntensity | null;
 type GenerationResultMeta = {
   model: string;
   provider?: string;
@@ -72,10 +73,30 @@ type StyleCardTheme = {
 
 const DEFAULT_TRANSFORM_COST = 5;
 
-const INTENSITY_OPTIONS: { value: TransformIntensity; label: string; subtitle: string }[] = [
-  { value: "soft", label: "Soft", subtitle: "Subtle luxury refinement" },
-  { value: "editorial", label: "Editorial", subtitle: "Balanced premium look" },
-  { value: "dramatic", label: "Dramatic", subtitle: "Bold cinematic styling" },
+const INTENSITY_OPTIONS: {
+  value: TransformIntensity;
+  label: string;
+  subtitle: string;
+  details: string;
+}[] = [
+  {
+    value: "soft",
+    label: "Soft",
+    subtitle: "Lighter styling pass",
+    details: "Keeps the chosen style more natural and closer to your original photo.",
+  },
+  {
+    value: "editorial",
+    label: "Editorial",
+    subtitle: "Balanced style upgrade",
+    details: "Adds a clearer fashion finish to lighting, mood, and styling without pushing too far.",
+  },
+  {
+    value: "dramatic",
+    label: "Dramatic",
+    subtitle: "Stronger cinematic effect",
+    details: "Pushes the chosen style further with bolder lighting, contrast, pose energy, and atmosphere.",
+  },
 ];
 
 const STYLE_CARD_THEME_MAP: Record<string, StyleCardTheme> = {
@@ -255,7 +276,7 @@ export default function InstaMeScreen() {
   const { credits, refreshCredits } = useCredits();
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
-  const [intensity, setIntensity] = useState<TransformIntensity>("editorial");
+  const [intensity, setIntensity] = useState<OptionalTransformIntensity>(null);
   const [stylePresets, setStylePresets] = useState<InstaMeStylePreset[]>(INSTAME_STYLE_PRESETS);
   const [generationTiers, setGenerationTiers] = useState<InstaMeGenerationTier[]>(INSTAME_GENERATION_TIERS);
   const [editTiers, setEditTiers] = useState<InstaMeEditTier[]>(INSTAME_EDIT_TIERS);
@@ -529,11 +550,38 @@ export default function InstaMeScreen() {
       return;
     }
 
-    setPhoto(portraitEnhanceCandidate);
+    let savedImageId = "";
+    try {
+      const saved = await apiClient.saveInstaMeUploadedImage({
+        image: {
+          name: portraitEnhanceCandidate.name || `${photo?.name || "Portrait"} Enhanced`,
+          mimeType: portraitEnhanceCandidate.mimeType,
+          base64: portraitEnhanceCandidate.base64,
+          previewBase64: portraitEnhanceCandidate.previewBase64 || portraitEnhanceCandidate.base64,
+          width: portraitEnhanceCandidate.width || 1024,
+          height: portraitEnhanceCandidate.height || 1024,
+          fileSizeBytes: portraitEnhanceCandidate.fileSizeBytes || Math.ceil((portraitEnhanceCandidate.base64.length * 3) / 4),
+        },
+      });
+      savedImageId = saved.image?.id || "";
+    } catch (error: any) {
+      Alert.alert(
+        "Saved as current portrait only",
+        error?.message || "The enhanced portrait could not be added to Uploaded Images.",
+      );
+    }
+
+    setPhoto({
+      ...portraitEnhanceCandidate,
+      sourceImageId: savedImageId || portraitEnhanceCandidate.sourceImageId,
+    });
     setPortraitEnhanceCandidate(null);
     setUsingEnhancedPortrait(true);
     await Haptics.selectionAsync();
-  }, [portraitEnhanceCandidate]);
+    if (savedImageId) {
+      Alert.alert("Saved", "Your enhanced portrait was saved to Uploaded Images for later use.");
+    }
+  }, [photo?.name, portraitEnhanceCandidate]);
 
   const handleTransform = useCallback(async () => {
     if (!photo) {
@@ -553,7 +601,7 @@ export default function InstaMeScreen() {
       const result = await apiClient.transformOldMoney({
         photo: { base64: photo.base64, mimeType: photo.mimeType },
         customPrompt: composedPrompt,
-        intensity,
+        intensity: intensity || undefined,
         preserveBackground,
         stylePresetId: selectedPreset?.id,
         generationTierId: selectedGenerationTierId,
@@ -688,7 +736,6 @@ export default function InstaMeScreen() {
             <Ionicons name="sparkles" size={14} color={Colors.accent} />
             <Text style={styles.creditText}>{credits} credits</Text>
           </View>
-          <Text style={styles.libraryHint}>Style base: {styleReferenceCount} curated references</Text>
           {lastUsedStyleRefs.length > 0 ? (
             <Text style={styles.libraryHintMuted}>Last transform anchors: {lastUsedStyleRefs.join(", ")}</Text>
           ) : null}
@@ -777,7 +824,7 @@ export default function InstaMeScreen() {
             <View style={styles.enhancePreviewCard}>
               <Text style={styles.enhancePreviewTitle}>Enhanced portrait preview</Text>
               <Text style={styles.enhancePreviewSubtitle}>
-                If you like this improved version, keep it as your new base image.
+                If you like this improved version, keep it as your new base image and save it to Uploaded Images.
               </Text>
               <Image
                 source={{ uri: portraitEnhanceCandidate.uri }}
@@ -982,7 +1029,35 @@ export default function InstaMeScreen() {
             </View>
           </View>
 
-          <Text style={styles.cardTitle}>3. Fine tune</Text>
+          <Text style={styles.cardTitle}>3. Fine tune (optional)</Text>
+          <Text style={styles.fineTuneIntro}>
+            Your selected style sets the main look. Fine tune only adjusts how strongly that style is applied.
+          </Text>
+          <View style={styles.fineTuneExplanationCard}>
+            <Text style={styles.fineTuneExplanationTitle}>What changes when you use fine tune</Text>
+            <Text style={styles.fineTuneExplanationText}>
+              It can change the strength of lighting, contrast, mood, styling polish, and overall cinematic impact.
+            </Text>
+            <Text style={styles.fineTuneExplanationText}>
+              It does not replace your selected style. If you choose <Text style={styles.fineTuneAccent}>{selectedStylePreset?.label || "a style"}</Text>, the result stays in that style family.
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => setIntensity(null)}
+            style={[styles.fineTuneSkipCard, intensity === null && styles.fineTuneSkipCardActive]}
+          >
+            <View style={styles.fineTuneSkipTopRow}>
+              <Text style={[styles.fineTuneSkipTitle, intensity === null && styles.fineTuneSkipTitleActive]}>
+                No extra fine tune
+              </Text>
+              {intensity === null ? (
+                <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
+              ) : null}
+            </View>
+            <Text style={[styles.fineTuneSkipText, intensity === null && styles.fineTuneSkipTextActive]}>
+              Use the selected style as-is, with standard balanced styling.
+            </Text>
+          </Pressable>
           <View style={styles.intensityRow}>
             {INTENSITY_OPTIONS.map((option) => (
               <Pressable
@@ -995,6 +1070,9 @@ export default function InstaMeScreen() {
                 </Text>
                 <Text style={[styles.chipSubtitle, intensity === option.value && styles.chipSubtitleActive]}>
                   {option.subtitle}
+                </Text>
+                <Text style={[styles.chipDetails, intensity === option.value && styles.chipDetailsActive]}>
+                  {option.details}
                 </Text>
               </Pressable>
             ))}
@@ -1015,7 +1093,7 @@ export default function InstaMeScreen() {
           <TextInput
             value={customPrompt}
             onChangeText={setCustomPrompt}
-            placeholder="Extra instructions (optional): pearl earrings, soft blush, sunset lighting..."
+            placeholder="Extra notes (optional): colder shadows, softer makeup, stronger grain, pearl earrings..."
             placeholderTextColor="#7A7A7A"
             multiline
             style={styles.promptInput}
@@ -1211,13 +1289,13 @@ const styles = StyleSheet.create({
   libraryHintMuted: { color: "#8B8B8B", fontFamily: "Inter_400Regular", fontSize: 11 },
   card: {
     marginHorizontal: 20,
-    marginTop: 14,
+    marginTop: 12,
     borderWidth: 1,
     borderColor: "rgba(255,79,125,0.30)",
     borderRadius: 18,
     backgroundColor: "rgba(7,7,7,0.86)",
-    padding: 14,
-    gap: 12,
+    padding: 12,
+    gap: 10,
   },
   cardTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 16 },
   uploadBox: {
@@ -1227,8 +1305,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "rgba(255,255,255,0.03)",
   },
-  uploadImage: { width: "100%", height: 360 },
-  uploadPlaceholder: { height: 220, justifyContent: "center", alignItems: "center", paddingHorizontal: 18, gap: 8 },
+  uploadImage: { width: "100%", height: 250 },
+  uploadPlaceholder: { height: 160, justifyContent: "center", alignItems: "center", paddingHorizontal: 18, gap: 8 },
   uploadPlaceholderTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 15 },
   uploadPlaceholderSubtitle: { color: "#A3A3A3", fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" },
   uploadActionRow: {
@@ -1749,6 +1827,73 @@ const styles = StyleSheet.create({
   postGenerationSection: {
     gap: 10,
   },
+  fineTuneIntro: {
+    color: "#C9C9C9",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: -2,
+  },
+  fineTuneExplanationCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  fineTuneExplanationTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  fineTuneExplanationText: {
+    color: "#BDBDBD",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  fineTuneAccent: {
+    color: "#FFD3DF",
+    fontFamily: "Inter_700Bold",
+  },
+  fineTuneSkipCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  fineTuneSkipCardActive: {
+    borderColor: "rgba(255,79,125,0.66)",
+    backgroundColor: "rgba(255,79,125,0.16)",
+  },
+  fineTuneSkipTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  fineTuneSkipTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  fineTuneSkipTitleActive: {
+    color: Colors.accentLight,
+  },
+  fineTuneSkipText: {
+    color: "#9A9A9A",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  fineTuneSkipTextActive: {
+    color: "#FFD3DF",
+  },
   intensityRow: { gap: 8 },
   chip: {
     borderRadius: 12,
@@ -1767,6 +1912,16 @@ const styles = StyleSheet.create({
   chipLabelActive: { color: Colors.accentLight },
   chipSubtitle: { color: "#8D8D8D", fontFamily: "Inter_400Regular", fontSize: 12 },
   chipSubtitleActive: { color: "#FFD3DF" },
+  chipDetails: {
+    color: "#9B9B9B",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  chipDetailsActive: {
+    color: "#FFE2EA",
+  },
   toggle: {
     borderRadius: 12,
     borderWidth: 1,

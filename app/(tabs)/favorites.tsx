@@ -56,7 +56,9 @@ export default function FavoritesScreen() {
 
         <View style={styles.section}>
           {sortedOutfits.length === 0 ? (
-            <Text style={styles.emptyText}>No saved outfits yet. Generate outfits in Stylist first.</Text>
+            <Text style={styles.emptyText}>
+              No saved favorites yet. When you save looks you love, they will appear here.
+            </Text>
           ) : (
             sortedOutfits.map((outfit) => {
               const isFavorite = favorites.includes(outfit.id);
@@ -88,7 +90,7 @@ export default function FavoritesScreen() {
           disabled={saving}
           style={({ pressed }) => [styles.saveButton, pressed && { opacity: 0.85 }, saving && { opacity: 0.6 }]}
         >
-          <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save Favorites"}</Text>
+          <Text style={styles.saveButtonText}>{saving ? "Saving..." : "Save changes"}</Text>
         </Pressable>
       </ScrollView>
     </View>
