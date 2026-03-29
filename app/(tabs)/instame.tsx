@@ -328,7 +328,18 @@ export default function InstaMeScreen() {
     [generationTiers, selectedGenerationTierId],
   );
 
-  const transformCost = liveGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST;
+  const highResGenerationTier = useMemo(
+    () =>
+      generationTiers.find((tier) => tier.id === "high_res") ||
+      INSTAME_GENERATION_TIERS.find((tier) => tier.id === "high_res") ||
+      generationTiers[generationTiers.length - 1] ||
+      INSTAME_GENERATION_TIERS[INSTAME_GENERATION_TIERS.length - 1],
+    [generationTiers],
+  );
+
+  const activeGenerationTier = selectedArtStyle ? highResGenerationTier : liveGenerationTier;
+
+  const transformCost = activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST;
   const portraitEnhanceCost = portraitEnhanceTier?.credits ?? INSTAME_PORTRAIT_ENHANCE_TIER.credits;
 
   const selectedEditTier = useMemo(
@@ -451,6 +462,12 @@ export default function InstaMeScreen() {
       setSelectedEditTierId(editTiers[0].id);
     }
   }, [editTiers, selectedEditTierId]);
+
+  useEffect(() => {
+    if (selectedArtStyleId) {
+      setIntensity(null);
+    }
+  }, [selectedArtStyleId]);
 
   const canGenerate = useMemo(
     () => Boolean(photo && !loading && credits >= transformCost),
@@ -608,10 +625,10 @@ export default function InstaMeScreen() {
       const result = await apiClient.transformOldMoney({
         photo: { base64: photo.base64, mimeType: photo.mimeType },
         customPrompt: composedPrompt,
-        intensity: intensity || undefined,
+        intensity: selectedArtStyle ? undefined : intensity || undefined,
         preserveBackground,
         stylePresetId: selectedPreset?.id,
-        generationTierId: selectedGenerationTierId,
+        generationTierId: activeGenerationTier?.id || selectedGenerationTierId,
       });
 
       setResultBase64(result.imageBase64);
@@ -642,6 +659,7 @@ export default function InstaMeScreen() {
     intensity,
     preserveBackground,
     refreshCredits,
+    activeGenerationTier,
     selectedGenerationTierId,
   ]);
 
@@ -1000,7 +1018,7 @@ export default function InstaMeScreen() {
             <View style={styles.artStylesPanelHeader}>
               <Text style={styles.artStylesPanelTitle}>Art Styles</Text>
               <Text style={styles.artStylesPanelSubtitle}>
-                Optional. Layer an illustrated finish on top of your selected portrait style.
+                Optional. Art styles export in High Res and skip the fine tune step below.
               </Text>
             </View>
 
@@ -1070,93 +1088,133 @@ export default function InstaMeScreen() {
 
           <View style={styles.pricingSection}>
             <Text style={styles.pricingSectionTitle}>Generate</Text>
-            <View style={styles.pricingCardsRow}>
-              {generationTiers.map((tier) => {
-                const isLiveTier = tier.id === liveGenerationTier?.id;
-                return (
-                  <Pressable
-                    key={tier.id}
-                    onPress={() => setSelectedGenerationTierId(tier.id)}
-                    style={[
-                      styles.pricingCard,
-                      isLiveTier && styles.pricingCardActive,
-                    ]}
-                  >
+            {selectedArtStyle ? (
+              <>
+                <Text style={styles.selectedStyleText}>
+                  Art Styles are locked to{" "}
+                  <Text style={styles.selectedStyleAccent}>{highResGenerationTier?.label || "High Res"}</Text>
+                  {" "}for the final export.
+                </Text>
+                <View style={styles.pricingCardsRow}>
+                  <View style={[styles.pricingCard, styles.pricingCardActive]}>
                     <View style={styles.pricingTopRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.pricingLabel}>{tier.label}</Text>
-                        <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
+                        <Text style={styles.pricingLabel}>{highResGenerationTier?.label || "High Res"}</Text>
+                        <Text style={styles.pricingSubtitle}>
+                          {highResGenerationTier?.subtitle || "Sharper premium export"}
+                        </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.pricingBadge,
-                          tier.availability === "live"
-                            ? styles.pricingBadgeLive
-                            : styles.pricingBadgeSoon,
-                        ]}
-                      >
-                        <Text style={styles.pricingBadgeText}>{tier.badge || tier.availability}</Text>
+                      <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
+                        <Text style={styles.pricingBadgeText}>
+                          {highResGenerationTier?.badge || "Live"}
+                        </Text>
                       </View>
                     </View>
 
                     <View style={styles.pricingMetaRow}>
-                      <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
-                      <Text style={styles.pricingMetaText}>{tier.output}</Text>
+                      <Text style={styles.pricingCredits}>
+                        {highResGenerationTier?.credits ?? transformCost} credits
+                      </Text>
+                      <Text style={styles.pricingMetaText}>
+                        {highResGenerationTier?.output || "1024 x 1024"}
+                      </Text>
                     </View>
-                  </Pressable>
-                );
-              })}
-            </View>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <View style={styles.pricingCardsRow}>
+                {generationTiers.map((tier) => {
+                  const isLiveTier = tier.id === liveGenerationTier?.id;
+                  return (
+                    <Pressable
+                      key={tier.id}
+                      onPress={() => setSelectedGenerationTierId(tier.id)}
+                      style={[
+                        styles.pricingCard,
+                        isLiveTier && styles.pricingCardActive,
+                      ]}
+                    >
+                      <View style={styles.pricingTopRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.pricingLabel}>{tier.label}</Text>
+                          <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.pricingBadge,
+                            tier.availability === "live"
+                              ? styles.pricingBadgeLive
+                              : styles.pricingBadgeSoon,
+                          ]}
+                        >
+                          <Text style={styles.pricingBadgeText}>{tier.badge || tier.availability}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.pricingMetaRow}>
+                        <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
+                        <Text style={styles.pricingMetaText}>{tier.output}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
-          <Text style={styles.cardTitle}>3. Fine tune (optional)</Text>
-          <Text style={styles.fineTuneIntro}>
-            Your selected style sets the main look. Fine tune only adjusts how strongly that style is applied.
-          </Text>
-          <View style={styles.fineTuneExplanationCard}>
-            <Text style={styles.fineTuneExplanationTitle}>What changes when you use fine tune</Text>
-            <Text style={styles.fineTuneExplanationText}>
-              It can change the strength of lighting, contrast, mood, styling polish, and overall cinematic impact.
-            </Text>
-            <Text style={styles.fineTuneExplanationText}>
-              It does not replace your selected style. If you choose <Text style={styles.fineTuneAccent}>{selectedStylePreset?.label || "a style"}</Text>, the result stays in that style family.
-            </Text>
-          </View>
-          <Pressable
-            onPress={() => setIntensity(null)}
-            style={[styles.fineTuneSkipCard, intensity === null && styles.fineTuneSkipCardActive]}
-          >
-            <View style={styles.fineTuneSkipTopRow}>
-              <Text style={[styles.fineTuneSkipTitle, intensity === null && styles.fineTuneSkipTitleActive]}>
-                No extra fine tune
+          {!selectedArtStyle ? (
+            <>
+              <Text style={styles.cardTitle}>3. Fine tune (optional)</Text>
+              <Text style={styles.fineTuneIntro}>
+                Your selected style sets the main look. Fine tune only adjusts how strongly that style is applied.
               </Text>
-              {intensity === null ? (
-                <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
-              ) : null}
-            </View>
-            <Text style={[styles.fineTuneSkipText, intensity === null && styles.fineTuneSkipTextActive]}>
-              Use the selected style as-is, with standard balanced styling.
-            </Text>
-          </Pressable>
-          <View style={styles.intensityRow}>
-            {INTENSITY_OPTIONS.map((option) => (
+              <View style={styles.fineTuneExplanationCard}>
+                <Text style={styles.fineTuneExplanationTitle}>What changes when you use fine tune</Text>
+                <Text style={styles.fineTuneExplanationText}>
+                  It can change the strength of lighting, contrast, mood, styling polish, and overall cinematic impact.
+                </Text>
+                <Text style={styles.fineTuneExplanationText}>
+                  It does not replace your selected style. If you choose <Text style={styles.fineTuneAccent}>{selectedStylePreset?.label || "a style"}</Text>, the result stays in that style family.
+                </Text>
+              </View>
               <Pressable
-                key={option.value}
-                onPress={() => setIntensity(option.value)}
-                style={[styles.chip, intensity === option.value && styles.chipActive]}
+                onPress={() => setIntensity(null)}
+                style={[styles.fineTuneSkipCard, intensity === null && styles.fineTuneSkipCardActive]}
               >
-                <Text style={[styles.chipLabel, intensity === option.value && styles.chipLabelActive]}>
-                  {option.label}
-                </Text>
-                <Text style={[styles.chipSubtitle, intensity === option.value && styles.chipSubtitleActive]}>
-                  {option.subtitle}
-                </Text>
-                <Text style={[styles.chipDetails, intensity === option.value && styles.chipDetailsActive]}>
-                  {option.details}
+                <View style={styles.fineTuneSkipTopRow}>
+                  <Text style={[styles.fineTuneSkipTitle, intensity === null && styles.fineTuneSkipTitleActive]}>
+                    No extra fine tune
+                  </Text>
+                  {intensity === null ? (
+                    <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
+                  ) : null}
+                </View>
+                <Text style={[styles.fineTuneSkipText, intensity === null && styles.fineTuneSkipTextActive]}>
+                  Use the selected style as-is, with standard balanced styling.
                 </Text>
               </Pressable>
-            ))}
-          </View>
+              <View style={styles.intensityRow}>
+                {INTENSITY_OPTIONS.map((option) => (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setIntensity(option.value)}
+                    style={[styles.chip, intensity === option.value && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipLabel, intensity === option.value && styles.chipLabelActive]}>
+                      {option.label}
+                    </Text>
+                    <Text style={[styles.chipSubtitle, intensity === option.value && styles.chipSubtitleActive]}>
+                      {option.subtitle}
+                    </Text>
+                    <Text style={[styles.chipDetails, intensity === option.value && styles.chipDetailsActive]}>
+                      {option.details}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
 
           <Pressable
             onPress={() => setPreserveBackground((prev) => !prev)}
@@ -1202,7 +1260,7 @@ export default function InstaMeScreen() {
 
         {resultBase64 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>4. Your Chicoo result</Text>
+            <Text style={styles.cardTitle}>{selectedArtStyle ? "3. Your Chicoo result" : "4. Your Chicoo result"}</Text>
             <Image
               source={{ uri: `data:image/png;base64,${resultBase64}` }}
               style={styles.resultImage}
@@ -1211,10 +1269,11 @@ export default function InstaMeScreen() {
             <View style={styles.resultMetaCard}>
               <Text style={styles.resultMetaTitle}>Generation details</Text>
               <Text style={styles.resultMetaText}>
-                Style: {selectedStylePreset?.label || "Chicoo"} - Export: {liveGenerationTier?.label || "Preview"}
+                Style: {selectedStylePreset?.label || "Chicoo"}
+                {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Export: {activeGenerationTier?.label || "Preview"}
               </Text>
               <Text style={styles.resultMetaText}>
-                Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {liveGenerationTier?.output || "512 x 512"}
+                Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "512 x 512"}
               </Text>
             </View>
             <View style={styles.postGenerationSection}>

@@ -9,7 +9,7 @@ export type InstaMeArtStyle = {
 };
 
 export const INSTAME_WELCOME_CARD_SOURCES: ImageSourcePropType[] = [
-  require("../assets/images/welcome-cards/welcome-card-1.png"),
+  require("../assets/images/welcome-cards/welcome-card-1.jpeg"),
   require("../assets/images/welcome-cards/welcome-card-2.png"),
   require("../assets/images/welcome-cards/welcome-card-3.png"),
   require("../assets/images/welcome-cards/welcome-card-4.png"),
