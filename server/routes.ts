@@ -403,7 +403,7 @@ const GEMINI_API_BASE_URL =
 const DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 const DEFAULT_TOGETHER_FLASH_IMAGE_MODEL =
-  process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-2.5";
+  process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-3.1";
 const DEFAULT_TOGETHER_PRO_IMAGE_MODEL =
   process.env.STYLE_HIGH_RES_TOGETHER_MODEL || "google/gemini-3-pro-image";
 const STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
@@ -1603,7 +1603,7 @@ function resolvePromptOnlyFallbackModel(
   return {
     provider: "together",
     model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
-    displayName: "Google Flash Image 2.5",
+    displayName: "Google Flash Image 3.1 Preview",
   };
 }
 
