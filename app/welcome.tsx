@@ -82,7 +82,6 @@ export default function WelcomeScreen() {
                       locations={[0, 0.2, 1]}
                       style={styles.frameTint}
                     />
-                    <View style={styles.innerPanel} />
                     <View style={styles.centerRing} />
                     <Text style={styles.frameIndex}>
                       {String(reversedIndex + 1).padStart(2, "0")}
@@ -230,17 +229,6 @@ const styles = StyleSheet.create({
   },
   frameTint: {
     ...StyleSheet.absoluteFillObject,
-  },
-  innerPanel: {
-    position: "absolute",
-    width: "32%",
-    height: "38%",
-    left: "24%",
-    top: "18%",
-    borderRadius: 16,
-    backgroundColor: "rgba(255,79,125,0.16)",
-    borderWidth: 1,
-    borderColor: "rgba(255,120,170,0.12)",
   },
   centerRing: {
     position: "absolute",
