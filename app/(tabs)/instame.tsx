@@ -30,6 +30,7 @@ import {
   type PreparedUploadImage,
 } from "@/lib/instame-uploaded-images";
 import Colors from "@/constants/colors";
+import { INSTAME_ART_STYLES } from "@/constants/instameArtStyles";
 import { INSTAME_STYLE_PRESETS, type InstaMeStylePreset } from "@shared/instame-style-presets";
 import {
   INSTAME_EDIT_TIERS,
@@ -290,6 +291,7 @@ export default function InstaMeScreen() {
     INSTAME_EDIT_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_EDIT_TIERS[0]?.id || "basic_edit",
   );
   const [selectedStyleId, setSelectedStyleId] = useState<string>(INSTAME_STYLE_PRESETS[0]?.id || "");
+  const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
@@ -314,6 +316,11 @@ export default function InstaMeScreen() {
   const previewStyle = useMemo(
     () => stylePresets.find((preset) => preset.id === previewStyleId) || null,
     [stylePresets, previewStyleId],
+  );
+
+  const selectedArtStyle = useMemo(
+    () => INSTAME_ART_STYLES.find((style) => style.id === selectedArtStyleId) || null,
+    [selectedArtStyleId],
   );
 
   const liveGenerationTier = useMemo(
@@ -596,7 +603,7 @@ export default function InstaMeScreen() {
     setLoading(true);
     try {
       const selectedPreset = selectedStylePreset || stylePresets[0];
-      const composedPrompt = [customPrompt.trim()].filter(Boolean).join(". ");
+      const composedPrompt = [selectedArtStyle?.promptHint, customPrompt.trim()].filter(Boolean).join(". ");
 
       const result = await apiClient.transformOldMoney({
         photo: { base64: photo.base64, mimeType: photo.mimeType },
@@ -631,6 +638,7 @@ export default function InstaMeScreen() {
     selectedStylePreset,
     stylePresets,
     customPrompt,
+    selectedArtStyle,
     intensity,
     preserveBackground,
     refreshCredits,
@@ -987,6 +995,78 @@ export default function InstaMeScreen() {
           <Text style={styles.selectedStyleText}>
             Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
           </Text>
+
+          <View style={styles.artStylesPanel}>
+            <View style={styles.artStylesPanelHeader}>
+              <Text style={styles.artStylesPanelTitle}>Art Styles</Text>
+              <Text style={styles.artStylesPanelSubtitle}>
+                Optional. Layer an illustrated finish on top of your selected portrait style.
+              </Text>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.artStylesRow}
+            >
+              <Pressable
+                onPress={() => setSelectedArtStyleId("")}
+                style={[
+                  styles.artStyleOption,
+                  styles.artStyleOptionEmpty,
+                  !selectedArtStyleId && styles.artStyleOptionActive,
+                ]}
+              >
+                <View style={styles.artStyleOptionTextWrap}>
+                  <Text style={[styles.artStyleOptionTitle, !selectedArtStyleId && styles.artStyleOptionTitleActive]}>
+                    No art style
+                  </Text>
+                  <Text
+                    style={[
+                      styles.artStyleOptionSubtitle,
+                      !selectedArtStyleId && styles.artStyleOptionSubtitleActive,
+                    ]}
+                  >
+                    Keep the result fully photographic.
+                  </Text>
+                </View>
+              </Pressable>
+
+              {INSTAME_ART_STYLES.map((style) => {
+                const active = selectedArtStyleId === style.id;
+                return (
+                  <Pressable
+                    key={style.id}
+                    onPress={() => setSelectedArtStyleId(style.id)}
+                    style={[styles.artStyleOption, active && styles.artStyleOptionActive]}
+                  >
+                    <Image source={style.preview} style={styles.artStyleOptionImage} contentFit="cover" />
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.88)"]}
+                      style={styles.artStyleOptionOverlay}
+                    />
+                    <View style={styles.artStyleOptionTextWrap}>
+                      <Text style={[styles.artStyleOptionTitle, active && styles.artStyleOptionTitleActive]}>
+                        {style.label}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.artStyleOptionSubtitle,
+                          active && styles.artStyleOptionSubtitleActive,
+                        ]}
+                      >
+                        {style.subtitle}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <Text style={styles.selectedStyleText}>
+              Art finish: <Text style={styles.selectedStyleAccent}>{selectedArtStyle?.label || "None"}</Text>
+            </Text>
+          </View>
 
           <View style={styles.pricingSection}>
             <Text style={styles.pricingSectionTitle}>Generate</Text>
@@ -1734,6 +1814,80 @@ const styles = StyleSheet.create({
   selectedStyleAccent: {
     color: "#FF9EBC",
     fontFamily: "Inter_700Bold",
+  },
+  artStylesPanel: {
+    marginTop: 10,
+    gap: 10,
+  },
+  artStylesPanelHeader: {
+    gap: 4,
+  },
+  artStylesPanelTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  artStylesPanelSubtitle: {
+    color: "#C8C8C8",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  artStylesRow: {
+    gap: 12,
+    paddingRight: 2,
+  },
+  artStyleOption: {
+    width: 180,
+    height: 200,
+    borderRadius: 22,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#09090C",
+  },
+  artStyleOptionEmpty: {
+    backgroundColor: "rgba(255,255,255,0.035)",
+    justifyContent: "flex-end",
+  },
+  artStyleOptionActive: {
+    borderColor: "rgba(255,122,176,0.82)",
+    shadowColor: "#FF5CB8",
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  artStyleOptionImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  artStyleOptionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  artStyleOptionTextWrap: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 14,
+    gap: 4,
+  },
+  artStyleOptionTitle: {
+    color: "#F3EDF0",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13.5,
+    lineHeight: 18,
+  },
+  artStyleOptionTitleActive: {
+    color: "#FFF2F7",
+  },
+  artStyleOptionSubtitle: {
+    color: "#C2BAC0",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  artStyleOptionSubtitleActive: {
+    color: "#E5D3DB",
   },
   pricingSection: {
     gap: 10,

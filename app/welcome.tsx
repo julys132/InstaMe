@@ -13,14 +13,10 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { INSTAME_STYLE_PRESETS } from "@shared/instame-style-presets";
-
-const FRAME_SOURCES = [
-  INSTAME_STYLE_PRESETS.find((preset) => preset.id === "retro")?.representativeImage,
-  INSTAME_STYLE_PRESETS.find((preset) => preset.id === "glam")?.representativeImage,
-  INSTAME_STYLE_PRESETS.find((preset) => preset.id === "old_money")?.representativeImage,
-  INSTAME_STYLE_PRESETS.find((preset) => preset.id === "street_luxe")?.representativeImage,
-].filter(Boolean) as string[];
+import {
+  INSTAME_ART_STYLES,
+  INSTAME_WELCOME_CARD_SOURCES,
+} from "@/constants/instameArtStyles";
 
 const FRAME_LAYOUT = [
   { x: -76, y: 12, rotate: "-9deg", scale: 0.9, tint: "rgba(8,8,10,0.68)", border: "rgba(255,255,255,0.06)", z: 1 },
@@ -74,7 +70,7 @@ export default function WelcomeScreen() {
               >
                 <View style={[styles.frameCard, { borderColor: frame.border }]}>
                   <Image
-                    source={{ uri: FRAME_SOURCES[index % FRAME_SOURCES.length] }}
+                    source={INSTAME_WELCOME_CARD_SOURCES[index % INSTAME_WELCOME_CARD_SOURCES.length]}
                     style={styles.frameImage}
                     contentFit="cover"
                   />
@@ -97,6 +93,26 @@ export default function WelcomeScreen() {
                 {word}
               </Text>
             ))}
+          </View>
+
+          <View style={styles.artStylesSection}>
+            <Text style={styles.artStylesEyebrow}>Art Styles</Text>
+            <Text style={styles.artStylesTitle}>Turn portraits into illustrated looks.</Text>
+            <View style={styles.artStylesGrid}>
+              {INSTAME_ART_STYLES.map((style) => (
+                <View key={style.id} style={styles.artStyleCard}>
+                  <Image source={style.preview} style={styles.artStyleImage} contentFit="cover" />
+                  <LinearGradient
+                    colors={["rgba(255,255,255,0.04)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.82)"]}
+                    style={styles.artStyleOverlay}
+                  />
+                  <View style={styles.artStyleTextWrap}>
+                    <Text style={styles.artStyleLabel}>{style.label}</Text>
+                    <Text style={styles.artStyleSubtitle}>{style.subtitle}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
           </View>
 
           <Pressable
@@ -275,6 +291,63 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 3.1,
     textTransform: "uppercase",
+  },
+  artStylesSection: {
+    width: "100%",
+    marginTop: 10,
+    marginBottom: 18,
+    gap: 10,
+  },
+  artStylesEyebrow: {
+    color: Colors.accent,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    letterSpacing: 3,
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
+  artStylesTitle: {
+    color: "#EEE6EA",
+    fontFamily: "Inter_500Medium",
+    fontSize: 15,
+    lineHeight: 22,
+    textAlign: "center",
+  },
+  artStylesGrid: {
+    gap: 12,
+  },
+  artStyleCard: {
+    width: "100%",
+    height: 168,
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#09090C",
+  },
+  artStyleImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  artStyleOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  artStyleTextWrap: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 14,
+    gap: 4,
+  },
+  artStyleLabel: {
+    color: "#FFF4F8",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  artStyleSubtitle: {
+    color: "#CABCC3",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11.5,
+    lineHeight: 17,
   },
   primaryButton: {
     width: "100%",
