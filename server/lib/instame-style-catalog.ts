@@ -182,9 +182,39 @@ export function choosePromptVariant(
 
 export function chooseRequestedModel(
   variant: InstaMePromptVariant | null,
-  _mode: "preview" | "high_res",
+  mode: "preview" | "high_res",
 ): InstaMeRequestedModel | null {
   const models = variant?.requestedModels || [];
   if (models.length === 0) return null;
-  return models[0] || null;
+  if (models.length === 1) return models[0] || null;
+
+  const rankModel = (model: InstaMeRequestedModel): number => {
+    const normalized = `${model.provider}:${model.model}:${model.displayName}`.toLowerCase();
+
+    if (mode === "high_res") {
+      if (normalized.includes("flux.2-max")) return 100;
+      if (normalized.includes("gemini-3-pro-image")) return 95;
+      if (normalized.includes("gpt-image-1.5")) return 90;
+      if (normalized.includes("qwen-image")) return 85;
+      if (normalized.includes("flux.2-pro")) return 80;
+      if (normalized.includes("reve-v1.1")) return 75;
+      if (normalized.includes("flash-image-2.5")) return 70;
+      if (normalized.includes("gpt-image-1")) return 60;
+      return 50;
+    }
+
+    if (normalized.includes("flash-image-2.5")) return 100;
+    if (normalized.includes("qwen-image")) return 95;
+    if (normalized.includes("flux.2-pro")) return 90;
+    if (normalized.includes("gpt-image-1")) return 85;
+    if (normalized.includes("gpt-image-1.5")) return 80;
+    if (normalized.includes("reve-v1.1")) return 75;
+    if (normalized.includes("gemini-3-pro-image")) return 70;
+    if (normalized.includes("flux.2-max")) return 65;
+    return 50;
+  };
+
+  return models
+    .slice()
+    .sort((left, right) => rankModel(right) - rankModel(left))[0] || models[0] || null;
 }

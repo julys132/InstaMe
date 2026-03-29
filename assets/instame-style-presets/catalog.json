@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-11T17:11:59.762743+00:00",
+  "generatedAt": "2026-03-28T17:39:28.388789+00:00",
   "sourceFolder": "C:\\Users\\stiul\\OneDrive\\Pictures\\Screenshots\\Styles\\Styles Representative Image",
   "presetCount": 11,
   "presets": [
@@ -52,7 +52,7 @@
           ]
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "edgy_editorial_minimalism",
@@ -74,7 +74,7 @@
           "requestedModels": []
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "luxurious_mediterranean_glamour",
@@ -118,7 +118,7 @@
           ]
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "minimalist_chic",
@@ -145,14 +145,19 @@
           "prompt": "Edit the image, keeping 1:1 facial features. Apply soft, diffused high-key studio lighting that creates a flattering and even skin texture. The color palette must be strictly monochromatic warm creams and whites, applied across all elements. The background is a clean, minimalist light-grey studio backdrop with soft fall-off. A serene and confident facial expression is applied. The subject is seated in a modern, curved armchair, leaning back slightly in a relaxed yet elegant posture. Her left arm rests softly across her lap, and her right arm is supported by the armrest, with the hand and fingers resting naturally and elegantly over the edge. She wears a simple gold ring. The subject is dressed in a luxurious, thick-knit, fuzzy cream turtleneck sweater and matching cream wide-leg trousers. The structure of the wavy hair framing the face is precisely maintained. A very subtle, premium digital film grain is applied across the entire composition for a polished print quality. Ensure the image is completely clean of all logos or text.",
           "requestedModels": [
             {
-              "provider": "reve",
-              "model": "reve-v1.1",
-              "displayName": "Reve v1.1"
+              "provider": "together",
+              "model": "Qwen/Qwen-Image",
+              "displayName": "Qwen Image"
+            },
+            {
+              "provider": "openai",
+              "model": "gpt-image-1.5",
+              "displayName": "GPT Image 1.5"
             }
           ]
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "monochromatic_urban_elegance",
@@ -182,9 +187,21 @@
               "displayName": "Reve v1.1"
             }
           ]
+        },
+        {
+          "id": "prompt_2",
+          "label": "Prompt 2",
+          "prompt": "Edit the image, keeping 1:1 facial features, apply a confident walking posture on a city street. The subject's body is angled slightly to the left, with the head turned gracefully to look off-camera to the left. The facial expression is relaxed, neutral, confident, and slightly pouty. The left hand is casually tucked into the front pocket of the trousers, with only the thumb and a small part of the hand visible. The right arm hangs relaxed at the side, the fingers lightly gripping a small, rectangular, textured black clutch bag. The outfit consists of an oversized, structured dark charcoal-grey blazer worn open, revealing a smooth, slightly draped silk or satin camisole top underneath. This is paired with tailored, high-waisted, wide-leg off-white trousers with a soft, elegant drape. The hair is long, thick, and styled in loose, voluminous, cascading waves that fall naturally over the shoulders and chest. The background is a softly blurred classic European-style city street with tall grey stone buildings and a paved road, utilizing a shallow depth of field. The lighting is soft, overcast, and perfectly diffused, casting no harsh shadows. The color palette is muted and cool-toned, focusing on urban greys and neutrals, emphasizing a smooth, matte skin texture. The overall aesthetic is moody, chic street-style photography with a vintage analog film grain effect, low-to-medium contrast, slightly washed-out shadows, and cinematic 8k resolution. Ensure the image is completely clean of all logos, text, or watermarks.",
+          "requestedModels": [
+            {
+              "provider": "together",
+              "model": "black-forest-labs/FLUX.2-pro",
+              "displayName": "FLUX.2 Pro"
+            }
+          ]
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "natural_glam_portrait",
@@ -205,7 +222,7 @@
           "requestedModels": []
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "polished_urban_chic",
@@ -225,6 +242,11 @@
           "prompt": "Edit the image, ensuring the new target face's features are preserved exactly (1:1 mapping), while applying the specific styling and composition of the original. Retain the precise same sage washed woolen coat, the light shirt left , the cream-colored high-waisted trousers, and the statement dark leather belt with the large gold buckle. Maintain the pose, including the subtle confident smile and the relaxed hands-in-pockets posture and head sligly tilted to one side. . The background must be the identical reflective metal-lined elevator interior with the horizontal LED lights. The overall feel should be one of vintage cinematic grainy  luxurious, effortless sophistication, achieved through a refined high-definition polish with subtle film grain texture. Crucially, do not alter the inherent hair or eye color of the target face.",
           "requestedModels": [
             {
+              "provider": "openai",
+              "model": "gpt-image-1.5",
+              "displayName": "GPT Image 1.5"
+            },
+            {
               "provider": "together",
               "model": "black-forest-labs/FLUX.2-max",
               "displayName": "FLUX.2 Max"
@@ -237,7 +259,7 @@
           ]
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "selfie",
@@ -275,7 +297,7 @@
           "requestedModels": []
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "selfie_glamour_dark",
@@ -309,7 +331,7 @@
           ]
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "soft_dreamy_editorial",
@@ -336,7 +358,7 @@
           ]
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     },
     {
       "id": "timeless_cinematic_chic",
@@ -369,7 +391,7 @@
           ]
         }
       ],
-      "promptOnlyAfterFirstUse": true
+      "promptOnlyAfterFirstUse": false
     }
   ]
 }

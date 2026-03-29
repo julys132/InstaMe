@@ -50,6 +50,26 @@ function getReveBaseUrl(): string {
 }
 
 function resolveTogetherModelAlias(model: string): string {
+  const normalized = model.trim().toLowerCase();
+  if (!normalized) return model;
+
+  if (
+    normalized === "gemini-3.1-flash-image-preview" ||
+    normalized === "gemini 3.1 flash image preview" ||
+    normalized === "gemini-2.5-flash-image" ||
+    normalized === "google/flash-image-2.5"
+  ) {
+    return "google/flash-image-2.5";
+  }
+
+  if (
+    normalized === "gemini-3-pro-image" ||
+    normalized === "gemini 3 pro image" ||
+    normalized === "google/gemini-3-pro-image"
+  ) {
+    return "google/gemini-3-pro-image";
+  }
+
   return model;
 }
 

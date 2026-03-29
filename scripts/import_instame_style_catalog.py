@@ -59,9 +59,44 @@ MODEL_RULES: list[tuple[re.Pattern[str], dict[str, str]]] = [
             "displayName": "GPT Image 1",
         },
     ),
+    (
+        re.compile(r"chatgpt-image-latest-high-fidelity", re.IGNORECASE),
+        {
+            "provider": "openai",
+            "model": "gpt-image-1.5",
+            "displayName": "GPT Image 1.5",
+        },
+    ),
+    (
+        re.compile(r"qwen(?:-|\s*)image(?:-|\s*)2(?:\.0)?|qwen\s*image", re.IGNORECASE),
+        {
+            "provider": "together",
+            "model": "Qwen/Qwen-Image",
+            "displayName": "Qwen Image",
+        },
+    ),
+    (
+        re.compile(
+            r"gemini\s*(?:3(?:\.1)?|2(?:\.5)?)\s*[- ]?flash\s*[- ]?image(?:\s*preview)?",
+            re.IGNORECASE,
+        ),
+        {
+            "provider": "together",
+            "model": "google/flash-image-2.5",
+            "displayName": "Google Flash Image 2.5",
+        },
+    ),
+    (
+        re.compile(r"gemini\s*(?:3(?:\.1)?|3)\s*[- ]?pro\s*[- ]?image", re.IGNORECASE),
+        {
+            "provider": "together",
+            "model": "google/gemini-3-pro-image",
+            "displayName": "Google Gemini 3 Pro Image",
+        },
+    ),
 ]
 MODEL_ANNOTATION_PATTERN = re.compile(
-    r'[\s"“”\']*\(\s*[^()\n]*(?:flux\s*2|reve(?:\s|-)?v?\s*1\.1|gpt(?:-|\s*)image|chat\s*gpt)[^()\n]*\)?\s*$',
+    r'[\s"“”\']*\(\s*[^()\n]*(?:flux\s*2|reve(?:\s|-)?v?\s*1\.1|gpt(?:-|\s*)image|chat\s*gpt|chatgpt-image-latest-high-fidelity|gemini|qwen(?:-|\\s*)image)[^()\n]*\)?\s*$',
     re.IGNORECASE,
 )
 
@@ -257,7 +292,7 @@ def main() -> None:
                 "examples": copied_images,
                 "promptFile": prompt_file_relative_path,
                 "promptVariants": prompt_variants,
-                "promptOnlyAfterFirstUse": True,
+                "promptOnlyAfterFirstUse": False,
             }
         )
 
@@ -276,3 +311,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

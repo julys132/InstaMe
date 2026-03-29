@@ -402,9 +402,13 @@ const GEMINI_API_BASE_URL =
 // Override these defaults with STYLE_TEXT_MODEL / STYLE_IMAGE_MODEL env vars.
 const DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+const DEFAULT_TOGETHER_FLASH_IMAGE_MODEL =
+  process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-2.5";
+const DEFAULT_TOGETHER_PRO_IMAGE_MODEL =
+  process.env.STYLE_HIGH_RES_TOGETHER_MODEL || "google/gemini-3-pro-image";
 const STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
 const INSTAME_PORTRAIT_ENHANCE_MODEL =
-  process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || INSTAME_PORTRAIT_ENHANCE_TIER.model;
+  process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || DEFAULT_TOGETHER_FLASH_IMAGE_MODEL;
 const INSTAME_PORTRAIT_ENHANCE_SIZE =
   (process.env.INSTAME_PORTRAIT_ENHANCE_SIZE || INSTAME_PORTRAIT_ENHANCE_TIER.output).trim() ||
   "1024 x 1024";
@@ -1585,6 +1589,24 @@ function resolveGenerationMode(generationTierId: string): InstaMeGenerationMode 
   return generationTierId === "high_res" ? "high_res" : "preview";
 }
 
+function resolvePromptOnlyFallbackModel(
+  mode: InstaMeGenerationMode,
+): { provider: "together"; model: string; displayName: string } {
+  if (mode === "high_res") {
+    return {
+      provider: "together",
+      model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+      displayName: "Google Gemini 3 Pro Image",
+    };
+  }
+
+  return {
+    provider: "together",
+    model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+    displayName: "Google Flash Image 2.5",
+  };
+}
+
 async function generatePromptOnlyPresetImage(options: {
   req: Request;
   uploadedImages: UploadedReferenceImage[];
@@ -1594,7 +1616,9 @@ async function generatePromptOnlyPresetImage(options: {
   preserveBackground: boolean;
   customPrompt: string;
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
-  const selectedModel = chooseRequestedModel(options.variant, options.generationMode);
+  const selectedModel =
+    chooseRequestedModel(options.variant, options.generationMode) ||
+    resolvePromptOnlyFallbackModel(options.generationMode);
   const prompt = buildPromptOnlyPresetTransformPrompt({
     presetLabel: options.preset.label,
     variantPrompt: options.variant.prompt,
@@ -1791,24 +1815,21 @@ async function generateInstaMeEditImage(options: {
 }
 
 async function generateInstaMePortraitEnhance(options: {
+  req: Request;
   photo: UploadedReferenceImage;
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
-  const response = await generateGeminiContent({
+  const imageBase64 = await generateTogetherImage({
     model: INSTAME_PORTRAIT_ENHANCE_MODEL,
-    parts: [{ text: buildPortraitEnhancePrompt() }, ...toGeminiInlineImageParts([options.photo])],
-    responseModalities: ["IMAGE", "TEXT"],
-    maxOutputTokens: 1200,
+    prompt: buildPortraitEnhancePrompt(),
+    imageUrl: toRuntimeAssetUrl(options.req, options.photo),
+    width: 1024,
+    height: 1024,
   });
-
-  const imageBase64 = extractGeminiImageBase64(response);
-  if (!imageBase64) {
-    throw new Error("Portrait enhancement failed. No image data returned.");
-  }
 
   return {
     imageBase64,
     model: INSTAME_PORTRAIT_ENHANCE_MODEL,
-    provider: INSTAME_PORTRAIT_ENHANCE_TIER.provider,
+    provider: "Together",
   };
 }
 
@@ -3613,8 +3634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const promptVariant = choosePromptVariant(resolvedStylePreset || undefined, priorStyleUseCount);
       const shouldUsePromptOnly =
         Boolean(stylePresetId) &&
-        resolvedStylePreset?.promptOnlyAfterFirstUse === true &&
-        priorStyleUseCount >= 1 &&
+        (resolvedStylePreset?.promptVariants?.length || 0) > 0 &&
         Boolean(promptVariant);
 
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
@@ -3747,6 +3767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       creditsConsumed = true;
 
       const enhanceResult = await generateInstaMePortraitEnhance({
+        req,
         photo: uploadedImages[0],
       });
 

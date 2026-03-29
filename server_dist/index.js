@@ -218,8 +218,8 @@ var INSTAME_GENERATION_TIERS = [
     label: "Preview",
     subtitle: "Fast low-res test generation",
     credits: 5,
-    provider: "Google",
-    model: "gemini-3.1-flash-image-preview",
+    provider: "Together",
+    model: "Google Flash Image 2.5",
     output: "512 x 512",
     badge: "Live",
     availability: "live"
@@ -276,8 +276,8 @@ var INSTAME_PORTRAIT_ENHANCE_TIER = {
   label: "Portrait Enhance",
   subtitle: "Polish your selfie before styling",
   credits: 3,
-  provider: "Gemini",
-  model: "gemini-3.1-flash-image-preview",
+  provider: "Together",
+  model: "Google Flash Image 2.5",
   output: "1024 x 1024",
   badge: "Live",
   availability: "live"
@@ -618,10 +618,34 @@ function choosePromptVariant(preset, usageCount) {
   const index = usageCount <= 0 ? 0 : usageCount % variants.length;
   return variants[index] || variants[0] || null;
 }
-function chooseRequestedModel(variant, _mode) {
+function chooseRequestedModel(variant, mode) {
   const models = variant?.requestedModels || [];
   if (models.length === 0) return null;
-  return models[0] || null;
+  if (models.length === 1) return models[0] || null;
+  const rankModel = (model) => {
+    const normalized = `${model.provider}:${model.model}:${model.displayName}`.toLowerCase();
+    if (mode === "high_res") {
+      if (normalized.includes("flux.2-max")) return 100;
+      if (normalized.includes("gemini-3-pro-image")) return 95;
+      if (normalized.includes("gpt-image-1.5")) return 90;
+      if (normalized.includes("qwen-image")) return 85;
+      if (normalized.includes("flux.2-pro")) return 80;
+      if (normalized.includes("reve-v1.1")) return 75;
+      if (normalized.includes("flash-image-2.5")) return 70;
+      if (normalized.includes("gpt-image-1")) return 60;
+      return 50;
+    }
+    if (normalized.includes("flash-image-2.5")) return 100;
+    if (normalized.includes("qwen-image")) return 95;
+    if (normalized.includes("flux.2-pro")) return 90;
+    if (normalized.includes("gpt-image-1")) return 85;
+    if (normalized.includes("gpt-image-1.5")) return 80;
+    if (normalized.includes("reve-v1.1")) return 75;
+    if (normalized.includes("gemini-3-pro-image")) return 70;
+    if (normalized.includes("flux.2-max")) return 65;
+    return 50;
+  };
+  return models.slice().sort((left, right) => rankModel(right) - rankModel(left))[0] || models[0] || null;
 }
 
 // server/lib/instame-runtime-assets.ts
@@ -718,6 +742,14 @@ function getReveBaseUrl() {
   return process.env.REVE_API_BASE_URL || "https://api.reve.com";
 }
 function resolveTogetherModelAlias(model) {
+  const normalized = model.trim().toLowerCase();
+  if (!normalized) return model;
+  if (normalized === "gemini-3.1-flash-image-preview" || normalized === "gemini 3.1 flash image preview" || normalized === "gemini-2.5-flash-image" || normalized === "google/flash-image-2.5") {
+    return "google/flash-image-2.5";
+  }
+  if (normalized === "gemini-3-pro-image" || normalized === "gemini 3 pro image" || normalized === "google/gemini-3-pro-image") {
+    return "google/gemini-3-pro-image";
+  }
   return model;
 }
 function normalizeReveModelEnvKey(model) {
@@ -1126,8 +1158,10 @@ var DEFAULT_ALLOWED_DEV_CREDIT_EMAILS = ["iuliastarcean@gmail.com"];
 var GEMINI_API_BASE_URL = process.env.GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
 var DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 var DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+var DEFAULT_TOGETHER_FLASH_IMAGE_MODEL = process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-2.5";
+var DEFAULT_TOGETHER_PRO_IMAGE_MODEL = process.env.STYLE_HIGH_RES_TOGETHER_MODEL || "google/gemini-3-pro-image";
 var STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
-var INSTAME_PORTRAIT_ENHANCE_MODEL = process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || INSTAME_PORTRAIT_ENHANCE_TIER.model;
+var INSTAME_PORTRAIT_ENHANCE_MODEL = process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || DEFAULT_TOGETHER_FLASH_IMAGE_MODEL;
 var INSTAME_PORTRAIT_ENHANCE_SIZE = (process.env.INSTAME_PORTRAIT_ENHANCE_SIZE || INSTAME_PORTRAIT_ENHANCE_TIER.output).trim() || "1024 x 1024";
 var INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path3.resolve(
   process.cwd(),
@@ -1968,8 +2002,22 @@ function resolveEditTierById(input) {
 function resolveGenerationMode(generationTierId) {
   return generationTierId === "high_res" ? "high_res" : "preview";
 }
+function resolvePromptOnlyFallbackModel(mode) {
+  if (mode === "high_res") {
+    return {
+      provider: "together",
+      model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+      displayName: "Google Gemini 3 Pro Image"
+    };
+  }
+  return {
+    provider: "together",
+    model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+    displayName: "Google Flash Image 2.5"
+  };
+}
 async function generatePromptOnlyPresetImage(options) {
-  const selectedModel = chooseRequestedModel(options.variant, options.generationMode);
+  const selectedModel = chooseRequestedModel(options.variant, options.generationMode) || resolvePromptOnlyFallbackModel(options.generationMode);
   const prompt = buildPromptOnlyPresetTransformPrompt({
     presetLabel: options.preset.label,
     variantPrompt: options.variant.prompt,
@@ -2118,20 +2166,17 @@ async function generateInstaMeEditImage(options) {
   };
 }
 async function generateInstaMePortraitEnhance(options) {
-  const response = await generateGeminiContent({
+  const imageBase64 = await generateTogetherImage({
     model: INSTAME_PORTRAIT_ENHANCE_MODEL,
-    parts: [{ text: buildPortraitEnhancePrompt() }, ...toGeminiInlineImageParts([options.photo])],
-    responseModalities: ["IMAGE", "TEXT"],
-    maxOutputTokens: 1200
+    prompt: buildPortraitEnhancePrompt(),
+    imageUrl: toRuntimeAssetUrl(options.req, options.photo),
+    width: 1024,
+    height: 1024
   });
-  const imageBase64 = extractGeminiImageBase64(response);
-  if (!imageBase64) {
-    throw new Error("Portrait enhancement failed. No image data returned.");
-  }
   return {
     imageBase64,
     model: INSTAME_PORTRAIT_ENHANCE_MODEL,
-    provider: INSTAME_PORTRAIT_ENHANCE_TIER.provider
+    provider: "Together"
   };
 }
 async function createStylingPlan({
@@ -3484,7 +3529,7 @@ async function registerRoutes(app2) {
       const styleUsageMap = normalizeUsageMap(userBeforeTransform?.instameStyleUsage);
       const priorStyleUseCount = stylePresetId ? styleUsageMap[stylePresetId] || 0 : 0;
       const promptVariant = choosePromptVariant(resolvedStylePreset || void 0, priorStyleUseCount);
-      const shouldUsePromptOnly = Boolean(stylePresetId) && resolvedStylePreset?.promptOnlyAfterFirstUse === true && priorStyleUseCount >= 1 && Boolean(promptVariant);
+      const shouldUsePromptOnly = Boolean(stylePresetId) && (resolvedStylePreset?.promptVariants?.length || 0) > 0 && Boolean(promptVariant);
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
       if (!consumed) {
         return res.status(402).json({
@@ -3582,6 +3627,7 @@ async function registerRoutes(app2) {
       }
       creditsConsumed = true;
       const enhanceResult = await generateInstaMePortraitEnhance({
+        req,
         photo: uploadedImages[0]
       });
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
