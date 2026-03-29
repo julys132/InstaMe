@@ -48,42 +48,49 @@ export default function WelcomeScreen() {
           </View>
 
           <View style={styles.collageArea}>
-            {FRAME_LAYOUT.map((frame, index) => (
-              <View
-                key={`frame-${index}`}
-                style={[
-                  styles.frameOuter,
-                  {
-                    transform: [
-                      { translateX: frame.x },
-                      { translateY: frame.y },
-                      { rotate: frame.rotate },
-                      { scale: frame.scale },
-                    ],
-                    zIndex: frame.z,
-                    shadowColor: frame.tint,
-                  },
-                ]}
-              >
-                <View style={[styles.frameCard, { borderColor: frame.border }]}>
-                  <Image
-                    source={INSTAME_WELCOME_CARD_SOURCES[index % INSTAME_WELCOME_CARD_SOURCES.length]}
-                    style={styles.frameImage}
-                    contentFit="cover"
-                  />
-                  <LinearGradient
-                    colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.04)", frame.tint]}
-                    locations={[0, 0.2, 1]}
-                    style={styles.frameTint}
-                  />
-                  <View style={styles.innerPanel} />
-                  <View style={styles.centerRing} />
-                  <Text style={styles.frameIndex}>
-                    {String(FRAME_LAYOUT.length - index).padStart(2, "0")}
-                  </Text>
+            {FRAME_LAYOUT.map((frame, index) => {
+              const reversedIndex = FRAME_LAYOUT.length - 1 - index;
+              return (
+                <View
+                  key={`frame-${index}`}
+                  style={[
+                    styles.frameOuter,
+                    {
+                      transform: [
+                        { translateX: frame.x },
+                        { translateY: frame.y },
+                        { rotate: frame.rotate },
+                        { scale: frame.scale },
+                      ],
+                      zIndex: frame.z,
+                      shadowColor: frame.tint,
+                    },
+                  ]}
+                >
+                  <View style={[styles.frameCard, { borderColor: frame.border }]}>
+                    <Image
+                      source={
+                        INSTAME_WELCOME_CARD_SOURCES[
+                          reversedIndex % INSTAME_WELCOME_CARD_SOURCES.length
+                        ]
+                      }
+                      style={styles.frameImage}
+                      contentFit="cover"
+                    />
+                    <LinearGradient
+                      colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.04)", frame.tint]}
+                      locations={[0, 0.2, 1]}
+                      style={styles.frameTint}
+                    />
+                    <View style={styles.innerPanel} />
+                    <View style={styles.centerRing} />
+                    <Text style={styles.frameIndex}>
+                      {String(reversedIndex + 1).padStart(2, "0")}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
           <View style={styles.signalRow}>
