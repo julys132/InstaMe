@@ -195,6 +195,8 @@ export function chooseRequestedModel(
       if (normalized.includes("flux.2-max")) return 100;
       if (normalized.includes("gemini-3-pro-image")) return 95;
       if (normalized.includes("gpt-image-1.5")) return 90;
+      if (normalized.includes("qwen-image-2.0-pro")) return 88;
+      if (normalized.includes("qwen-image-2.0")) return 86;
       if (normalized.includes("qwen-image")) return 85;
       if (normalized.includes("flux.2-pro")) return 80;
       if (normalized.includes("reve-v1.1")) return 75;
@@ -206,6 +208,8 @@ export function chooseRequestedModel(
 
     if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 100;
     if (normalized.includes("flash-image-2.5")) return 98;
+    if (normalized.includes("qwen-image-2.0-pro")) return 97;
+    if (normalized.includes("qwen-image-2.0")) return 96;
     if (normalized.includes("qwen-image")) return 95;
     if (normalized.includes("flux.2-pro")) return 90;
     if (normalized.includes("gpt-image-1")) return 85;

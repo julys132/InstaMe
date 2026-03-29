@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-03-28T17:39:28.388789+00:00",
+  "generatedAt": "2026-03-29T07:20:31.353073+00:00",
   "sourceFolder": "C:\\Users\\stiul\\OneDrive\\Pictures\\Screenshots\\Styles\\Styles Representative Image",
-  "presetCount": 11,
+  "presetCount": 12,
   "presets": [
     {
       "id": "analog_night_flash",
@@ -48,6 +48,33 @@
               "provider": "together",
               "model": "black-forest-labs/FLUX.2-max",
               "displayName": "FLUX.2 Max"
+            }
+          ]
+        }
+      ],
+      "promptOnlyAfterFirstUse": false
+    },
+    {
+      "id": "cinematic",
+      "label": "Cinematic",
+      "subtitle": "Prompt-led portrait transformation preset",
+      "promptHint": "Cinematic",
+      "cover": "assets/instame-style-presets/styles/cinematic/chatgpt-image-latest-high-fidelity-20251216_b_Edit_the_image,_ensu.png",
+      "representativeImage": "assets/instame-style-presets/styles/cinematic/chatgpt-image-latest-high-fidelity-20251216_b_Edit_the_image,_ensu.png",
+      "examples": [
+        "assets/instame-style-presets/styles/cinematic/chatgpt-image-latest-high-fidelity-20251216_b_Edit_the_image,_ensu.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/cinematic/prompt.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "Edit the image, ensuring the new target face's features and hair color ,are preserved exactly (1:1 mapping), while applying the specific styling and composition of the original..\n\n\nA high-quality 90s cinematic film cose up portrait of a seducer woman  She has voluminous,  hair  framing her face, like in old vintage movies, sof make up . She is wearing a classic turtleneck. The lighting is cold and moody with a heavy  tint, creating deep 'inky' shadows and a soft on the skin. 90s supermodel aesthetic, sultry and knowing expression with a faint 'Mona Lisa' smile. Shot on 35mm film, visible fine grain, muted contrast, earthy tones of terracotta, espresso, and bronze. High-end editorial style, 'Femme Fatale' vibe, sophisticated and mysterious. colors,black, white, grey, , visible large thick grain vintage",
+          "requestedModels": [
+            {
+              "provider": "openai",
+              "model": "gpt-image-1.5",
+              "displayName": "GPT Image 1.5"
             }
           ]
         }
@@ -146,8 +173,8 @@
           "requestedModels": [
             {
               "provider": "together",
-              "model": "Qwen/Qwen-Image",
-              "displayName": "Qwen Image"
+              "model": "Qwen/Qwen-Image-2.0",
+              "displayName": "Qwen Image 2.0"
             },
             {
               "provider": "openai",

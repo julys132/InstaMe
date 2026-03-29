@@ -68,7 +68,23 @@ MODEL_RULES: list[tuple[re.Pattern[str], dict[str, str]]] = [
         },
     ),
     (
-        re.compile(r"qwen(?:-|\s*)image(?:-|\s*)2(?:\.0)?|qwen\s*image", re.IGNORECASE),
+        re.compile(r"qwen(?:-|\s*)image(?:-|\s*)2(?:\.0)?(?:-|\s*)pro|qwen\s*image\s*2(?:\.0)?\s*pro", re.IGNORECASE),
+        {
+            "provider": "together",
+            "model": "Qwen/Qwen-Image-2.0-Pro",
+            "displayName": "Qwen Image 2.0 Pro",
+        },
+    ),
+    (
+        re.compile(r"qwen(?:-|\s*)image(?:-|\s*)2(?:\.0)?|qwen\s*image\s*2(?:\.0)?", re.IGNORECASE),
+        {
+            "provider": "together",
+            "model": "Qwen/Qwen-Image-2.0",
+            "displayName": "Qwen Image 2.0",
+        },
+    ),
+    (
+        re.compile(r"qwen\s*image", re.IGNORECASE),
         {
             "provider": "together",
             "model": "Qwen/Qwen-Image",
