@@ -214,17 +214,6 @@ function findInstaMeStylePresetById(id) {
 // shared/instame-pricing.ts
 var INSTAME_GENERATION_TIERS = [
   {
-    id: "preview",
-    label: "Preview",
-    subtitle: "Fast low-res test generation",
-    credits: 5,
-    provider: "Together",
-    model: "Google Flash Image 3.1 Preview",
-    output: "512 x 512",
-    badge: "Live",
-    availability: "live"
-  },
-  {
     id: "high_res",
     label: "High Res",
     subtitle: "Sharper premium export",
@@ -238,36 +227,14 @@ var INSTAME_GENERATION_TIERS = [
 ];
 var INSTAME_EDIT_TIERS = [
   {
-    id: "basic_edit",
-    label: "Basic Edit",
-    subtitle: "Cheapest correction pass",
+    id: "edit",
+    label: "Edit",
+    subtitle: "Gemini 3.1 Flash Preview refinement",
     credits: 3,
-    provider: "OpenAI",
-    model: "gpt-image-1-mini",
-    output: "1024 x 1024 low",
-    badge: "Cheapest",
-    availability: "live"
-  },
-  {
-    id: "pro_edit",
-    label: "Pro Edit",
-    subtitle: "Best balance for face consistency",
-    credits: 6,
     provider: "Together",
-    model: "FLUX.1 Kontext [pro]",
+    model: "Google Flash Image 3.1 Preview",
     output: "1024 x 1024",
-    badge: "Recommended",
-    availability: "live"
-  },
-  {
-    id: "premium_edit",
-    label: "Premium Edit",
-    subtitle: "Highest quality refinement pass",
-    credits: 10,
-    provider: "Together",
-    model: "FLUX.1 Kontext [max]",
-    output: "1024 x 1024+",
-    badge: "Premium",
+    badge: "Live",
     availability: "live"
   }
 ];
@@ -633,40 +600,12 @@ function choosePromptVariant(preset, _usageCount) {
   const preferredVariant = variants.find((variant) => variant.requestedModels.length > 0);
   return preferredVariant || variants[0] || null;
 }
-function chooseRequestedModel(variant, mode) {
+function chooseRequestedModel(variant, usageCount) {
   const models = variant?.requestedModels || [];
   if (models.length === 0) return null;
   if (models.length === 1) return models[0] || null;
-  const rankModel = (model) => {
-    const normalized = `${model.provider}:${model.model}:${model.displayName}`.toLowerCase();
-    if (mode === "high_res") {
-      if (normalized.includes("chatgpt-image-latest-high-fidelity")) return 110;
-      if (normalized.includes("flux.2-max")) return 100;
-      if (normalized.includes("gemini-3-pro-image")) return 95;
-      if (normalized.includes("gpt-image-1.5") || normalized.includes("gpt-image-1")) return 90;
-      if (normalized.includes("qwen-image-2.0-pro")) return 88;
-      if (normalized.includes("qwen-image-2.0")) return 86;
-      if (normalized.includes("qwen-image")) return 85;
-      if (normalized.includes("flux.2-pro")) return 80;
-      if (normalized.includes("reve-v1.1")) return 75;
-      if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 72;
-      if (normalized.includes("flash-image-2.5")) return 70;
-      return 50;
-    }
-    if (normalized.includes("chatgpt-image-latest-high-fidelity")) return 110;
-    if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 100;
-    if (normalized.includes("flash-image-2.5")) return 98;
-    if (normalized.includes("qwen-image-2.0-pro")) return 97;
-    if (normalized.includes("qwen-image-2.0")) return 96;
-    if (normalized.includes("qwen-image")) return 95;
-    if (normalized.includes("flux.2-pro")) return 90;
-    if (normalized.includes("gpt-image-1.5") || normalized.includes("gpt-image-1")) return 85;
-    if (normalized.includes("reve-v1.1")) return 75;
-    if (normalized.includes("gemini-3-pro-image")) return 70;
-    if (normalized.includes("flux.2-max")) return 65;
-    return 50;
-  };
-  return models.slice().sort((left, right) => rankModel(right) - rankModel(left))[0] || models[0] || null;
+  const index = Math.abs(usageCount) % models.length;
+  return models[index] || models[0] || null;
 }
 
 // server/lib/instame-runtime-assets.ts
@@ -2072,7 +2011,7 @@ function resolveAvailablePromptOnlyModel(requestedModel, mode) {
 }
 async function generatePromptOnlyPresetImage(options) {
   const selectedModel = resolveAvailablePromptOnlyModel(
-    chooseRequestedModel(options.variant, options.generationMode),
+    chooseRequestedModel(options.variant, options.styleUsageCount),
     options.generationMode
   ) || resolvePromptOnlyFallbackModel(options.generationMode);
   const prompt = buildPromptOnlyPresetTransformPrompt({
@@ -2189,30 +2128,14 @@ async function generateInstaMeEditImage(options) {
     editInstruction: options.editInstruction,
     customPrompt: options.customPrompt
   });
-  if (tier.id === "basic_edit") {
-    const images = [options.currentImage];
-    if (options.originalPhoto) {
-      images.push(options.originalPhoto);
-    }
-    const imageBase642 = await generateOpenAiImage({
-      model: "gpt-image-1-mini",
-      prompt,
-      images,
-      size: "1024x1024",
-      quality: "low"
-    });
-    return {
-      imageBase64: imageBase642,
-      model: "gpt-image-1-mini",
-      provider: "OpenAI"
-    };
-  }
-  const currentImageUrl = toRuntimeAssetUrl(options.req, options.currentImage);
-  const togetherModel = tier.id === "premium_edit" ? "black-forest-labs/FLUX.1-kontext-max" : "black-forest-labs/FLUX.1-kontext-pro";
+  const referenceImages = [
+    toRuntimeAssetUrl(options.req, options.currentImage),
+    options.originalPhoto ? toRuntimeAssetUrl(options.req, options.originalPhoto) : null
+  ].filter((image) => Boolean(image));
   const imageBase64 = await generateTogetherImage({
-    model: togetherModel,
+    model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
     prompt,
-    imageUrl: currentImageUrl,
+    referenceImages,
     width: 1024,
     height: 1024
   });
@@ -3611,6 +3534,7 @@ async function registerRoutes(app2) {
         uploadedImages,
         preset: resolvedStylePreset,
         variant: promptVariant,
+        styleUsageCount: priorStyleUseCount,
         generationMode,
         preserveBackground,
         customPrompt

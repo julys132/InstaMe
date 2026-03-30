@@ -290,10 +290,10 @@ export default function InstaMeScreen() {
     INSTAME_PORTRAIT_ENHANCE_TIER,
   );
   const [selectedGenerationTierId, setSelectedGenerationTierId] = useState<string>(
-    INSTAME_GENERATION_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_GENERATION_TIERS[0]?.id || "preview",
+    INSTAME_GENERATION_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_GENERATION_TIERS[0]?.id || "high_res",
   );
   const [selectedEditTierId, setSelectedEditTierId] = useState<string>(
-    INSTAME_EDIT_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_EDIT_TIERS[0]?.id || "basic_edit",
+    INSTAME_EDIT_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_EDIT_TIERS[0]?.id || "edit",
   );
   const [selectedStyleId, setSelectedStyleId] = useState<string>(INSTAME_STYLE_PRESETS[0]?.id || "");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
@@ -1368,49 +1368,31 @@ export default function InstaMeScreen() {
               <Text style={styles.resultMetaTitle}>Generation details</Text>
               <Text style={styles.resultMetaText}>
                 Style: {selectedStylePreset?.label || "Chicoo"}
-                {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Export: {activeGenerationTier?.label || "Preview"}
+                {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Export: {activeGenerationTier?.label || "High Res"}
               </Text>
               <Text style={styles.resultMetaText}>
-                Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "512 x 512"}
+                Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "1024 x 1024"}
               </Text>
             </View>
             <View style={styles.postGenerationSection}>
               <Text style={styles.pricingSectionTitle}>Edit after generation</Text>
-              <View style={[styles.pricingCardsRow, useStackedEditTierCards && styles.pricingCardsStacked]}>
-                {editTiers.map((tier) => (
-                  <Pressable
-                    key={tier.id}
-                    onPress={() => setSelectedEditTierId(tier.id)}
-                    style={[
-                      styles.pricingCard,
-                      useStackedEditTierCards && styles.pricingCardStacked,
-                      selectedEditTier?.id === tier.id && styles.pricingCardActive,
-                    ]}
-                  >
-                    <View style={[styles.pricingTopRow, useStackedEditTierCards && styles.pricingTopRowStacked]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.pricingLabel}>{tier.label}</Text>
-                        <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.pricingBadge,
-                          useStackedEditTierCards && styles.pricingBadgeStacked,
-                          tier.availability === "live"
-                            ? styles.pricingBadgeLive
-                            : styles.pricingBadgeSoon,
-                        ]}
-                      >
-                        <Text style={styles.pricingBadgeText}>{tier.badge || tier.availability}</Text>
-                      </View>
-                    </View>
+              <View style={[styles.pricingCard, styles.pricingCardActive]}>
+                <View style={styles.pricingTopRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.pricingLabel}>{selectedEditTier?.label || "Edit"}</Text>
+                    <Text style={styles.pricingSubtitle}>
+                      {selectedEditTier?.subtitle || "Refine your generated result"}
+                    </Text>
+                  </View>
+                  <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
+                    <Text style={styles.pricingBadgeText}>{selectedEditTier?.badge || "Live"}</Text>
+                  </View>
+                </View>
 
-                    <View style={styles.pricingMetaRow}>
-                      <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
-                      <Text style={styles.pricingMetaText}>{tier.output}</Text>
-                    </View>
-                  </Pressable>
-                ))}
+                <View style={styles.pricingMetaRow}>
+                  <Text style={styles.pricingCredits}>{selectedEditTier?.credits ?? 0} credits</Text>
+                  <Text style={styles.pricingMetaText}>{selectedEditTier?.output || "1024 x 1024"}</Text>
+                </View>
               </View>
             </View>
             <View style={styles.resultActionRow}>
@@ -1430,7 +1412,7 @@ export default function InstaMeScreen() {
               <View style={styles.editComposer}>
                 <Text style={styles.editComposerTitle}>Refine this result</Text>
                 <Text style={styles.editComposerSubtitle}>
-                  Selected option: {selectedEditTier?.label || "Edit"} - {selectedEditTier?.credits ?? 0} credits
+                  This edit costs {selectedEditTier?.credits ?? 0} credits
                 </Text>
                 <TextInput
                   value={editInstruction}
@@ -1462,7 +1444,7 @@ export default function InstaMeScreen() {
               </View>
             ) : null}
             <Text style={styles.resultFootnote}>
-              Download is free. Every edit is charged separately based on the selected tier.
+              Download is free. Every edit is charged separately.
             </Text>
           </View>
         ) : null}

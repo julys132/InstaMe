@@ -1658,12 +1658,13 @@ async function generatePromptOnlyPresetImage(options: {
   uploadedImages: UploadedReferenceImage[];
   preset: InstaMeStylePreset;
   variant: NonNullable<ReturnType<typeof choosePromptVariant>>;
+  styleUsageCount: number;
   generationMode: InstaMeGenerationMode;
   preserveBackground: boolean;
   customPrompt: string;
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
   const selectedModel = resolveAvailablePromptOnlyModel(
-    chooseRequestedModel(options.variant, options.generationMode),
+    chooseRequestedModel(options.variant, options.styleUsageCount),
     options.generationMode,
   ) || resolvePromptOnlyFallbackModel(options.generationMode);
   const prompt = buildPromptOnlyPresetTransformPrompt({
@@ -1820,36 +1821,14 @@ async function generateInstaMeEditImage(options: {
     customPrompt: options.customPrompt,
   });
 
-  if (tier.id === "basic_edit") {
-    const images: RuntimeImageInput[] = [options.currentImage];
-    if (options.originalPhoto) {
-      images.push(options.originalPhoto);
-    }
-
-    const imageBase64 = await generateOpenAiImage({
-      model: "gpt-image-1-mini",
-      prompt,
-      images,
-      size: "1024x1024",
-      quality: "low",
-    });
-
-    return {
-      imageBase64,
-      model: "gpt-image-1-mini",
-      provider: "OpenAI",
-    };
-  }
-
-  const currentImageUrl = toRuntimeAssetUrl(options.req, options.currentImage);
-  const togetherModel =
-    tier.id === "premium_edit"
-      ? "black-forest-labs/FLUX.1-kontext-max"
-      : "black-forest-labs/FLUX.1-kontext-pro";
+  const referenceImages = [
+    toRuntimeAssetUrl(options.req, options.currentImage),
+    options.originalPhoto ? toRuntimeAssetUrl(options.req, options.originalPhoto) : null,
+  ].filter((image): image is string => Boolean(image));
   const imageBase64 = await generateTogetherImage({
-    model: togetherModel,
+    model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
     prompt,
-    imageUrl: currentImageUrl,
+    referenceImages,
     width: 1024,
     height: 1024,
   });
@@ -3717,6 +3696,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             uploadedImages,
             preset: resolvedStylePreset!,
             variant: promptVariant,
+            styleUsageCount: priorStyleUseCount,
             generationMode,
             preserveBackground,
             customPrompt,

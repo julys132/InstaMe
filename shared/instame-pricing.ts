@@ -38,17 +38,6 @@ export type InstaMePortraitEnhanceTier = {
 
 export const INSTAME_GENERATION_TIERS: InstaMeGenerationTier[] = [
   {
-    id: "preview",
-    label: "Preview",
-    subtitle: "Fast low-res test generation",
-    credits: 5,
-    provider: "Together",
-    model: "Google Flash Image 3.1 Preview",
-    output: "512 x 512",
-    badge: "Live",
-    availability: "live",
-  },
-  {
     id: "high_res",
     label: "High Res",
     subtitle: "Sharper premium export",
@@ -63,36 +52,14 @@ export const INSTAME_GENERATION_TIERS: InstaMeGenerationTier[] = [
 
 export const INSTAME_EDIT_TIERS: InstaMeEditTier[] = [
   {
-    id: "basic_edit",
-    label: "Basic Edit",
-    subtitle: "Cheapest correction pass",
+    id: "edit",
+    label: "Edit",
+    subtitle: "Refine your generated result",
     credits: 3,
-    provider: "OpenAI",
-    model: "gpt-image-1-mini",
-    output: "1024 x 1024 low",
-    badge: "Cheapest",
-    availability: "live",
-  },
-  {
-    id: "pro_edit",
-    label: "Pro Edit",
-    subtitle: "Best balance for face consistency",
-    credits: 6,
     provider: "Together",
-    model: "FLUX.1 Kontext [pro]",
+    model: "Google Flash Image 3.1 Preview",
     output: "1024 x 1024",
-    badge: "Recommended",
-    availability: "live",
-  },
-  {
-    id: "premium_edit",
-    label: "Premium Edit",
-    subtitle: "Highest quality refinement pass",
-    credits: 10,
-    provider: "Together",
-    model: "FLUX.1 Kontext [max]",
-    output: "1024 x 1024+",
-    badge: "Premium",
+    badge: "Live",
     availability: "live",
   },
 ];
