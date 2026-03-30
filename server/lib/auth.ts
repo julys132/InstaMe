@@ -85,6 +85,11 @@ export function verifyAccessToken(token: string): JwtPayload {
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.warn("[auth] rejected request", {
+      path: req.originalUrl || req.url,
+      reason: "missing_bearer_token",
+      method: req.method,
+    });
     res.status(401).json({ error: "No token provided" });
     return;
   }
@@ -100,9 +105,19 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     next();
   } catch (error: any) {
     if (error.message === "TOKEN_EXPIRED") {
+      console.warn("[auth] rejected request", {
+        path: req.originalUrl || req.url,
+        reason: "token_expired",
+        method: req.method,
+      });
       res.status(401).json({ error: "Token expired", code: "TOKEN_EXPIRED" });
       return;
     }
+    console.warn("[auth] rejected request", {
+      path: req.originalUrl || req.url,
+      reason: "invalid_token",
+      method: req.method,
+    });
     res.status(401).json({ error: "Invalid token" });
   }
 }

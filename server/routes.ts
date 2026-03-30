@@ -3733,6 +3733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/instame/enhance-portrait", authMiddleware, async (req, res) => {
     const userId = req.user!.id;
     const body = req.body || {};
+    let failureStage = "request_received";
     const enhanceCost =
       Number.isInteger(INSTAME_PORTRAIT_ENHANCE_TIER.credits) && INSTAME_PORTRAIT_ENHANCE_TIER.credits > 0
         ? INSTAME_PORTRAIT_ENHANCE_TIER.credits
@@ -3746,8 +3747,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     let uploadedImages: UploadedReferenceImage[] = [];
     try {
+      failureStage = "normalize_uploaded_images";
       uploadedImages = normalizeUploadedImages(photoInput, "single_item");
     } catch (error: unknown) {
+      console.error("InstaMe portrait enhance invalid payload:", {
+        userId,
+        stage: failureStage,
+        error: toErrorMessage(error, "Invalid image payload"),
+      });
       return res.status(400).json({ error: toErrorMessage(error, "Invalid image payload") });
     }
 
@@ -3757,6 +3764,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     let creditsConsumed = false;
     try {
+      console.info("InstaMe portrait enhance start", {
+        userId,
+        stage: failureStage,
+        model: INSTAME_PORTRAIT_ENHANCE_MODEL,
+        output: INSTAME_PORTRAIT_ENHANCE_SIZE,
+        hasPublicAppUrl: Boolean(process.env.PUBLIC_APP_URL),
+        hasTogetherApiKey: Boolean(process.env.TOGETHER_API_KEY),
+        mimeType: uploadedImages[0]?.mimeType || null,
+        width: uploadedImages[0]?.width || null,
+        height: uploadedImages[0]?.height || null,
+        fileSizeBytes: uploadedImages[0]?.fileSizeBytes || null,
+      });
+
+      failureStage = "consume_credits";
       const consumed = await consumeCredits(userId, enhanceCost, "instame_portrait_enhance");
       if (!consumed) {
         return res.status(402).json({
@@ -3766,15 +3787,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       creditsConsumed = true;
 
+      failureStage = "generate_enhanced_portrait";
       const enhanceResult = await generateInstaMePortraitEnhance({
         req,
         photo: uploadedImages[0],
       });
 
+      failureStage = "fetch_updated_credits";
       const [updatedUser] = await db
         .select({ credits: users.credits })
         .from(users)
         .where(eq(users.id, userId));
+
+      console.info("InstaMe portrait enhance success", {
+        userId,
+        model: enhanceResult.model,
+        provider: enhanceResult.provider,
+        creditsCharged: enhanceCost,
+        creditsRemaining: updatedUser?.credits ?? 0,
+      });
 
       return res.json({
         imageBase64: enhanceResult.imageBase64,
@@ -3785,8 +3816,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         output: INSTAME_PORTRAIT_ENHANCE_SIZE,
       });
     } catch (error: unknown) {
-      console.error("InstaMe portrait enhance error:", error);
+      console.error("InstaMe portrait enhance error:", {
+        userId,
+        stage: failureStage,
+        model: INSTAME_PORTRAIT_ENHANCE_MODEL,
+        output: INSTAME_PORTRAIT_ENHANCE_SIZE,
+        hasPublicAppUrl: Boolean(process.env.PUBLIC_APP_URL),
+        hasTogetherApiKey: Boolean(process.env.TOGETHER_API_KEY),
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
       if (creditsConsumed) {
+        failureStage = "refund_credits";
         await refundCredits(userId, enhanceCost, "instame_portrait_enhance_failed");
       }
       const errorMessage = toErrorMessage(error, "Failed to enhance portrait");
