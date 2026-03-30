@@ -871,9 +871,6 @@ async function generateTogetherImage(options) {
   if (typeof options.imageUrl === "string" && options.imageUrl.trim()) {
     payload.image_url = options.imageUrl.trim();
   }
-  if (typeof options.steps === "number" && Number.isFinite(options.steps)) {
-    payload.steps = options.steps;
-  }
   const response = await fetch(`${baseUrl}/images/generations`, {
     method: "POST",
     headers: {
@@ -883,15 +880,25 @@ async function generateTogetherImage(options) {
     body: JSON.stringify(payload)
   });
   const responseText = await response.text();
-  const parsed = responseText ? JSON.parse(responseText) : null;
+  let parsed = null;
+  try {
+    parsed = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    parsed = null;
+  }
   if (!response.ok) {
-    const message = parsed?.error?.message || parsed?.message || responseText || `Together API returned status ${response.status}`;
-    throw new Error(message);
+    const parsedError = parsed && typeof parsed.error === "object" && parsed.error !== null ? parsed.error : null;
+    const remoteMessage = typeof parsedError?.message === "string" ? parsedError.message : typeof parsed?.message === "string" ? parsed.message : "";
+    const message = remoteMessage || responseText || `Together API returned status ${response.status}`;
+    const payloadKeys = Object.keys(payload).sort().join(", ");
+    throw new Error(
+      `Together API error (${response.status}) for model ${resolvedModel} with payload keys [${payloadKeys}]: ${message}`
+    );
   }
   const data = Array.isArray(parsed?.data) ? parsed.data : [];
   const base64 = data[0]?.b64_json;
   if (!base64) {
-    throw new Error("Together image generation returned no image data.");
+    throw new Error(`Together image generation returned no image data for model ${resolvedModel}.`);
   }
   return base64;
 }
