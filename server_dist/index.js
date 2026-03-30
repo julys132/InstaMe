@@ -219,7 +219,7 @@ var INSTAME_GENERATION_TIERS = [
     subtitle: "Fast low-res test generation",
     credits: 5,
     provider: "Together",
-    model: "Google Flash Image 2.5",
+    model: "Google Flash Image 3.1 Preview",
     output: "512 x 512",
     badge: "Live",
     availability: "live"
@@ -277,7 +277,7 @@ var INSTAME_PORTRAIT_ENHANCE_TIER = {
   subtitle: "Polish your selfie before styling",
   credits: 3,
   provider: "Together",
-  model: "Google Flash Image 2.5",
+  model: "Google Flash Image 3.1 Preview",
   output: "1024 x 1024",
   badge: "Live",
   availability: "live"
@@ -751,7 +751,7 @@ function resolveTogetherModelAlias(model) {
   const normalized = model.trim().toLowerCase();
   if (!normalized) return model;
   if (normalized === "gemini-3.1-flash-image-preview" || normalized === "gemini 3.1 flash image preview" || normalized === "gemini-2.5-flash-image" || normalized === "google/flash-image-2.5" || normalized === "google/flash-image-3.1") {
-    return "google/flash-image-2.5";
+    return normalized === "google/flash-image-2.5" ? "google/flash-image-2.5" : "google/flash-image-3.1";
   }
   if (normalized === "gemini-3-pro-image" || normalized === "gemini 3 pro image" || normalized === "google/gemini-3-pro-image") {
     return "google/gemini-3-pro-image";
@@ -1164,7 +1164,7 @@ var DEFAULT_ALLOWED_DEV_CREDIT_EMAILS = ["iuliastarcean@gmail.com"];
 var GEMINI_API_BASE_URL = process.env.GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
 var DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 var DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
-var DEFAULT_TOGETHER_FLASH_IMAGE_MODEL = process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-2.5";
+var DEFAULT_TOGETHER_FLASH_IMAGE_MODEL = process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-3.1";
 var DEFAULT_TOGETHER_PRO_IMAGE_MODEL = process.env.STYLE_HIGH_RES_TOGETHER_MODEL || "google/gemini-3-pro-image";
 var STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
 var INSTAME_PORTRAIT_ENHANCE_MODEL = process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || DEFAULT_TOGETHER_FLASH_IMAGE_MODEL;
@@ -2019,7 +2019,7 @@ function resolvePromptOnlyFallbackModel(mode) {
   return {
     provider: "together",
     model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
-    displayName: "Google Flash Image 2.5"
+    displayName: "Google Flash Image 3.1 Preview"
   };
 }
 async function generatePromptOnlyPresetImage(options) {
