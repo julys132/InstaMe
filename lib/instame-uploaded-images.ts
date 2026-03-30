@@ -121,3 +121,88 @@ export async function optimizeImageAsset(
     fileSizeBytes: optimizedBytes,
   };
 }
+
+export async function optimizeGeneratedBase64Image(options: {
+  base64: string;
+  mimeType?: string;
+  previewDimension?: number;
+}): Promise<PreparedUploadImage> {
+  const mimeType = options.mimeType || "image/png";
+  const inputUri = buildDataUri(options.base64, mimeType);
+  const previewDimension = options.previewDimension || LIBRARY_PREVIEW_DIMENSION;
+
+  const firstPass = await manipulateAsync(inputUri, [], {
+    compress: 0.92,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
+
+  const sourceWidth = Math.max(firstPass.width || 0, 1);
+  const sourceHeight = Math.max(firstPass.height || 0, 1);
+  const largestSide = Math.max(sourceWidth, sourceHeight);
+  const resizeAction =
+    largestSide > MAX_LIBRARY_IMAGE_DIMENSION
+      ? sourceWidth >= sourceHeight
+        ? [{ resize: { width: MAX_LIBRARY_IMAGE_DIMENSION } }]
+        : [{ resize: { height: MAX_LIBRARY_IMAGE_DIMENSION } }]
+      : [];
+
+  const compressSteps = [0.82, 0.72, 0.62, 0.52, 0.42];
+  let optimizedBase64 = stripDataUriPrefix(firstPass.base64 || "");
+  let optimizedUri = firstPass.uri;
+  let optimizedWidth = firstPass.width;
+  let optimizedHeight = firstPass.height;
+  let optimizedBytes = estimateBase64Bytes(optimizedBase64);
+
+  for (const compress of compressSteps) {
+    const result = await manipulateAsync(firstPass.uri, resizeAction, {
+      compress,
+      format: SaveFormat.JPEG,
+      base64: true,
+    });
+
+    const candidateBase64 = stripDataUriPrefix(result.base64 || "");
+    const candidateBytes = estimateBase64Bytes(candidateBase64);
+
+    optimizedBase64 = candidateBase64;
+    optimizedUri = result.uri;
+    optimizedWidth = result.width;
+    optimizedHeight = result.height;
+    optimizedBytes = candidateBytes;
+
+    if (candidateBase64 && candidateBytes <= MAX_LIBRARY_IMAGE_BYTES) {
+      break;
+    }
+  }
+
+  if (!optimizedBase64) {
+    throw new Error("Could not optimize the enhanced portrait.");
+  }
+
+  if (optimizedBytes > MAX_LIBRARY_IMAGE_BYTES) {
+    throw new Error("The enhanced portrait is still larger than 1MB after optimization.");
+  }
+
+  const previewResizeAction =
+    Math.max(optimizedWidth, optimizedHeight) > previewDimension
+      ? optimizedWidth >= optimizedHeight
+        ? [{ resize: { width: previewDimension } }]
+        : [{ resize: { height: previewDimension } }]
+      : [];
+
+  const previewResult = await manipulateAsync(optimizedUri, previewResizeAction, {
+    compress: 0.62,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
+
+  return {
+    uri: optimizedUri,
+    base64: optimizedBase64,
+    previewBase64: stripDataUriPrefix(previewResult.base64 || optimizedBase64),
+    mimeType: "image/jpeg",
+    width: optimizedWidth,
+    height: optimizedHeight,
+    fileSizeBytes: optimizedBytes,
+  };
+}

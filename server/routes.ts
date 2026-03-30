@@ -20,6 +20,7 @@ import {
 import {
   INSTAME_STYLE_PRESETS,
   findInstaMeStylePresetById,
+  type InstaMeRequestedModel,
   type InstaMeStylePreset,
 } from "../shared/instame-style-presets";
 import {
@@ -426,7 +427,9 @@ const MAX_IMAGE_COUNT_BY_MODE: Record<ImageInputMode, number> = {
   multi_item: 3,
 };
 const MAX_IMAGE_BASE64_LENGTH = 2_500_000;
-const MAX_INSTAME_LIBRARY_IMAGES = 10;
+const MAX_INSTAME_UPLOADED_IMAGES = 10;
+const MAX_INSTAME_ENHANCED_IMAGES = 10;
+const MAX_INSTAME_LIBRARY_IMAGES_TOTAL = MAX_INSTAME_UPLOADED_IMAGES + MAX_INSTAME_ENHANCED_IMAGES;
 const MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1_000_000;
 const MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 const MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 220_000;
@@ -1032,6 +1035,7 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
       const base64 = normalizeStringValue(candidate.base64);
       const previewBase64 = normalizeStringValue(candidate.previewBase64);
       const name = normalizeStringValue(candidate.name) || "Portrait";
+      const kind = candidate.kind === "enhanced" ? "enhanced" : "uploaded";
       const width = Number(candidate.width);
       const height = Number(candidate.height);
       const fileSizeBytes = Number(candidate.fileSizeBytes);
@@ -1044,6 +1048,7 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
       return {
         id,
         name,
+        kind,
         mimeType,
         base64: stripDataUriPrefix(base64),
         previewBase64: stripDataUriPrefix(previewBase64),
@@ -1057,13 +1062,14 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
       };
     })
     .filter((entry): entry is InstaMeUploadedImageRecord => Boolean(entry))
-    .slice(0, MAX_INSTAME_LIBRARY_IMAGES);
+    .slice(0, MAX_INSTAME_LIBRARY_IMAGES_TOTAL);
 }
 
 function toInstaMeUploadedImageSummary(image: InstaMeUploadedImageRecord) {
   return {
     id: image.id,
     name: image.name,
+    kind: image.kind || "uploaded",
     mimeType: image.mimeType,
     width: image.width,
     height: image.height,
@@ -1607,6 +1613,46 @@ function resolvePromptOnlyFallbackModel(
     };
   }
 
+function hasOpenAiImageConfig(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
+}
+
+function hasTogetherImageConfig(): boolean {
+  return Boolean(process.env.TOGETHER_API_KEY);
+}
+
+function hasReveImageConfig(): boolean {
+  return Boolean(process.env.REVE_API_KEY);
+}
+
+function resolveAvailablePromptOnlyModel(
+  requestedModel: InstaMeRequestedModel | null,
+  mode: InstaMeGenerationMode,
+): InstaMeRequestedModel | { provider: "together"; model: string; displayName: string } | null {
+  if (!requestedModel) {
+    return hasTogetherImageConfig() ? resolvePromptOnlyFallbackModel(mode) : null;
+  }
+
+  if (requestedModel.provider === "openai") {
+    if (hasOpenAiImageConfig()) return requestedModel;
+    if (hasTogetherImageConfig()) return resolvePromptOnlyFallbackModel(mode);
+    return requestedModel;
+  }
+
+  if (requestedModel.provider === "reve") {
+    if (hasReveImageConfig()) return requestedModel;
+    if (hasTogetherImageConfig()) return resolvePromptOnlyFallbackModel(mode);
+    return requestedModel;
+  }
+
+  if (requestedModel.provider === "together") {
+    if (hasTogetherImageConfig()) return requestedModel;
+    return requestedModel;
+  }
+
+  return requestedModel;
+}
+
 async function generatePromptOnlyPresetImage(options: {
   req: Request;
   uploadedImages: UploadedReferenceImage[];
@@ -1616,9 +1662,10 @@ async function generatePromptOnlyPresetImage(options: {
   preserveBackground: boolean;
   customPrompt: string;
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
-  const selectedModel =
-    chooseRequestedModel(options.variant, options.generationMode) ||
-    resolvePromptOnlyFallbackModel(options.generationMode);
+  const selectedModel = resolveAvailablePromptOnlyModel(
+    chooseRequestedModel(options.variant, options.generationMode),
+    options.generationMode,
+  ) || resolvePromptOnlyFallbackModel(options.generationMode);
   const prompt = buildPromptOnlyPresetTransformPrompt({
     presetLabel: options.preset.label,
     variantPrompt: options.variant.prompt,
@@ -3450,6 +3497,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/instame/uploaded-images", authMiddleware, async (req, res) => {
+    const requestedKind = normalizeStringValue(req.query.kind);
+    const imageKind = requestedKind === "enhanced" ? "enhanced" : requestedKind === "uploaded" ? "uploaded" : "";
+
     const [user] = await db
       .select({ instameUploadedImages: users.instameUploadedImages })
       .from(users)
@@ -3459,6 +3509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     return res.json({
       images: images
+        .filter((image) => !imageKind || (image.kind || "uploaded") === imageKind)
         .slice()
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
         .map((image) => toInstaMeUploadedImageSummary(image)),
@@ -3490,6 +3541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const body = req.body || {};
     const input = body.image && typeof body.image === "object" ? body.image : {};
     const name = normalizeStringValue((input as { name?: unknown }).name) || "Portrait";
+    const kind = normalizeStringValue((input as { kind?: unknown }).kind) === "enhanced" ? "enhanced" : "uploaded";
     const mimeType =
       typeof (input as { mimeType?: unknown }).mimeType === "string" &&
       String((input as { mimeType?: unknown }).mimeType).startsWith("image/")
@@ -3531,15 +3583,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(eq(users.id, req.user!.id));
 
     const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
-    if (existingImages.length >= MAX_INSTAME_LIBRARY_IMAGES) {
+    const existingKindCount = existingImages.filter((entry) => (entry.kind || "uploaded") === kind).length;
+    const kindLimit = kind === "enhanced" ? MAX_INSTAME_ENHANCED_IMAGES : MAX_INSTAME_UPLOADED_IMAGES;
+    if (existingKindCount >= kindLimit) {
       return res.status(409).json({
-        error: `You can save up to ${MAX_INSTAME_LIBRARY_IMAGES} uploaded images.`,
+        error: `You can save up to ${kindLimit} ${kind === "enhanced" ? "enhanced portraits" : "uploaded images"}.`,
       });
     }
 
     const savedImage: InstaMeUploadedImageRecord = {
       id: randomUUID(),
       name,
+      kind,
       mimeType,
       base64,
       previewBase64,

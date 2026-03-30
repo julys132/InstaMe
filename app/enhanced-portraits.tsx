@@ -14,20 +14,16 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as ImagePicker from "expo-image-picker";
 import { apiClient, type InstaMeUploadedImage } from "@/lib/api-client";
 import {
-  MAX_STORED_UPLOADS,
-  optimizeImageAsset,
   VIEW_MODE_OPTIONS,
   VIEW_MODE_TILE_SIZE,
-  type PreparedUploadImage,
   type UploadedImageViewMode,
 } from "@/lib/instame-uploaded-images";
 import Colors from "@/constants/colors";
 import ChicooBackground from "@/components/ChicooBackground";
 
-export default function UploadedImagesScreen() {
+export default function EnhancedPortraitsScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ selectedImageId?: string | string[] }>();
   const selectedImageIdParam = Array.isArray(params.selectedImageId)
@@ -43,10 +39,10 @@ export default function UploadedImagesScreen() {
 
   const loadImages = useCallback(async () => {
     try {
-      const result = await apiClient.getInstaMeUploadedImages("uploaded");
+      const result = await apiClient.getInstaMeUploadedImages("enhanced");
       setImages(Array.isArray(result.images) ? result.images : []);
     } catch (error: any) {
-      Alert.alert("Load failed", error?.message || "Could not load saved portraits.");
+      Alert.alert("Load failed", error?.message || "Could not load enhanced portraits.");
       setImages([]);
     } finally {
       setLoading(false);
@@ -57,79 +53,6 @@ export default function UploadedImagesScreen() {
     loadImages();
   }, [loadImages]);
 
-  const pickRawImage = useCallback(async (): Promise<ImagePicker.ImagePickerAsset | null> => {
-    const pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      quality: 0.9,
-      base64: false,
-    });
-
-    if (pickerResult.canceled || !pickerResult.assets[0]) {
-      return null;
-    }
-
-    return pickerResult.assets[0];
-  }, []);
-
-  const savePreparedToLibrary = useCallback(
-    async (prepared: PreparedUploadImage, name?: string) => {
-      if (images.length >= MAX_STORED_UPLOADS) {
-        Alert.alert("Limit reached", `You can save up to ${MAX_STORED_UPLOADS} portraits.`);
-        return null;
-      }
-
-      setActionLoading(true);
-      try {
-        const result = await apiClient.saveInstaMeUploadedImage({
-          image: {
-            name: name || "Portrait",
-            kind: "uploaded",
-            mimeType: prepared.mimeType,
-            base64: prepared.base64,
-            previewBase64: prepared.previewBase64,
-            width: prepared.width,
-            height: prepared.height,
-            fileSizeBytes: prepared.fileSizeBytes,
-          },
-        });
-        await loadImages();
-        return result.image;
-      } catch (error: any) {
-        Alert.alert("Save failed", error?.message || "Could not save this portrait.");
-        return null;
-      } finally {
-        setActionLoading(false);
-      }
-    },
-    [images.length, loadImages],
-  );
-
-  const handleAddImage = useCallback(async () => {
-    const asset = await pickRawImage();
-    if (!asset) return;
-
-    let prepared: PreparedUploadImage;
-    try {
-      prepared = await optimizeImageAsset(asset);
-    } catch (error: any) {
-      Alert.alert("Image error", error?.message || "Could not optimize this image.");
-      return;
-    }
-
-    const saved = await savePreparedToLibrary(prepared, asset.fileName || "Portrait");
-    if (!saved) return;
-
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.replace({
-      pathname: "/(tabs)/instame",
-      params: {
-        uploadedImageId: saved.id,
-        uploadedImageNonce: String(Date.now()),
-      },
-    });
-  }, [pickRawImage, savePreparedToLibrary]);
-
   const handleDeleteImage = useCallback(
     async (imageId: string) => {
       setActionLoading(true);
@@ -138,7 +61,7 @@ export default function UploadedImagesScreen() {
         await loadImages();
         await Haptics.selectionAsync();
       } catch (error: any) {
-        Alert.alert("Delete failed", error?.message || "Could not remove this portrait.");
+        Alert.alert("Delete failed", error?.message || "Could not remove this enhanced portrait.");
       } finally {
         setActionLoading(false);
       }
@@ -157,10 +80,7 @@ export default function UploadedImagesScreen() {
     });
   }, []);
 
-  const headerCountText = useMemo(
-    () => `${images.length}/${MAX_STORED_UPLOADS}`,
-    [images.length],
-  );
+  const headerCountText = useMemo(() => `${images.length}/10`, [images.length]);
 
   return (
     <View style={styles.container}>
@@ -182,9 +102,9 @@ export default function UploadedImagesScreen() {
 
           <View style={styles.headerTextWrap}>
             <Text style={styles.headerEyebrow}>Chicoo Library</Text>
-            <Text style={styles.headerTitle}>Uploaded Images</Text>
+            <Text style={styles.headerTitle}>Enhanced Portraits</Text>
             <Text style={styles.headerSubtitle}>
-              Save up to 10 optimized portraits and reuse them instantly in generation.
+              Reuse polished base portraits later, without running Enhance Portrait again.
             </Text>
           </View>
 
@@ -196,27 +116,12 @@ export default function UploadedImagesScreen() {
         <View style={styles.card}>
           <View style={styles.cardTopRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardTitle}>Portrait Library</Text>
+              <Text style={styles.cardTitle}>Enhanced Library</Text>
               <Text style={styles.cardSubtitle}>
-                Each portrait is stored at max 1024 x 1024 px and 1MB for lower AI cost.
+                These are your saved AI-polished base portraits, ready to reuse in Chicoo.
               </Text>
             </View>
             {actionLoading ? <ActivityIndicator color={Colors.accent} size="small" /> : null}
-          </View>
-
-          <View style={styles.actionRow}>
-            <Pressable
-              onPress={handleAddImage}
-              disabled={images.length >= MAX_STORED_UPLOADS || actionLoading}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                (images.length >= MAX_STORED_UPLOADS || actionLoading) && styles.primaryButtonDisabled,
-                pressed && images.length < MAX_STORED_UPLOADS ? { opacity: 0.9 } : undefined,
-              ]}
-            >
-              <Ionicons name="cloud-upload-outline" size={18} color="#0A0A0A" />
-              <Text style={styles.primaryButtonText}>Add portrait</Text>
-            </Pressable>
           </View>
 
           <View style={styles.viewModeRow}>
@@ -244,14 +149,14 @@ export default function UploadedImagesScreen() {
           {loading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator color={Colors.accent} />
-              <Text style={styles.emptyStateTitle}>Loading saved portraits...</Text>
+              <Text style={styles.emptyStateTitle}>Loading enhanced portraits...</Text>
             </View>
           ) : images.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="images-outline" size={28} color={Colors.accent} />
-              <Text style={styles.emptyStateTitle}>No saved portraits yet</Text>
+              <Ionicons name="sparkles-outline" size={28} color={Colors.accent} />
+              <Text style={styles.emptyStateTitle}>No enhanced portraits yet</Text>
               <Text style={styles.emptyStateSubtitle}>
-                Add portraits here once, then reuse them without browsing your phone every time.
+                Keep an enhanced result once, and it will stay here for reuse later.
               </Text>
             </View>
           ) : (
@@ -293,10 +198,7 @@ export default function UploadedImagesScreen() {
                         </Text>
                       </View>
                     </Pressable>
-                    <Pressable
-                      onPress={() => handleDeleteImage(image.id)}
-                      style={styles.deleteButton}
-                    >
+                    <Pressable onPress={() => handleDeleteImage(image.id)} style={styles.deleteButton}>
                       <Ionicons name="close" size={14} color="#FFF" />
                     </Pressable>
                   </View>
@@ -320,21 +222,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 14,
-    marginBottom: 14,
+    marginBottom: 20,
   },
   backButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
+    backgroundColor: "rgba(255,255,255,0.05)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: "rgba(255,255,255,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },
   headerTextWrap: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   headerEyebrow: {
     color: Colors.accent,
@@ -346,156 +248,131 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: "#FFF",
     fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 30,
+    fontSize: 34,
+    lineHeight: 40,
   },
   headerSubtitle: {
-    color: "#AEAEAE",
+    color: "#BEBEBE",
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     lineHeight: 19,
-    marginTop: 2,
   },
   countBadge: {
+    alignSelf: "flex-start",
+    minWidth: 48,
     height: 34,
     borderRadius: 17,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,79,125,0.45)",
+    backgroundColor: "rgba(255,79,125,0.12)",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.34)",
-    backgroundColor: "rgba(255,79,125,0.10)",
   },
   countBadgeText: {
-    color: "#FFD5E2",
+    color: "#FFD8E4",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
   },
   card: {
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(10,10,14,0.84)",
-    padding: 16,
+    borderColor: "rgba(255,79,125,0.28)",
+    backgroundColor: "rgba(10,10,12,0.92)",
+    padding: 14,
     gap: 14,
   },
   cardTopRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
     gap: 12,
+    alignItems: "flex-start",
   },
   cardTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
+    fontSize: 22,
   },
   cardSubtitle: {
-    color: "#A8A8A8",
+    color: "#BDBDBD",
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 4,
-  },
-  actionRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  primaryButton: {
-    minHeight: 46,
-    borderRadius: 13,
-    backgroundColor: Colors.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  primaryButtonDisabled: {
-    opacity: 0.45,
-  },
-  primaryButtonText: {
-    color: "#0A0A0A",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
   },
   viewModeRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
   },
   viewModeChip: {
-    minWidth: 40,
-    height: 34,
     borderRadius: 999,
+    paddingHorizontal: 14,
+    height: 40,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.10)",
     backgroundColor: "rgba(255,255,255,0.03)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
   },
   viewModeChipActive: {
-    borderColor: "rgba(255,79,125,0.64)",
-    backgroundColor: "rgba(255,79,125,0.14)",
+    borderColor: "rgba(255,79,125,0.65)",
+    backgroundColor: "rgba(255,79,125,0.18)",
   },
   viewModeChipText: {
-    color: "#D4D4D4",
+    color: "#D3D3D3",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontSize: 13,
   },
   viewModeChipTextActive: {
-    color: "#FFE1EA",
+    color: "#FFE0EA",
   },
   emptyState: {
-    minHeight: 184,
+    minHeight: 220,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.02)",
+    backgroundColor: "rgba(255,255,255,0.025)",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingHorizontal: 22,
+    gap: 10,
   },
   emptyStateTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 16,
     textAlign: "center",
   },
   emptyStateSubtitle: {
-    color: "#9D9D9D",
+    color: "#AEAEAE",
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: "center",
   },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 12,
   },
   tileWrap: {
     position: "relative",
   },
   tile: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: 20,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "#0B0B0B",
+    backgroundColor: "#0B0B0E",
   },
   tileActive: {
-    borderColor: "rgba(255,79,125,0.82)",
+    borderColor: "rgba(255,79,125,0.75)",
     shadowColor: "#FF5CB8",
     shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
   },
   tileImage: {
     ...StyleSheet.absoluteFillObject,
@@ -506,7 +383,7 @@ const styles = StyleSheet.create({
   selectedBadge: {
     position: "absolute",
     top: 10,
-    left: 10,
+    right: 10,
     width: 22,
     height: 22,
     borderRadius: 11,
@@ -516,12 +393,10 @@ const styles = StyleSheet.create({
   },
   tileMeta: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-    paddingTop: 18,
+    left: 12,
+    right: 12,
+    bottom: 12,
+    gap: 2,
   },
   tileName: {
     color: "#FFF",
@@ -529,22 +404,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   tileInfo: {
-    color: "#D5D5D5",
+    color: "#D0D0D0",
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    marginTop: 2,
   },
   deleteButton: {
     position: "absolute",
-    top: 8,
-    right: 8,
+    top: 10,
+    left: 10,
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.68)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.58)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
   },
 });

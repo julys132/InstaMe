@@ -26,7 +26,9 @@ import {
   type InstaMeUploadedImageAsset,
 } from "@/lib/api-client";
 import {
+  buildDataUri,
   optimizeImageAsset,
+  optimizeGeneratedBase64Image,
   type PreparedUploadImage,
 } from "@/lib/instame-uploaded-images";
 import Colors from "@/constants/colors";
@@ -580,17 +582,36 @@ export default function InstaMeScreen() {
       return;
     }
 
+    let optimizedEnhanced = portraitEnhanceCandidate;
     let savedImageId = "";
     try {
+      const prepared = await optimizeGeneratedBase64Image({
+        base64: portraitEnhanceCandidate.base64,
+        mimeType: portraitEnhanceCandidate.mimeType,
+      });
+
+      optimizedEnhanced = {
+        ...portraitEnhanceCandidate,
+        uri: buildDataUri(prepared.base64, prepared.mimeType),
+        base64: prepared.base64,
+        previewBase64: prepared.previewBase64,
+        mimeType: prepared.mimeType,
+        width: prepared.width,
+        height: prepared.height,
+        fileSizeBytes: prepared.fileSizeBytes,
+      };
+
       const saved = await apiClient.saveInstaMeUploadedImage({
         image: {
           name: portraitEnhanceCandidate.name || `${photo?.name || "Portrait"} Enhanced`,
-          mimeType: portraitEnhanceCandidate.mimeType,
-          base64: portraitEnhanceCandidate.base64,
-          previewBase64: portraitEnhanceCandidate.previewBase64 || portraitEnhanceCandidate.base64,
-          width: portraitEnhanceCandidate.width || 1024,
-          height: portraitEnhanceCandidate.height || 1024,
-          fileSizeBytes: portraitEnhanceCandidate.fileSizeBytes || Math.ceil((portraitEnhanceCandidate.base64.length * 3) / 4),
+          kind: "enhanced",
+          mimeType: optimizedEnhanced.mimeType,
+          base64: optimizedEnhanced.base64,
+          previewBase64: optimizedEnhanced.previewBase64 || optimizedEnhanced.base64,
+          width: optimizedEnhanced.width || 1024,
+          height: optimizedEnhanced.height || 1024,
+          fileSizeBytes:
+            optimizedEnhanced.fileSizeBytes || Math.ceil((optimizedEnhanced.base64.length * 3) / 4),
         },
       });
       savedImageId = saved.image?.id || "";
@@ -602,14 +623,14 @@ export default function InstaMeScreen() {
     }
 
     setPhoto({
-      ...portraitEnhanceCandidate,
-      sourceImageId: savedImageId || portraitEnhanceCandidate.sourceImageId,
+      ...optimizedEnhanced,
+      sourceImageId: savedImageId || optimizedEnhanced.sourceImageId,
     });
     setPortraitEnhanceCandidate(null);
     setUsingEnhancedPortrait(true);
     await Haptics.selectionAsync();
     if (savedImageId) {
-      Alert.alert("Saved", "Your enhanced portrait was saved to Uploaded Images for later use.");
+      Alert.alert("Saved", "Your enhanced portrait was saved to Enhanced Portraits for later use.");
     }
   }, [photo?.name, portraitEnhanceCandidate]);
 
@@ -823,6 +844,19 @@ export default function InstaMeScreen() {
             </Pressable>
           </View>
 
+          <View style={styles.uploadActionRow}>
+            <Pressable
+              onPress={() => router.push("/enhanced-portraits")}
+              style={({ pressed }) => [
+                styles.secondaryActionButton,
+                pressed && { opacity: 0.88 },
+              ]}
+            >
+              <Ionicons name="sparkles-outline" size={16} color="#FFE1EA" />
+              <Text style={styles.secondaryActionButtonText}>Enhanced Portraits</Text>
+            </Pressable>
+          </View>
+
           <Pressable
             onPress={handleEnhancePortrait}
             disabled={!photo || portraitEnhanceLoading}
@@ -856,7 +890,7 @@ export default function InstaMeScreen() {
             <View style={styles.enhancePreviewCard}>
               <Text style={styles.enhancePreviewTitle}>Enhanced portrait preview</Text>
               <Text style={styles.enhancePreviewSubtitle}>
-                If you like this improved version, keep it as your new base image and save it to Uploaded Images.
+                If you like this improved version, keep it as your new base image and save it to Enhanced Portraits.
               </Text>
               <Image
                 source={{ uri: portraitEnhanceCandidate.uri }}

@@ -16,6 +16,7 @@ import { z } from "zod";
 export type InstaMeUploadedImageRecord = {
   id: string;
   name: string;
+  kind?: "uploaded" | "enhanced";
   mimeType: string;
   base64: string;
   previewBase64: string;

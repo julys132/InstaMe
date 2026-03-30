@@ -16,6 +16,7 @@ export const STORAGE_KEYS = {
 export type InstaMeUploadedImage = {
   id: string;
   name: string;
+  kind?: "uploaded" | "enhanced";
   mimeType: string;
   width: number;
   height: number;
@@ -516,10 +517,10 @@ class ApiClient {
     }>("/instame/pricing", {}, true);
   }
 
-  async getInstaMeUploadedImages() {
+  async getInstaMeUploadedImages(kind?: "uploaded" | "enhanced") {
     return this.request<{
       images: InstaMeUploadedImage[];
-    }>("/instame/uploaded-images", {}, true);
+    }>(`/instame/uploaded-images${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`, {}, true);
   }
 
   async getInstaMeUploadedImage(imageId: string) {
@@ -531,6 +532,7 @@ class ApiClient {
   async saveInstaMeUploadedImage(payload: {
     image: {
       name?: string;
+      kind?: "uploaded" | "enhanced";
       mimeType?: string;
       base64: string;
       previewBase64: string;

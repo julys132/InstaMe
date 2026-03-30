@@ -1176,7 +1176,9 @@ var MAX_IMAGE_COUNT_BY_MODE = {
   multi_item: 3
 };
 var MAX_IMAGE_BASE64_LENGTH = 25e5;
-var MAX_INSTAME_LIBRARY_IMAGES = 10;
+var MAX_INSTAME_UPLOADED_IMAGES = 10;
+var MAX_INSTAME_ENHANCED_IMAGES = 10;
+var MAX_INSTAME_LIBRARY_IMAGES_TOTAL = MAX_INSTAME_UPLOADED_IMAGES + MAX_INSTAME_ENHANCED_IMAGES;
 var MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1e6;
 var MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 var MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 22e4;
@@ -1612,6 +1614,7 @@ function normalizeStoredInstaMeUploadedImages(input) {
     const base64 = normalizeStringValue(candidate.base64);
     const previewBase64 = normalizeStringValue(candidate.previewBase64);
     const name = normalizeStringValue(candidate.name) || "Portrait";
+    const kind = candidate.kind === "enhanced" ? "enhanced" : "uploaded";
     const width = Number(candidate.width);
     const height = Number(candidate.height);
     const fileSizeBytes = Number(candidate.fileSizeBytes);
@@ -1622,6 +1625,7 @@ function normalizeStoredInstaMeUploadedImages(input) {
     return {
       id,
       name,
+      kind,
       mimeType,
       base64: stripDataUriPrefix(base64),
       previewBase64: stripDataUriPrefix(previewBase64),
@@ -1630,12 +1634,13 @@ function normalizeStoredInstaMeUploadedImages(input) {
       fileSizeBytes: Number.isFinite(fileSizeBytes) && fileSizeBytes > 0 ? Math.round(fileSizeBytes) : estimateBase64Bytes(base64),
       createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
     };
-  }).filter((entry) => Boolean(entry)).slice(0, MAX_INSTAME_LIBRARY_IMAGES);
+  }).filter((entry) => Boolean(entry)).slice(0, MAX_INSTAME_LIBRARY_IMAGES_TOTAL);
 }
 function toInstaMeUploadedImageSummary(image) {
   return {
     id: image.id,
     name: image.name,
+    kind: image.kind || "uploaded",
     mimeType: image.mimeType,
     width: image.width,
     height: image.height,
@@ -2016,8 +2021,40 @@ function resolvePromptOnlyFallbackModel(mode) {
     displayName: "Google Flash Image 3.1 Preview"
   };
 }
+function hasOpenAiImageConfig() {
+  return Boolean(process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
+}
+function hasTogetherImageConfig() {
+  return Boolean(process.env.TOGETHER_API_KEY);
+}
+function hasReveImageConfig() {
+  return Boolean(process.env.REVE_API_KEY);
+}
+function resolveAvailablePromptOnlyModel(requestedModel, mode) {
+  if (!requestedModel) {
+    return hasTogetherImageConfig() ? resolvePromptOnlyFallbackModel(mode) : null;
+  }
+  if (requestedModel.provider === "openai") {
+    if (hasOpenAiImageConfig()) return requestedModel;
+    if (hasTogetherImageConfig()) return resolvePromptOnlyFallbackModel(mode);
+    return requestedModel;
+  }
+  if (requestedModel.provider === "reve") {
+    if (hasReveImageConfig()) return requestedModel;
+    if (hasTogetherImageConfig()) return resolvePromptOnlyFallbackModel(mode);
+    return requestedModel;
+  }
+  if (requestedModel.provider === "together") {
+    if (hasTogetherImageConfig()) return requestedModel;
+    return requestedModel;
+  }
+  return requestedModel;
+}
 async function generatePromptOnlyPresetImage(options) {
-  const selectedModel = chooseRequestedModel(options.variant, options.generationMode) || resolvePromptOnlyFallbackModel(options.generationMode);
+  const selectedModel = resolveAvailablePromptOnlyModel(
+    chooseRequestedModel(options.variant, options.generationMode),
+    options.generationMode
+  ) || resolvePromptOnlyFallbackModel(options.generationMode);
   const prompt = buildPromptOnlyPresetTransformPrompt({
     presetLabel: options.preset.label,
     variantPrompt: options.variant.prompt,
@@ -3411,10 +3448,12 @@ async function registerRoutes(app2) {
     });
   });
   app2.get("/api/instame/uploaded-images", authMiddleware, async (req, res) => {
+    const requestedKind = normalizeStringValue(req.query.kind);
+    const imageKind = requestedKind === "enhanced" ? "enhanced" : requestedKind === "uploaded" ? "uploaded" : "";
     const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
     const images = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
     return res.json({
-      images: images.slice().sort((left, right) => right.createdAt.localeCompare(left.createdAt)).map((image) => toInstaMeUploadedImageSummary(image))
+      images: images.filter((image) => !imageKind || (image.kind || "uploaded") === imageKind).slice().sort((left, right) => right.createdAt.localeCompare(left.createdAt)).map((image) => toInstaMeUploadedImageSummary(image))
     });
   });
   app2.get("/api/instame/uploaded-images/:imageId", authMiddleware, async (req, res) => {
@@ -3436,6 +3475,7 @@ async function registerRoutes(app2) {
     const body = req.body || {};
     const input = body.image && typeof body.image === "object" ? body.image : {};
     const name = normalizeStringValue(input.name) || "Portrait";
+    const kind = normalizeStringValue(input.kind) === "enhanced" ? "enhanced" : "uploaded";
     const mimeType = typeof input.mimeType === "string" && String(input.mimeType).startsWith("image/") ? String(input.mimeType) : "image/jpeg";
     const base64 = stripDataUriPrefix(normalizeStringValue(input.base64));
     const previewBase64 = stripDataUriPrefix(
@@ -3462,14 +3502,17 @@ async function registerRoutes(app2) {
     }
     const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
     const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
-    if (existingImages.length >= MAX_INSTAME_LIBRARY_IMAGES) {
+    const existingKindCount = existingImages.filter((entry) => (entry.kind || "uploaded") === kind).length;
+    const kindLimit = kind === "enhanced" ? MAX_INSTAME_ENHANCED_IMAGES : MAX_INSTAME_UPLOADED_IMAGES;
+    if (existingKindCount >= kindLimit) {
       return res.status(409).json({
-        error: `You can save up to ${MAX_INSTAME_LIBRARY_IMAGES} uploaded images.`
+        error: `You can save up to ${kindLimit} ${kind === "enhanced" ? "enhanced portraits" : "uploaded images"}.`
       });
     }
     const savedImage = {
       id: (0, import_node_crypto2.randomUUID)(),
       name,
+      kind,
       mimeType,
       base64,
       previewBase64,

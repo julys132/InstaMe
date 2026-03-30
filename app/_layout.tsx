@@ -28,6 +28,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="uploaded-images" options={{ headerShown: false }} />
+      <Stack.Screen name="enhanced-portraits" options={{ headerShown: false }} />
       <Stack.Screen name="payment-success" options={{ headerShown: false }} />
     </Stack>
   );
