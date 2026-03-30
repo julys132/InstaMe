@@ -3422,7 +3422,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     res.setHeader("Content-Type", asset.mimeType);
-    return res.sendFile(asset.absolutePath);
+    res.setHeader("Cache-Control", "private, max-age=1800");
+    return res.send(asset.buffer);
   });
 
   app.get("/api/instame/style-presets", authMiddleware, async (req, res) => {

@@ -27,8 +27,8 @@ var import_express = __toESM(require("express"));
 
 // server/routes.ts
 var import_node_http = require("node:http");
-var fs3 = __toESM(require("node:fs"));
-var path3 = __toESM(require("node:path"));
+var fs2 = __toESM(require("node:fs"));
+var path2 = __toESM(require("node:path"));
 var import_node_crypto2 = require("node:crypto");
 var import_drizzle_orm3 = require("drizzle-orm");
 
@@ -426,11 +426,11 @@ function getStripeSecretKey() {
 }
 async function stripeRequest({
   method,
-  path: path5,
+  path: path4,
   body
 }) {
   const secretKey = getStripeSecretKey();
-  const response = await fetch(`${STRIPE_API_BASE}${path5}`, {
+  const response = await fetch(`${STRIPE_API_BASE}${path4}`, {
     method,
     headers: {
       Authorization: `Bearer ${secretKey}`,
@@ -670,10 +670,8 @@ function chooseRequestedModel(variant, mode) {
 }
 
 // server/lib/instame-runtime-assets.ts
-var fs2 = __toESM(require("node:fs"));
-var path2 = __toESM(require("node:path"));
+var import_node_buffer = require("node:buffer");
 var import_node_crypto = require("node:crypto");
-var RUNTIME_ASSETS_ROOT = path2.resolve(process.cwd(), ".runtime", "instame-assets");
 var runtimeAssetMap = /* @__PURE__ */ new Map();
 var MAX_RUNTIME_ASSET_AGE_MS = 1e3 * 60 * 30;
 function normalizeMimeType(input) {
@@ -682,41 +680,22 @@ function normalizeMimeType(input) {
   }
   return "image/png";
 }
-function extensionFromMimeType(mimeType) {
-  if (mimeType === "image/jpeg") return "jpg";
-  if (mimeType === "image/webp") return "webp";
-  return "png";
-}
-function ensureRuntimeAssetsRoot() {
-  if (!fs2.existsSync(RUNTIME_ASSETS_ROOT)) {
-    fs2.mkdirSync(RUNTIME_ASSETS_ROOT, { recursive: true });
-  }
-}
 function cleanupRuntimeAssets(now = Date.now()) {
   for (const [token, record] of runtimeAssetMap.entries()) {
     if (now - record.createdAt <= MAX_RUNTIME_ASSET_AGE_MS) continue;
     runtimeAssetMap.delete(token);
-    try {
-      if (fs2.existsSync(record.absolutePath)) {
-        fs2.unlinkSync(record.absolutePath);
-      }
-    } catch {
-    }
   }
 }
 function createRuntimeAsset(options) {
   cleanupRuntimeAssets();
-  ensureRuntimeAssetsRoot();
   const mimeType = normalizeMimeType(options.mimeType);
   const token = (0, import_node_crypto.randomUUID)();
-  const extension = extensionFromMimeType(mimeType);
-  const absolutePath = path2.join(RUNTIME_ASSETS_ROOT, `${token}.${extension}`);
-  fs2.writeFileSync(absolutePath, Buffer.from(options.base64, "base64"));
+  const buffer = import_node_buffer.Buffer.from(options.base64, "base64");
   const record = {
     token,
-    absolutePath,
     mimeType,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    buffer
   };
   runtimeAssetMap.set(token, record);
   return record;
@@ -727,7 +706,7 @@ function getRuntimeAsset(token) {
 }
 
 // server/lib/instame-image.ts
-var import_node_buffer = require("node:buffer");
+var import_node_buffer2 = require("node:buffer");
 var import_openai = __toESM(require("openai"));
 function normalizeMimeType2(input) {
   if (typeof input === "string" && input.startsWith("image/")) {
@@ -835,7 +814,7 @@ async function toOpenAiUpload(input, fallbackName) {
   const mimeType = normalizeMimeType2(input.mimeType);
   const extension = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
   const filename = input.filename || `${fallbackName}.${extension}`;
-  return (0, import_openai.toFile)(import_node_buffer.Buffer.from(input.base64, "base64"), filename, { type: mimeType });
+  return (0, import_openai.toFile)(import_node_buffer2.Buffer.from(input.base64, "base64"), filename, { type: mimeType });
 }
 async function generateOpenAiImage(options) {
   const client = getOpenAiClient();
@@ -1184,7 +1163,7 @@ var DEFAULT_TOGETHER_PRO_IMAGE_MODEL = process.env.STYLE_HIGH_RES_TOGETHER_MODEL
 var STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
 var INSTAME_PORTRAIT_ENHANCE_MODEL = process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || DEFAULT_TOGETHER_FLASH_IMAGE_MODEL;
 var INSTAME_PORTRAIT_ENHANCE_SIZE = (process.env.INSTAME_PORTRAIT_ENHANCE_SIZE || INSTAME_PORTRAIT_ENHANCE_TIER.output).trim() || "1024 x 1024";
-var INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path3.resolve(
+var INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path2.resolve(
   process.cwd(),
   "assets",
   "instame-style-presets",
@@ -1248,7 +1227,7 @@ var GOOGLE_IAP_PRODUCT_CREDITS = {
   ...SHARED_IAP_PRODUCT_CREDITS,
   ...parseProductCreditsMap(process.env.GOOGLE_IAP_PRODUCT_CREDITS)
 };
-var STYLE_REFERENCE_LIBRARY_PATH = path3.resolve(
+var STYLE_REFERENCE_LIBRARY_PATH = path2.resolve(
   process.cwd(),
   "assets",
   "style-references",
@@ -1275,11 +1254,11 @@ function loadStyleReferenceLibrary() {
   if (styleReferenceLibraryCache) {
     return styleReferenceLibraryCache;
   }
-  if (!fs3.existsSync(STYLE_REFERENCE_LIBRARY_PATH)) {
+  if (!fs2.existsSync(STYLE_REFERENCE_LIBRARY_PATH)) {
     return null;
   }
   try {
-    const raw = fs3.readFileSync(STYLE_REFERENCE_LIBRARY_PATH, "utf-8");
+    const raw = fs2.readFileSync(STYLE_REFERENCE_LIBRARY_PATH, "utf-8");
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed.references) || parsed.references.length === 0) {
       return null;
@@ -1297,7 +1276,7 @@ function loadStyleReferenceLibrary() {
   }
 }
 function getMimeTypeFromFilename(filePath) {
-  const extension = path3.extname(filePath).toLowerCase();
+  const extension = path2.extname(filePath).toLowerCase();
   if (extension === ".png") return "image/png";
   if (extension === ".webp") return "image/webp";
   return "image/jpeg";
@@ -1305,12 +1284,12 @@ function getMimeTypeFromFilename(filePath) {
 function loadStyleReferenceImage(reference) {
   const cached = styleReferenceImageCache.get(reference.id);
   if (cached) return cached;
-  const absolutePath = path3.resolve(process.cwd(), reference.file);
-  if (!fs3.existsSync(absolutePath)) {
+  const absolutePath = path2.resolve(process.cwd(), reference.file);
+  if (!fs2.existsSync(absolutePath)) {
     return null;
   }
   try {
-    const base64 = fs3.readFileSync(absolutePath).toString("base64");
+    const base64 = fs2.readFileSync(absolutePath).toString("base64");
     if (!base64) return null;
     const image = {
       base64,
@@ -1892,7 +1871,7 @@ function getPortraitEnhancePromptTemplate() {
     return cachedPortraitEnhancePrompt;
   }
   try {
-    cachedPortraitEnhancePrompt = fs3.readFileSync(INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH, "utf8").replace(/\u00C2/g, "").trim();
+    cachedPortraitEnhancePrompt = fs2.readFileSync(INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH, "utf8").replace(/\u00C2/g, "").trim();
   } catch (error) {
     throw new Error(
       `Portrait enhance prompt file is missing at ${INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH}: ${toErrorMessage(error, "Could not read prompt file")}`
@@ -3408,7 +3387,8 @@ async function registerRoutes(app2) {
       return res.status(404).json({ error: "Runtime image not found." });
     }
     res.setHeader("Content-Type", asset.mimeType);
-    return res.sendFile(asset.absolutePath);
+    res.setHeader("Cache-Control", "private, max-age=1800");
+    return res.send(asset.buffer);
   });
   app2.get("/api/instame/style-presets", authMiddleware, async (req, res) => {
     const catalogPresets = getInstaMeStylePresetsFromCatalog();
@@ -3977,8 +3957,8 @@ async function registerRoutes(app2) {
 }
 
 // server/index.ts
-var fs4 = __toESM(require("fs"));
-var path4 = __toESM(require("path"));
+var fs3 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
 var app = (0, import_express.default)();
 var log = console.log;
 function addOriginCandidate(origins, value) {
@@ -4048,7 +4028,7 @@ function setupBodyParsing(app2) {
 function setupRequestLogging(app2) {
   app2.use((req, res, next) => {
     const start = Date.now();
-    const path5 = req.path;
+    const path4 = req.path;
     let capturedJsonResponse = void 0;
     const originalResJson = res.json;
     res.json = function(bodyJson, ...args) {
@@ -4056,9 +4036,9 @@ function setupRequestLogging(app2) {
       return originalResJson.apply(res, [bodyJson, ...args]);
     };
     res.on("finish", () => {
-      if (!path5.startsWith("/api")) return;
+      if (!path4.startsWith("/api")) return;
       const duration = Date.now() - start;
-      let logLine = `${req.method} ${path5} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${path4} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
@@ -4072,8 +4052,8 @@ function setupRequestLogging(app2) {
 }
 function getAppName() {
   try {
-    const appJsonPath = path4.resolve(process.cwd(), "app.json");
-    const appJsonContent = fs4.readFileSync(appJsonPath, "utf-8");
+    const appJsonPath = path3.resolve(process.cwd(), "app.json");
+    const appJsonContent = fs3.readFileSync(appJsonPath, "utf-8");
     const appJson = JSON.parse(appJsonContent);
     return appJson.expo?.name || "App Landing Page";
   } catch {
@@ -4081,19 +4061,19 @@ function getAppName() {
   }
 }
 function serveExpoManifest(platform, res) {
-  const manifestPath = path4.resolve(
+  const manifestPath = path3.resolve(
     process.cwd(),
     "static-build",
     platform,
     "manifest.json"
   );
-  if (!fs4.existsSync(manifestPath)) {
+  if (!fs3.existsSync(manifestPath)) {
     return res.status(404).json({ error: `Manifest not found for platform: ${platform}` });
   }
   res.setHeader("expo-protocol-version", "1");
   res.setHeader("expo-sfv-version", "0");
   res.setHeader("content-type", "application/json");
-  const manifest = fs4.readFileSync(manifestPath, "utf-8");
+  const manifest = fs3.readFileSync(manifestPath, "utf-8");
   res.send(manifest);
 }
 function serveLandingPage({
@@ -4115,12 +4095,12 @@ function serveLandingPage({
   res.status(200).send(html);
 }
 function configureExpoAndLanding(app2) {
-  const webBuildPath = path4.resolve(process.cwd(), "web-build");
-  const webIndexPath = path4.join(webBuildPath, "index.html");
-  const hasWebBuild = fs4.existsSync(webIndexPath);
+  const webBuildPath = path3.resolve(process.cwd(), "web-build");
+  const webIndexPath = path3.join(webBuildPath, "index.html");
+  const hasWebBuild = fs3.existsSync(webIndexPath);
   if (hasWebBuild) {
     app2.use(import_express.default.static(webBuildPath));
-    app2.use("/assets", import_express.default.static(path4.resolve(process.cwd(), "assets")));
+    app2.use("/assets", import_express.default.static(path3.resolve(process.cwd(), "assets")));
     app2.get(/.*/, (req, res, next) => {
       if (req.path.startsWith("/api")) return next();
       if (req.method !== "GET") return next();
@@ -4129,13 +4109,13 @@ function configureExpoAndLanding(app2) {
     log("Serving Expo web build from /web-build");
     return;
   }
-  const templatePath = path4.resolve(
+  const templatePath = path3.resolve(
     process.cwd(),
     "server",
     "templates",
     "landing-page.html"
   );
-  const landingPageTemplate = fs4.readFileSync(templatePath, "utf-8");
+  const landingPageTemplate = fs3.readFileSync(templatePath, "utf-8");
   const appName = getAppName();
   log("Serving static Expo files with dynamic manifest routing");
   app2.use((req, res, next) => {
@@ -4159,8 +4139,8 @@ function configureExpoAndLanding(app2) {
     }
     next();
   });
-  app2.use("/assets", import_express.default.static(path4.resolve(process.cwd(), "assets")));
-  app2.use(import_express.default.static(path4.resolve(process.cwd(), "static-build")));
+  app2.use("/assets", import_express.default.static(path3.resolve(process.cwd(), "assets")));
+  app2.use(import_express.default.static(path3.resolve(process.cwd(), "static-build")));
   log("Expo routing: Checking expo-platform header on / and /manifest");
 }
 function setupErrorHandler(app2) {
