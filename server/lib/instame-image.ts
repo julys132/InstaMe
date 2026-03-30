@@ -220,15 +220,19 @@ export async function generateTogetherImage(options: {
 }): Promise<string> {
   const apiKey = getTogetherApiKey();
   const baseUrl = process.env.TOGETHER_BASE_URL || "https://api.together.xyz/v1";
+  const resolvedModel = resolveTogetherModelAlias(options.model);
   const payload: Record<string, unknown> = {
-    model: resolveTogetherModelAlias(options.model),
+    model: resolvedModel,
     prompt: options.prompt,
     width: options.width,
     height: options.height,
-    n: 1,
     response_format: "b64_json",
     output_format: "png",
   };
+
+  if (!resolvedModel.toLowerCase().startsWith("google/")) {
+    payload.n = 1;
+  }
 
   if (Array.isArray(options.referenceImages) && options.referenceImages.length > 0) {
     payload.reference_images = options.referenceImages;
