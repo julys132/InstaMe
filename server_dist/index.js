@@ -627,11 +627,11 @@ function getCatalogRelativeAssetParts(relativePath) {
     filename
   };
 }
-function choosePromptVariant(preset, usageCount) {
+function choosePromptVariant(preset, _usageCount) {
   const variants = preset?.promptVariants || [];
   if (variants.length === 0) return null;
-  const index = usageCount <= 0 ? 0 : usageCount % variants.length;
-  return variants[index] || variants[0] || null;
+  const preferredVariant = variants.find((variant) => variant.requestedModels.length > 0);
+  return preferredVariant || variants[0] || null;
 }
 function chooseRequestedModel(variant, mode) {
   const models = variant?.requestedModels || [];
@@ -640,9 +640,10 @@ function chooseRequestedModel(variant, mode) {
   const rankModel = (model) => {
     const normalized = `${model.provider}:${model.model}:${model.displayName}`.toLowerCase();
     if (mode === "high_res") {
+      if (normalized.includes("chatgpt-image-latest-high-fidelity")) return 110;
       if (normalized.includes("flux.2-max")) return 100;
       if (normalized.includes("gemini-3-pro-image")) return 95;
-      if (normalized.includes("gpt-image-1.5")) return 90;
+      if (normalized.includes("gpt-image-1.5") || normalized.includes("gpt-image-1")) return 90;
       if (normalized.includes("qwen-image-2.0-pro")) return 88;
       if (normalized.includes("qwen-image-2.0")) return 86;
       if (normalized.includes("qwen-image")) return 85;
@@ -650,17 +651,16 @@ function chooseRequestedModel(variant, mode) {
       if (normalized.includes("reve-v1.1")) return 75;
       if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 72;
       if (normalized.includes("flash-image-2.5")) return 70;
-      if (normalized.includes("gpt-image-1")) return 60;
       return 50;
     }
+    if (normalized.includes("chatgpt-image-latest-high-fidelity")) return 110;
     if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 100;
     if (normalized.includes("flash-image-2.5")) return 98;
     if (normalized.includes("qwen-image-2.0-pro")) return 97;
     if (normalized.includes("qwen-image-2.0")) return 96;
     if (normalized.includes("qwen-image")) return 95;
     if (normalized.includes("flux.2-pro")) return 90;
-    if (normalized.includes("gpt-image-1")) return 85;
-    if (normalized.includes("gpt-image-1.5")) return 80;
+    if (normalized.includes("gpt-image-1.5") || normalized.includes("gpt-image-1")) return 85;
     if (normalized.includes("reve-v1.1")) return 75;
     if (normalized.includes("gemini-3-pro-image")) return 70;
     if (normalized.includes("flux.2-max")) return 65;
@@ -723,6 +723,15 @@ function getOpenAiClient() {
     apiKey,
     baseURL: process.env.OPENAI_BASE_URL || process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || void 0
   });
+}
+function resolveOpenAiImageModelAlias(model) {
+  const normalized = model.trim().toLowerCase();
+  const latestHighFidelityWithVersion = "chatgpt-image-latest-high-fidelity (20251216)";
+  if (!normalized) return model;
+  if (normalized === "gpt-image-1.5" || normalized === "gpt-image-1" || normalized === "chatgpt-image-latest-high-fidelity" || normalized === "chatgpt image latest high fidelity" || normalized === latestHighFidelityWithVersion) {
+    return "chatgpt-image-latest-high-fidelity";
+  }
+  return model;
 }
 function getTogetherApiKey() {
   const apiKey = process.env.TOGETHER_API_KEY;
@@ -818,6 +827,7 @@ async function toOpenAiUpload(input, fallbackName) {
 }
 async function generateOpenAiImage(options) {
   const client = getOpenAiClient();
+  const resolvedModel = resolveOpenAiImageModelAlias(options.model);
   const size = options.size || "1024x1024";
   const quality = options.quality || "auto";
   const inputImages = Array.isArray(options.images) ? options.images : [];
@@ -826,7 +836,7 @@ async function generateOpenAiImage(options) {
       inputImages.map((image, index) => toOpenAiUpload(image, `instame-edit-${index + 1}`))
     );
     const response2 = await client.images.edit({
-      model: options.model,
+      model: resolvedModel,
       prompt: options.prompt,
       image: files,
       size,
@@ -839,7 +849,7 @@ async function generateOpenAiImage(options) {
     return base642;
   }
   const response = await client.images.generate({
-    model: options.model,
+    model: resolvedModel,
     prompt: options.prompt,
     size,
     quality
@@ -2102,7 +2112,7 @@ async function generatePromptOnlyPresetImage(options) {
       provider: "Reve"
     };
   }
-  const openAiModel = selectedModel?.model || "gpt-image-1.5";
+  const openAiModel = selectedModel?.model || "chatgpt-image-latest-high-fidelity";
   const imageBase64 = await generateOpenAiImage({
     model: openAiModel,
     prompt,

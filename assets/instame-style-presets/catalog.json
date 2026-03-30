@@ -73,8 +73,8 @@
           "requestedModels": [
             {
               "provider": "openai",
-              "model": "gpt-image-1.5",
-              "displayName": "GPT Image 1.5"
+              "model": "chatgpt-image-latest-high-fidelity",
+              "displayName": "ChatGPT Image Latest High Fidelity (20251216)"
             }
           ]
         }
@@ -178,8 +178,8 @@
             },
             {
               "provider": "openai",
-              "model": "gpt-image-1.5",
-              "displayName": "GPT Image 1.5"
+              "model": "chatgpt-image-latest-high-fidelity",
+              "displayName": "ChatGPT Image Latest High Fidelity (20251216)"
             }
           ]
         }
@@ -270,8 +270,8 @@
           "requestedModels": [
             {
               "provider": "openai",
-              "model": "gpt-image-1.5",
-              "displayName": "GPT Image 1.5"
+              "model": "chatgpt-image-latest-high-fidelity",
+              "displayName": "ChatGPT Image Latest High Fidelity (20251216)"
             },
             {
               "provider": "together",
@@ -412,8 +412,8 @@
           "requestedModels": [
             {
               "provider": "openai",
-              "model": "gpt-image-1.5",
-              "displayName": "GPT Image 1.5"
+              "model": "chatgpt-image-latest-high-fidelity",
+              "displayName": "ChatGPT Image Latest High Fidelity (20251216)"
             }
           ]
         }

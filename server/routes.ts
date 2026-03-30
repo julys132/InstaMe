@@ -1707,7 +1707,7 @@ async function generatePromptOnlyPresetImage(options: {
     };
   }
 
-  const openAiModel = selectedModel?.model || "gpt-image-1.5";
+  const openAiModel = selectedModel?.model || "chatgpt-image-latest-high-fidelity";
   const imageBase64 = await generateOpenAiImage({
     model: openAiModel,
     prompt,

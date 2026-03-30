@@ -171,13 +171,13 @@ export function getCatalogRelativeAssetParts(relativePath: string): { styleId: s
 
 export function choosePromptVariant(
   preset: InstaMeStylePreset | undefined,
-  usageCount: number,
+  _usageCount: number,
 ): InstaMePromptVariant | null {
   const variants = preset?.promptVariants || [];
   if (variants.length === 0) return null;
 
-  const index = usageCount <= 0 ? 0 : usageCount % variants.length;
-  return variants[index] || variants[0] || null;
+  const preferredVariant = variants.find((variant) => variant.requestedModels.length > 0);
+  return preferredVariant || variants[0] || null;
 }
 
 export function chooseRequestedModel(
@@ -192,9 +192,10 @@ export function chooseRequestedModel(
     const normalized = `${model.provider}:${model.model}:${model.displayName}`.toLowerCase();
 
     if (mode === "high_res") {
+      if (normalized.includes("chatgpt-image-latest-high-fidelity")) return 110;
       if (normalized.includes("flux.2-max")) return 100;
       if (normalized.includes("gemini-3-pro-image")) return 95;
-      if (normalized.includes("gpt-image-1.5")) return 90;
+      if (normalized.includes("gpt-image-1.5") || normalized.includes("gpt-image-1")) return 90;
       if (normalized.includes("qwen-image-2.0-pro")) return 88;
       if (normalized.includes("qwen-image-2.0")) return 86;
       if (normalized.includes("qwen-image")) return 85;
@@ -202,18 +203,17 @@ export function chooseRequestedModel(
       if (normalized.includes("reve-v1.1")) return 75;
       if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 72;
       if (normalized.includes("flash-image-2.5")) return 70;
-      if (normalized.includes("gpt-image-1")) return 60;
       return 50;
     }
 
+  if (normalized.includes("chatgpt-image-latest-high-fidelity")) return 110;
     if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 100;
     if (normalized.includes("flash-image-2.5")) return 98;
     if (normalized.includes("qwen-image-2.0-pro")) return 97;
     if (normalized.includes("qwen-image-2.0")) return 96;
     if (normalized.includes("qwen-image")) return 95;
     if (normalized.includes("flux.2-pro")) return 90;
-    if (normalized.includes("gpt-image-1")) return 85;
-    if (normalized.includes("gpt-image-1.5")) return 80;
+    if (normalized.includes("gpt-image-1.5") || normalized.includes("gpt-image-1")) return 85;
     if (normalized.includes("reve-v1.1")) return 75;
     if (normalized.includes("gemini-3-pro-image")) return 70;
     if (normalized.includes("flux.2-max")) return 65;

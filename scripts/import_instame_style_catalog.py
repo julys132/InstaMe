@@ -47,24 +47,24 @@ MODEL_RULES: list[tuple[re.Pattern[str], dict[str, str]]] = [
         re.compile(r"chat\s*gpt\s*1\.5\s*image\s*model|gpt(?:-|\s*)image\s*1\.5", re.IGNORECASE),
         {
             "provider": "openai",
-            "model": "gpt-image-1.5",
-            "displayName": "GPT Image 1.5",
+            "model": "chatgpt-image-latest-high-fidelity",
+            "displayName": "ChatGPT Image Latest High Fidelity (20251216)",
         },
     ),
     (
         re.compile(r"gpt(?:-|\s*)image\s*1(?!\.\d)|chat\s*gpt\s*image\s*model", re.IGNORECASE),
         {
             "provider": "openai",
-            "model": "gpt-image-1",
-            "displayName": "GPT Image 1",
+            "model": "chatgpt-image-latest-high-fidelity",
+            "displayName": "ChatGPT Image Latest High Fidelity (20251216)",
         },
     ),
     (
         re.compile(r"chatgpt-image-latest-high-fidelity", re.IGNORECASE),
         {
             "provider": "openai",
-            "model": "gpt-image-1.5",
-            "displayName": "GPT Image 1.5",
+            "model": "chatgpt-image-latest-high-fidelity",
+            "displayName": "ChatGPT Image Latest High Fidelity (20251216)",
         },
     ),
     (

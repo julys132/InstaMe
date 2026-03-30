@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
   Modal,
   Platform,
   Pressable,
@@ -276,6 +277,7 @@ function getStyleCardTheme(styleId: string): StyleCardTheme {
 export default function InstaMeScreen() {
   const params = useLocalSearchParams<{ uploadedImageId?: string | string[]; uploadedImageNonce?: string | string[] }>();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const { credits, refreshCredits } = useCredits();
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
@@ -354,6 +356,7 @@ export default function InstaMeScreen() {
     () => INTENSITY_OPTIONS.find((option) => option.value === intensity) || null,
     [intensity],
   );
+  const useStackedEditTierCards = windowWidth < 430;
 
   const uploadedImageIdParam = Array.isArray(params.uploadedImageId)
     ? params.uploadedImageId[0]
@@ -1373,17 +1376,18 @@ export default function InstaMeScreen() {
             </View>
             <View style={styles.postGenerationSection}>
               <Text style={styles.pricingSectionTitle}>Edit after generation</Text>
-              <View style={styles.pricingCardsRow}>
+              <View style={[styles.pricingCardsRow, useStackedEditTierCards && styles.pricingCardsStacked]}>
                 {editTiers.map((tier) => (
                   <Pressable
                     key={tier.id}
                     onPress={() => setSelectedEditTierId(tier.id)}
                     style={[
                       styles.pricingCard,
+                      useStackedEditTierCards && styles.pricingCardStacked,
                       selectedEditTier?.id === tier.id && styles.pricingCardActive,
                     ]}
                   >
-                    <View style={styles.pricingTopRow}>
+                    <View style={[styles.pricingTopRow, useStackedEditTierCards && styles.pricingTopRowStacked]}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.pricingLabel}>{tier.label}</Text>
                         <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
@@ -1391,6 +1395,7 @@ export default function InstaMeScreen() {
                       <View
                         style={[
                           styles.pricingBadge,
+                          useStackedEditTierCards && styles.pricingBadgeStacked,
                           tier.availability === "live"
                             ? styles.pricingBadgeLive
                             : styles.pricingBadgeSoon,
@@ -2095,6 +2100,9 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
     gap: 10,
   },
+  pricingCardsStacked: {
+    flexDirection: "column",
+  },
   pricingCard: {
     flex: 1,
     borderRadius: 14,
@@ -2106,6 +2114,11 @@ const styles = StyleSheet.create({
     minHeight: 132,
     justifyContent: "space-between",
     gap: 12,
+  },
+  pricingCardStacked: {
+    flex: 0,
+    minHeight: 0,
+    width: "100%",
   },
   pricingCardActive: {
     borderColor: "rgba(255,79,125,0.62)",
@@ -2120,6 +2133,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
+  },
+  pricingTopRowStacked: {
+    flexWrap: "wrap",
   },
   pricingLabel: {
     color: "#FFF",
@@ -2138,6 +2154,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderWidth: 1,
+  },
+  pricingBadgeStacked: {
+    alignSelf: "flex-start",
   },
   pricingBadgeLive: {
     backgroundColor: "rgba(255,79,125,0.18)",

@@ -29,6 +29,24 @@ function getOpenAiClient(): OpenAI {
   });
 }
 
+function resolveOpenAiImageModelAlias(model: string): string {
+  const normalized = model.trim().toLowerCase();
+  const latestHighFidelityWithVersion = "chatgpt-image-latest-high-fidelity (20251216)";
+  if (!normalized) return model;
+
+  if (
+    normalized === "gpt-image-1.5" ||
+    normalized === "gpt-image-1" ||
+    normalized === "chatgpt-image-latest-high-fidelity" ||
+    normalized === "chatgpt image latest high fidelity" ||
+    normalized === latestHighFidelityWithVersion
+  ) {
+    return "chatgpt-image-latest-high-fidelity";
+  }
+
+  return model;
+}
+
 function getTogetherApiKey(): string {
   const apiKey = process.env.TOGETHER_API_KEY;
   if (!apiKey) {
@@ -171,6 +189,7 @@ export async function generateOpenAiImage(options: {
   quality?: "low" | "medium" | "high" | "auto";
 }): Promise<string> {
   const client = getOpenAiClient();
+  const resolvedModel = resolveOpenAiImageModelAlias(options.model);
   const size = options.size || "1024x1024";
   const quality = options.quality || "auto";
   const inputImages = Array.isArray(options.images) ? options.images : [];
@@ -181,7 +200,7 @@ export async function generateOpenAiImage(options: {
     );
 
     const response = await client.images.edit({
-      model: options.model,
+      model: resolvedModel,
       prompt: options.prompt,
       image: files as any,
       size,
@@ -196,7 +215,7 @@ export async function generateOpenAiImage(options: {
   }
 
   const response = await client.images.generate({
-    model: options.model,
+    model: resolvedModel,
     prompt: options.prompt,
     size,
     quality,
