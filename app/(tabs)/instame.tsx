@@ -278,6 +278,7 @@ export default function InstaMeScreen() {
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [intensity, setIntensity] = useState<OptionalTransformIntensity>(null);
+  const [showFineTunePanel, setShowFineTunePanel] = useState(false);
   const [stylePresets, setStylePresets] = useState<InstaMeStylePreset[]>(INSTAME_STYLE_PRESETS);
   const [generationTiers, setGenerationTiers] = useState<InstaMeGenerationTier[]>(INSTAME_GENERATION_TIERS);
   const [editTiers, setEditTiers] = useState<InstaMeEditTier[]>(INSTAME_EDIT_TIERS);
@@ -345,6 +346,11 @@ export default function InstaMeScreen() {
   const selectedEditTier = useMemo(
     () => editTiers.find((tier) => tier.id === selectedEditTierId) || editTiers[0],
     [editTiers, selectedEditTierId],
+  );
+
+  const selectedIntensityOption = useMemo(
+    () => INTENSITY_OPTIONS.find((option) => option.value === intensity) || null,
+    [intensity],
   );
 
   const uploadedImageIdParam = Array.isArray(params.uploadedImageId)
@@ -886,7 +892,7 @@ export default function InstaMeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>2. Choose a style</Text>
+          <Text style={styles.cardTitle}>2. Main Styles</Text>
           <View style={styles.styleCarouselWrap}>
             <ScrollView
               ref={styleListRef}
@@ -1014,11 +1020,140 @@ export default function InstaMeScreen() {
             Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
           </Text>
 
+          <View style={styles.fineTuneDropdownWrap}>
+            <Pressable
+              onPress={() => setShowFineTunePanel((prev) => !prev)}
+              style={[
+                styles.fineTuneDropdownTrigger,
+                showFineTunePanel && styles.fineTuneDropdownTriggerActive,
+              ]}
+            >
+              <View style={styles.fineTuneDropdownHeaderText}>
+                <Text style={styles.fineTuneDropdownTitle}>Fine tune (optional)</Text>
+                <Text style={styles.fineTuneDropdownSummary}>
+                  {selectedArtStyle
+                    ? "Art Styles take priority. You can still keep the background and add notes here."
+                    : selectedIntensityOption
+                      ? `${selectedIntensityOption.label}: ${selectedIntensityOption.subtitle}`
+                      : "No extra fine tune selected."}
+                </Text>
+              </View>
+              <Ionicons
+                name={showFineTunePanel ? "chevron-up" : "chevron-down"}
+                size={18}
+                color={showFineTunePanel ? Colors.accentLight : "#D7D7D7"}
+              />
+            </Pressable>
+
+            {showFineTunePanel ? (
+              <View style={styles.fineTuneDropdownBody}>
+                <Text style={styles.fineTuneIntro}>
+                  Your selected style sets the main look. Fine tune only adjusts how strongly that style is applied.
+                </Text>
+                <View style={styles.fineTuneExplanationCard}>
+                  <Text style={styles.fineTuneExplanationTitle}>What it changes</Text>
+                  <Text style={styles.fineTuneExplanationText}>
+                    It can change lighting strength, contrast, mood, styling polish, and overall cinematic impact.
+                  </Text>
+                  <Text style={styles.fineTuneExplanationText}>
+                    It does not replace your selected style. If you choose{" "}
+                    <Text style={styles.fineTuneAccent}>{selectedStylePreset?.label || "a style"}</Text>, the result stays in
+                    that style family.
+                  </Text>
+                </View>
+
+                {!selectedArtStyle ? (
+                  <>
+                    <Pressable
+                      onPress={() => {
+                        setIntensity(null);
+                        setShowFineTunePanel(false);
+                      }}
+                      style={[styles.fineTuneSkipCard, intensity === null && styles.fineTuneSkipCardActive]}
+                    >
+                      <View style={styles.fineTuneSkipTopRow}>
+                        <Text
+                          style={[styles.fineTuneSkipTitle, intensity === null && styles.fineTuneSkipTitleActive]}
+                        >
+                          No extra fine tune
+                        </Text>
+                        {intensity === null ? (
+                          <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
+                        ) : null}
+                      </View>
+                      <Text
+                        style={[styles.fineTuneSkipText, intensity === null && styles.fineTuneSkipTextActive]}
+                      >
+                        Use the selected style as-is, with standard balanced styling.
+                      </Text>
+                    </Pressable>
+                    <View style={styles.intensityRow}>
+                      {INTENSITY_OPTIONS.map((option) => (
+                        <Pressable
+                          key={option.value}
+                          onPress={() => {
+                            setIntensity(option.value);
+                            setShowFineTunePanel(false);
+                          }}
+                          style={[styles.chip, intensity === option.value && styles.chipActive]}
+                        >
+                          <Text
+                            style={[styles.chipLabel, intensity === option.value && styles.chipLabelActive]}
+                          >
+                            {option.label}
+                          </Text>
+                          <Text
+                            style={[styles.chipSubtitle, intensity === option.value && styles.chipSubtitleActive]}
+                          >
+                            {option.subtitle}
+                          </Text>
+                          <Text
+                            style={[styles.chipDetails, intensity === option.value && styles.chipDetailsActive]}
+                          >
+                            {option.details}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </>
+                ) : (
+                  <View style={styles.fineTuneArtStyleNotice}>
+                    <Text style={styles.fineTuneArtStyleNoticeTitle}>Art Style selected</Text>
+                    <Text style={styles.fineTuneArtStyleNoticeText}>
+                      Fine tune strength is skipped while an Art Style is active. Background and notes still apply.
+                    </Text>
+                  </View>
+                )}
+
+                <Pressable
+                  onPress={() => setPreserveBackground((prev) => !prev)}
+                  style={[styles.toggle, preserveBackground && styles.toggleActive]}
+                >
+                  <Ionicons
+                    name={preserveBackground ? "checkmark-circle" : "ellipse-outline"}
+                    size={18}
+                    color={preserveBackground ? Colors.accent : "#8E8E8E"}
+                  />
+                  <Text style={styles.toggleText}>Keep original background</Text>
+                </Pressable>
+
+                <TextInput
+                  value={customPrompt}
+                  onChangeText={setCustomPrompt}
+                  placeholder="Extra notes (optional): colder shadows, softer makeup, stronger grain, pearl earrings..."
+                  placeholderTextColor="#7A7A7A"
+                  multiline
+                  style={styles.promptInput}
+                />
+              </View>
+            ) : null}
+          </View>
+
           <View style={styles.artStylesPanel}>
             <View style={styles.artStylesPanelHeader}>
               <Text style={styles.artStylesPanelTitle}>Art Styles</Text>
               <Text style={styles.artStylesPanelSubtitle}>
-                Optional. Art styles export in High Res and skip the fine tune step below.
+                Optional. Art styles export in High Res and override fine tune strength while active.
               </Text>
             </View>
 
@@ -1162,80 +1297,6 @@ export default function InstaMeScreen() {
               </View>
             )}
           </View>
-
-          {!selectedArtStyle ? (
-            <>
-              <Text style={styles.cardTitle}>3. Fine tune (optional)</Text>
-              <Text style={styles.fineTuneIntro}>
-                Your selected style sets the main look. Fine tune only adjusts how strongly that style is applied.
-              </Text>
-              <View style={styles.fineTuneExplanationCard}>
-                <Text style={styles.fineTuneExplanationTitle}>What changes when you use fine tune</Text>
-                <Text style={styles.fineTuneExplanationText}>
-                  It can change the strength of lighting, contrast, mood, styling polish, and overall cinematic impact.
-                </Text>
-                <Text style={styles.fineTuneExplanationText}>
-                  It does not replace your selected style. If you choose <Text style={styles.fineTuneAccent}>{selectedStylePreset?.label || "a style"}</Text>, the result stays in that style family.
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => setIntensity(null)}
-                style={[styles.fineTuneSkipCard, intensity === null && styles.fineTuneSkipCardActive]}
-              >
-                <View style={styles.fineTuneSkipTopRow}>
-                  <Text style={[styles.fineTuneSkipTitle, intensity === null && styles.fineTuneSkipTitleActive]}>
-                    No extra fine tune
-                  </Text>
-                  {intensity === null ? (
-                    <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
-                  ) : null}
-                </View>
-                <Text style={[styles.fineTuneSkipText, intensity === null && styles.fineTuneSkipTextActive]}>
-                  Use the selected style as-is, with standard balanced styling.
-                </Text>
-              </Pressable>
-              <View style={styles.intensityRow}>
-                {INTENSITY_OPTIONS.map((option) => (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setIntensity(option.value)}
-                    style={[styles.chip, intensity === option.value && styles.chipActive]}
-                  >
-                    <Text style={[styles.chipLabel, intensity === option.value && styles.chipLabelActive]}>
-                      {option.label}
-                    </Text>
-                    <Text style={[styles.chipSubtitle, intensity === option.value && styles.chipSubtitleActive]}>
-                      {option.subtitle}
-                    </Text>
-                    <Text style={[styles.chipDetails, intensity === option.value && styles.chipDetailsActive]}>
-                      {option.details}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          ) : null}
-
-          <Pressable
-            onPress={() => setPreserveBackground((prev) => !prev)}
-            style={[styles.toggle, preserveBackground && styles.toggleActive]}
-          >
-            <Ionicons
-              name={preserveBackground ? "checkmark-circle" : "ellipse-outline"}
-              size={18}
-              color={preserveBackground ? Colors.accent : "#8E8E8E"}
-            />
-            <Text style={styles.toggleText}>Keep original background</Text>
-          </Pressable>
-
-          <TextInput
-            value={customPrompt}
-            onChangeText={setCustomPrompt}
-            placeholder="Extra notes (optional): colder shadows, softer makeup, stronger grain, pearl earrings..."
-            placeholderTextColor="#7A7A7A"
-            multiline
-            style={styles.promptInput}
-          />
 
           <Pressable
             onPress={handleTransform}
@@ -1874,6 +1935,44 @@ const styles = StyleSheet.create({
     color: "#FF9EBC",
     fontFamily: "Inter_700Bold",
   },
+  fineTuneDropdownWrap: {
+    marginTop: 10,
+    gap: 8,
+  },
+  fineTuneDropdownTrigger: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  fineTuneDropdownTriggerActive: {
+    borderColor: "rgba(255,79,125,0.54)",
+    backgroundColor: "rgba(255,79,125,0.08)",
+  },
+  fineTuneDropdownHeaderText: {
+    flex: 1,
+    gap: 4,
+  },
+  fineTuneDropdownTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  fineTuneDropdownSummary: {
+    color: "#C5C5C5",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  fineTuneDropdownBody: {
+    gap: 8,
+  },
   artStylesPanel: {
     marginTop: 10,
     gap: 10,
@@ -2070,6 +2169,26 @@ const styles = StyleSheet.create({
   fineTuneAccent: {
     color: "#FFD3DF",
     fontFamily: "Inter_700Bold",
+  },
+  fineTuneArtStyleNotice: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  fineTuneArtStyleNoticeTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  fineTuneArtStyleNoticeText: {
+    color: "#C2C2C2",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
   },
   fineTuneSkipCard: {
     borderRadius: 12,
