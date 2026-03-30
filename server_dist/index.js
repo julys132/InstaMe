@@ -628,14 +628,20 @@ function chooseRequestedModel(variant, mode) {
       if (normalized.includes("flux.2-max")) return 100;
       if (normalized.includes("gemini-3-pro-image")) return 95;
       if (normalized.includes("gpt-image-1.5")) return 90;
+      if (normalized.includes("qwen-image-2.0-pro")) return 88;
+      if (normalized.includes("qwen-image-2.0")) return 86;
       if (normalized.includes("qwen-image")) return 85;
       if (normalized.includes("flux.2-pro")) return 80;
       if (normalized.includes("reve-v1.1")) return 75;
+      if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 72;
       if (normalized.includes("flash-image-2.5")) return 70;
       if (normalized.includes("gpt-image-1")) return 60;
       return 50;
     }
-    if (normalized.includes("flash-image-2.5")) return 100;
+    if (normalized.includes("flash-image-3.1") || normalized.includes("flash image 3.1")) return 100;
+    if (normalized.includes("flash-image-2.5")) return 98;
+    if (normalized.includes("qwen-image-2.0-pro")) return 97;
+    if (normalized.includes("qwen-image-2.0")) return 96;
     if (normalized.includes("qwen-image")) return 95;
     if (normalized.includes("flux.2-pro")) return 90;
     if (normalized.includes("gpt-image-1")) return 85;
@@ -744,7 +750,7 @@ function getReveBaseUrl() {
 function resolveTogetherModelAlias(model) {
   const normalized = model.trim().toLowerCase();
   if (!normalized) return model;
-  if (normalized === "gemini-3.1-flash-image-preview" || normalized === "gemini 3.1 flash image preview" || normalized === "gemini-2.5-flash-image" || normalized === "google/flash-image-2.5") {
+  if (normalized === "gemini-3.1-flash-image-preview" || normalized === "gemini 3.1 flash image preview" || normalized === "gemini-2.5-flash-image" || normalized === "google/flash-image-2.5" || normalized === "google/flash-image-3.1") {
     return "google/flash-image-2.5";
   }
   if (normalized === "gemini-3-pro-image" || normalized === "gemini 3 pro image" || normalized === "google/gemini-3-pro-image") {
@@ -2169,7 +2175,7 @@ async function generateInstaMePortraitEnhance(options) {
   const imageBase64 = await generateTogetherImage({
     model: INSTAME_PORTRAIT_ENHANCE_MODEL,
     prompt: buildPortraitEnhancePrompt(),
-    imageUrl: toRuntimeAssetUrl(options.req, options.photo),
+    referenceImages: [toRuntimeAssetUrl(options.req, options.photo)],
     width: 1024,
     height: 1024
   });

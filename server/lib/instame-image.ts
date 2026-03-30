@@ -60,7 +60,7 @@ function resolveTogetherModelAlias(model: string): string {
     normalized === "google/flash-image-2.5" ||
     normalized === "google/flash-image-3.1"
   ) {
-    return normalized === "google/flash-image-2.5" ? "google/flash-image-2.5" : "google/flash-image-3.1";
+    return "google/flash-image-2.5";
   }
 
   if (

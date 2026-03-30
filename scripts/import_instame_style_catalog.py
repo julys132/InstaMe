@@ -98,8 +98,8 @@ MODEL_RULES: list[tuple[re.Pattern[str], dict[str, str]]] = [
         ),
         {
             "provider": "together",
-            "model": "google/flash-image-3.1",
-            "displayName": "Google Flash Image 3.1 Preview",
+            "model": "google/flash-image-2.5",
+            "displayName": "Google Flash Image 2.5",
         },
     ),
     (

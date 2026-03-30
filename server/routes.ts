@@ -403,7 +403,7 @@ const GEMINI_API_BASE_URL =
 const DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 const DEFAULT_TOGETHER_FLASH_IMAGE_MODEL =
-  process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-3.1";
+  process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-2.5";
 const DEFAULT_TOGETHER_PRO_IMAGE_MODEL =
   process.env.STYLE_HIGH_RES_TOGETHER_MODEL || "google/gemini-3-pro-image";
 const STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
@@ -1600,12 +1600,12 @@ function resolvePromptOnlyFallbackModel(
     };
   }
 
-  return {
-    provider: "together",
-    model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
-    displayName: "Google Flash Image 3.1 Preview",
-  };
-}
+    return {
+      provider: "together",
+      model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      displayName: "Google Flash Image 2.5",
+    };
+  }
 
 async function generatePromptOnlyPresetImage(options: {
   req: Request;
@@ -1821,7 +1821,7 @@ async function generateInstaMePortraitEnhance(options: {
   const imageBase64 = await generateTogetherImage({
     model: INSTAME_PORTRAIT_ENHANCE_MODEL,
     prompt: buildPortraitEnhancePrompt(),
-    imageUrl: toRuntimeAssetUrl(options.req, options.photo),
+    referenceImages: [toRuntimeAssetUrl(options.req, options.photo)],
     width: 1024,
     height: 1024,
   });
