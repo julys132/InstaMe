@@ -24,6 +24,8 @@ export type InstaMeStylePreset = {
   promptOnlyAfterFirstUse?: boolean;
 };
 
+export const INSTAME_OWN_STYLE_ID = "own_style";
+
 export const INSTAME_STYLE_PRESETS: InstaMeStylePreset[] = [
   {
     id: "old_money",

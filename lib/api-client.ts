@@ -463,6 +463,7 @@ class ApiClient {
 
   async transformOldMoney(payload: {
     photo: { base64: string; mimeType?: string };
+    stylePhoto?: { base64: string; mimeType?: string };
     customPrompt?: string;
     intensity?: "soft" | "editorial" | "dramatic";
     preserveBackground?: boolean;

@@ -34,7 +34,11 @@ import {
 } from "@/lib/instame-uploaded-images";
 import Colors from "@/constants/colors";
 import { INSTAME_ART_STYLES } from "@/constants/instameArtStyles";
-import { INSTAME_STYLE_PRESETS, type InstaMeStylePreset } from "@shared/instame-style-presets";
+import {
+  INSTAME_OWN_STYLE_ID,
+  INSTAME_STYLE_PRESETS,
+  type InstaMeStylePreset,
+} from "@shared/instame-style-presets";
 import {
   INSTAME_EDIT_TIERS,
   INSTAME_GENERATION_TIERS,
@@ -104,6 +108,15 @@ const INTENSITY_OPTIONS: {
 ];
 
 const STYLE_CARD_THEME_MAP: Record<string, StyleCardTheme> = {
+  own_style: {
+    glow: "#86F4FF",
+    glowSoft: "rgba(134,244,255,0.34)",
+    border: "rgba(185,251,255,0.48)",
+    text: "#E0FDFF",
+    footerTop: "#08242B",
+    footerBottom: "#03090C",
+    ambient: "rgba(134,244,255,0.14)",
+  },
   analog_night_flash: {
     glow: "#8FF5C2",
     glowSoft: "rgba(143,245,194,0.35)",
@@ -298,6 +311,7 @@ export default function InstaMeScreen() {
   const [selectedStyleId, setSelectedStyleId] = useState<string>(INSTAME_STYLE_PRESETS[0]?.id || "");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
+  const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
@@ -313,14 +327,34 @@ export default function InstaMeScreen() {
   const [editInstruction, setEditInstruction] = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
+  const ownStylePreset = useMemo<InstaMeStylePreset>(() => ({
+    id: INSTAME_OWN_STYLE_ID,
+    label: "OWN STYLE",
+    subtitle: "Upload a reference image with the style you want",
+    promptHint: "user uploaded style reference",
+    representativeImage: ownStylePhoto?.uri || stylePresets[0]?.representativeImage || "",
+    cover: ownStylePhoto?.uri || stylePresets[0]?.cover || stylePresets[0]?.representativeImage || "",
+    examples: ownStylePhoto?.uri ? [ownStylePhoto.uri] : [],
+  }), [ownStylePhoto, stylePresets]);
+
+  const visibleStylePresets = useMemo(
+    () => [ownStylePreset, ...stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID)],
+    [ownStylePreset, stylePresets],
+  );
+
+  const defaultStylePreset = useMemo(
+    () => visibleStylePresets.find((preset) => preset.id !== INSTAME_OWN_STYLE_ID) || visibleStylePresets[0],
+    [visibleStylePresets],
+  );
+
   const selectedStylePreset = useMemo(
-    () => stylePresets.find((preset) => preset.id === selectedStyleId) || stylePresets[0],
-    [stylePresets, selectedStyleId],
+    () => visibleStylePresets.find((preset) => preset.id === selectedStyleId) || defaultStylePreset,
+    [defaultStylePreset, selectedStyleId, visibleStylePresets],
   );
 
   const previewStyle = useMemo(
-    () => stylePresets.find((preset) => preset.id === previewStyleId) || null,
-    [stylePresets, previewStyleId],
+    () => visibleStylePresets.find((preset) => preset.id === previewStyleId) || null,
+    [previewStyleId, visibleStylePresets],
   );
 
   const selectedArtStyle = useMemo(
@@ -356,6 +390,7 @@ export default function InstaMeScreen() {
     () => INTENSITY_OPTIONS.find((option) => option.value === intensity) || null,
     [intensity],
   );
+  const isOwnStyleSelected = selectedStyleId === INSTAME_OWN_STYLE_ID;
   const useStackedEditTierCards = windowWidth < 430;
 
   const uploadedImageIdParam = Array.isArray(params.uploadedImageId)
@@ -542,6 +577,36 @@ export default function InstaMeScreen() {
     await Haptics.selectionAsync();
   }, [pickRawImage]);
 
+  const pickOwnStyleImage = useCallback(async () => {
+    const asset = await pickRawImage();
+    if (!asset) return;
+
+    let prepared: PreparedUploadImage;
+    try {
+      prepared = await optimizeImageAsset(asset);
+    } catch (error: any) {
+      Alert.alert("Image error", error?.message || "Could not optimize this style image.");
+      return;
+    }
+
+    setOwnStylePhoto({
+      uri: prepared.uri,
+      base64: prepared.base64,
+      previewBase64: prepared.previewBase64,
+      mimeType: prepared.mimeType,
+      width: prepared.width,
+      height: prepared.height,
+      fileSizeBytes: prepared.fileSizeBytes,
+      sourceImageId: undefined,
+      name: asset.fileName || "Style reference",
+    });
+    setResultBase64(null);
+    setResultMeta(null);
+    setShowEditComposer(false);
+    setEditInstruction("");
+    await Haptics.selectionAsync();
+  }, [pickRawImage]);
+
   const handleEnhancePortrait = useCallback(async () => {
     if (!photo) {
       Alert.alert("Missing image", "Upload one portrait before enhancing it.");
@@ -642,6 +707,10 @@ export default function InstaMeScreen() {
       Alert.alert("Missing image", "Upload one photo before transforming.");
       return;
     }
+    if (isOwnStyleSelected && !ownStylePhoto) {
+      Alert.alert("Missing style image", "Upload one style reference image for Own Style before generating.");
+      return;
+    }
     if (credits < transformCost) {
       Alert.alert("Not enough credits", `This transform costs ${transformCost} credits.`);
       return;
@@ -649,13 +718,16 @@ export default function InstaMeScreen() {
 
     setLoading(true);
     try {
-      const selectedPreset = selectedStylePreset || stylePresets[0];
+      const selectedPreset = selectedStylePreset || defaultStylePreset;
       const composedPrompt = [selectedArtStyle?.promptHint, customPrompt.trim()].filter(Boolean).join(". ");
 
       const result = await apiClient.transformOldMoney({
         photo: { base64: photo.base64, mimeType: photo.mimeType },
+        stylePhoto: isOwnStyleSelected && ownStylePhoto
+          ? { base64: ownStylePhoto.base64, mimeType: ownStylePhoto.mimeType }
+          : undefined,
         customPrompt: composedPrompt,
-        intensity: selectedArtStyle ? undefined : intensity || undefined,
+        intensity: selectedArtStyle || isOwnStyleSelected ? undefined : intensity || undefined,
         preserveBackground,
         stylePresetId: selectedPreset?.id,
         generationTierId: activeGenerationTier?.id || selectedGenerationTierId,
@@ -685,8 +757,11 @@ export default function InstaMeScreen() {
     selectedStylePreset,
     stylePresets,
     customPrompt,
+    defaultStylePreset,
     selectedArtStyle,
+    isOwnStyleSelected,
     intensity,
+    ownStylePhoto,
     preserveBackground,
     refreshCredits,
     activeGenerationTier,
@@ -939,10 +1014,11 @@ export default function InstaMeScreen() {
               onScroll={handleStyleRowScroll}
               scrollEventThrottle={16}
             >
-              {stylePresets.map((preset, index) => {
+              {visibleStylePresets.map((preset, index) => {
                 const active = selectedStyleId === preset.id;
+                const isOwnStylePreset = preset.id === INSTAME_OWN_STYLE_ID;
                 const isFirst = index === 0;
-                const isLast = index === stylePresets.length - 1;
+                const isLast = index === visibleStylePresets.length - 1;
                 const theme = getStyleCardTheme(preset.id);
 
                 return (
@@ -950,7 +1026,12 @@ export default function InstaMeScreen() {
                     key={preset.id}
                     onPress={() => {
                       setSelectedStyleId(preset.id);
-                      setPreviewStyleId(preset.id);
+                      if (isOwnStylePreset) {
+                        setIntensity(null);
+                        setPreviewStyleId(null);
+                      } else {
+                        setPreviewStyleId(preset.id);
+                      }
                     }}
                     style={[
                       styles.styleCardOuter,
@@ -979,11 +1060,18 @@ export default function InstaMeScreen() {
                         },
                       ]}
                     >
-                      <Image
-                        source={{ uri: preset.cover || preset.representativeImage }}
-                        contentFit="cover"
-                        style={styles.styleCardImage}
-                      />
+                      {isOwnStylePreset && !ownStylePhoto ? (
+                        <View style={styles.ownStyleCardPlaceholder}>
+                          <Ionicons name="sparkles-outline" size={36} color={theme.text} />
+                          <Text style={[styles.ownStyleCardPlaceholderText, { color: theme.text }]}>Upload a look you love</Text>
+                        </View>
+                      ) : (
+                        <Image
+                          source={{ uri: preset.cover || preset.representativeImage }}
+                          contentFit="cover"
+                          style={styles.styleCardImage}
+                        />
+                      )}
 
                       <LinearGradient
                         colors={
@@ -1057,6 +1145,44 @@ export default function InstaMeScreen() {
             Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
           </Text>
 
+          {isOwnStyleSelected ? (
+            <View style={styles.ownStylePanel}>
+              <Text style={styles.ownStylePanelTitle}>Upload your style reference</Text>
+              <Text style={styles.ownStylePanelText}>
+                Add one image whose styling you want to transfer. We will analyze its pose, expression, hair, lighting, framing, and overall aesthetic.
+              </Text>
+              <Pressable onPress={pickOwnStyleImage} style={styles.ownStyleUploadBox}>
+                {ownStylePhoto ? (
+                  <Image source={{ uri: ownStylePhoto.uri }} style={styles.ownStyleUploadImage} contentFit="cover" />
+                ) : (
+                  <View style={styles.ownStyleUploadPlaceholder}>
+                    <Ionicons name="images-outline" size={28} color={Colors.accent} />
+                    <Text style={styles.ownStyleUploadPlaceholderTitle}>Choose style image</Text>
+                    <Text style={styles.ownStyleUploadPlaceholderText}>Use a photo with the exact pose and styling direction you want.</Text>
+                  </View>
+                )}
+              </Pressable>
+              <View style={styles.uploadActionRow}>
+                <Pressable
+                  onPress={pickOwnStyleImage}
+                  style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
+                >
+                  <Ionicons name="cloud-upload-outline" size={16} color="#FFE1EA" />
+                  <Text style={styles.secondaryActionButtonText}>{ownStylePhoto ? "Change style image" : "Upload style image"}</Text>
+                </Pressable>
+                {ownStylePhoto ? (
+                  <Pressable
+                    onPress={() => setOwnStylePhoto(null)}
+                    style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#FFE1EA" />
+                    <Text style={styles.secondaryActionButtonText}>Remove</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.fineTuneDropdownWrap}>
             <Pressable
               onPress={() => setShowFineTunePanel((prev) => !prev)}
@@ -1070,6 +1196,8 @@ export default function InstaMeScreen() {
                 <Text style={styles.fineTuneDropdownSummary}>
                   {selectedArtStyle
                     ? "Art Styles take priority. You can still keep the background and add notes here."
+                    : isOwnStyleSelected
+                      ? "Own Style uses your uploaded reference image. You can still keep the background and add notes here."
                     : selectedIntensityOption
                       ? `${selectedIntensityOption.label}: ${selectedIntensityOption.subtitle}`
                       : "No extra fine tune selected."}
@@ -1099,7 +1227,7 @@ export default function InstaMeScreen() {
                   </Text>
                 </View>
 
-                {!selectedArtStyle ? (
+                {!selectedArtStyle && !isOwnStyleSelected ? (
                   <>
                     <Pressable
                       onPress={() => {
@@ -1153,6 +1281,13 @@ export default function InstaMeScreen() {
                       ))}
                     </View>
                   </>
+                ) : isOwnStyleSelected ? (
+                  <View style={styles.fineTuneArtStyleNotice}>
+                    <Text style={styles.fineTuneArtStyleNoticeTitle}>Own Style selected</Text>
+                    <Text style={styles.fineTuneArtStyleNoticeText}>
+                      The uploaded style reference drives the look here. You can still preserve the background and add custom notes below.
+                    </Text>
+                  </View>
                 ) : (
                   <View style={styles.fineTuneArtStyleNotice}>
                     <Text style={styles.fineTuneArtStyleNoticeTitle}>Art Style selected</Text>
@@ -1662,6 +1797,53 @@ const styles = StyleSheet.create({
   secondaryActionButtonTextAccent: {
     color: Colors.accentLight,
   },
+  ownStylePanel: {
+    marginTop: 8,
+    gap: 10,
+  },
+  ownStylePanelTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  ownStylePanelText: {
+    color: "#BFBFBF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  ownStyleUploadBox: {
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(134,244,255,0.28)",
+    backgroundColor: "rgba(134,244,255,0.08)",
+    minHeight: 220,
+    justifyContent: "center",
+  },
+  ownStyleUploadImage: {
+    width: "100%",
+    height: 240,
+  },
+  ownStyleUploadPlaceholder: {
+    minHeight: 220,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  ownStyleUploadPlaceholderTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  ownStyleUploadPlaceholderText: {
+    color: "#A9BCC2",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "center",
+  },
   uploadedImagesSection: {
     marginTop: 16,
     borderRadius: 16,
@@ -1873,6 +2055,20 @@ const styles = StyleSheet.create({
   },
   styleCardImage: {
     ...StyleSheet.absoluteFillObject,
+  },
+  ownStyleCardPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    gap: 10,
+    backgroundColor: "rgba(134,244,255,0.10)",
+  },
+  ownStyleCardPlaceholderText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 18,
   },
   styleCardAtmosphere: {
     ...StyleSheet.absoluteFillObject,

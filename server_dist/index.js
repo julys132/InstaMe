@@ -133,6 +133,7 @@ var insertMessageSchema = (0, import_drizzle_zod.createInsertSchema)(messages).o
 });
 
 // shared/instame-style-presets.ts
+var INSTAME_OWN_STYLE_ID = "own_style";
 var INSTAME_STYLE_PRESETS = [
   {
     id: "old_money",
@@ -229,7 +230,7 @@ var INSTAME_EDIT_TIERS = [
   {
     id: "edit",
     label: "Edit",
-    subtitle: "Gemini 3.1 Flash Preview refinement",
+    subtitle: "Refine your generated result",
     credits: 3,
     provider: "Together",
     model: "Google Flash Image 3.1 Preview",
@@ -1117,6 +1118,7 @@ var DEFAULT_ALLOWED_DEV_CREDIT_EMAILS = ["iuliastarcean@gmail.com"];
 var GEMINI_API_BASE_URL = process.env.GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
 var DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 var DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+var DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || "gemini-3.1-pro";
 var DEFAULT_TOGETHER_FLASH_IMAGE_MODEL = process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-3.1";
 var DEFAULT_TOGETHER_PRO_IMAGE_MODEL = process.env.STYLE_HIGH_RES_TOGETHER_MODEL || "google/gemini-3-pro-image";
 var STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
@@ -1475,6 +1477,12 @@ function resolveGenerationResolution(generationTierId) {
 function resolveOpenAiSize(generationTierId) {
   return "1024x1024";
 }
+var OWN_STYLE_ANALYSIS_PROMPT = [
+  "Analyze this image from the perspective of an elite-level professional photographer.",
+  "Include exact body posing, facial expression, facial micro-expression, and exactly how the hair falls or is arranged.",
+  "Also describe wardrobe, lighting, camera angle, framing, composition, background, mood, color palette, texture, and the overall aesthetic.",
+  "Write the result in English as one precise editing instruction paragraph without bullet points or numbering."
+].join(" ");
 function normalizeStringList(input) {
   if (!Array.isArray(input)) return [];
   return input.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean);
@@ -2063,6 +2071,64 @@ async function generatePromptOnlyPresetImage(options) {
     imageBase64,
     model: selectedModel?.displayName || openAiModel,
     provider: "OpenAI"
+  };
+}
+async function analyzeOwnStyleReferenceImage(styleImage) {
+  const analysisResponse = await generateGeminiContent({
+    model: DEFAULT_OWN_STYLE_ANALYSIS_MODEL,
+    parts: [{ text: OWN_STYLE_ANALYSIS_PROMPT }, ...toGeminiInlineImageParts([styleImage])],
+    responseMimeType: "text/plain",
+    maxOutputTokens: 1200,
+    temperature: 0.3
+  });
+  const analysisText = extractGeminiText(analysisResponse).replace(/\s+/g, " ").trim();
+  if (!analysisText) {
+    throw new Error("Own Style analysis returned no prompt text.");
+  }
+  return analysisText;
+}
+function buildOwnStyleTransformPrompt(options) {
+  const promptParts = [
+    `Edit the image following these instructions: ${options.analyzedStylePrompt}`,
+    "Preserve the uploaded subject's identity, facial features, and overall likeness exactly.",
+    "Keep the result photorealistic and cohesive.",
+    "Use the largest native output resolution available from the model."
+  ];
+  if (options.preserveBackground) {
+    promptParts.push(
+      "Keep the original background structure where possible unless the style instructions clearly require a different scene."
+    );
+  }
+  if (options.customPrompt.trim()) {
+    promptParts.push(`Additional user notes: ${options.customPrompt.trim()}`);
+  }
+  return promptParts.join("\n");
+}
+async function generateOwnStyleImage(options) {
+  const analyzedStylePrompt = await analyzeOwnStyleReferenceImage(options.styleImage);
+  const imageResponse = await generateGeminiContent({
+    model: DEFAULT_STYLE_IMAGE_MODEL,
+    parts: [
+      {
+        text: buildOwnStyleTransformPrompt({
+          analyzedStylePrompt,
+          customPrompt: options.customPrompt,
+          preserveBackground: options.preserveBackground
+        })
+      },
+      ...toGeminiInlineImageParts(options.uploadedImages)
+    ],
+    responseModalities: ["IMAGE", "TEXT"],
+    maxOutputTokens: 1200
+  });
+  const imageBase64 = extractGeminiImageBase64(imageResponse);
+  if (!imageBase64) {
+    throw new Error("Own Style generation failed. No image data returned.");
+  }
+  return {
+    imageBase64,
+    model: DEFAULT_STYLE_IMAGE_MODEL,
+    provider: "Google"
   };
 }
 async function generateReferenceGuidedHighResImage(options) {
@@ -3489,10 +3555,12 @@ async function registerRoutes(app2) {
     const userId = req.user.id;
     const body = req.body || {};
     const customPrompt = normalizeStringValue(body.customPrompt);
-    const resolvedStylePreset = resolveInstaMeStylePreset(body.stylePresetId);
-    const stylePresetId = resolvedStylePreset?.id || "";
-    const stylePresetLabel = resolvedStylePreset?.label || "";
-    const stylePresetPromptHint = resolvedStylePreset?.promptHint || "";
+    const requestedStylePresetId = normalizeStringValue(body.stylePresetId);
+    const isOwnStyleRequested = requestedStylePresetId === INSTAME_OWN_STYLE_ID;
+    const resolvedStylePreset = isOwnStyleRequested ? null : resolveInstaMeStylePreset(body.stylePresetId);
+    const stylePresetId = isOwnStyleRequested ? INSTAME_OWN_STYLE_ID : resolvedStylePreset?.id || "";
+    const stylePresetLabel = isOwnStyleRequested ? "Own Style" : resolvedStylePreset?.label || "";
+    const stylePresetPromptHint = isOwnStyleRequested ? "" : resolvedStylePreset?.promptHint || "";
     const intensity = normalizeTransformIntensity(body.intensity);
     const preserveBackground = body.preserveBackground !== false;
     const generationTier = resolveGenerationTierById(body.generationTierId);
@@ -3508,6 +3576,18 @@ async function registerRoutes(app2) {
     if (uploadedImages.length === 0) {
       return res.status(400).json({ error: "Upload one input image to transform." });
     }
+    let ownStyleImages = [];
+    if (isOwnStyleRequested) {
+      const stylePhotoInput = body.stylePhoto ? [body.stylePhoto] : [];
+      try {
+        ownStyleImages = normalizeUploadedImages(stylePhotoInput, "single_item");
+      } catch (error) {
+        return res.status(400).json({ error: toErrorMessage(error, "Invalid own style image payload") });
+      }
+      if (ownStyleImages.length === 0) {
+        return res.status(400).json({ error: "Upload one style reference image for Own Style." });
+      }
+    }
     let creditsConsumed = false;
     try {
       const [userBeforeTransform] = await db.select({
@@ -3515,8 +3595,9 @@ async function registerRoutes(app2) {
       }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       const styleUsageMap = normalizeUsageMap(userBeforeTransform?.instameStyleUsage);
       const priorStyleUseCount = stylePresetId ? styleUsageMap[stylePresetId] || 0 : 0;
-      const promptVariant = choosePromptVariant(resolvedStylePreset || void 0, priorStyleUseCount);
-      const shouldUsePromptOnly = Boolean(stylePresetId) && (resolvedStylePreset?.promptVariants?.length || 0) > 0 && Boolean(promptVariant);
+      const promptVariant = isOwnStyleRequested ? null : choosePromptVariant(resolvedStylePreset || void 0, priorStyleUseCount);
+      const shouldUseOwnStyle = isOwnStyleRequested && ownStyleImages.length > 0;
+      const shouldUsePromptOnly = !shouldUseOwnStyle && Boolean(stylePresetId) && (resolvedStylePreset?.promptVariants?.length || 0) > 0 && Boolean(promptVariant);
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
       if (!consumed) {
         return res.status(402).json({
@@ -3529,7 +3610,12 @@ async function registerRoutes(app2) {
         intensity,
         customPrompt: [customPrompt, stylePresetId, stylePresetLabel, stylePresetPromptHint].filter(Boolean).join(" ")
       });
-      const generationResult = shouldUsePromptOnly && promptVariant ? await generatePromptOnlyPresetImage({
+      const generationResult = shouldUseOwnStyle ? await generateOwnStyleImage({
+        uploadedImages,
+        styleImage: ownStyleImages[0],
+        customPrompt,
+        preserveBackground
+      }) : shouldUsePromptOnly && promptVariant ? await generatePromptOnlyPresetImage({
         req,
         uploadedImages,
         preset: resolvedStylePreset,
@@ -3556,7 +3642,7 @@ async function registerRoutes(app2) {
         stylePresetLabel,
         stylePresetPromptHint
       });
-      if (stylePresetId) {
+      if (stylePresetId && stylePresetId !== INSTAME_OWN_STYLE_ID) {
         const nextUsageMap = {
           ...styleUsageMap,
           [stylePresetId]: priorStyleUseCount + 1
@@ -3575,7 +3661,7 @@ async function registerRoutes(app2) {
         provider: generationResult.provider,
         styleReferenceIds: selectedStyleReferences.map((reference) => reference.id),
         stylePresetId: stylePresetId || null,
-        promptOnlyMode: shouldUsePromptOnly,
+        promptOnlyMode: shouldUsePromptOnly || shouldUseOwnStyle,
         generationTierId: generationTier.id
       });
     } catch (error) {
