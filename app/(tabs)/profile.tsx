@@ -229,6 +229,9 @@ export default function ProfileScreen() {
           <MenuItem icon="color-palette-outline" label="Style Preferences" onPress={() => router.push("/(tabs)/style-preferences" as any)} />
           <MenuItem icon="heart-outline" label="Favorites" onPress={() => router.push("/(tabs)/favorites" as any)} />
           <MenuItem icon="notifications-outline" label="Notifications" onPress={() => router.push("/(tabs)/notifications" as any)} />
+          {user?.provider === "email" ? (
+            <MenuItem icon="lock-closed-outline" label="Change Password" onPress={() => router.push("/change-password" as any)} />
+          ) : null}
           <MenuItem icon="help-circle-outline" label="Help & Support" onPress={() => router.push("/(tabs)/help-support" as any)} />
         </Animated.View>
 

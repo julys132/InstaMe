@@ -50,7 +50,7 @@ export default function TermsScreen() {
         },
         {
           title: "Contact",
-          paragraphs: [`For support or legal questions about these terms, email ${CHICOO_SUPPORT_EMAIL}.`],
+          paragraphs: ["For support or legal questions about these terms, use the Contact support button below."],
         },
       ]}
       actions={[

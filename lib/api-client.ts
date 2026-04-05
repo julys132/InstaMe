@@ -307,15 +307,45 @@ class ApiClient {
     return data;
   }
 
-  async resetPassword(email: string, newPassword: string) {
+  async requestPasswordReset(email: string) {
+    return this.request<{ success: boolean; message: string }>(
+      "/auth/forgot-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      },
+      false,
+    );
+  }
+
+  async resetPassword(email: string, token: string, newPassword: string) {
     return this.request<{ success: boolean; message: string }>(
       "/auth/reset-password",
       {
         method: "POST",
-        body: JSON.stringify({ email, newPassword }),
+        body: JSON.stringify({ email, token, newPassword }),
       },
       false,
     );
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    const data = await this.request<{
+      success: boolean;
+      message: string;
+      user: any;
+      accessToken: string;
+      refreshToken: string;
+    }>(
+      "/auth/change-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      },
+      true,
+    );
+    await this.setAuth(data.accessToken, data.refreshToken);
+    return data;
   }
 
   async socialLogin(payload: SocialLoginPayload) {

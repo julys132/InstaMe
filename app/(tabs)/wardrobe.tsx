@@ -108,7 +108,7 @@ export default function WardrobeScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       resetForm();
       setShowModal(false);
-    } catch (e) {
+    } catch {
       Alert.alert("Error", "Failed to save item");
     } finally {
       setSaving(false);

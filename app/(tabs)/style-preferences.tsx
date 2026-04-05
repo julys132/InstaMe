@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,10 +23,14 @@ export default function StylePreferencesScreen() {
   const { user, updateProfile } = useAuth();
   const [selected, setSelected] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const stylePreferences = useMemo(
+    () => (Array.isArray(user?.stylePreferences) ? [...user.stylePreferences] : []),
+    [user?.stylePreferences],
+  );
 
   useEffect(() => {
-    setSelected(Array.isArray(user?.stylePreferences) ? user.stylePreferences : []);
-  }, [user?.id, JSON.stringify(user?.stylePreferences || [])]);
+    setSelected(stylePreferences);
+  }, [user?.id, stylePreferences]);
 
   function toggleTag(tag: string) {
     setSelected((prev) => (prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]));

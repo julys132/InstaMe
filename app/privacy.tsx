@@ -53,7 +53,7 @@ export default function PrivacyScreen() {
         },
         {
           title: "Contact",
-          paragraphs: [`For privacy requests, email ${CHICOO_PRIVACY_EMAIL}.`],
+          paragraphs: ["For privacy requests, use the Email privacy team button below."],
         },
       ]}
       actions={[

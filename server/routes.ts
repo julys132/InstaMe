@@ -37,12 +37,18 @@ import {
   createSession,
   generateAccessToken,
   generateRefreshToken,
+  hashToken,
   hashPassword,
   revokeAllSessions,
   revokeSession,
   validateRefreshToken,
   verifyPassword,
 } from "./lib/auth";
+import { getPasswordValidationMessage } from "../shared/password-policy";
+import {
+  isTransactionalEmailConfigured,
+  sendTransactionalEmail,
+} from "./lib/email";
 import {
   createStripeBillingPortalSession,
   createStripeCheckoutSession,
@@ -2293,6 +2299,58 @@ function getDefaultBaseUrl(req: Request): string {
   return `${proto}://${host}`.replace(/\/+$/, "");
 }
 
+const PASSWORD_RESET_TOKEN_TTL_MS = 1000 * 60 * 60;
+
+function buildPasswordResetUrl(req: Request, email: string, token: string): string {
+  const resetUrl = new URL("/reset-password", getDefaultBaseUrl(req));
+  resetUrl.searchParams.set("email", email);
+  resetUrl.searchParams.set("token", token);
+  return resetUrl.toString();
+}
+
+function buildPasswordResetEmailHtml(name: string, resetUrl: string): string {
+  return `
+    <div style="font-family:Arial,sans-serif;background:#0b0b10;color:#f3f2f5;padding:32px;line-height:1.6;">
+      <div style="max-width:560px;margin:0 auto;background:#11131a;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:32px;">
+        <p style="margin:0 0 12px;color:#ff8fae;letter-spacing:2px;text-transform:uppercase;font-size:12px;">Chicoo Security</p>
+        <h1 style="margin:0 0 16px;font-size:28px;color:#ffffff;">Reset your password</h1>
+        <p style="margin:0 0 18px;">Hi ${name || "there"},</p>
+        <p style="margin:0 0 18px;">We received a request to reset the password for your Chicoo account. Use the button below to choose a new password. This link expires in 1 hour.</p>
+        <p style="margin:24px 0;">
+          <a href="${resetUrl}" style="display:inline-block;background:#ff4f7d;color:#000000;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:700;">Reset password</a>
+        </p>
+        <p style="margin:0 0 10px;color:#b2a9b0;">If the button does not open, paste this link into your browser:</p>
+        <p style="margin:0;word-break:break-word;color:#ffffff;">${resetUrl}</p>
+        <p style="margin:24px 0 0;color:#8f8690;font-size:13px;">If you did not request this, you can ignore this email.</p>
+      </div>
+    </div>
+  `;
+}
+
+function buildPasswordResetEmailText(name: string, resetUrl: string): string {
+  return [
+    `Hi ${name || "there"},`,
+    "",
+    "We received a request to reset the password for your Chicoo account.",
+    "Use the link below to choose a new password. This link expires in 1 hour.",
+    "",
+    resetUrl,
+    "",
+    "If you did not request this, you can ignore this email.",
+  ].join("\n");
+}
+
+function isMatchingHashedToken(candidateToken: string, storedTokenHash: string | null): boolean {
+  if (!storedTokenHash) return false;
+  const candidateHash = hashToken(candidateToken);
+  const candidateBuffer = Buffer.from(candidateHash);
+  const storedBuffer = Buffer.from(storedTokenHash);
+  if (candidateBuffer.length !== storedBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(candidateBuffer, storedBuffer);
+}
+
 function getAllowedCheckoutOrigins(req: Request): Set<string> {
   const origins = new Set<string>();
   const candidates = [
@@ -2807,8 +2865,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!isValidEmail(email)) {
         return res.status(400).json({ error: "Invalid email address" });
       }
-      if (password.length < 8) {
-        return res.status(400).json({ error: "Password must have at least 8 characters" });
+      const passwordValidationMessage = getPasswordValidationMessage(password);
+      if (passwordValidationMessage) {
+        return res.status(400).json({ error: passwordValidationMessage });
       }
 
       const normalizedEmail = normalizeEmail(email);
@@ -2879,48 +2938,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/reset-password", async (req, res) => {
+  app.post("/api/auth/forgot-password", async (req, res) => {
     try {
-      const { email, newPassword } = req.body ?? {};
-      if (!email?.trim() || !newPassword?.trim()) {
-        return res.status(400).json({ error: "Email and new password are required" });
+      const { email } = req.body ?? {};
+      if (!email?.trim()) {
+        return res.status(400).json({ error: "Email is required" });
       }
       if (!isValidEmail(email)) {
         return res.status(400).json({ error: "Invalid email address" });
       }
-      if (newPassword.length < 8) {
-        return res.status(400).json({ error: "Password must have at least 8 characters" });
+      if (!isTransactionalEmailConfigured()) {
+        return res.status(503).json({
+          error: "Password reset email is not configured yet. Set RESEND_API_KEY and RESEND_FROM_EMAIL.",
+        });
       }
 
       const normalizedEmail = normalizeEmail(email);
       const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail));
-      if (!user) {
-        return res.status(404).json({ error: "No account found for this email" });
-      }
-      if (user.authProvider !== "email" || !user.passwordHash) {
-        return res.status(400).json({
-          error: "This account uses social sign-in. Use Apple or Google sign-in instead.",
+
+      if (user && user.authProvider === "email" && user.passwordHash) {
+        const resetToken = generateRefreshToken();
+        const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
+
+        await db
+          .update(users)
+          .set({
+            passwordResetTokenHash: hashToken(resetToken),
+            passwordResetTokenExpiresAt: expiresAt,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, user.id));
+
+        const resetUrl = buildPasswordResetUrl(req, normalizedEmail, resetToken);
+        await sendTransactionalEmail({
+          to: normalizedEmail,
+          subject: "Reset your Chicoo password",
+          html: buildPasswordResetEmailHtml(user.name, resetUrl),
+          text: buildPasswordResetEmailText(user.name, resetUrl),
         });
       }
 
-      const [updated] = await db
+      res.json({
+        success: true,
+        message: "If that email is linked to a Chicoo password account, a reset link has been sent.",
+      });
+    } catch (error: unknown) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: toErrorMessage(error, "Failed to send password reset email") });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, token, newPassword } = req.body ?? {};
+      if (!email?.trim() || !token?.trim() || !newPassword?.trim()) {
+        return res.status(400).json({ error: "Email, token and new password are required" });
+      }
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ error: "Invalid email address" });
+      }
+
+      const passwordValidationMessage = getPasswordValidationMessage(newPassword);
+      if (passwordValidationMessage) {
+        return res.status(400).json({ error: passwordValidationMessage });
+      }
+
+      const normalizedEmail = normalizeEmail(email);
+      const [user] = await db.select().from(users).where(eq(users.email, normalizedEmail));
+      if (!user || user.authProvider !== "email" || !user.passwordHash) {
+        return res.status(400).json({ error: "Invalid or expired reset link" });
+      }
+
+      const expiresAt = user.passwordResetTokenExpiresAt;
+      const tokenIsValid = isMatchingHashedToken(token, user.passwordResetTokenHash);
+      const tokenIsExpired = !expiresAt || expiresAt.getTime() < Date.now();
+
+      if (!tokenIsValid || tokenIsExpired) {
+        return res.status(400).json({ error: "Invalid or expired reset link" });
+      }
+
+      await db
         .update(users)
         .set({
           passwordHash: hashPassword(newPassword),
+          passwordResetTokenHash: null,
+          passwordResetTokenExpiresAt: null,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, user.id))
-        .returning({ id: users.id });
-
-      if (!updated) {
-        return res.status(404).json({ error: "User not found" });
-      }
+        .where(eq(users.id, user.id));
 
       await revokeAllSessions(user.id);
       res.json({ success: true, message: "Password reset successful" });
     } catch (error: unknown) {
       console.error("Reset password error:", error);
       res.status(500).json({ error: toErrorMessage(error, "Password reset failed") });
+    }
+  });
+
+  app.post("/api/auth/change-password", authMiddleware, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const { currentPassword, newPassword } = req.body ?? {};
+      if (!currentPassword?.trim() || !newPassword?.trim()) {
+        return res.status(400).json({ error: "Current password and new password are required" });
+      }
+
+      const passwordValidationMessage = getPasswordValidationMessage(newPassword);
+      if (passwordValidationMessage) {
+        return res.status(400).json({ error: passwordValidationMessage });
+      }
+
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (user.authProvider !== "email" || !user.passwordHash) {
+        return res.status(400).json({
+          error: "This account uses social sign-in. Use Apple or Google sign-in instead.",
+        });
+      }
+      if (!verifyPassword(currentPassword, user.passwordHash)) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+      if (verifyPassword(newPassword, user.passwordHash)) {
+        return res.status(400).json({ error: "Choose a different password from the current one" });
+      }
+
+      await db
+        .update(users)
+        .set({
+          passwordHash: hashPassword(newPassword),
+          passwordResetTokenHash: null,
+          passwordResetTokenExpiresAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
+
+      await revokeAllSessions(user.id);
+      const accessToken = generateAccessToken({
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      });
+      const refreshToken = generateRefreshToken();
+      await createSession(user.id, refreshToken);
+
+      res.json({
+        success: true,
+        message: "Password updated successfully",
+        user: sanitizeUser(user),
+        accessToken,
+        refreshToken,
+      });
+    } catch (error: unknown) {
+      console.error("Change password error:", error);
+      res.status(500).json({ error: toErrorMessage(error, "Failed to update password") });
     }
   });
 

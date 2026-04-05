@@ -21,6 +21,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   socialLogin: (payload: SocialLoginPayload) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -111,6 +112,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   }
 
+  async function changePassword(currentPassword: string, newPassword: string) {
+    const { user: userData } = await apiClient.changePassword(currentPassword, newPassword);
+    setUser(userData);
+  }
+
   async function updateProfile(payload: {
     name?: string;
     styleGender?: "female" | "male" | "non_binary" | null;
@@ -152,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       socialLogin,
+      changePassword,
       logout,
       deleteAccount,
       refreshUser,

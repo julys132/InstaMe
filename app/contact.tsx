@@ -20,9 +20,9 @@ export default function ContactScreen() {
         {
           title: "Support channels",
           bullets: [
-            `General support: ${CHICOO_SUPPORT_EMAIL}`,
-            `Billing support: ${CHICOO_BILLING_EMAIL}`,
-            `Privacy requests: ${CHICOO_PRIVACY_EMAIL}`,
+            "General support: Chicoo Support team",
+            "Billing support: Chicoo Billing team",
+            "Privacy requests: Chicoo Privacy team",
           ],
         },
         {
@@ -32,6 +32,7 @@ export default function ContactScreen() {
             "A short description of the issue or request.",
             "For billing requests, include the payment date and platform if known.",
             "For deletion requests, clearly state whether you want account deletion or data export.",
+            "Use the email action buttons below to open the correct Chicoo contact channel.",
           ],
         },
         {

@@ -709,7 +709,7 @@ export default function StylistScreen() {
         }
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
+    } catch {
       Alert.alert("Error", "Failed to download image.");
     }
   }, [result]);

@@ -369,7 +369,7 @@ function getStyleCardTheme(styleId: string): StyleCardTheme {
 export default function InstaMeScreen() {
   const params = useLocalSearchParams<{ uploadedImageId?: string | string[]; uploadedImageNonce?: string | string[] }>();
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
+  useWindowDimensions();
   const { user } = useAuth();
   const { credits, refreshCredits } = useCredits();
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
@@ -407,7 +407,6 @@ export default function InstaMeScreen() {
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
-  const [styleReferenceCount, setStyleReferenceCount] = useState<number>(0);
   const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
   const [portraitEnhanceCandidate, setPortraitEnhanceCandidate] = useState<UploadedPhoto | null>(null);
   const [portraitEnhanceLoading, setPortraitEnhanceLoading] = useState(false);
@@ -548,8 +547,6 @@ export default function InstaMeScreen() {
     () => INTENSITY_OPTIONS.find((option) => option.value === intensity) || null,
     [intensity],
   );
-  const useStackedEditTierCards = windowWidth < 430;
-
   const uploadedImageIdParam = Array.isArray(params.uploadedImageId)
     ? params.uploadedImageId[0]
     : params.uploadedImageId;
@@ -569,9 +566,7 @@ export default function InstaMeScreen() {
         if (!mounted) return;
 
         if (styleLibraryResult.status === "fulfilled") {
-          setStyleReferenceCount(styleLibraryResult.value.referenceCount || 0);
-        } else {
-          setStyleReferenceCount(0);
+          void styleLibraryResult.value.referenceCount;
         }
 
         if (stylePresetResult.status === "fulfilled" && stylePresetResult.value.presets.length > 0) {
@@ -1392,7 +1387,6 @@ export default function InstaMeScreen() {
     credits,
     transformCost,
     selectedStylePreset,
-    stylePresets,
     customPrompt,
     defaultStylePreset,
     selectedArtStyle,
@@ -1893,7 +1887,7 @@ export default function InstaMeScreen() {
                   </Pressable>
                   {ownStyleNeedsActivation ? (
                     <Text style={styles.processingHintText}>
-                      Own Style is loaded, but another main style is still selected. Generate stays locked until you tap "Use this style".
+                      Own Style is loaded, but another main style is still selected. Generate stays locked until you tap &quot;Use this style&quot;.
                     </Text>
                   ) : null}
                 </>

@@ -14,10 +14,14 @@ export default function FavoritesScreen() {
   const { outfits } = useWardrobe();
   const [favorites, setFavorites] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const favoriteLooks = useMemo(
+    () => (Array.isArray(user?.favoriteLooks) ? [...user.favoriteLooks] : []),
+    [user?.favoriteLooks],
+  );
 
   useEffect(() => {
-    setFavorites(Array.isArray(user?.favoriteLooks) ? user.favoriteLooks : []);
-  }, [user?.id, JSON.stringify(user?.favoriteLooks || [])]);
+    setFavorites(favoriteLooks);
+  }, [user?.id, favoriteLooks]);
 
   const sortedOutfits = useMemo(
     () => [...outfits].sort((a, b) => b.createdAt - a.createdAt),

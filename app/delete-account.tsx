@@ -22,7 +22,7 @@ export default function DeleteAccountScreen() {
         {
           title: "Delete without app access",
           paragraphs: [
-            `If you cannot sign in, email ${CHICOO_PRIVACY_EMAIL} from the address linked to your account and use the subject line "Delete My Chicoo Account".`,
+            "If you cannot sign in, use the Email deletion request button below from the address linked to your account and use the subject line \"Delete My Chicoo Account\".",
           ],
         },
         {

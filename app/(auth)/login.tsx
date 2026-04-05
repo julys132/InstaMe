@@ -9,7 +9,7 @@ import {
   Platform,
   Alert,
   ScrollView,
-  Modal,
+  Linking,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,7 +23,7 @@ import Colors from "@/constants/colors";
 import ChicooBackground from "@/components/ChicooBackground";
 import { useAuth } from "@/contexts/AuthContext";
 import * as Haptics from "expo-haptics";
-import { apiClient } from "@/lib/api-client";
+import { CHICOO_SUPPORT_EMAIL, PUBLIC_PAGE_PATHS } from "@/lib/public-site";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -36,11 +36,6 @@ export default function LoginScreen() {
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
-  const [resetPasswordValue, setResetPasswordValue] = useState("");
-  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
-  const [resetLoading, setResetLoading] = useState(false);
   const [googleNativeModule, setGoogleNativeModule] =
     useState<typeof import("@react-native-google-signin/google-signin") | null>(null);
 
@@ -251,35 +246,26 @@ export default function LoginScreen() {
     }
   }
 
-  async function handleResetPassword() {
-    if (!resetEmail.trim() || !resetPasswordValue.trim() || !resetPasswordConfirm.trim()) {
-      Alert.alert("Error", "Please complete all reset password fields.");
-      return;
-    }
-    if (resetPasswordValue.length < 8) {
-      Alert.alert("Error", "New password must be at least 8 characters.");
-      return;
-    }
-    if (resetPasswordValue !== resetPasswordConfirm) {
-      Alert.alert("Error", "Passwords do not match.");
-      return;
-    }
-
-    setResetLoading(true);
-    try {
-      await apiClient.resetPassword(resetEmail.trim(), resetPasswordValue);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setShowResetModal(false);
-      setResetPasswordValue("");
-      setResetPasswordConfirm("");
-      setPassword("");
-      Alert.alert("Success", "Password updated. You can now sign in with the new password.");
-    } catch (e: any) {
-      Alert.alert("Error", e?.message || "Failed to reset password. Please try again.");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setResetLoading(false);
-    }
+  function handlePasswordHelp() {
+    Alert.alert(
+      "Password help",
+      "Password recovery is handled by support for this launch. Contact Chicoo support from the email linked to your account.",
+      [
+        {
+          text: "Email support",
+          onPress: () => {
+            void Linking.openURL(
+              `mailto:${CHICOO_SUPPORT_EMAIL}?subject=Chicoo%20Password%20Reset&body=Please%20help%20me%20recover%20my%20password%20for%20the%20account%20linked%20to%20this%20email.`,
+            );
+          },
+        },
+        {
+          text: "Support page",
+          onPress: () => router.push(PUBLIC_PAGE_PATHS.contact as any),
+        },
+        { text: "Cancel", style: "cancel" },
+      ],
+    );
   }
 
   const showApple = Platform.OS === "ios" && appleAuthAvailable;
@@ -345,13 +331,10 @@ export default function LoginScreen() {
             </View>
 
             <Pressable
-              onPress={() => {
-                setResetEmail((prev) => prev || email.trim());
-                setShowResetModal(true);
-              }}
+              onPress={handlePasswordHelp}
               style={styles.forgotPasswordBtn}
             >
-              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              <Text style={styles.forgotPasswordText}>Need password help?</Text>
             </Pressable>
 
             <Pressable
@@ -423,67 +406,6 @@ export default function LoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <Modal visible={showResetModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reset Password</Text>
-              <Pressable onPress={() => setShowResetModal(false)}>
-                <Ionicons name="close" size={22} color={Colors.white} />
-              </Pressable>
-            </View>
-
-            <Text style={styles.modalSubtitle}>
-              Enter your account email and choose a new password.
-            </Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Email"
-              placeholderTextColor={Colors.textMuted}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={resetEmail}
-              onChangeText={setResetEmail}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="New password (min 8 chars)"
-              placeholderTextColor={Colors.textMuted}
-              secureTextEntry
-              value={resetPasswordValue}
-              onChangeText={setResetPasswordValue}
-            />
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Confirm new password"
-              placeholderTextColor={Colors.textMuted}
-              secureTextEntry
-              value={resetPasswordConfirm}
-              onChangeText={setResetPasswordConfirm}
-            />
-
-            <View style={styles.modalActions}>
-              <Pressable onPress={() => setShowResetModal(false)} style={styles.modalCancelBtn}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleResetPassword}
-                disabled={resetLoading}
-                style={({ pressed }) => [
-                  styles.modalConfirmBtn,
-                  pressed && { opacity: 0.85 },
-                  resetLoading && { opacity: 0.6 },
-                ]}
-              >
-                <Text style={styles.modalConfirmText}>
-                  {resetLoading ? "Updating..." : "Reset"}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -654,82 +576,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
     color: Colors.accent,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    justifyContent: "flex-end",
-  },
-  modalCard: {
-    backgroundColor: "rgba(10,10,14,0.98)",
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 24,
-    gap: 10,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontFamily: "PlayfairDisplay_700Bold",
-    fontSize: 24,
-    color: Colors.white,
-  },
-  modalSubtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 19,
-    marginBottom: 6,
-  },
-  modalInput: {
-    height: 52,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.inputBorder,
-    backgroundColor: Colors.inputBg,
-    paddingHorizontal: 14,
-    color: Colors.white,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
-  },
-  modalCancelBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalCancelText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  modalConfirmBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: Colors.accent,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalConfirmText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: Colors.black,
   },
 });
 

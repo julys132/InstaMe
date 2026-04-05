@@ -85,6 +85,17 @@ Repo-ul este pregatit pentru Railway cu:
    - `npm run db:push`
    - `npm run server:prod`
 
+### Resetare parola pe email
+
+Pentru forgot-password securizat, mai ai nevoie de:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+
+Setup complet aici:
+
+- [`docs/password-reset-railway-setup.md`](./docs/password-reset-railway-setup.md)
+
 Comenzile de deploy sunt deja definite:
 
 - Build: `npm run build:railway` (exporta web app + build backend)

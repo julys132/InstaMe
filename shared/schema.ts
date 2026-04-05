@@ -35,6 +35,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   name: text("name").notNull(),
   passwordHash: text("password_hash"),
+  passwordResetTokenHash: text("password_reset_token_hash"),
+  passwordResetTokenExpiresAt: timestamp("password_reset_token_expires_at"),
   authProvider: text("auth_provider").notNull().default("email"),
   providerId: text("provider_id"),
   credits: integer("credits").notNull().default(3),

@@ -20,8 +20,14 @@ import { makeRedirectUri } from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import Colors from "@/constants/colors";
 import ChicooBackground from "@/components/ChicooBackground";
+import PasswordRequirements from "@/components/PasswordRequirements";
 import { useAuth } from "@/contexts/AuthContext";
 import * as Haptics from "expo-haptics";
+import {
+  getPasswordRequirementChecks,
+  getPasswordValidationMessage,
+  isStrongPassword,
+} from "@shared/password-policy";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -37,6 +43,8 @@ export default function RegisterScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [googleNativeModule, setGoogleNativeModule] =
     useState<typeof import("@react-native-google-signin/google-signin") | null>(null);
+  const passwordChecks = getPasswordRequirementChecks(password);
+  const passwordReady = isStrongPassword(password);
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
@@ -115,8 +123,9 @@ export default function RegisterScreen() {
       Alert.alert("Error", "Please fill in all fields");
       return;
     }
-    if (password.length < 8) {
-      Alert.alert("Error", "Password must be at least 8 characters");
+    const passwordValidationMessage = getPasswordValidationMessage(password);
+    if (passwordValidationMessage) {
+      Alert.alert("Error", passwordValidationMessage);
       return;
     }
     setLoading(true);
@@ -309,11 +318,11 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, password.length > 0 && passwordReady && styles.inputContainerSuccess]}>
               <Ionicons name="lock-closed-outline" size={20} color={Colors.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Password (min 8 characters)"
+                placeholder="Password"
                 placeholderTextColor={Colors.textMuted}
                 value={password}
                 onChangeText={(value) => {
@@ -326,6 +335,8 @@ export default function RegisterScreen() {
                 <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={Colors.textMuted} />
               </Pressable>
             </View>
+
+            <PasswordRequirements checks={passwordChecks} />
 
             <Pressable
               onPress={handleRegister}
@@ -435,6 +446,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.inputBorder,
     paddingHorizontal: 16,
     height: 56,
+  },
+  inputContainerSuccess: {
+    borderColor: "rgba(76,175,80,0.55)",
+    backgroundColor: "rgba(76,175,80,0.08)",
   },
   inputIcon: { marginRight: 12 },
   input: {

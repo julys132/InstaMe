@@ -30,10 +30,11 @@ export default function PaymentSuccessScreen() {
     const value = Array.isArray(raw) ? raw[0] : raw;
     return value === "1" || value === "true";
   }, [params.cancelled]);
+  const userId = user?.id;
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) {
+    if (!userId) {
       router.replace("/(auth)/login");
       return;
     }
@@ -65,7 +66,7 @@ export default function PaymentSuccessScreen() {
         setMessage(error?.message || "Failed to verify payment.");
       }
     })();
-  }, [authLoading, cancelled, user?.id, sessionId]);
+  }, [authLoading, cancelled, userId, sessionId, verifyPaymentSession]);
 
   return (
     <View style={styles.container}>
