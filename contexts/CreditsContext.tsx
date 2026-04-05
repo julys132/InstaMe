@@ -20,34 +20,34 @@ export interface SubscriptionPlan {
 }
 
 export const CREDIT_PACKAGES: CreditPackage[] = [
-  { id: "pack_5", name: "Starter", credits: 5, price: 2.99 },
-  { id: "pack_15", name: "Style Pack", credits: 15, price: 6.99, popular: true },
-  { id: "pack_30", name: "Fashion Pack", credits: 30, price: 11.99 },
-  { id: "pack_100", name: "Pro Pack", credits: 100, price: 34.99 },
+  { id: "pack_5", name: "Quick Start", credits: 5, price: 2.99 },
+  { id: "pack_15", name: "Creator Pack", credits: 15, price: 7.99, popular: true },
+  { id: "pack_30", name: "Studio Pack", credits: 30, price: 14.99 },
+  { id: "pack_100", name: "Best Value", credits: 100, price: 44.99 },
 ];
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: "sub_basic",
-    name: "Basic",
-    creditsPerMonth: 10,
+    name: "Lite",
+    creditsPerMonth: 8,
     price: 4.99,
-    features: ["10 outfits/month", "Basic styling tips", "Save outfits"],
+    features: ["8 credits/month", "Fast and Best generations", "Save favorite styles"],
   },
   {
     id: "sub_premium",
-    name: "Premium",
-    creditsPerMonth: 30,
+    name: "Plus",
+    creditsPerMonth: 20,
     price: 9.99,
-    features: ["30 outfits/month", "Advanced AI styling", "Download outfits", "Priority support"],
+    features: ["20 credits/month", "Signature generations included", "Own Style saves", "Priority support"],
     popular: true,
   },
   {
     id: "sub_unlimited",
-    name: "Unlimited",
-    creditsPerMonth: 999,
+    name: "Studio",
+    creditsPerMonth: 45,
     price: 19.99,
-    features: ["Unlimited outfits", "Premium AI models", "All features", "VIP support"],
+    features: ["45 credits/month", "Best overall value", "Signature generations included", "All premium features"],
   },
 ];
 

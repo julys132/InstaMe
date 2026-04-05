@@ -50,9 +50,13 @@ import {
   INSTAME_GENERATION_TIERS,
   INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS,
   INSTAME_PORTRAIT_ENHANCE_TIER,
-  type InstaMeEditTier,
-  type InstaMeGenerationTier,
-  type InstaMePortraitEnhanceTier,
+  getInstaMeCreditsForQualityTier,
+  getInstaMeQualityTierLabel,
+  getInstaMeQualityTierSubtitle,
+  type InstaMeQualityTier,
+  type PublicInstaMeEditTier,
+  type PublicInstaMeGenerationTier,
+  type PublicInstaMePortraitEnhanceTier,
 } from "@shared/instame-pricing";
 
 type UploadedPhoto = {
@@ -70,8 +74,8 @@ type UploadedPhoto = {
 type TransformIntensity = "soft" | "editorial" | "dramatic";
 type OptionalTransformIntensity = TransformIntensity | null;
 type GenerationResultMeta = {
-  model: string;
-  provider?: string;
+  qualityTier?: InstaMeQualityTier;
+  qualityLabel?: string;
   promptOnlyMode?: boolean;
   generationTierId?: string;
   stylePresetId?: string | null;
@@ -87,9 +91,26 @@ type StyleCardTheme = {
   ambient: string;
 };
 
-const DEFAULT_TRANSFORM_COST = 5;
+const DEFAULT_TRANSFORM_COST = getInstaMeCreditsForQualityTier("premium");
 const GENERATION_WAIT_MESSAGE = "This can take around 1 to 2 minutes when providers are busy.";
 const MAX_INSTAME_HISTORY_ITEMS = 10;
+
+function resolveDisplayedGenerationQualityTier(options: {
+  preset: InstaMeStylePreset | null | undefined;
+  generationTier: PublicInstaMeGenerationTier | undefined;
+  selectedArtStyle: boolean;
+  isOwnStyleSelected: boolean;
+}): InstaMeQualityTier {
+  if (options.isOwnStyleSelected) {
+    return options.generationTier?.qualityTier || "premium";
+  }
+
+  const presetTier = options.preset?.qualityTier || options.generationTier?.qualityTier || "premium";
+  if (options.selectedArtStyle && presetTier === "standard") {
+    return "premium";
+  }
+  return presetTier;
+}
 
 type FavoriteStyleKey = string;
 
@@ -377,9 +398,9 @@ export default function InstaMeScreen() {
   const [intensity, setIntensity] = useState<OptionalTransformIntensity>(null);
   const [showFineTunePanel, setShowFineTunePanel] = useState(false);
   const [stylePresets, setStylePresets] = useState<InstaMeStylePreset[]>(INSTAME_STYLE_PRESETS);
-  const [generationTiers, setGenerationTiers] = useState<InstaMeGenerationTier[]>(INSTAME_GENERATION_TIERS);
-  const [editTiers, setEditTiers] = useState<InstaMeEditTier[]>(INSTAME_EDIT_TIERS);
-  const [portraitEnhanceTier, setPortraitEnhanceTier] = useState<InstaMePortraitEnhanceTier>(
+  const [generationTiers, setGenerationTiers] = useState<PublicInstaMeGenerationTier[]>(INSTAME_GENERATION_TIERS);
+  const [editTiers, setEditTiers] = useState<PublicInstaMeEditTier[]>(INSTAME_EDIT_TIERS);
+  const [portraitEnhanceTier, setPortraitEnhanceTier] = useState<PublicInstaMePortraitEnhanceTier>(
     INSTAME_PORTRAIT_ENHANCE_TIER,
   );
   const [selectedGenerationTierId, setSelectedGenerationTierId] = useState<string>(
@@ -471,6 +492,7 @@ export default function InstaMeScreen() {
     id: INSTAME_OWN_STYLE_ID,
     label: "OWN STYLE",
     subtitle: "Upload a reference image with the style you want",
+    qualityTier: "premium",
     promptHint: "user uploaded style reference",
     representativeImage:
       ownStylePhoto?.uri ||
@@ -530,11 +552,32 @@ export default function InstaMeScreen() {
   );
 
   const activeGenerationTier = selectedArtStyle ? highResGenerationTier : liveGenerationTier;
-
   const isOwnStyleSelected = selectedStyleId === INSTAME_OWN_STYLE_ID;
+
+  const activeGenerationQualityTier = useMemo(
+    () =>
+      resolveDisplayedGenerationQualityTier({
+        preset: selectedStylePreset,
+        generationTier: activeGenerationTier,
+        selectedArtStyle: Boolean(selectedArtStyle),
+        isOwnStyleSelected,
+      }),
+    [activeGenerationTier, isOwnStyleSelected, selectedArtStyle, selectedStylePreset],
+  );
+
+  const activeGenerationQualityLabel = useMemo(
+    () => getInstaMeQualityTierLabel(activeGenerationQualityTier),
+    [activeGenerationQualityTier],
+  );
+
+  const activeGenerationQualitySubtitle = useMemo(
+    () => getInstaMeQualityTierSubtitle(activeGenerationQualityTier, "generate"),
+    [activeGenerationQualityTier],
+  );
   const isFirstOwnStyleGeneration = isOwnStyleSelected && !selectedOwnStyleId;
+  const transformBaseCost = getInstaMeCreditsForQualityTier(activeGenerationQualityTier);
   const transformCost =
-    (activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST) +
+    transformBaseCost +
     (isFirstOwnStyleGeneration ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0);
   const portraitEnhanceCost = portraitEnhanceTier?.credits ?? INSTAME_PORTRAIT_ENHANCE_TIER.credits;
 
@@ -1095,8 +1138,8 @@ export default function InstaMeScreen() {
 
     setResultBase64(entry.editableBase64);
     setResultMeta({
-      model: resultMeta?.model || "History",
-      provider: resultMeta?.provider,
+      qualityTier: resultMeta?.qualityTier,
+      qualityLabel: resultMeta?.qualityLabel,
       promptOnlyMode: entry.stylePresetId === INSTAME_OWN_STYLE_ID,
       stylePresetId: entry.stylePresetId || null,
     });
@@ -1120,7 +1163,7 @@ export default function InstaMeScreen() {
       setEditInstruction("");
     }
     await Haptics.selectionAsync();
-  }, [resultMeta?.model, resultMeta?.provider, savedOwnStyles]);
+  }, [resultMeta?.qualityLabel, resultMeta?.qualityTier, savedOwnStyles]);
 
   const handleSaveResultAsOwnStyle = useCallback(async () => {
     if (!resultBase64) {
@@ -1347,8 +1390,8 @@ export default function InstaMeScreen() {
       setResultBase64(result.imageBase64);
   setComparisonImageUri(buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType));
       setResultMeta({
-        model: result.model,
-        provider: result.provider,
+        qualityTier: result.qualityTier,
+        qualityLabel: result.qualityLabel,
         promptOnlyMode: result.promptOnlyMode,
         generationTierId: result.generationTierId,
         stylePresetId: result.stylePresetId,
@@ -1432,8 +1475,8 @@ export default function InstaMeScreen() {
       setResultBase64(result.imageBase64);
       setComparisonImageUri(`data:image/png;base64,${previousResultBase64}`);
       setResultMeta({
-        model: result.model,
-        provider: result.provider,
+        qualityTier: result.qualityTier,
+        qualityLabel: result.qualityLabel,
       });
       await persistHistoryResult({
         imageBase64: result.imageBase64,
@@ -2227,29 +2270,29 @@ export default function InstaMeScreen() {
             {selectedArtStyle ? (
               <>
                 <Text style={styles.selectedStyleText}>
-                  Art Styles are locked to{" "}
-                  <Text style={styles.selectedStyleAccent}>{highResGenerationTier?.label || "High Res"}</Text>
-                  {" "}for the final export.
+                  Art Styles automatically use{" "}
+                  <Text style={styles.selectedStyleAccent}>{activeGenerationQualityLabel}</Text>
+                  {" "}quality for the final export.
                 </Text>
                 <View style={styles.pricingCardsRow}>
                   <View style={[styles.pricingCard, styles.pricingCardActive]}>
                     <View style={styles.pricingTopRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.pricingLabel}>{highResGenerationTier?.label || "High Res"}</Text>
+                        <Text style={styles.pricingLabel}>{activeGenerationQualityLabel}</Text>
                         <Text style={styles.pricingSubtitle}>
-                          {highResGenerationTier?.subtitle || "Sharper premium export"}
+                          {activeGenerationQualitySubtitle}
                         </Text>
                       </View>
                       <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
                         <Text style={styles.pricingBadgeText}>
-                          {highResGenerationTier?.badge || "Live"}
+                          {highResGenerationTier?.badge || "Auto"}
                         </Text>
                       </View>
                     </View>
 
                     <View style={styles.pricingMetaRow}>
                       <Text style={styles.pricingCredits}>
-                        {highResGenerationTier?.credits ?? transformCost} credits
+                        {transformCost} credits
                       </Text>
                       <Text style={styles.pricingMetaText}>
                         {highResGenerationTier?.output || "1024 x 1024"}
@@ -2259,43 +2302,31 @@ export default function InstaMeScreen() {
                 </View>
               </>
             ) : (
-              <View style={styles.pricingCardsRow}>
-                {generationTiers.map((tier) => {
-                  const isLiveTier = tier.id === liveGenerationTier?.id;
-                  return (
-                    <Pressable
-                      key={tier.id}
-                      onPress={() => setSelectedGenerationTierId(tier.id)}
-                      style={[
-                        styles.pricingCard,
-                        isLiveTier && styles.pricingCardActive,
-                      ]}
-                    >
-                      <View style={styles.pricingTopRow}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.pricingLabel}>{tier.label}</Text>
-                          <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.pricingBadge,
-                            tier.availability === "live"
-                              ? styles.pricingBadgeLive
-                              : styles.pricingBadgeSoon,
-                          ]}
-                        >
-                          <Text style={styles.pricingBadgeText}>{tier.badge || tier.availability}</Text>
-                        </View>
+              <>
+                <Text style={styles.selectedStyleText}>
+                  Your selected style automatically uses{" "}
+                  <Text style={styles.selectedStyleAccent}>{activeGenerationQualityLabel}</Text>
+                  {" "}quality.
+                </Text>
+                <View style={styles.pricingCardsRow}>
+                  <View style={[styles.pricingCard, styles.pricingCardActive]}>
+                    <View style={styles.pricingTopRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.pricingLabel}>{activeGenerationQualityLabel}</Text>
+                        <Text style={styles.pricingSubtitle}>{activeGenerationQualitySubtitle}</Text>
                       </View>
+                      <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
+                        <Text style={styles.pricingBadgeText}>{liveGenerationTier?.badge || "Auto"}</Text>
+                      </View>
+                    </View>
 
-                      <View style={styles.pricingMetaRow}>
-                        <Text style={styles.pricingCredits}>{tier.credits} credits</Text>
-                        <Text style={styles.pricingMetaText}>{tier.output}</Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                    <View style={styles.pricingMetaRow}>
+                      <Text style={styles.pricingCredits}>{transformCost} credits</Text>
+                      <Text style={styles.pricingMetaText}>{activeGenerationTier?.output || "1024 x 1024"}</Text>
+                    </View>
+                  </View>
+                </View>
+              </>
             )}
           </View>
 
@@ -2364,7 +2395,7 @@ export default function InstaMeScreen() {
               <Text style={styles.resultMetaTitle}>Generation details</Text>
               <Text style={styles.resultMetaText}>
                 Style: {selectedStylePreset?.label || "Chicoo"}
-                {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Export: {activeGenerationTier?.label || "High Res"}
+                {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Quality: {resultMeta?.qualityLabel || activeGenerationQualityLabel}
               </Text>
               <Text style={styles.resultMetaText}>
                 Mode: {resultMeta?.stylePresetId === INSTAME_OWN_STYLE_ID ? "Own Style" : resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "1024 x 1024"}

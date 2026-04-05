@@ -72,11 +72,15 @@ function SubPlanCard({
   plan,
   active,
   onSubscribe,
+  onTopUp,
+  onCancel,
   loading,
 }: {
   plan: SubscriptionPlan;
   active: boolean;
   onSubscribe: () => void;
+  onTopUp: () => void;
+  onCancel: () => void;
   loading: boolean;
 }) {
   return (
@@ -94,7 +98,7 @@ function SubPlanCard({
         <Text style={styles.subPrice}>${plan.price.toFixed(2)}</Text>
         <Text style={styles.subPricePeriod}>/month</Text>
       </View>
-      <Text style={styles.subCredits}>{plan.creditsPerMonth === 999 ? "Unlimited" : plan.creditsPerMonth} outfits/month</Text>
+      <Text style={styles.subCredits}>{plan.creditsPerMonth} credits/month</Text>
 
       <View style={styles.featuresList}>
         {plan.features.map((feature, i) => (
@@ -123,6 +127,36 @@ function SubPlanCard({
           </Text>
         )}
       </Pressable>
+
+      {active ? (
+        <>
+          <Text style={styles.subManageHint}>Cancel anytime from Manage Billing.</Text>
+
+          <View style={styles.subActionsRow}>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); onTopUp(); }}
+              style={({ pressed }) => [
+                styles.subTopUpButton,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Ionicons name="add-circle-outline" size={16} color={Colors.accent} />
+              <Text style={styles.subTopUpButtonText}>Buy Extra Credits</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); onCancel(); }}
+              style={({ pressed }) => [
+                styles.subCancelButton,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <Ionicons name="close-circle-outline" size={16} color={Colors.white} />
+              <Text style={styles.subCancelButtonText}>Cancel Subscription</Text>
+            </Pressable>
+          </View>
+        </>
+      ) : null}
     </Animated.View>
   );
 }
@@ -147,6 +181,7 @@ export default function CreditsScreen() {
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"credits" | "subscription">("credits");
   const showDevCreditTools = __DEV__ || process.env.EXPO_PUBLIC_ENABLE_DEV_CREDITS === "true";
+  const hasActiveSubscription = Boolean(subscription);
   const nativePlatform = Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : null;
   const subscriptionsAvailable = Platform.OS === "web";
   const iapPriceLookup = useMemo(
@@ -383,6 +418,25 @@ export default function CreditsScreen() {
           </View>
         </Animated.View>
 
+        {hasActiveSubscription ? (
+          <Animated.View entering={FadeInDown.delay(140).duration(500)} style={styles.topUpInfoCard}>
+            <View style={styles.topUpInfoHeader}>
+              <Ionicons name="sparkles-outline" size={16} color={Colors.accent} />
+              <Text style={styles.topUpInfoTitle}>Your plan stays active</Text>
+            </View>
+            <Text style={styles.topUpInfoText}>
+              Need more credits before your next renewal? Buy a top-up anytime and it stacks on top of your subscription balance.
+            </Text>
+            <Text style={styles.topUpInfoHint}>Cancel anytime from Manage Billing.</Text>
+            <Pressable
+              onPress={() => setActiveTab("credits")}
+              style={({ pressed }) => [styles.topUpInfoButton, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.topUpInfoButtonText}>Open Credit Packs</Text>
+            </Pressable>
+          </Animated.View>
+        ) : null}
+
         {showDevCreditTools && (
           <Animated.View entering={FadeInDown.delay(120).duration(500)} style={styles.devToolsCard}>
             <View style={styles.devToolsHeader}>
@@ -463,6 +517,8 @@ export default function CreditsScreen() {
                 plan={plan}
                 active={subscription === plan.id}
                 onSubscribe={() => handleSubscribe(plan)}
+                onTopUp={() => setActiveTab("credits")}
+                onCancel={handleManageBilling}
                 loading={subLoading === plan.id}
               />
             ))}
@@ -501,28 +557,54 @@ export default function CreditsScreen() {
           </View>
           <Text style={styles.paymentNote}>
             {nativePlatform
-              ? "Credit packs use Apple or Google in-app purchase on mobile. Subscriptions are available on web checkout only."
-              : "Secure Stripe checkout for web credit packs and subscriptions."}
+              ? "Credit packs use Apple or Google in-app purchase on mobile. Subscriptions are available on web checkout only, and top-up packs can still be bought separately."
+              : "Secure Stripe checkout for web credit packs and subscriptions. One-time top-ups can be bought even with an active plan."}
           </Text>
           {subscription ? (
-            <Pressable
-              onPress={handleManageBilling}
-              disabled={billingPortalLoading}
-              style={({ pressed }) => [
-                styles.manageBillingButton,
-                pressed && { opacity: 0.85 },
-                billingPortalLoading && { opacity: 0.7 },
-              ]}
-            >
-              {billingPortalLoading ? (
-                <ActivityIndicator color={Colors.white} size="small" />
-              ) : (
-                <>
-                  <Ionicons name="settings-outline" size={16} color={Colors.white} />
-                  <Text style={styles.manageBillingButtonText}>Manage Billing</Text>
-                </>
-              )}
-            </Pressable>
+            <>
+              <Text style={styles.manageBillingHint}>Cancel anytime from Manage Billing.</Text>
+              <View style={styles.manageBillingActions}>
+                <Pressable
+                  onPress={handleManageBilling}
+                  disabled={billingPortalLoading}
+                  style={({ pressed }) => [
+                    styles.manageBillingButton,
+                    styles.manageBillingButtonPrimary,
+                    pressed && { opacity: 0.85 },
+                    billingPortalLoading && { opacity: 0.7 },
+                  ]}
+                >
+                  {billingPortalLoading ? (
+                    <ActivityIndicator color={Colors.white} size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="settings-outline" size={16} color={Colors.white} />
+                      <Text style={styles.manageBillingButtonText}>Manage Billing</Text>
+                    </>
+                  )}
+                </Pressable>
+
+                <Pressable
+                  onPress={handleManageBilling}
+                  disabled={billingPortalLoading}
+                  style={({ pressed }) => [
+                    styles.manageBillingButton,
+                    styles.manageBillingButtonSecondary,
+                    pressed && { opacity: 0.85 },
+                    billingPortalLoading && { opacity: 0.7 },
+                  ]}
+                >
+                  {billingPortalLoading ? (
+                    <ActivityIndicator color={Colors.white} size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="close-circle-outline" size={16} color={Colors.white} />
+                      <Text style={styles.manageBillingButtonText}>Cancel Subscription</Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            </>
           ) : null}
           {nativePlatform && !iap.isLoading && !iap.isAvailable && iap.error ? (
             <Text style={styles.paymentWarning}>{iap.error}</Text>
@@ -599,6 +681,51 @@ const styles = StyleSheet.create({
     fontFamily: "PlayfairDisplay_700Bold",
     fontSize: 28,
     color: Colors.accent,
+  },
+  topUpInfoCard: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    gap: 10,
+  },
+  topUpInfoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  topUpInfoTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.white,
+  },
+  topUpInfoText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+  },
+  topUpInfoHint: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.white,
+  },
+  topUpInfoButton: {
+    alignSelf: "flex-start",
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: Colors.accent,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  topUpInfoButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.black,
   },
   devToolsCard: {
     marginHorizontal: 20,
@@ -805,6 +932,52 @@ const styles = StyleSheet.create({
   subButtonTextActive: {
     color: Colors.success,
   },
+  subManageHint: {
+    marginTop: 10,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  subActionsRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  subTopUpButton: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.surfaceLight,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  subTopUpButtonText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.white,
+  },
+  subCancelButton: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  subCancelButtonText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.white,
+  },
   paymentInfo: {
     marginHorizontal: 20,
     marginTop: 28,
@@ -827,11 +1000,11 @@ const styles = StyleSheet.create({
   paymentMethod: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
     backgroundColor: Colors.surfaceLight,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
+    gap: 8,
   },
   paymentMethodText: {
     fontFamily: "Inter_500Medium",
@@ -840,14 +1013,29 @@ const styles = StyleSheet.create({
   },
   paymentNote: {
     fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    marginTop: 10,
+  },
+  manageBillingHint: {
+    marginTop: 12,
+    fontFamily: "Inter_500Medium",
     fontSize: 12,
-    color: Colors.textMuted,
+    color: Colors.white,
+  },
+  manageBillingActions: {
+    marginTop: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
   },
   paymentWarning: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: "#FFD7A0",
     lineHeight: 18,
+    marginTop: 10,
   },
   restoreButton: {
     marginTop: 2,
@@ -878,6 +1066,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  manageBillingButtonPrimary: {
+    backgroundColor: Colors.surfaceLight,
+  },
+  manageBillingButtonSecondary: {
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
   manageBillingButtonText: {
     fontFamily: "Inter_500Medium",

@@ -141,6 +141,7 @@ var INSTAME_STYLE_PRESETS = [
     id: "old_money",
     label: "Old Money",
     subtitle: "Timeless tailoring and refined neutrals",
+    qualityTier: "premium",
     promptHint: "quiet old-money elegance, tailored silhouettes, premium fabrics, minimal luxury accessories",
     representativeImage: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop",
     examples: [
@@ -153,6 +154,7 @@ var INSTAME_STYLE_PRESETS = [
     id: "retro",
     label: "Retro",
     subtitle: "Vintage vibe with film-like warmth",
+    qualityTier: "premium",
     promptHint: "retro editorial mood, soft grain feeling, vintage styling cues, analog-inspired color",
     representativeImage: "https://images.unsplash.com/photo-1464863979621-258859e62245?q=80&w=1000&auto=format&fit=crop",
     examples: [
@@ -165,6 +167,7 @@ var INSTAME_STYLE_PRESETS = [
     id: "glam",
     label: "Glam",
     subtitle: "Polished beauty and statement details",
+    qualityTier: "premium",
     promptHint: "high-end glam editorial, sculpted light, clean skin texture, polished luxury finish",
     representativeImage: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1000&auto=format&fit=crop",
     examples: [
@@ -177,6 +180,7 @@ var INSTAME_STYLE_PRESETS = [
     id: "selfie",
     label: "Selfie",
     subtitle: "Natural face-first premium selfie look",
+    qualityTier: "premium",
     promptHint: "clean premium selfie aesthetic, flattering light, natural skin texture, subtle makeup refinement",
     representativeImage: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1000&auto=format&fit=crop",
     examples: [
@@ -189,6 +193,7 @@ var INSTAME_STYLE_PRESETS = [
     id: "in_car_selfie",
     label: "In-Car Selfie",
     subtitle: "Luxury car ambience with elegant light",
+    qualityTier: "premium",
     promptHint: "inside premium car selfie look, realistic in-car reflections, elegant contrast, social-ready framing",
     representativeImage: "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1000&auto=format&fit=crop",
     examples: [
@@ -201,6 +206,7 @@ var INSTAME_STYLE_PRESETS = [
     id: "street_luxe",
     label: "Street Luxe",
     subtitle: "Modern city chic with premium edge",
+    qualityTier: "premium",
     promptHint: "urban luxury editorial, crisp styling, clean structure, premium street-chic mood",
     representativeImage: "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1000&auto=format&fit=crop",
     examples: [
@@ -215,42 +221,124 @@ function findInstaMeStylePresetById(id) {
 }
 
 // shared/instame-pricing.ts
-var INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS = 2;
+var INSTAME_QUALITY_TIER_CREDITS = {
+  standard: 1,
+  premium: 2,
+  pro: 4
+};
+var INSTAME_QUALITY_TIER_RANK = {
+  standard: 1,
+  premium: 2,
+  pro: 3
+};
+function getInstaMeCreditsForQualityTier(qualityTier) {
+  return INSTAME_QUALITY_TIER_CREDITS[qualityTier] || INSTAME_QUALITY_TIER_CREDITS.premium;
+}
+function getInstaMeQualityTierLabel(qualityTier) {
+  if (qualityTier === "standard") return "Fast";
+  if (qualityTier === "pro") return "Signature";
+  return "Best";
+}
+function getHigherInstaMeQualityTier(left, right) {
+  return INSTAME_QUALITY_TIER_RANK[left] >= INSTAME_QUALITY_TIER_RANK[right] ? left : right;
+}
+function resolveInstaMeQualityTierForModel(input) {
+  const provider = (input.provider || "").trim().toLowerCase();
+  const model = (input.model || "").trim().toLowerCase();
+  const fingerprint = `${provider}:${model}`;
+  if (fingerprint.includes("flux.2-max") || fingerprint.includes("reve-v1.1") || fingerprint.includes("reve")) {
+    return "pro";
+  }
+  if (fingerprint.includes("flux.2-pro") || fingerprint.includes("chatgpt-image-latest-high-fidelity") || fingerprint.includes("gpt-image-1") || fingerprint.includes("gemini-3-pro-image")) {
+    return "premium";
+  }
+  if (fingerprint.includes("flash-image-3.1") || fingerprint.includes("gemini-3.1-flash-image-preview") || fingerprint.includes("qwen-image-2.0")) {
+    return "standard";
+  }
+  return provider === "reve" ? "pro" : provider === "openai" ? "premium" : "premium";
+}
+function resolveHighestInstaMeQualityTier(models, fallback = "premium") {
+  if (!Array.isArray(models) || models.length === 0) return fallback;
+  return models.reduce((highest, model) => {
+    const nextTier = resolveInstaMeQualityTierForModel(model);
+    return getHigherInstaMeQualityTier(highest, nextTier);
+  }, fallback);
+}
+function toPublicInstaMeGenerationTier(tier) {
+  return {
+    id: tier.id,
+    label: tier.label,
+    subtitle: tier.subtitle,
+    credits: tier.credits,
+    qualityTier: tier.qualityTier,
+    output: tier.output,
+    badge: tier.badge,
+    availability: tier.availability
+  };
+}
+function toPublicInstaMeEditTier(tier) {
+  return {
+    id: tier.id,
+    label: tier.label,
+    subtitle: tier.subtitle,
+    credits: tier.credits,
+    qualityTier: tier.qualityTier,
+    output: tier.output,
+    badge: tier.badge,
+    availability: tier.availability
+  };
+}
+function toPublicInstaMePortraitEnhanceTier(tier) {
+  return {
+    id: tier.id,
+    label: tier.label,
+    subtitle: tier.subtitle,
+    credits: tier.credits,
+    qualityTier: tier.qualityTier,
+    output: tier.output,
+    badge: tier.badge,
+    availability: tier.availability
+  };
+}
+var INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS = 1;
 var INSTAME_GENERATION_TIERS = [
   {
     id: "high_res",
-    label: "High Res",
-    subtitle: "Sharper premium export",
-    credits: 9,
+    label: "Best",
+    subtitle: "High-fidelity portrait generation",
+    credits: getInstaMeCreditsForQualityTier("premium"),
+    qualityTier: "premium",
     provider: "Together",
     model: "FLUX.2 Pro",
     output: "1024 x 1024",
-    badge: "Live",
+    badge: "Included",
     availability: "live"
   }
 ];
 var INSTAME_EDIT_TIERS = [
   {
     id: "edit",
-    label: "Edit",
-    subtitle: "Refine your generated result",
-    credits: 3,
+    label: "Fast",
+    subtitle: "Quick touch-up pass",
+    credits: getInstaMeCreditsForQualityTier("standard"),
+    qualityTier: "standard",
     provider: "Together",
     model: "Google Flash Image 3.1 Preview",
     output: "1024 x 1024",
-    badge: "Live",
+    badge: "Included",
     availability: "live"
   }
 ];
 var INSTAME_PORTRAIT_ENHANCE_TIER = {
   id: "portrait_enhance",
-  label: "Portrait Enhance",
-  subtitle: "Polish your selfie before styling",
-  credits: 3,
+  label: "Fast",
+  subtitle: "Portrait cleanup before styling",
+  credits: getInstaMeCreditsForQualityTier("standard"),
+  qualityTier: "standard",
   provider: "Together",
   model: "Google Flash Image 3.1 Preview",
   output: "1024 x 1024",
-  badge: "Live",
+  badge: "Included",
   availability: "live"
 };
 function getLiveInstaMeGenerationTier() {
@@ -1193,15 +1281,15 @@ async function verifyAppleIdentityToken(identityToken) {
   return { sub, email };
 }
 var CREDIT_PACKAGES = [
-  { id: "pack_5", name: "Starter", credits: 5, priceCents: 299 },
-  { id: "pack_15", name: "Style Pack", credits: 15, priceCents: 699, popular: true },
-  { id: "pack_30", name: "Fashion Pack", credits: 30, priceCents: 1199 },
-  { id: "pack_100", name: "Pro Pack", credits: 100, priceCents: 3499 }
+  { id: "pack_5", name: "Quick Start", credits: 5, priceCents: 299 },
+  { id: "pack_15", name: "Creator Pack", credits: 15, priceCents: 799, popular: true },
+  { id: "pack_30", name: "Studio Pack", credits: 30, priceCents: 1499 },
+  { id: "pack_100", name: "Best Value", credits: 100, priceCents: 4499 }
 ];
 var SUBSCRIPTION_PLANS = [
-  { id: "sub_basic", name: "Basic", creditsPerMonth: 10, priceCents: 499 },
-  { id: "sub_premium", name: "Premium", creditsPerMonth: 30, priceCents: 999, popular: true },
-  { id: "sub_unlimited", name: "Unlimited", creditsPerMonth: 999, priceCents: 1999 }
+  { id: "sub_basic", name: "Lite", creditsPerMonth: 8, priceCents: 499 },
+  { id: "sub_premium", name: "Plus", creditsPerMonth: 20, priceCents: 999, popular: true },
+  { id: "sub_unlimited", name: "Studio", creditsPerMonth: 45, priceCents: 1999 }
 ];
 var STYLE_COSTS = {
   text: 2,
@@ -2175,6 +2263,37 @@ function resolvePromptOnlyFallbackModel(mode) {
     provider: "together",
     model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
     displayName: "Google Flash Image 3.1 Preview"
+  };
+}
+function resolveStylePresetQualityTier(preset) {
+  if (!preset) return "premium";
+  if (preset.qualityTier) return preset.qualityTier;
+  const requestedModels = (preset.promptVariants || []).flatMap((variant) => variant.requestedModels || []);
+  return resolveHighestInstaMeQualityTier(requestedModels, "premium");
+}
+function resolveTransformQualityTier(options) {
+  if (options.isOwnStyleRequested) {
+    return options.generationMode === "high_res" ? "premium" : "standard";
+  }
+  const promptOnlyQuality = options.promptVariant?.requestedModels?.length ? resolveHighestInstaMeQualityTier(options.promptVariant.requestedModels, "premium") : null;
+  const presetQuality = resolveStylePresetQualityTier(options.resolvedStylePreset);
+  const resolvedQuality = promptOnlyQuality ? getHigherInstaMeQualityTier(presetQuality, promptOnlyQuality) : presetQuality;
+  if (options.generationMode === "high_res" && resolvedQuality === "standard") {
+    return "premium";
+  }
+  return resolvedQuality;
+}
+function toPublicStylePreset(req, preset) {
+  return {
+    id: preset.id,
+    label: preset.label,
+    subtitle: preset.subtitle,
+    qualityTier: resolveStylePresetQualityTier(preset),
+    promptHint: preset.promptHint,
+    cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
+    representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
+    examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
+    promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse
   };
 }
 function hasOpenAiImageConfig() {
@@ -3843,21 +3962,18 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/instame/style-presets", authMiddleware, async (req, res) => {
     const catalogPresets = getInstaMeStylePresetsFromCatalog();
-    const resolvedPresets = (catalogPresets.length > 0 ? catalogPresets : INSTAME_STYLE_PRESETS).map((preset) => ({
-      ...preset,
-      cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
-      representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
-      examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath))
-    }));
+    const resolvedPresets = (catalogPresets.length > 0 ? catalogPresets : INSTAME_STYLE_PRESETS).map(
+      (preset) => toPublicStylePreset(req, preset)
+    );
     return res.json({
       presets: resolvedPresets
     });
   });
   app2.get("/api/instame/pricing", authMiddleware, async (_req, res) => {
     return res.json({
-      generationTiers: INSTAME_GENERATION_TIERS,
-      editTiers: INSTAME_EDIT_TIERS,
-      portraitEnhanceTier: INSTAME_PORTRAIT_ENHANCE_TIER,
+      generationTiers: INSTAME_GENERATION_TIERS.map((tier) => toPublicInstaMeGenerationTier(tier)),
+      editTiers: INSTAME_EDIT_TIERS.map((tier) => toPublicInstaMeEditTier(tier)),
+      portraitEnhanceTier: toPublicInstaMePortraitEnhanceTier(INSTAME_PORTRAIT_ENHANCE_TIER),
       liveGenerationTierId: getLiveInstaMeGenerationTier().id
     });
   });
@@ -4060,9 +4176,6 @@ async function registerRoutes(app2) {
     const preserveBackground = body.preserveBackground !== false;
     const generationTier = resolveGenerationTierById(body.generationTierId);
     const generationMode = resolveGenerationMode(generationTier.id);
-    const baseTransformCost = Number.isInteger(generationTier.credits) && generationTier.credits > 0 ? generationTier.credits : Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 5;
-    const ownStyleFirstUseSurcharge = isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
-    const transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
     const photoInput = body.photo ? [body.photo] : Array.isArray(body.photos) && body.photos.length > 0 ? [body.photos[0]] : [];
     let uploadedImages = [];
     try {
@@ -4104,11 +4217,20 @@ async function registerRoutes(app2) {
       const promptVariant = isOwnStyleRequested ? null : choosePromptVariant(resolvedStylePreset || void 0, priorStyleUseCount);
       const shouldUseOwnStyle = isOwnStyleRequested && (ownStyleImages.length > 0 || Boolean(selectedSavedOwnStyle));
       const shouldUsePromptOnly = !shouldUseOwnStyle && Boolean(stylePresetId) && (resolvedStylePreset?.promptVariants?.length || 0) > 0 && Boolean(promptVariant);
-      const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
+      const transformQualityTier = resolveTransformQualityTier({
+        generationMode,
+        isOwnStyleRequested,
+        resolvedStylePreset,
+        promptVariant
+      });
+      const baseTransformCost = getInstaMeCreditsForQualityTier(transformQualityTier) || (Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 2);
+      const ownStyleFirstUseSurcharge = isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
+      const transformCost2 = baseTransformCost + ownStyleFirstUseSurcharge;
+      const consumed = await consumeCredits(userId, transformCost2, "instame_old_money_transform");
       if (!consumed) {
         return res.status(402).json({
-          error: `Not enough credits. This request costs ${transformCost} credits.`,
-          requiredCredits: transformCost
+          error: `Not enough credits. This request costs ${transformCost2} credits.`,
+          requiredCredits: transformCost2
         });
       }
       creditsConsumed = true;
@@ -4193,10 +4315,10 @@ async function registerRoutes(app2) {
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       return res.json({
         imageBase64: generationResult.imageBase64,
-        creditsCharged: transformCost,
+        creditsCharged: transformCost2,
         creditsRemaining: updatedUser?.credits ?? 0,
-        model: generationResult.model,
-        provider: generationResult.provider,
+        qualityTier: transformQualityTier,
+        qualityLabel: getInstaMeQualityTierLabel(transformQualityTier),
         styleReferenceIds: selectedStyleReferences.map((reference) => reference.id),
         stylePresetId: stylePresetId || null,
         promptOnlyMode: shouldUsePromptOnly || shouldUseOwnStyle,
@@ -4277,8 +4399,8 @@ async function registerRoutes(app2) {
         imageBase64: enhanceResult.imageBase64,
         creditsCharged: enhanceCost,
         creditsRemaining: updatedUser?.credits ?? 0,
-        model: enhanceResult.model,
-        provider: enhanceResult.provider,
+        qualityTier: INSTAME_PORTRAIT_ENHANCE_TIER.qualityTier,
+        qualityLabel: getInstaMeQualityTierLabel(INSTAME_PORTRAIT_ENHANCE_TIER.qualityTier),
         output: INSTAME_PORTRAIT_ENHANCE_SIZE
       });
     } catch (error) {
@@ -4351,8 +4473,8 @@ async function registerRoutes(app2) {
         imageBase64: editResult.imageBase64,
         creditsCharged: editTier.credits,
         creditsRemaining: updatedUser?.credits ?? 0,
-        model: editResult.model,
-        provider: editResult.provider,
+        qualityTier: editTier.qualityTier,
+        qualityLabel: getInstaMeQualityTierLabel(editTier.qualityTier),
         editTierId: editTier.id
       });
     } catch (error) {

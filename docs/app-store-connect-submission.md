@@ -443,7 +443,7 @@ Recommended:
 ### For The Screen You Attached
 
 Your current draft IAP is:
-- `Starter 5 Credits`
+- `Quick Start 5 Credits`
 - Product ID: `com.instame.app.credits.5`
 - Type: `Consumable`
 
@@ -452,7 +452,7 @@ If App Store Connect shows `Missing Metadata`, open that IAP and complete these 
 #### Required fields to fill
 
 - Reference Name:
-  `Starter 5 Credits`
+  `Quick Start 5 Credits`
 
 - Product ID:
   `com.instame.app.credits.5`
@@ -471,7 +471,7 @@ If App Store Connect shows `Missing Metadata`, open that IAP and complete these 
 
 - Save the IAP.
 - Go back to the app version page.
-- In `In-App Purchases and Subscriptions`, attach `Starter 5 Credits` to the version.
+- In `In-App Purchases and Subscriptions`, attach `Quick Start 5 Credits` to the version.
 - Submit the app version and that first IAP together.
 
 Important:
@@ -481,41 +481,41 @@ Important:
 #### Recommended metadata for the other packs
 
 - `com.instame.app.credits.15`
-  - Reference Name: `Style Pack 15 Credits`
+  - Reference Name: `Creator Pack 15 Credits`
   - Display Name: `15 Credits`
   - Description: `Consumable credits used to generate and edit AI portrait images in Chicoo.`
 
 - `com.instame.app.credits.30`
-  - Reference Name: `Fashion Pack 30 Credits`
+  - Reference Name: `Studio Pack 30 Credits`
   - Display Name: `30 Credits`
   - Description: `Consumable credits used to generate and edit AI portrait images in Chicoo.`
 
 - `com.instame.app.credits.100`
-  - Reference Name: `Pro Pack 100 Credits`
+  - Reference Name: `Best Value 100 Credits`
   - Display Name: `100 Credits`
   - Description: `Consumable credits used to generate and edit AI portrait images in Chicoo.`
 
 For iOS, create these as consumable credit packs if not already fully configured:
 
 - `com.instame.app.credits.5`
-  - Reference Name: `Starter 5 Credits`
+  - Reference Name: `Quick Start 5 Credits`
   - Display Name: `5 Credits`
   - Price: `$2.99`
 
 - `com.instame.app.credits.15`
-  - Reference Name: `Style Pack 15 Credits`
+  - Reference Name: `Creator Pack 15 Credits`
   - Display Name: `15 Credits`
-  - Price: `$6.99`
+  - Price: `$7.99`
 
 - `com.instame.app.credits.30`
-  - Reference Name: `Fashion Pack 30 Credits`
+  - Reference Name: `Studio Pack 30 Credits`
   - Display Name: `30 Credits`
-  - Price: `$11.99`
+  - Price: `$14.99`
 
 - `com.instame.app.credits.100`
-  - Reference Name: `Pro Pack 100 Credits`
+  - Reference Name: `Best Value 100 Credits`
   - Display Name: `100 Credits`
-  - Price: `$34.99`
+  - Price: `$44.99`
 
 IAP review screenshot guidance:
 - use a clean credits purchase screen screenshot from the app

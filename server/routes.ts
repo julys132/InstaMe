@@ -30,7 +30,15 @@ import {
   INSTAME_GENERATION_TIERS,
   INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS,
   INSTAME_PORTRAIT_ENHANCE_TIER,
+  getHigherInstaMeQualityTier,
+  getInstaMeCreditsForQualityTier,
+  getInstaMeQualityTierLabel,
   getLiveInstaMeGenerationTier,
+  resolveHighestInstaMeQualityTier,
+  toPublicInstaMeEditTier,
+  toPublicInstaMeGenerationTier,
+  toPublicInstaMePortraitEnhanceTier,
+  type InstaMeQualityTier,
 } from "../shared/instame-pricing";
 import {
   authMiddleware,
@@ -361,16 +369,16 @@ async function verifyAppleIdentityToken(identityToken: string): Promise<{
 }
 
 const CREDIT_PACKAGES: CreditPackage[] = [
-  { id: "pack_5", name: "Starter", credits: 5, priceCents: 299 },
-  { id: "pack_15", name: "Style Pack", credits: 15, priceCents: 699, popular: true },
-  { id: "pack_30", name: "Fashion Pack", credits: 30, priceCents: 1199 },
-  { id: "pack_100", name: "Pro Pack", credits: 100, priceCents: 3499 },
+  { id: "pack_5", name: "Quick Start", credits: 5, priceCents: 299 },
+  { id: "pack_15", name: "Creator Pack", credits: 15, priceCents: 799, popular: true },
+  { id: "pack_30", name: "Studio Pack", credits: 30, priceCents: 1499 },
+  { id: "pack_100", name: "Best Value", credits: 100, priceCents: 4499 },
 ];
 
 const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
-  { id: "sub_basic", name: "Basic", creditsPerMonth: 10, priceCents: 499 },
-  { id: "sub_premium", name: "Premium", creditsPerMonth: 30, priceCents: 999, popular: true },
-  { id: "sub_unlimited", name: "Unlimited", creditsPerMonth: 999, priceCents: 1999 },
+  { id: "sub_basic", name: "Lite", creditsPerMonth: 8, priceCents: 499 },
+  { id: "sub_premium", name: "Plus", creditsPerMonth: 20, priceCents: 999, popular: true },
+  { id: "sub_unlimited", name: "Studio", creditsPerMonth: 45, priceCents: 1999 },
 ];
 
 type StyleOutputMode = "text" | "image";
@@ -1773,6 +1781,54 @@ function resolvePromptOnlyFallbackModel(
       displayName: "Google Flash Image 3.1 Preview",
     };
   }
+
+function resolveStylePresetQualityTier(preset: InstaMeStylePreset | null | undefined): InstaMeQualityTier {
+  if (!preset) return "premium";
+  if (preset.qualityTier) return preset.qualityTier;
+
+  const requestedModels = (preset.promptVariants || []).flatMap((variant) => variant.requestedModels || []);
+  return resolveHighestInstaMeQualityTier(requestedModels, "premium");
+}
+
+function resolveTransformQualityTier(options: {
+  generationMode: InstaMeGenerationMode;
+  isOwnStyleRequested: boolean;
+  resolvedStylePreset: InstaMeStylePreset | null;
+  promptVariant: { requestedModels: InstaMeRequestedModel[] } | null;
+}): InstaMeQualityTier {
+  if (options.isOwnStyleRequested) {
+    return options.generationMode === "high_res" ? "premium" : "standard";
+  }
+
+  const promptOnlyQuality = options.promptVariant?.requestedModels?.length
+    ? resolveHighestInstaMeQualityTier(options.promptVariant.requestedModels, "premium")
+    : null;
+
+  const presetQuality = resolveStylePresetQualityTier(options.resolvedStylePreset);
+  const resolvedQuality = promptOnlyQuality
+    ? getHigherInstaMeQualityTier(presetQuality, promptOnlyQuality)
+    : presetQuality;
+
+  if (options.generationMode === "high_res" && resolvedQuality === "standard") {
+    return "premium";
+  }
+
+  return resolvedQuality;
+}
+
+function toPublicStylePreset(req: Request, preset: InstaMeStylePreset): InstaMeStylePreset {
+  return {
+    id: preset.id,
+    label: preset.label,
+    subtitle: preset.subtitle,
+    qualityTier: resolveStylePresetQualityTier(preset),
+    promptHint: preset.promptHint,
+    cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
+    representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
+    examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
+    promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse,
+  };
+}
 
 function hasOpenAiImageConfig(): boolean {
   return Boolean(process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY);
@@ -3960,12 +4016,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/instame/style-presets", authMiddleware, async (req, res) => {
     const catalogPresets = getInstaMeStylePresetsFromCatalog();
-    const resolvedPresets = (catalogPresets.length > 0 ? catalogPresets : INSTAME_STYLE_PRESETS).map((preset) => ({
-      ...preset,
-      cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
-      representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
-      examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
-    }));
+    const resolvedPresets = (catalogPresets.length > 0 ? catalogPresets : INSTAME_STYLE_PRESETS).map((preset) =>
+      toPublicStylePreset(req, preset),
+    );
 
     return res.json({
       presets: resolvedPresets,
@@ -3974,9 +4027,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/instame/pricing", authMiddleware, async (_req, res) => {
     return res.json({
-      generationTiers: INSTAME_GENERATION_TIERS,
-      editTiers: INSTAME_EDIT_TIERS,
-      portraitEnhanceTier: INSTAME_PORTRAIT_ENHANCE_TIER,
+      generationTiers: INSTAME_GENERATION_TIERS.map((tier) => toPublicInstaMeGenerationTier(tier)),
+      editTiers: INSTAME_EDIT_TIERS.map((tier) => toPublicInstaMeEditTier(tier)),
+      portraitEnhanceTier: toPublicInstaMePortraitEnhanceTier(INSTAME_PORTRAIT_ENHANCE_TIER),
       liveGenerationTierId: getLiveInstaMeGenerationTier().id,
     });
   });
@@ -4278,15 +4331,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const preserveBackground = body.preserveBackground !== false;
     const generationTier = resolveGenerationTierById(body.generationTierId);
     const generationMode = resolveGenerationMode(generationTier.id);
-    const baseTransformCost =
-      Number.isInteger(generationTier.credits) && generationTier.credits > 0
-        ? generationTier.credits
-        : Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0
-          ? INSTAME_TRANSFORM_COST
-          : 5;
-    const ownStyleFirstUseSurcharge =
-      isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
-    const transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
 
     const photoInput = body.photo
       ? [body.photo]
@@ -4352,6 +4396,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         Boolean(stylePresetId) &&
         (resolvedStylePreset?.promptVariants?.length || 0) > 0 &&
         Boolean(promptVariant);
+
+      const transformQualityTier = resolveTransformQualityTier({
+        generationMode,
+        isOwnStyleRequested,
+        resolvedStylePreset,
+        promptVariant,
+      });
+      const baseTransformCost =
+        getInstaMeCreditsForQualityTier(transformQualityTier) ||
+        (Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 2);
+      const ownStyleFirstUseSurcharge =
+        isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
+      const transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
 
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
       if (!consumed) {
@@ -4475,8 +4532,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageBase64: generationResult.imageBase64,
         creditsCharged: transformCost,
         creditsRemaining: updatedUser?.credits ?? 0,
-        model: generationResult.model,
-        provider: generationResult.provider,
+        qualityTier: transformQualityTier,
+        qualityLabel: getInstaMeQualityTierLabel(transformQualityTier),
         styleReferenceIds: selectedStyleReferences.map((reference) => reference.id),
         stylePresetId: stylePresetId || null,
         promptOnlyMode: shouldUsePromptOnly || shouldUseOwnStyle,
@@ -4577,8 +4634,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageBase64: enhanceResult.imageBase64,
         creditsCharged: enhanceCost,
         creditsRemaining: updatedUser?.credits ?? 0,
-        model: enhanceResult.model,
-        provider: enhanceResult.provider,
+        qualityTier: INSTAME_PORTRAIT_ENHANCE_TIER.qualityTier,
+        qualityLabel: getInstaMeQualityTierLabel(INSTAME_PORTRAIT_ENHANCE_TIER.qualityTier),
         output: INSTAME_PORTRAIT_ENHANCE_SIZE,
       });
     } catch (error: unknown) {
@@ -4662,8 +4719,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         imageBase64: editResult.imageBase64,
         creditsCharged: editTier.credits,
         creditsRemaining: updatedUser?.credits ?? 0,
-        model: editResult.model,
-        provider: editResult.provider,
+        qualityTier: editTier.qualityTier,
+        qualityLabel: getInstaMeQualityTierLabel(editTier.qualityTier),
         editTierId: editTier.id,
       });
     } catch (error: unknown) {

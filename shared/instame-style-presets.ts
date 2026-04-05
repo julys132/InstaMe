@@ -1,3 +1,5 @@
+import type { InstaMeQualityTier } from "./instame-pricing";
+
 export type InstaMeRequestedModel = {
   provider: "openai" | "together" | "reve";
   model: string;
@@ -15,6 +17,7 @@ export type InstaMeStylePreset = {
   id: string;
   label: string;
   subtitle: string;
+  qualityTier?: InstaMeQualityTier;
   promptHint: string;
   cover?: string;
   representativeImage: string;
@@ -31,6 +34,7 @@ export const INSTAME_STYLE_PRESETS: InstaMeStylePreset[] = [
     id: "old_money",
     label: "Old Money",
     subtitle: "Timeless tailoring and refined neutrals",
+    qualityTier: "premium",
     promptHint:
       "quiet old-money elegance, tailored silhouettes, premium fabrics, minimal luxury accessories",
     representativeImage:
@@ -45,6 +49,7 @@ export const INSTAME_STYLE_PRESETS: InstaMeStylePreset[] = [
     id: "retro",
     label: "Retro",
     subtitle: "Vintage vibe with film-like warmth",
+    qualityTier: "premium",
     promptHint: "retro editorial mood, soft grain feeling, vintage styling cues, analog-inspired color",
     representativeImage:
       "https://images.unsplash.com/photo-1464863979621-258859e62245?q=80&w=1000&auto=format&fit=crop",
@@ -58,6 +63,7 @@ export const INSTAME_STYLE_PRESETS: InstaMeStylePreset[] = [
     id: "glam",
     label: "Glam",
     subtitle: "Polished beauty and statement details",
+    qualityTier: "premium",
     promptHint: "high-end glam editorial, sculpted light, clean skin texture, polished luxury finish",
     representativeImage:
       "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=1000&auto=format&fit=crop",
@@ -71,6 +77,7 @@ export const INSTAME_STYLE_PRESETS: InstaMeStylePreset[] = [
     id: "selfie",
     label: "Selfie",
     subtitle: "Natural face-first premium selfie look",
+    qualityTier: "premium",
     promptHint:
       "clean premium selfie aesthetic, flattering light, natural skin texture, subtle makeup refinement",
     representativeImage:
@@ -85,6 +92,7 @@ export const INSTAME_STYLE_PRESETS: InstaMeStylePreset[] = [
     id: "in_car_selfie",
     label: "In-Car Selfie",
     subtitle: "Luxury car ambience with elegant light",
+    qualityTier: "premium",
     promptHint:
       "inside premium car selfie look, realistic in-car reflections, elegant contrast, social-ready framing",
     representativeImage:
@@ -99,6 +107,7 @@ export const INSTAME_STYLE_PRESETS: InstaMeStylePreset[] = [
     id: "street_luxe",
     label: "Street Luxe",
     subtitle: "Modern city chic with premium edge",
+    qualityTier: "premium",
     promptHint: "urban luxury editorial, crisp styling, clean structure, premium street-chic mood",
     representativeImage:
       "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1000&auto=format&fit=crop",

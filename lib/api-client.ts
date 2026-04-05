@@ -3,9 +3,10 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 import type { InstaMeStylePreset } from "@shared/instame-style-presets";
 import type {
-  InstaMeEditTier,
-  InstaMeGenerationTier,
-  InstaMePortraitEnhanceTier,
+  PublicInstaMeEditTier,
+  PublicInstaMeGenerationTier,
+  PublicInstaMePortraitEnhanceTier,
+  InstaMeQualityTier,
 } from "@shared/instame-pricing";
 
 export const STORAGE_KEYS = {
@@ -524,8 +525,8 @@ class ApiClient {
       imageBase64: string;
       creditsCharged: number;
       creditsRemaining: number;
-      model: string;
-      provider?: string;
+      qualityTier: InstaMeQualityTier;
+      qualityLabel?: string;
       styleReferenceIds?: string[];
       stylePresetId?: string | null;
       promptOnlyMode?: boolean;
@@ -562,9 +563,9 @@ class ApiClient {
 
   async getInstaMePricing() {
     return this.request<{
-      generationTiers: InstaMeGenerationTier[];
-      editTiers: InstaMeEditTier[];
-      portraitEnhanceTier: InstaMePortraitEnhanceTier;
+      generationTiers: PublicInstaMeGenerationTier[];
+      editTiers: PublicInstaMeEditTier[];
+      portraitEnhanceTier: PublicInstaMePortraitEnhanceTier;
       liveGenerationTierId: string;
     }>("/instame/pricing", {}, true);
   }
@@ -678,8 +679,8 @@ class ApiClient {
       imageBase64: string;
       creditsCharged: number;
       creditsRemaining: number;
-      model: string;
-      provider?: string;
+      qualityTier: InstaMeQualityTier;
+      qualityLabel?: string;
       editTierId?: string;
     }>(
       "/instame/edit",
@@ -698,8 +699,8 @@ class ApiClient {
       imageBase64: string;
       creditsCharged: number;
       creditsRemaining: number;
-      model: string;
-      provider?: string;
+      qualityTier: InstaMeQualityTier;
+      qualityLabel?: string;
       output?: string;
     }>(
       "/instame/enhance-portrait",
