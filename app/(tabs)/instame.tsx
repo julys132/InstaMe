@@ -1989,11 +1989,6 @@ export default function InstaMeScreen() {
                   );
                 })}
               </View>
-              <Text style={styles.processingHintText}>
-                {ownStyleMode === "reference_locked"
-                  ? "Signature Match keeps the style reference image involved in generation for the closest result."
-                  : "Creative Freedom uses only the analyzed style prompt during generation, so the result can explore more beyond the original reference image."}
-              </Text>
               <Pressable onPress={pickOwnStyleImage} style={styles.ownStyleUploadBox}>
                 {ownStylePhoto ? (
                   <Image source={{ uri: ownStylePhoto.uri }} style={styles.ownStyleUploadImage} contentFit="cover" />
@@ -2365,11 +2360,6 @@ export default function InstaMeScreen() {
             <Text style={styles.pricingSectionTitle}>Generate</Text>
             {selectedArtStyle ? (
               <>
-                <Text style={styles.selectedStyleText}>
-                  Art Styles automatically use{" "}
-                  <Text style={styles.selectedStyleAccent}>{activeGenerationQualityLabel}</Text>
-                  {" "}quality for the final export.
-                </Text>
                 <View style={styles.pricingCardsRow}>
                   <View style={[styles.pricingCard, styles.pricingCardActive]}>
                     <View style={styles.pricingTopRow}>
@@ -2390,20 +2380,12 @@ export default function InstaMeScreen() {
                       <Text style={styles.pricingCredits}>
                         {transformCost} credits
                       </Text>
-                      <Text style={styles.pricingMetaText}>
-                        {highResGenerationTier?.output || "High native resolution"}
-                      </Text>
                     </View>
                   </View>
                 </View>
               </>
             ) : (
               <>
-                <Text style={styles.selectedStyleText}>
-                  Your selected style automatically uses{" "}
-                  <Text style={styles.selectedStyleAccent}>{activeGenerationQualityLabel}</Text>
-                  {" "}quality.
-                </Text>
                 <View style={styles.pricingCardsRow}>
                   <View style={[styles.pricingCard, styles.pricingCardActive]}>
                     <View style={styles.pricingTopRow}>
@@ -2418,7 +2400,6 @@ export default function InstaMeScreen() {
 
                     <View style={styles.pricingMetaRow}>
                       <Text style={styles.pricingCredits}>{transformCost} credits</Text>
-                      <Text style={styles.pricingMetaText}>{activeGenerationTier?.output || "High native resolution"}</Text>
                     </View>
                   </View>
                 </View>
@@ -2494,7 +2475,7 @@ export default function InstaMeScreen() {
                 {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Quality: {resultMeta?.qualityLabel || activeGenerationQualityLabel}
               </Text>
               <Text style={styles.resultMetaText}>
-                Mode: {resultMeta?.stylePresetId === INSTAME_OWN_STYLE_ID ? "Own Style" : resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "High native resolution"}
+                Mode: {resultMeta?.stylePresetId === INSTAME_OWN_STYLE_ID ? "Own Style" : resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"}
               </Text>
             </View>
             <View style={styles.postGenerationSection}>

@@ -69,6 +69,7 @@ import {
   getCatalogAssetAbsolutePath,
   getCatalogRelativeAssetParts,
   getInstaMeStylePresetsFromCatalog,
+  loadInstaMeStyleCatalog,
 } from "./lib/instame-style-catalog";
 import {
   createRuntimeAsset,
@@ -163,6 +164,37 @@ function toErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+const TEMPORARY_IMAGE_SERVICE_MESSAGE =
+  "We're receiving an unusually high number of image requests right now. Please try again in about 30 minutes.";
+
+function toUserFacingTemporaryImageServiceMessage(errorMessage: string): string | null {
+  const normalized = normalizeStringValue(errorMessage).toLowerCase();
+  if (!normalized) return null;
+
+  if (normalized.startsWith("ai_not_configured:")) {
+    return TEMPORARY_IMAGE_SERVICE_MESSAGE;
+  }
+
+  const providerCapacityPatterns = [
+    /insufficient credits?/i,
+    /insufficient balance/i,
+    /credit balance/i,
+    /quota/i,
+    /billing/i,
+    /payment required/i,
+    /resource exhausted/i,
+    /rate limit/i,
+    /too many requests/i,
+    /temporarily unavailable/i,
+    /overloaded/i,
+    /capacity/i,
+  ];
+
+  return providerCapacityPatterns.some((pattern) => pattern.test(normalized))
+    ? TEMPORARY_IMAGE_SERVICE_MESSAGE
+    : null;
 }
 
 function getEnvValues(keys: string[]): string[] {
@@ -906,9 +938,12 @@ function toCatalogAssetUrl(req: Request, relativePath: string): string {
     return relativePath;
   }
 
+  const catalogVersion = normalizeStringValue(loadInstaMeStyleCatalog()?.generatedAt);
+  const versionSuffix = catalogVersion ? `?v=${encodeURIComponent(catalogVersion)}` : "";
+
   return `${origin}/api/instame/style-asset/${encodeURIComponent(assetParts.styleId)}/${encodeURIComponent(
     assetParts.filename,
-  )}`;
+  )}${versionSuffix}`;
 }
 
 function toRuntimeAssetUrl(req: Request, image: UploadedReferenceImage): string {
@@ -2009,7 +2044,10 @@ async function generatePromptOnlyPresetImage(options: {
   };
 }
 
-async function analyzeOwnStyleReferenceImage(styleImage: UploadedReferenceImage): Promise<string> {
+async function analyzeOwnStyleReferenceImage(
+  styleImage: UploadedReferenceImage,
+  options?: { allowStaticFallback?: boolean },
+): Promise<string> {
   try {
     const analysisResponse = await generateGeminiContent({
       model: DEFAULT_OWN_STYLE_ANALYSIS_MODEL,
@@ -2030,9 +2068,13 @@ async function analyzeOwnStyleReferenceImage(styleImage: UploadedReferenceImage)
 
     return analysisText;
   } catch (error: unknown) {
-    if (hasTogetherImageConfig() && shouldFallbackOwnStyleToTogether(error)) {
+    if (options?.allowStaticFallback && hasTogetherImageConfig() && shouldFallbackOwnStyleToTogether(error)) {
       console.warn("Own Style analysis falling back to Together-compatible prompt:", error);
       return buildOwnStyleFallbackAnalysisPrompt();
+    }
+
+    if (shouldFallbackOwnStyleToTogether(error)) {
+      throw new Error("AI_NOT_CONFIGURED: Own Style analysis is temporarily unavailable. Please try again later.");
     }
 
     throw error;
@@ -2047,12 +2089,15 @@ function buildOwnStyleTransformPrompt(options: {
   const promptParts = [
     "This is a full style transformation request, not a simple cleanup, beauty retouch, or portrait enhancement.",
     "Treat the following style analysis as direct, executable art direction for the uploaded user photo.",
+    "The uploaded user base photo is the only identity source for the final result.",
+    "The final image must depict only the person from the user base photo, never the person from the style reference image.",
     "Apply the described pose, expression, hair placement, wardrobe feeling, lighting, framing, camera angle, palette, and mood as concrete styling instructions, not as passive commentary.",
     "Do not summarize, dilute, or ignore the style analysis.",
     "Style analysis to apply verbatim:",
     options.analyzedStylePrompt,
     "Restyle the image clearly and visibly. Change wardrobe, hair styling, makeup feeling, pose energy, expression, framing, camera angle, lighting, color palette, and background mood so the final image strongly reflects the target style direction.",
     "Do not keep the result too close to the original photo styling. Do not respond with only a subtle enhancement.",
+    "If the output looks like the original photo with only light cleanup, the task has failed. Apply a real visual restyle.",
     "There is no style reference image attached in this generation step. Use only the extracted style direction and the uploaded user photo.",
     "Preserve the uploaded subject's identity, facial features, and overall likeness exactly.",
     "Keep the result photorealistic, editorial, and cohesive.",
@@ -2079,6 +2124,8 @@ function buildOwnStyleReferenceLockedPrompt(options: {
 }): string {
   const promptParts = [
     "Use the style reference image as a strong visual guide for pose, expression, hair shape, wardrobe direction, framing, lighting, camera angle, composition, and scene mood.",
+    "The uploaded user base photo is the actual source subject and must remain the final person shown in the output.",
+    "Never return the style reference image itself and never reproduce the reference person's identity or face.",
     "Also apply this detailed style analysis directly as art direction:",
     options.analyzedStylePrompt,
     "Apply that direction closely to the user base photo while preserving the user subject's identity, facial features, skin tone, and likeness exactly.",
@@ -2107,9 +2154,11 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options: {
 }): string {
   const promptParts = [
     "Create a photorealistic edit of the uploaded user portrait.",
+    "The uploaded user portrait is the only identity source for the final output.",
     "Apply the following detailed style analysis directly to the uploaded user portrait:",
     options.analyzedStylePrompt,
     "Interpret the styling with more creative freedom instead of matching the original reference image too literally, but still execute the described pose, expression, hair placement, lighting, framing, and aesthetic direction clearly.",
+    "Do not return a light beauty pass, simple enhance, or near-unchanged version of the input image.",
     "Preserve the uploaded subject's identity, facial structure, skin tone, and likeness exactly.",
     "Keep the result realistic, editorial, and cohesive.",
     "Use the largest native output resolution available from the model.",
@@ -2135,6 +2184,7 @@ function buildOwnStyleTogetherFallbackPrompt(options: {
 }): string {
   const promptParts = [
     "Create a photorealistic edit of the user portrait using the uploaded style reference image as the primary guide.",
+    "The uploaded user portrait is the source subject for the final output. Never return the style reference image itself.",
     "Transfer the style reference image's pose, facial expression, hair arrangement, wardrobe direction, lighting, camera angle, framing, composition, background mood, color palette, and overall aesthetic.",
     "Reinforce the transformation with this detailed style analysis:",
     options.analyzedStylePrompt,
@@ -2182,10 +2232,10 @@ async function generateOwnStyleImage(options: {
     const parts: GeminiPart[] = options.ownStyleMode === "reference_locked"
       ? [
           { text: prompt },
-          { text: "Style reference image:" },
-          ...toGeminiInlineImageParts([options.styleReferenceImage]),
-          { text: "User base photo to transform:" },
+          { text: "User base photo to transform. This person must remain the final subject:" },
           ...toGeminiInlineImageParts(options.uploadedImages),
+          { text: "Style reference image. Use only for styling cues, never as the output identity:" },
+          ...toGeminiInlineImageParts([options.styleReferenceImage]),
         ]
       : [
           { text: prompt },
@@ -2232,7 +2282,7 @@ async function generateOwnStyleImage(options: {
     const imageBase64 = await generateTogetherImage({
       model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
       prompt,
-      referenceImages: options.ownStyleMode === "reference_locked" ? [styleReferenceUrl, userImageUrl] : [userImageUrl],
+      referenceImages: options.ownStyleMode === "reference_locked" ? [userImageUrl, styleReferenceUrl] : [userImageUrl],
       width,
       height,
       sourceWidth: options.uploadedImages[0]?.width,
@@ -4578,7 +4628,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Own Style reference image is missing." });
       }
       if (shouldUseOwnStyle && !analyzedOwnStylePrompt) {
-        analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage!);
+        analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage!, {
+          allowStaticFallback: ownStyleMode === "reference_locked",
+        });
       }
 
       const generationResult = shouldUseOwnStyle
@@ -4684,8 +4736,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await refundCredits(userId, transformCost, "instame_old_money_transform_failed");
       }
       const errorMessage = toErrorMessage(error, "Failed to transform image");
-      if (errorMessage.startsWith("AI_NOT_CONFIGURED:")) {
-        return res.status(503).json({ error: errorMessage.replace("AI_NOT_CONFIGURED: ", "") });
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
       }
       return res.status(500).json({ error: errorMessage });
     }
@@ -4792,8 +4845,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await refundCredits(userId, enhanceCost, "instame_portrait_enhance_failed");
       }
       const errorMessage = toErrorMessage(error, "Failed to enhance portrait");
-      if (errorMessage.startsWith("AI_NOT_CONFIGURED:")) {
-        return res.status(503).json({ error: errorMessage.replace("AI_NOT_CONFIGURED: ", "") });
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
       }
       return res.status(500).json({ error: errorMessage });
     }
@@ -4868,6 +4922,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const errorMessage = toErrorMessage(error, "Failed to edit image");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
       return res.status(500).json({ error: errorMessage });
     }
   });
@@ -4979,8 +5037,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await refundCredits(userId, creditCost, `style_generation_${outputMode}_failed`);
       }
       const errorMessage: string = toErrorMessage(error, "Failed to generate styling");
-      if (errorMessage.startsWith("AI_NOT_CONFIGURED:")) {
-        return res.status(503).json({ error: errorMessage.replace("AI_NOT_CONFIGURED: ", "") });
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
       }
       res.status(500).json({ error: errorMessage });
     }
@@ -5091,8 +5150,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await refundCredits(userId, creditCost, `style_modify_${outputMode}_failed`);
       }
       const errorMessage: string = toErrorMessage(error, "Failed to modify styling");
-      if (errorMessage.startsWith("AI_NOT_CONFIGURED:")) {
-        return res.status(503).json({ error: errorMessage.replace("AI_NOT_CONFIGURED: ", "") });
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
       }
       res.status(500).json({ error: errorMessage });
     }
