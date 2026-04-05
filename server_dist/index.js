@@ -836,6 +836,18 @@ function getRuntimeAsset(token) {
 // server/lib/instame-image.ts
 var import_node_buffer2 = require("node:buffer");
 var import_openai = __toESM(require("openai"));
+var GOOGLE_TOGETHER_SUPPORTED_SIZES = [
+  { width: 768, height: 1376 },
+  { width: 1376, height: 768 },
+  { width: 1536, height: 2752 },
+  { width: 2752, height: 1536 },
+  { width: 3072, height: 5504 },
+  { width: 5504, height: 3072 },
+  { width: 1548, height: 672 },
+  { width: 1584, height: 672 },
+  { width: 3168, height: 1344 },
+  { width: 6336, height: 2688 }
+];
 function normalizeMimeType2(input) {
   if (typeof input === "string" && input.startsWith("image/")) {
     return input;
@@ -888,6 +900,36 @@ function resolveTogetherModelAlias(model) {
     return "google/gemini-3-pro-image";
   }
   return model;
+}
+function isGoogleTogetherModel(model) {
+  return model.trim().toLowerCase().startsWith("google/");
+}
+function getImageOrientation(width, height) {
+  if (width === height) return "square";
+  return height > width ? "portrait" : "landscape";
+}
+function resolveGoogleTogetherSize(options) {
+  const requestedWidth = Math.max(1, Math.round(options.width));
+  const requestedHeight = Math.max(1, Math.round(options.height));
+  const sourceWidth = Number.isFinite(options.sourceWidth) ? Math.round(options.sourceWidth) : 0;
+  const sourceHeight = Number.isFinite(options.sourceHeight) ? Math.round(options.sourceHeight) : 0;
+  const preferredOrientation = sourceWidth > 0 && sourceHeight > 0 ? getImageOrientation(sourceWidth, sourceHeight) : getImageOrientation(requestedWidth, requestedHeight);
+  const normalizedOrientation = preferredOrientation === "square" ? "portrait" : preferredOrientation;
+  const requestedRatio = requestedWidth / requestedHeight;
+  const requestedArea = requestedWidth * requestedHeight;
+  const candidates = GOOGLE_TOGETHER_SUPPORTED_SIZES.filter((size) => {
+    const orientation = getImageOrientation(size.width, size.height);
+    return normalizedOrientation === "portrait" ? orientation === "portrait" : orientation === "landscape";
+  });
+  const pool2 = candidates.length > 0 ? candidates : GOOGLE_TOGETHER_SUPPORTED_SIZES;
+  const ranked = pool2.map((size) => {
+    const ratio = size.width / size.height;
+    return {
+      size,
+      score: Math.abs(Math.log(ratio / requestedRatio)) + Math.abs(Math.log(size.width * size.height / requestedArea))
+    };
+  }).sort((left, right) => left.score - right.score);
+  return ranked[0]?.size || GOOGLE_TOGETHER_SUPPORTED_SIZES[0];
 }
 function normalizeReveModelEnvKey(model) {
   return model.trim().replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").toUpperCase();
@@ -992,11 +1034,17 @@ async function generateTogetherImage(options) {
   const apiKey = getTogetherApiKey();
   const baseUrl = process.env.TOGETHER_BASE_URL || "https://api.together.xyz/v1";
   const resolvedModel = resolveTogetherModelAlias(options.model);
+  const resolvedSize = isGoogleTogetherModel(resolvedModel) ? resolveGoogleTogetherSize({
+    width: options.width,
+    height: options.height,
+    sourceWidth: options.sourceWidth,
+    sourceHeight: options.sourceHeight
+  }) : { width: options.width, height: options.height };
   const payload = {
     model: resolvedModel,
     prompt: options.prompt,
-    width: options.width,
-    height: options.height,
+    width: resolvedSize.width,
+    height: resolvedSize.height,
     response_format: "b64_json",
     output_format: "png"
   };
@@ -1761,7 +1809,14 @@ function normalizeUploadedImages(input, imageInputMode) {
     const base64 = typeof maybeEntry.base64 === "string" ? maybeEntry.base64.trim() : "";
     if (!base64) return null;
     const mimeType = typeof maybeEntry.mimeType === "string" && maybeEntry.mimeType.startsWith("image/") ? maybeEntry.mimeType : "image/jpeg";
-    return { base64, mimeType };
+    const width = Number(maybeEntry.width);
+    const height = Number(maybeEntry.height);
+    return {
+      base64,
+      mimeType,
+      width: Number.isFinite(width) && width > 0 ? Math.round(width) : void 0,
+      height: Number.isFinite(height) && height > 0 ? Math.round(height) : void 0
+    };
   }).filter((value) => Boolean(value));
   if (sanitized.length > maxAllowed) {
     throw new Error(`You can upload up to ${maxAllowed} image(s) for this image mode.`);
@@ -2338,7 +2393,9 @@ function buildOwnStyleFallbackAnalysisPrompt() {
 function toUploadedReferenceImageFromStoredOwnStyle(image) {
   return {
     base64: image.base64 || image.previewBase64,
-    mimeType: image.mimeType || "image/jpeg"
+    mimeType: image.mimeType || "image/jpeg",
+    width: image.width,
+    height: image.height
   };
 }
 function hasReveImageConfig() {
@@ -2384,7 +2441,9 @@ async function generatePromptOnlyPresetImage(options) {
       prompt,
       referenceImages: [referenceImageUrl],
       width,
-      height
+      height,
+      sourceWidth: options.uploadedImages[0]?.width,
+      sourceHeight: options.uploadedImages[0]?.height
     });
     return {
       imageBase64: imageBase642,
@@ -2585,7 +2644,9 @@ async function generateOwnStyleImage(options) {
       prompt,
       referenceImages: options.ownStyleMode === "reference_locked" ? [styleReferenceUrl, userImageUrl] : [userImageUrl],
       width,
-      height
+      height,
+      sourceWidth: options.uploadedImages[0]?.width,
+      sourceHeight: options.uploadedImages[0]?.height
     });
     return {
       imageBase64,
@@ -2666,7 +2727,9 @@ async function generateInstaMeEditImage(options) {
     prompt,
     referenceImages,
     width: 1024,
-    height: 1024
+    height: 1024,
+    sourceWidth: options.originalPhoto?.width || options.currentImage.width,
+    sourceHeight: options.originalPhoto?.height || options.currentImage.height
   });
   return {
     imageBase64,
@@ -2680,7 +2743,9 @@ async function generateInstaMePortraitEnhance(options) {
     prompt: buildPortraitEnhancePrompt(),
     referenceImages: [toRuntimeAssetUrl(options.req, options.photo)],
     width: 1024,
-    height: 1024
+    height: 1024,
+    sourceWidth: options.photo.width,
+    sourceHeight: options.photo.height
   });
   return {
     imageBase64,
@@ -4284,6 +4349,7 @@ async function registerRoutes(app2) {
       }
     }
     let creditsConsumed = false;
+    let transformCost = 0;
     try {
       const [userBeforeTransform] = await db.select({
         instameStyleUsage: users.instameStyleUsage,
@@ -4310,12 +4376,12 @@ async function registerRoutes(app2) {
       });
       const baseTransformCost = getInstaMeCreditsForQualityTier(transformQualityTier) || (Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 2);
       const ownStyleFirstUseSurcharge = isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
-      const transformCost2 = baseTransformCost + ownStyleFirstUseSurcharge;
-      const consumed = await consumeCredits(userId, transformCost2, "instame_old_money_transform");
+      transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
+      const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
       if (!consumed) {
         return res.status(402).json({
-          error: `Not enough credits. This request costs ${transformCost2} credits.`,
-          requiredCredits: transformCost2
+          error: `Not enough credits. This request costs ${transformCost} credits.`,
+          requiredCredits: transformCost
         });
       }
       creditsConsumed = true;
@@ -4401,7 +4467,7 @@ async function registerRoutes(app2) {
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       return res.json({
         imageBase64: generationResult.imageBase64,
-        creditsCharged: transformCost2,
+        creditsCharged: transformCost,
         creditsRemaining: updatedUser?.credits ?? 0,
         qualityTier: transformQualityTier,
         qualityLabel: getInstaMeQualityTierLabel(transformQualityTier),

@@ -1288,7 +1288,12 @@ export default function InstaMeScreen() {
     setPortraitEnhanceLoading(true);
     try {
       const result = await apiClient.enhanceInstaMePortrait({
-        photo: { base64: photo.base64, mimeType: photo.mimeType },
+        photo: {
+          base64: photo.base64,
+          mimeType: photo.mimeType,
+          width: photo.width,
+          height: photo.height,
+        },
       });
 
       setPortraitEnhanceCandidate({
@@ -1403,7 +1408,12 @@ export default function InstaMeScreen() {
       const composedPrompt = [selectedArtStyle?.promptHint, customPrompt.trim()].filter(Boolean).join(". ");
 
       const result = await apiClient.transformOldMoney({
-        photo: { base64: photo.base64, mimeType: photo.mimeType },
+        photo: {
+          base64: photo.base64,
+          mimeType: photo.mimeType,
+          width: photo.width,
+          height: photo.height,
+        },
         stylePhoto: isOwnStyleSelected && ownStylePhoto && !selectedOwnStyleId
           ? {
               base64: ownStylePhoto.base64,
@@ -1504,8 +1514,18 @@ export default function InstaMeScreen() {
     try {
       const previousResultBase64 = resultBase64;
       const result = await apiClient.editInstaMeImage({
-        currentImage: { base64: resultBase64, mimeType: "image/png" },
-        originalPhoto: photo ? { base64: photo.base64, mimeType: photo.mimeType } : undefined,
+        currentImage: {
+          base64: resultBase64,
+          mimeType: "image/png",
+          width: photo?.width,
+          height: photo?.height,
+        },
+        originalPhoto: photo ? {
+          base64: photo.base64,
+          mimeType: photo.mimeType,
+          width: photo.width,
+          height: photo.height,
+        } : undefined,
         editInstruction: editInstruction.trim(),
         customPrompt: customPrompt.trim(),
         editTierId: selectedEditTierId,

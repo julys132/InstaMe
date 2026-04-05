@@ -390,6 +390,8 @@ type TransformIntensity = "soft" | "editorial" | "dramatic";
 type UploadedReferenceImage = {
   base64: string;
   mimeType?: string;
+  width?: number;
+  height?: number;
 };
 type RawStyleItem = {
   name?: unknown;
@@ -1036,7 +1038,7 @@ function normalizeUploadedImages(
       }
       if (!entry || typeof entry !== "object") return null;
 
-      const maybeEntry = entry as { base64?: unknown; mimeType?: unknown };
+      const maybeEntry = entry as { base64?: unknown; mimeType?: unknown; width?: unknown; height?: unknown };
       const base64 = typeof maybeEntry.base64 === "string" ? maybeEntry.base64.trim() : "";
       if (!base64) return null;
 
@@ -1044,7 +1046,14 @@ function normalizeUploadedImages(
         typeof maybeEntry.mimeType === "string" && maybeEntry.mimeType.startsWith("image/")
           ? maybeEntry.mimeType
           : "image/jpeg";
-      return { base64, mimeType };
+      const width = Number(maybeEntry.width);
+      const height = Number(maybeEntry.height);
+      return {
+        base64,
+        mimeType,
+        width: Number.isFinite(width) && width > 0 ? Math.round(width) : undefined,
+        height: Number.isFinite(height) && height > 0 ? Math.round(height) : undefined,
+      };
     })
     .filter((value): value is UploadedReferenceImage => Boolean(value));
 
@@ -1890,6 +1899,8 @@ function toUploadedReferenceImageFromStoredOwnStyle(image: InstaMeUploadedImageR
   return {
     base64: image.base64 || image.previewBase64,
     mimeType: image.mimeType || "image/jpeg",
+    width: image.width,
+    height: image.height,
   };
 }
 
@@ -1956,6 +1967,8 @@ async function generatePromptOnlyPresetImage(options: {
       referenceImages: [referenceImageUrl],
       width,
       height,
+      sourceWidth: options.uploadedImages[0]?.width,
+      sourceHeight: options.uploadedImages[0]?.height,
     });
     return {
       imageBase64,
@@ -2222,6 +2235,8 @@ async function generateOwnStyleImage(options: {
       referenceImages: options.ownStyleMode === "reference_locked" ? [styleReferenceUrl, userImageUrl] : [userImageUrl],
       width,
       height,
+      sourceWidth: options.uploadedImages[0]?.width,
+      sourceHeight: options.uploadedImages[0]?.height,
     });
 
     return {
@@ -2339,6 +2354,8 @@ async function generateInstaMeEditImage(options: {
     referenceImages,
     width: 1024,
     height: 1024,
+    sourceWidth: options.originalPhoto?.width || options.currentImage.width,
+    sourceHeight: options.originalPhoto?.height || options.currentImage.height,
   });
 
   return {
@@ -2358,6 +2375,8 @@ async function generateInstaMePortraitEnhance(options: {
     referenceImages: [toRuntimeAssetUrl(options.req, options.photo)],
     width: 1024,
     height: 1024,
+    sourceWidth: options.photo.width,
+    sourceHeight: options.photo.height,
   });
 
   return {
@@ -4481,6 +4500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     let creditsConsumed = false;
+    let transformCost = 0;
     try {
       const [userBeforeTransform] = await db
         .select({
@@ -4525,7 +4545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 2);
       const ownStyleFirstUseSurcharge =
         isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
-      const transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
+      transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
 
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
       if (!consumed) {

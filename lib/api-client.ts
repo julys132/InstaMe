@@ -503,7 +503,7 @@ class ApiClient {
   }
 
   async transformOldMoney(payload: {
-    photo: { base64: string; mimeType?: string };
+    photo: { base64: string; mimeType?: string; width?: number; height?: number };
     stylePhoto?: {
       base64: string;
       mimeType?: string;
@@ -670,8 +670,8 @@ class ApiClient {
   }
 
   async editInstaMeImage(payload: {
-    currentImage: { base64: string; mimeType?: string };
-    originalPhoto?: { base64: string; mimeType?: string };
+    currentImage: { base64: string; mimeType?: string; width?: number; height?: number };
+    originalPhoto?: { base64: string; mimeType?: string; width?: number; height?: number };
     editInstruction: string;
     customPrompt?: string;
     editTierId?: string;
@@ -694,7 +694,7 @@ class ApiClient {
   }
 
   async enhanceInstaMePortrait(payload: {
-    photo: { base64: string; mimeType?: string };
+    photo: { base64: string; mimeType?: string; width?: number; height?: number };
   }) {
     return this.request<{
       imageBase64: string;

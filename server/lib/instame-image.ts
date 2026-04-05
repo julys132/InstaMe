@@ -9,6 +9,20 @@ export type RuntimeImageInput = {
 
 type OpenAiImageSize = "1024x1024" | "1536x1024" | "1024x1536" | "auto";
 type ReveGenerationMode = "preview" | "high_res";
+type TogetherResolution = { width: number; height: number };
+
+const GOOGLE_TOGETHER_SUPPORTED_SIZES: TogetherResolution[] = [
+  { width: 768, height: 1376 },
+  { width: 1376, height: 768 },
+  { width: 1536, height: 2752 },
+  { width: 2752, height: 1536 },
+  { width: 3072, height: 5504 },
+  { width: 5504, height: 3072 },
+  { width: 1548, height: 672 },
+  { width: 1584, height: 672 },
+  { width: 3168, height: 1344 },
+  { width: 6336, height: 2688 },
+];
 
 function normalizeMimeType(input: string | undefined): string {
   if (typeof input === "string" && input.startsWith("image/")) {
@@ -90,6 +104,51 @@ function resolveTogetherModelAlias(model: string): string {
   }
 
   return model;
+}
+
+function isGoogleTogetherModel(model: string): boolean {
+  return model.trim().toLowerCase().startsWith("google/");
+}
+
+function getImageOrientation(width: number, height: number): "portrait" | "landscape" | "square" {
+  if (width === height) return "square";
+  return height > width ? "portrait" : "landscape";
+}
+
+function resolveGoogleTogetherSize(options: {
+  width: number;
+  height: number;
+  sourceWidth?: number;
+  sourceHeight?: number;
+}): TogetherResolution {
+  const requestedWidth = Math.max(1, Math.round(options.width));
+  const requestedHeight = Math.max(1, Math.round(options.height));
+  const sourceWidth = Number.isFinite(options.sourceWidth) ? Math.round(options.sourceWidth as number) : 0;
+  const sourceHeight = Number.isFinite(options.sourceHeight) ? Math.round(options.sourceHeight as number) : 0;
+  const preferredOrientation = sourceWidth > 0 && sourceHeight > 0
+    ? getImageOrientation(sourceWidth, sourceHeight)
+    : getImageOrientation(requestedWidth, requestedHeight);
+  const normalizedOrientation = preferredOrientation === "square" ? "portrait" : preferredOrientation;
+  const requestedRatio = requestedWidth / requestedHeight;
+  const requestedArea = requestedWidth * requestedHeight;
+
+  const candidates = GOOGLE_TOGETHER_SUPPORTED_SIZES.filter((size) => {
+    const orientation = getImageOrientation(size.width, size.height);
+    return normalizedOrientation === "portrait" ? orientation === "portrait" : orientation === "landscape";
+  });
+
+  const pool = candidates.length > 0 ? candidates : GOOGLE_TOGETHER_SUPPORTED_SIZES;
+  const ranked = pool
+    .map((size) => {
+      const ratio = size.width / size.height;
+      return {
+        size,
+        score: Math.abs(Math.log(ratio / requestedRatio)) + Math.abs(Math.log((size.width * size.height) / requestedArea)),
+      };
+    })
+    .sort((left, right) => left.score - right.score);
+
+  return ranked[0]?.size || GOOGLE_TOGETHER_SUPPORTED_SIZES[0]!;
 }
 
 function normalizeReveModelEnvKey(model: string): string {
@@ -235,15 +294,25 @@ export async function generateTogetherImage(options: {
   imageUrl?: string;
   width: number;
   height: number;
+  sourceWidth?: number;
+  sourceHeight?: number;
 }): Promise<string> {
   const apiKey = getTogetherApiKey();
   const baseUrl = process.env.TOGETHER_BASE_URL || "https://api.together.xyz/v1";
   const resolvedModel = resolveTogetherModelAlias(options.model);
+  const resolvedSize = isGoogleTogetherModel(resolvedModel)
+    ? resolveGoogleTogetherSize({
+        width: options.width,
+        height: options.height,
+        sourceWidth: options.sourceWidth,
+        sourceHeight: options.sourceHeight,
+      })
+    : { width: options.width, height: options.height };
   const payload: Record<string, unknown> = {
     model: resolvedModel,
     prompt: options.prompt,
-    width: options.width,
-    height: options.height,
+    width: resolvedSize.width,
+    height: resolvedSize.height,
     response_format: "b64_json",
     output_format: "png",
   };
