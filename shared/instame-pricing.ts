@@ -36,6 +36,8 @@ export type InstaMePortraitEnhanceTier = {
   availability: InstaMeTierAvailability;
 };
 
+export const INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS = 2;
+
 export const INSTAME_GENERATION_TIERS: InstaMeGenerationTier[] = [
   {
     id: "high_res",

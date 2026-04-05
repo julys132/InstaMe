@@ -90,6 +90,7 @@ const STYLE_COSTS: Record<OutputMode, number> = {
   text: 2,
   image: 5,
 };
+const GENERATION_WAIT_MESSAGE = "This can take around 1 to 2 minutes when providers are busy.";
 
 const MAX_PHOTOS_BY_MODE: Record<ImageInputMode, number> = {
   single_item: 10,
@@ -1357,6 +1358,7 @@ export default function StylistScreen() {
               </View>
             )}
           </Pressable>
+          {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
           {actionHint ? <Text style={styles.actionHintText}>{actionHint}</Text> : null}
         </Animated.View>
 
@@ -1366,6 +1368,7 @@ export default function StylistScreen() {
               <View style={styles.modifyingContainer}>
                 <ActivityIndicator size="large" color={Colors.accent} />
                 <Text style={styles.modifyingText}>Modifying your outfit...</Text>
+                <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text>
               </View>
             ) : (
               <>
@@ -1947,6 +1950,14 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 18,
   },
+  processingHintText: {
+    marginTop: 8,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    textAlign: "center",
+  },
   resultSection: {
     margin: 20,
     backgroundColor: Colors.card,
@@ -2043,6 +2054,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 15,
     color: Colors.textSecondary,
+    textAlign: "center",
   },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
   modalContainer: {

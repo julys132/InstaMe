@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   InteractionManager,
+  PanResponder,
   useWindowDimensions,
   Modal,
   Platform,
@@ -13,18 +14,22 @@ import {
   TextInput,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
+import * as Crypto from "expo-crypto";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/contexts/CreditsContext";
 import {
   apiClient,
+  type InstaMeOwnStyle,
   type InstaMeUploadedImageAsset,
 } from "@/lib/api-client";
 import {
@@ -43,6 +48,7 @@ import {
 import {
   INSTAME_EDIT_TIERS,
   INSTAME_GENERATION_TIERS,
+  INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS,
   INSTAME_PORTRAIT_ENHANCE_TIER,
   type InstaMeEditTier,
   type InstaMeGenerationTier,
@@ -68,6 +74,7 @@ type GenerationResultMeta = {
   provider?: string;
   promptOnlyMode?: boolean;
   generationTierId?: string;
+  stylePresetId?: string | null;
 };
 
 type StyleCardTheme = {
@@ -81,6 +88,42 @@ type StyleCardTheme = {
 };
 
 const DEFAULT_TRANSFORM_COST = 5;
+const GENERATION_WAIT_MESSAGE = "This can take around 1 to 2 minutes when providers are busy.";
+const MAX_INSTAME_HISTORY_ITEMS = 10;
+
+type FavoriteStyleKey = string;
+
+type InstaMeHistoryEntry = {
+  id: string;
+  previewUri: string;
+  editableBase64: string;
+  editableMimeType: string;
+  sourcePhotoUri?: string;
+  styleLabel: string;
+  stylePresetId?: string | null;
+  ownStyleId?: string | null;
+  artStyleId?: string | null;
+  customPrompt: string;
+  creditsCharged: number;
+  createdAt: string;
+  source: "transform" | "edit" | "portrait_enhance";
+};
+
+function getInstaMeFavoritesStorageKey(userId?: string | null): string {
+  return `@instame_style_favorites_${userId || "guest"}`;
+}
+
+function getInstaMeHistoryStorageKey(userId?: string | null): string {
+  return `@instame_generation_history_${userId || "guest"}`;
+}
+
+function toPresetFavoriteKey(styleId: string): FavoriteStyleKey {
+  return `preset:${styleId}`;
+}
+
+function toOwnStyleFavoriteKey(styleId: string): FavoriteStyleKey {
+  return `own:${styleId}`;
+}
 
 const INTENSITY_OPTIONS: {
   value: TransformIntensity;
@@ -292,6 +335,7 @@ export default function InstaMeScreen() {
   const params = useLocalSearchParams<{ uploadedImageId?: string | string[]; uploadedImageNonce?: string | string[] }>();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
+  const { user } = useAuth();
   const { credits, refreshCredits } = useCredits();
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
@@ -313,6 +357,16 @@ export default function InstaMeScreen() {
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
+  const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
+  const [selectedOwnStyleId, setSelectedOwnStyleId] = useState<string | null>(null);
+  const [favoriteStyleKeys, setFavoriteStyleKeys] = useState<FavoriteStyleKey[]>([]);
+  const [generationHistory, setGenerationHistory] = useState<InstaMeHistoryEntry[]>([]);
+  const [ownStyleNameDraft, setOwnStyleNameDraft] = useState("");
+  const [renamingOwnStyle, setRenamingOwnStyle] = useState(false);
+  const [savingResultAsStyle, setSavingResultAsStyle] = useState(false);
+  const [compareWidth, setCompareWidth] = useState(0);
+  const [compareRatio, setCompareRatio] = useState(0.5);
+  const [comparisonImageUri, setComparisonImageUri] = useState<string | null>(null);
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
@@ -328,15 +382,74 @@ export default function InstaMeScreen() {
   const [editInstruction, setEditInstruction] = useState("");
   const [editLoading, setEditLoading] = useState(false);
 
+  const selectedSavedOwnStyle = useMemo(
+    () => savedOwnStyles.find((style) => style.id === selectedOwnStyleId) || null,
+    [savedOwnStyles, selectedOwnStyleId],
+  );
+
+  const currentFavoriteStyleKey = useMemo(() => {
+    if (selectedStyleId === INSTAME_OWN_STYLE_ID && selectedSavedOwnStyle) {
+      return toOwnStyleFavoriteKey(selectedSavedOwnStyle.id);
+    }
+    if (selectedStyleId && selectedStyleId !== INSTAME_OWN_STYLE_ID) {
+      return toPresetFavoriteKey(selectedStyleId);
+    }
+    return null;
+  }, [selectedSavedOwnStyle, selectedStyleId]);
+
+  const isCurrentStyleFavorite = currentFavoriteStyleKey
+    ? favoriteStyleKeys.includes(currentFavoriteStyleKey)
+    : false;
+
+  const favoritePresetCards = useMemo(
+    () => stylePresets.filter((preset) => favoriteStyleKeys.includes(toPresetFavoriteKey(preset.id))),
+    [favoriteStyleKeys, stylePresets],
+  );
+
+  const favoriteOwnStyleCards = useMemo(
+    () => savedOwnStyles.filter((style) => favoriteStyleKeys.includes(toOwnStyleFavoriteKey(style.id))),
+    [favoriteStyleKeys, savedOwnStyles],
+  );
+
+  const comparePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          if (!compareWidth) return;
+          setCompareRatio(Math.min(1, Math.max(0, event.nativeEvent.locationX / compareWidth)));
+        },
+        onPanResponderMove: (event) => {
+          if (!compareWidth) return;
+          setCompareRatio(Math.min(1, Math.max(0, event.nativeEvent.locationX / compareWidth)));
+        },
+      }),
+    [compareWidth],
+  );
+
   const ownStylePreset = useMemo<InstaMeStylePreset>(() => ({
     id: INSTAME_OWN_STYLE_ID,
     label: "OWN STYLE",
     subtitle: "Upload a reference image with the style you want",
     promptHint: "user uploaded style reference",
-    representativeImage: ownStylePhoto?.uri || stylePresets[0]?.representativeImage || "",
-    cover: ownStylePhoto?.uri || stylePresets[0]?.cover || stylePresets[0]?.representativeImage || "",
-    examples: ownStylePhoto?.uri ? [ownStylePhoto.uri] : [],
-  }), [ownStylePhoto, stylePresets]);
+    representativeImage:
+      ownStylePhoto?.uri ||
+      selectedSavedOwnStyle?.previewUri ||
+      stylePresets[0]?.representativeImage ||
+      "",
+    cover:
+      ownStylePhoto?.uri ||
+      selectedSavedOwnStyle?.previewUri ||
+      stylePresets[0]?.cover ||
+      stylePresets[0]?.representativeImage ||
+      "",
+    examples: ownStylePhoto?.uri
+      ? [ownStylePhoto.uri]
+      : selectedSavedOwnStyle?.previewUri
+        ? [selectedSavedOwnStyle.previewUri]
+        : [],
+  }), [ownStylePhoto, selectedSavedOwnStyle, stylePresets]);
 
   const visibleStylePresets = useMemo(
     () => [ownStylePreset, ...stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID)],
@@ -379,7 +492,11 @@ export default function InstaMeScreen() {
 
   const activeGenerationTier = selectedArtStyle ? highResGenerationTier : liveGenerationTier;
 
-  const transformCost = activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST;
+  const isOwnStyleSelected = selectedStyleId === INSTAME_OWN_STYLE_ID;
+  const isFirstOwnStyleGeneration = isOwnStyleSelected && !selectedOwnStyleId;
+  const transformCost =
+    (activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST) +
+    (isFirstOwnStyleGeneration ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0);
   const portraitEnhanceCost = portraitEnhanceTier?.credits ?? INSTAME_PORTRAIT_ENHANCE_TIER.credits;
 
   const selectedEditTier = useMemo(
@@ -391,7 +508,6 @@ export default function InstaMeScreen() {
     () => INTENSITY_OPTIONS.find((option) => option.value === intensity) || null,
     [intensity],
   );
-  const isOwnStyleSelected = selectedStyleId === INSTAME_OWN_STYLE_ID;
   const useStackedEditTierCards = windowWidth < 430;
 
   const uploadedImageIdParam = Array.isArray(params.uploadedImageId)
@@ -408,7 +524,8 @@ export default function InstaMeScreen() {
       apiClient.getInstaMeStyleLibrary(),
       apiClient.getInstaMeStylePresets(),
       apiClient.getInstaMePricing(),
-    ]).then(([styleLibraryResult, stylePresetResult, pricingResult]) => {
+      apiClient.getInstaMeOwnStyles(),
+    ]).then(([styleLibraryResult, stylePresetResult, pricingResult, ownStylesResult]) => {
         if (!mounted) return;
 
         if (styleLibraryResult.status === "fulfilled") {
@@ -435,12 +552,66 @@ export default function InstaMeScreen() {
             setSelectedGenerationTierId(pricingResult.value.liveGenerationTierId);
           }
         }
+
+        if (ownStylesResult.status === "fulfilled") {
+          setSavedOwnStyles(Array.isArray(ownStylesResult.value.ownStyles) ? ownStylesResult.value.ownStyles : []);
+        } else {
+          setSavedOwnStyles([]);
+        }
       });
 
     return () => {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (selectedOwnStyleId && !savedOwnStyles.some((style) => style.id === selectedOwnStyleId)) {
+      setSelectedOwnStyleId(null);
+    }
+  }, [savedOwnStyles, selectedOwnStyleId]);
+
+  useEffect(() => {
+    const storageKey = getInstaMeFavoritesStorageKey(user?.id);
+    let cancelled = false;
+
+    AsyncStorage.getItem(storageKey)
+      .then((stored) => {
+        if (cancelled) return;
+        const parsed = stored ? JSON.parse(stored) : [];
+        setFavoriteStyleKeys(Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string") : []);
+      })
+      .catch(() => {
+        if (!cancelled) setFavoriteStyleKeys([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    const storageKey = getInstaMeHistoryStorageKey(user?.id);
+    let cancelled = false;
+
+    AsyncStorage.getItem(storageKey)
+      .then((stored) => {
+        if (cancelled) return;
+        const parsed = stored ? JSON.parse(stored) : [];
+        setGenerationHistory(Array.isArray(parsed) ? parsed : []);
+      })
+      .catch(() => {
+        if (!cancelled) setGenerationHistory([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    setOwnStyleNameDraft(selectedSavedOwnStyle?.name || "");
+  }, [selectedSavedOwnStyle?.id, selectedSavedOwnStyle?.name]);
 
   useEffect(() => {
     if (!uploadedImageIdParam || !uploadedImageNonce) {
@@ -465,6 +636,7 @@ export default function InstaMeScreen() {
           sourceImageId: image.id,
           name: image.name,
         });
+        setComparisonImageUri(image.previewUri || image.dataUri);
         setPortraitEnhanceCandidate(null);
         setUsingEnhancedPortrait(false);
         setResultBase64(null);
@@ -517,8 +689,13 @@ export default function InstaMeScreen() {
   }, [selectedArtStyleId]);
 
   const canGenerate = useMemo(
-    () => Boolean(photo && !loading && credits >= transformCost),
-    [photo, loading, credits, transformCost],
+    () => Boolean(
+      photo &&
+      !loading &&
+      credits >= transformCost &&
+      (!isOwnStyleSelected || ownStylePhoto || selectedOwnStyleId),
+    ),
+    [photo, loading, credits, transformCost, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId],
   );
 
   const handleStyleRowScroll = useCallback((event: any) => {
@@ -530,6 +707,26 @@ export default function InstaMeScreen() {
   const scrollStylesRight = useCallback(() => {
     (styleListRef.current as ScrollView | null)?.scrollTo({ x: 220, animated: true });
   }, []);
+
+  const persistFavoriteKeys = useCallback(async (nextKeys: FavoriteStyleKey[]) => {
+    setFavoriteStyleKeys(nextKeys);
+    await AsyncStorage.setItem(getInstaMeFavoritesStorageKey(user?.id), JSON.stringify(nextKeys));
+  }, [user?.id]);
+
+  const toggleCurrentStyleFavorite = useCallback(async () => {
+    if (!currentFavoriteStyleKey) return;
+    const nextKeys = favoriteStyleKeys.includes(currentFavoriteStyleKey)
+      ? favoriteStyleKeys.filter((key) => key !== currentFavoriteStyleKey)
+      : [currentFavoriteStyleKey, ...favoriteStyleKeys];
+    await persistFavoriteKeys(nextKeys);
+    await Haptics.selectionAsync();
+  }, [currentFavoriteStyleKey, favoriteStyleKeys, persistFavoriteKeys]);
+
+  const appendGenerationHistory = useCallback(async (entry: InstaMeHistoryEntry) => {
+    const nextHistory = [entry, ...generationHistory.filter((item) => item.id !== entry.id)].slice(0, MAX_INSTAME_HISTORY_ITEMS);
+    setGenerationHistory(nextHistory);
+    await AsyncStorage.setItem(getInstaMeHistoryStorageKey(user?.id), JSON.stringify(nextHistory));
+  }, [generationHistory, user?.id]);
 
   const pickRawImage = useCallback(async (): Promise<ImagePicker.ImagePickerAsset | null> => {
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
@@ -569,6 +766,7 @@ export default function InstaMeScreen() {
       sourceImageId: undefined,
       name: asset.fileName || "Portrait",
     });
+    setComparisonImageUri(buildDataUri(prepared.previewBase64 || prepared.base64, prepared.mimeType));
     setPortraitEnhanceCandidate(null);
     setUsingEnhancedPortrait(false);
     setResultBase64(null);
@@ -590,6 +788,61 @@ export default function InstaMeScreen() {
       return;
     }
 
+    const preparedHash = await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      prepared.previewBase64,
+    );
+    const duplicateOwnStyle = savedOwnStyles.find(
+      (style) => style.imageHash && style.imageHash === preparedHash,
+    );
+
+    if (duplicateOwnStyle) {
+      Alert.alert(
+        "Style already saved",
+        `This looks like your saved style \"${duplicateOwnStyle.name}\". Reuse it instead of paying the first-time Own Style fee again?`,
+        [
+          {
+            text: "Keep new upload",
+            style: "cancel",
+            onPress: () => {
+              setOwnStylePhoto({
+                uri: prepared.uri,
+                base64: prepared.base64,
+                previewBase64: prepared.previewBase64,
+                mimeType: prepared.mimeType,
+                width: prepared.width,
+                height: prepared.height,
+                fileSizeBytes: prepared.fileSizeBytes,
+                sourceImageId: undefined,
+                name: asset.fileName || "Style reference",
+              });
+              setSelectedOwnStyleId(null);
+              setResultBase64(null);
+              setResultMeta(null);
+              setShowEditComposer(false);
+              setEditInstruction("");
+            },
+          },
+          {
+            text: "Use saved style",
+            onPress: () => {
+              setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+              setIntensity(null);
+              setPreviewStyleId(null);
+              setSelectedOwnStyleId(duplicateOwnStyle.id);
+              setOwnStylePhoto(null);
+              setResultBase64(null);
+              setResultMeta(null);
+              setShowEditComposer(false);
+              setEditInstruction("");
+            },
+          },
+        ],
+      );
+      await Haptics.selectionAsync();
+      return;
+    }
+
     setOwnStylePhoto({
       uri: prepared.uri,
       base64: prepared.base64,
@@ -601,12 +854,13 @@ export default function InstaMeScreen() {
       sourceImageId: undefined,
       name: asset.fileName || "Style reference",
     });
+    setSelectedOwnStyleId(null);
     setResultBase64(null);
     setResultMeta(null);
     setShowEditComposer(false);
     setEditInstruction("");
     await Haptics.selectionAsync();
-  }, [pickRawImage]);
+  }, [pickRawImage, savedOwnStyles]);
 
   const handleStylePresetPress = useCallback((preset: InstaMeStylePreset) => {
     setSelectedStyleId(preset.id);
@@ -615,7 +869,7 @@ export default function InstaMeScreen() {
       setIntensity(null);
       setPreviewStyleId(null);
 
-      if (!ownStylePhoto) {
+      if (!ownStylePhoto && !selectedOwnStyleId) {
         InteractionManager.runAfterInteractions(() => {
           void pickOwnStyleImage();
         });
@@ -624,7 +878,184 @@ export default function InstaMeScreen() {
     }
 
     setPreviewStyleId(preset.id);
-  }, [ownStylePhoto, pickOwnStyleImage]);
+  }, [ownStylePhoto, pickOwnStyleImage, selectedOwnStyleId]);
+
+  const handleSelectSavedOwnStyle = useCallback(async (style: InstaMeOwnStyle) => {
+    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+    setIntensity(null);
+    setPreviewStyleId(null);
+    setSelectedOwnStyleId(style.id);
+    setOwnStylePhoto(null);
+    setResultBase64(null);
+    setResultMeta(null);
+    setShowEditComposer(false);
+    setEditInstruction("");
+    await Haptics.selectionAsync();
+  }, []);
+
+  const handleDeleteSavedOwnStyle = useCallback((style: InstaMeOwnStyle) => {
+    Alert.alert(
+      "Delete saved style?",
+      "This removes the saved prompt and thumbnail from your Own Styles library.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await apiClient.deleteInstaMeOwnStyle(style.id);
+              setSavedOwnStyles((current) => current.filter((entry) => entry.id !== style.id));
+              const nextFavoriteKeys = favoriteStyleKeys.filter((key) => key !== toOwnStyleFavoriteKey(style.id));
+              setFavoriteStyleKeys(nextFavoriteKeys);
+              await AsyncStorage.setItem(getInstaMeFavoritesStorageKey(user?.id), JSON.stringify(nextFavoriteKeys));
+              if (selectedOwnStyleId === style.id) {
+                setSelectedOwnStyleId(null);
+              }
+              await Haptics.selectionAsync();
+            } catch (error: any) {
+              Alert.alert("Delete failed", error?.message || "Could not remove this saved style.");
+            }
+          },
+        },
+      ],
+    );
+  }, [favoriteStyleKeys, selectedOwnStyleId, user?.id]);
+
+  const handleRenameSavedOwnStyle = useCallback(async () => {
+    if (!selectedSavedOwnStyle) return;
+    const nextName = ownStyleNameDraft.trim().slice(0, 48);
+    if (!nextName || nextName === selectedSavedOwnStyle.name) return;
+
+    setRenamingOwnStyle(true);
+    try {
+      const result = await apiClient.renameInstaMeOwnStyle(selectedSavedOwnStyle.id, nextName);
+      setSavedOwnStyles((current) =>
+        current.map((style) => (style.id === result.ownStyle.id ? result.ownStyle : style)),
+      );
+      await Haptics.selectionAsync();
+    } catch (error: any) {
+      Alert.alert("Rename failed", error?.message || "Could not rename this saved style.");
+    } finally {
+      setRenamingOwnStyle(false);
+    }
+  }, [ownStyleNameDraft, selectedSavedOwnStyle]);
+
+  const restoreHistoryEntry = useCallback(async (entry: InstaMeHistoryEntry, openEditComposer?: boolean) => {
+    if (entry.sourcePhotoUri) {
+      const [, sourceBase64 = ""] = entry.sourcePhotoUri.split(",");
+      setPhoto((current) => ({
+        uri: entry.sourcePhotoUri || current?.uri || "",
+        base64: sourceBase64 || current?.base64 || "",
+        previewBase64: sourceBase64 || current?.previewBase64,
+        mimeType: current?.mimeType || "image/jpeg",
+        width: current?.width,
+        height: current?.height,
+        fileSizeBytes: current?.fileSizeBytes,
+        sourceImageId: current?.sourceImageId,
+        name: current?.name,
+      }));
+    }
+    setComparisonImageUri(entry.sourcePhotoUri || null);
+
+    setResultBase64(entry.editableBase64);
+    setResultMeta({
+      model: resultMeta?.model || "History",
+      provider: resultMeta?.provider,
+      promptOnlyMode: entry.stylePresetId === INSTAME_OWN_STYLE_ID,
+      stylePresetId: entry.stylePresetId || null,
+    });
+    setCustomPrompt(entry.customPrompt || "");
+    setOwnStylePhoto(null);
+    setSelectedArtStyleId(entry.artStyleId || "");
+
+    if (entry.stylePresetId === INSTAME_OWN_STYLE_ID && entry.ownStyleId) {
+      const ownStyle = savedOwnStyles.find((style) => style.id === entry.ownStyleId);
+      if (ownStyle) {
+        setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+        setSelectedOwnStyleId(ownStyle.id);
+      }
+    } else if (entry.stylePresetId) {
+      setSelectedStyleId(entry.stylePresetId);
+      setSelectedOwnStyleId(null);
+    }
+
+    setShowEditComposer(Boolean(openEditComposer));
+    if (openEditComposer) {
+      setEditInstruction("");
+    }
+    await Haptics.selectionAsync();
+  }, [resultMeta?.model, resultMeta?.provider, savedOwnStyles]);
+
+  const handleSaveResultAsOwnStyle = useCallback(async () => {
+    if (!resultBase64) {
+      Alert.alert("Missing image", "Generate an image before saving it as a style.");
+      return;
+    }
+
+    setSavingResultAsStyle(true);
+    try {
+      const prepared = await optimizeGeneratedBase64Image({
+        base64: resultBase64,
+        mimeType: "image/png",
+      });
+      const result = await apiClient.saveInstaMeOwnStyle({
+        image: {
+          name: `${selectedStylePreset?.label || "Chicoo"} Style`,
+          base64: prepared.base64,
+          previewBase64: prepared.previewBase64,
+          mimeType: prepared.mimeType,
+          width: prepared.width,
+          height: prepared.height,
+          fileSizeBytes: prepared.fileSizeBytes,
+        },
+      });
+      setSavedOwnStyles((current) => {
+        const rest = current.filter((style) => style.id !== result.ownStyle.id);
+        return [result.ownStyle, ...rest];
+      });
+      setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+      setSelectedOwnStyleId(result.ownStyle.id);
+      setOwnStylePhoto(null);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      Alert.alert("Save failed", error?.message || "Could not save this result as an Own Style.");
+    } finally {
+      setSavingResultAsStyle(false);
+    }
+  }, [resultBase64, selectedStylePreset?.label]);
+
+  const persistHistoryResult = useCallback(async (options: {
+    imageBase64: string;
+    mimeType?: string;
+    styleLabel: string;
+    stylePresetId?: string | null;
+    ownStyleId?: string | null;
+    customPrompt: string;
+    creditsCharged: number;
+    source: "transform" | "edit" | "portrait_enhance";
+  }) => {
+    const prepared = await optimizeGeneratedBase64Image({
+      base64: options.imageBase64,
+      mimeType: options.mimeType || "image/png",
+    });
+
+    await appendGenerationHistory({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      previewUri: buildDataUri(prepared.previewBase64, prepared.mimeType),
+      editableBase64: prepared.base64,
+      editableMimeType: prepared.mimeType,
+      sourcePhotoUri: photo ? buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType) : undefined,
+      styleLabel: options.styleLabel,
+      stylePresetId: options.stylePresetId || null,
+      ownStyleId: options.ownStyleId || null,
+      artStyleId: selectedArtStyleId || null,
+      customPrompt: options.customPrompt,
+      creditsCharged: options.creditsCharged,
+      createdAt: new Date().toISOString(),
+      source: options.source,
+    });
+  }, [appendGenerationHistory, photo, selectedArtStyleId]);
 
   const handleEnhancePortrait = useCallback(async () => {
     if (!photo) {
@@ -655,6 +1086,15 @@ export default function InstaMeScreen() {
         height: 1024,
         name: `${photo.name || "Portrait"} Enhanced`,
       });
+      setComparisonImageUri(buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType));
+      await persistHistoryResult({
+        imageBase64: result.imageBase64,
+        mimeType: "image/png",
+        styleLabel: "Portrait Enhance",
+        customPrompt: "",
+        creditsCharged: portraitEnhanceCost,
+        source: "portrait_enhance",
+      });
       await refreshCredits();
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
@@ -662,7 +1102,7 @@ export default function InstaMeScreen() {
     } finally {
       setPortraitEnhanceLoading(false);
     }
-  }, [credits, photo, portraitEnhanceCost, refreshCredits]);
+  }, [credits, persistHistoryResult, photo, portraitEnhanceCost, refreshCredits]);
 
   const handleKeepEnhancedPortrait = useCallback(async () => {
     if (!portraitEnhanceCandidate) {
@@ -726,7 +1166,7 @@ export default function InstaMeScreen() {
       Alert.alert("Missing image", "Upload one photo before transforming.");
       return;
     }
-    if (isOwnStyleSelected && !ownStylePhoto) {
+    if (isOwnStyleSelected && !ownStylePhoto && !selectedOwnStyleId) {
       Alert.alert("Missing style image", "Upload one style reference image for Own Style before generating.");
       return;
     }
@@ -742,9 +1182,19 @@ export default function InstaMeScreen() {
 
       const result = await apiClient.transformOldMoney({
         photo: { base64: photo.base64, mimeType: photo.mimeType },
-        stylePhoto: isOwnStyleSelected && ownStylePhoto
-          ? { base64: ownStylePhoto.base64, mimeType: ownStylePhoto.mimeType }
+        stylePhoto: isOwnStyleSelected && ownStylePhoto && !selectedOwnStyleId
+          ? {
+              base64: ownStylePhoto.base64,
+              mimeType: ownStylePhoto.mimeType,
+              previewBase64: ownStylePhoto.previewBase64,
+              width: ownStylePhoto.width,
+              height: ownStylePhoto.height,
+              fileSizeBytes: ownStylePhoto.fileSizeBytes,
+              name: ownStylePhoto.name,
+            }
           : undefined,
+        savedOwnStyleId: isOwnStyleSelected ? selectedOwnStyleId || undefined : undefined,
+        saveOwnStyle: Boolean(isOwnStyleSelected && ownStylePhoto && !selectedOwnStyleId),
         customPrompt: composedPrompt,
         intensity: selectedArtStyle || isOwnStyleSelected ? undefined : intensity || undefined,
         preserveBackground,
@@ -753,15 +1203,35 @@ export default function InstaMeScreen() {
       });
 
       setResultBase64(result.imageBase64);
+  setComparisonImageUri(buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType));
       setResultMeta({
         model: result.model,
         provider: result.provider,
         promptOnlyMode: result.promptOnlyMode,
         generationTierId: result.generationTierId,
+        stylePresetId: result.stylePresetId,
       });
+      if (result.savedOwnStyle) {
+        setSavedOwnStyles((current) => {
+          const rest = current.filter((entry) => entry.id !== result.savedOwnStyle?.id);
+          return [result.savedOwnStyle, ...rest];
+        });
+        setSelectedOwnStyleId(result.savedOwnStyle.id);
+        setOwnStylePhoto(null);
+      }
       setLastUsedStyleRefs(Array.isArray(result.styleReferenceIds) ? result.styleReferenceIds : []);
       setShowEditComposer(false);
       setEditInstruction("");
+      await persistHistoryResult({
+        imageBase64: result.imageBase64,
+        mimeType: "image/png",
+        styleLabel: selectedArtStyle ? `${selectedPreset?.label || "Chicoo"} + ${selectedArtStyle.label}` : selectedPreset?.label || "Chicoo",
+        stylePresetId: result.stylePresetId,
+        ownStyleId: result.savedOwnStyle?.id || selectedOwnStyleId || null,
+        customPrompt: composedPrompt,
+        creditsCharged: result.creditsCharged || transformCost,
+        source: "transform",
+      });
       await refreshCredits();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
@@ -781,7 +1251,9 @@ export default function InstaMeScreen() {
     isOwnStyleSelected,
     intensity,
     ownStylePhoto,
+    selectedOwnStyleId,
     preserveBackground,
+    persistHistoryResult,
     refreshCredits,
     activeGenerationTier,
     selectedGenerationTierId,
@@ -806,6 +1278,7 @@ export default function InstaMeScreen() {
 
     setEditLoading(true);
     try {
+      const previousResultBase64 = resultBase64;
       const result = await apiClient.editInstaMeImage({
         currentImage: { base64: resultBase64, mimeType: "image/png" },
         originalPhoto: photo ? { base64: photo.base64, mimeType: photo.mimeType } : undefined,
@@ -815,9 +1288,20 @@ export default function InstaMeScreen() {
       });
 
       setResultBase64(result.imageBase64);
+      setComparisonImageUri(`data:image/png;base64,${previousResultBase64}`);
       setResultMeta({
         model: result.model,
         provider: result.provider,
+      });
+      await persistHistoryResult({
+        imageBase64: result.imageBase64,
+        mimeType: "image/png",
+        styleLabel: `${selectedStylePreset?.label || "Chicoo"} Edit`,
+        stylePresetId: resultMeta?.stylePresetId || selectedStyleId,
+        ownStyleId: selectedOwnStyleId,
+        customPrompt: editInstruction.trim(),
+        creditsCharged: selectedEditTier?.credits ?? 0,
+        source: "edit",
       });
       await refreshCredits();
       setShowEditComposer(false);
@@ -836,7 +1320,12 @@ export default function InstaMeScreen() {
     selectedEditTierId,
     photo,
     customPrompt,
+    persistHistoryResult,
     refreshCredits,
+    resultMeta?.stylePresetId,
+    selectedStyleId,
+    selectedStylePreset?.label,
+    selectedOwnStyleId,
   ]);
 
   const handleDownload = useCallback(async () => {
@@ -973,6 +1462,7 @@ export default function InstaMeScreen() {
               </>
             )}
           </Pressable>
+          {portraitEnhanceLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
 
           <Text style={styles.enhanceHintText}>
             Improve the selfie first to reduce face distortion in later styled generations.
@@ -1024,6 +1514,56 @@ export default function InstaMeScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>2. Main Styles</Text>
+          {favoritePresetCards.length > 0 || favoriteOwnStyleCards.length > 0 ? (
+            <View style={styles.favoriteStylesSection}>
+              <View style={styles.ownStylesLibraryHeader}>
+                <Text style={styles.ownStylesLibraryTitle}>Favorite Styles</Text>
+                <Text style={styles.ownStylesLibraryCount}>{favoritePresetCards.length + favoriteOwnStyleCards.length}</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+                {favoritePresetCards.map((preset) => {
+                  const theme = getStyleCardTheme(preset.id);
+                  return (
+                    <Pressable
+                      key={`favorite-preset-${preset.id}`}
+                      onPress={() => handleStylePresetPress(preset)}
+                      style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
+                    >
+                      <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
+                        <Image source={{ uri: preset.cover || preset.representativeImage }} contentFit="cover" style={styles.styleCardImage} />
+                        <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
+                        <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
+                        <View style={styles.styleCardTextWrap}>
+                          <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{preset.label}</Text>
+                          <Text numberOfLines={2} style={styles.savedOwnStyleCardText}>{preset.subtitle}</Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+                {favoriteOwnStyleCards.map((style) => {
+                  const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
+                  return (
+                    <Pressable
+                      key={`favorite-own-${style.id}`}
+                      onPress={() => handleSelectSavedOwnStyle(style)}
+                      style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
+                    >
+                      <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
+                        <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
+                        <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
+                        <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
+                        <View style={styles.styleCardTextWrap}>
+                          <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
+                          <Text numberOfLines={2} style={styles.savedOwnStyleCardText}>{style.promptPreview}</Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : null}
           <View style={styles.styleCarouselWrap}>
             <ScrollView
               ref={styleListRef}
@@ -1071,7 +1611,7 @@ export default function InstaMeScreen() {
                         },
                       ]}
                     >
-                      {isOwnStylePreset && !ownStylePhoto ? (
+                      {isOwnStylePreset && !ownStylePhoto && !selectedSavedOwnStyle ? (
                         <View style={styles.ownStyleCardPlaceholder}>
                           <Ionicons name="sparkles-outline" size={36} color={theme.text} />
                           <Text style={[styles.ownStyleCardPlaceholderText, { color: theme.text }]}>Upload a look you love</Text>
@@ -1152,19 +1692,32 @@ export default function InstaMeScreen() {
             ) : null}
           </View>
 
-          <Text style={styles.selectedStyleText}>
-            Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
-          </Text>
+          <View style={styles.selectedStyleRow}>
+            <Text style={styles.selectedStyleText}>
+              Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
+            </Text>
+            {currentFavoriteStyleKey ? (
+              <Pressable onPress={() => void toggleCurrentStyleFavorite()} style={styles.favoriteStyleButton}>
+                <Ionicons name={isCurrentStyleFavorite ? "heart" : "heart-outline"} size={18} color={isCurrentStyleFavorite ? "#FF7CA9" : "#FFD6E3"} />
+                <Text style={styles.favoriteStyleButtonText}>{isCurrentStyleFavorite ? "Favorited" : "Favorite"}</Text>
+              </Pressable>
+            ) : null}
+          </View>
 
           {isOwnStyleSelected ? (
             <View style={styles.ownStylePanel}>
               <Text style={styles.ownStylePanelTitle}>Upload your style reference</Text>
               <Text style={styles.ownStylePanelText}>
-                Add one image whose styling you want to transfer. We will analyze its pose, expression, hair, lighting, framing, and overall aesthetic.
+                Add one image whose styling you want to transfer. After the first successful generation, we save a compact thumbnail and the analyzed prompt so you can reuse that look instantly later.
+              </Text>
+              <Text style={styles.processingHintText}>
+                First-time Own Style generation costs {transformCost} credits. Saved Own Styles return to {activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST} credits.
               </Text>
               <Pressable onPress={pickOwnStyleImage} style={styles.ownStyleUploadBox}>
                 {ownStylePhoto ? (
                   <Image source={{ uri: ownStylePhoto.uri }} style={styles.ownStyleUploadImage} contentFit="cover" />
+                ) : selectedSavedOwnStyle ? (
+                  <Image source={{ uri: selectedSavedOwnStyle.previewUri }} style={styles.ownStyleUploadImage} contentFit="cover" />
                 ) : (
                   <View style={styles.ownStyleUploadPlaceholder}>
                     <Ionicons name="images-outline" size={28} color={Colors.accent} />
@@ -1173,13 +1726,41 @@ export default function InstaMeScreen() {
                   </View>
                 )}
               </Pressable>
+              {selectedSavedOwnStyle ? (
+                <View style={styles.ownStyleSavedMeta}>
+                  <Text style={styles.ownStyleSavedMetaTitle}>Using saved style: {selectedSavedOwnStyle.name}</Text>
+                  <Text style={styles.ownStyleSavedMetaText}>{selectedSavedOwnStyle.promptPreview}</Text>
+                  <View style={styles.renameOwnStyleRow}>
+                    <TextInput
+                      value={ownStyleNameDraft}
+                      onChangeText={setOwnStyleNameDraft}
+                      placeholder="Rename this style"
+                      placeholderTextColor="#7EA1A7"
+                      style={styles.renameOwnStyleInput}
+                    />
+                    <Pressable
+                      onPress={() => void handleRenameSavedOwnStyle()}
+                      disabled={renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name}
+                      style={({ pressed }) => [
+                        styles.renameOwnStyleButton,
+                        (renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name) && styles.secondaryActionButtonDisabled,
+                        pressed && !(renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name) ? { opacity: 0.88 } : undefined,
+                      ]}
+                    >
+                      <Text style={styles.renameOwnStyleButtonText}>{renamingOwnStyle ? "Saving..." : "Rename"}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
               <View style={styles.uploadActionRow}>
                 <Pressable
                   onPress={pickOwnStyleImage}
                   style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
                 >
                   <Ionicons name="cloud-upload-outline" size={16} color="#FFE1EA" />
-                  <Text style={styles.secondaryActionButtonText}>{ownStylePhoto ? "Change style image" : "Upload style image"}</Text>
+                  <Text style={styles.secondaryActionButtonText}>
+                    {ownStylePhoto || selectedSavedOwnStyle ? "Use another style image" : "Upload style image"}
+                  </Text>
                 </Pressable>
                 {ownStylePhoto ? (
                   <Pressable
@@ -1189,8 +1770,79 @@ export default function InstaMeScreen() {
                     <Ionicons name="trash-outline" size={16} color="#FFE1EA" />
                     <Text style={styles.secondaryActionButtonText}>Remove</Text>
                   </Pressable>
+                ) : selectedSavedOwnStyle ? (
+                  <Pressable
+                    onPress={() => handleDeleteSavedOwnStyle(selectedSavedOwnStyle)}
+                    style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#FFE1EA" />
+                    <Text style={styles.secondaryActionButtonText}>Delete saved style</Text>
+                  </Pressable>
                 ) : null}
               </View>
+
+              {savedOwnStyles.length > 0 ? (
+                <View style={styles.ownStylesLibrarySection}>
+                  <View style={styles.ownStylesLibraryHeader}>
+                    <Text style={styles.ownStylesLibraryTitle}>Your Own Styles</Text>
+                    <Text style={styles.ownStylesLibraryCount}>{savedOwnStyles.length}</Text>
+                  </View>
+                  <Text style={styles.ownStylesLibraryText}>
+                    Reuse the looks you already analyzed. Each one keeps a compact preview plus the saved styling prompt.
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.ownStylesRow}
+                  >
+                    {savedOwnStyles.map((style, index) => {
+                      const active = selectedOwnStyleId === style.id;
+                      const isFirst = index === 0;
+                      const isLast = index === savedOwnStyles.length - 1;
+                      const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
+
+                      return (
+                        <Pressable
+                          key={style.id}
+                          onPress={() => handleSelectSavedOwnStyle(style)}
+                          style={[
+                            styles.savedOwnStyleCardOuter,
+                            isFirst && styles.styleCardOuterFirst,
+                            isLast && styles.styleCardOuterLast,
+                            { backgroundColor: theme.ambient, shadowColor: theme.glow },
+                            active && styles.styleCardOuterActive,
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.savedOwnStyleCard,
+                              { borderColor: active ? theme.glow : theme.border, backgroundColor: theme.footerBottom },
+                            ]}
+                          >
+                            <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
+                            <LinearGradient
+                              colors={active
+                                ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.66)"]
+                                : [theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]}
+                              locations={[0, 0.22, 1]}
+                              style={styles.styleCardAtmosphere}
+                            />
+                            <LinearGradient
+                              colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]}
+                              locations={[0, 0.4, 1]}
+                              style={styles.styleCardFooter}
+                            />
+                            <View style={styles.styleCardTextWrap}>
+                              <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
+                              <Text numberOfLines={2} style={styles.savedOwnStyleCardText}>{style.promptPreview}</Text>
+                            </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              ) : null}
             </View>
           ) : null}
 
@@ -1208,7 +1860,7 @@ export default function InstaMeScreen() {
                   {selectedArtStyle
                     ? "Art Styles take priority. You can still keep the background and add notes here."
                     : isOwnStyleSelected
-                      ? "Own Style uses your uploaded reference image. You can still keep the background and add notes here."
+                      ? "Own Style uses your uploaded or saved reference. You can still keep the background and add notes here."
                     : selectedIntensityOption
                       ? `${selectedIntensityOption.label}: ${selectedIntensityOption.subtitle}`
                       : "No extra fine tune selected."}
@@ -1296,7 +1948,7 @@ export default function InstaMeScreen() {
                   <View style={styles.fineTuneArtStyleNotice}>
                     <Text style={styles.fineTuneArtStyleNoticeTitle}>Own Style selected</Text>
                     <Text style={styles.fineTuneArtStyleNoticeText}>
-                      The uploaded style reference drives the look here. You can still preserve the background and add custom notes below.
+                      Your uploaded or saved Own Style drives the look here. You can still preserve the background and add custom notes below.
                     </Text>
                   </View>
                 ) : (
@@ -1500,11 +2152,43 @@ export default function InstaMeScreen() {
               </>
             )}
           </Pressable>
+          {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
         </View>
 
         {resultBase64 ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{selectedArtStyle ? "3. Your Chicoo result" : "4. Your Chicoo result"}</Text>
+            {comparisonImageUri ? (
+              <View style={styles.compareSection}>
+                <View style={styles.compareHeader}>
+                  <Text style={styles.compareTitle}>Before / After</Text>
+                  <Text style={styles.compareSubtitle}>Drag the divider to compare your original photo with the generated result.</Text>
+                </View>
+                <View
+                  style={styles.compareFrame}
+                  onLayout={(event) => setCompareWidth(event.nativeEvent.layout.width)}
+                  {...comparePanResponder.panHandlers}
+                >
+                  <Image source={{ uri: `data:image/png;base64,${resultBase64}` }} style={styles.compareImage} contentFit="cover" />
+                  <View style={[styles.compareOverlay, { width: Math.max(0, compareWidth * compareRatio) }]}>
+                    <Image
+                      source={{ uri: comparisonImageUri }}
+                      style={[styles.compareImage, compareWidth ? { width: compareWidth } : null]}
+                      contentFit="cover"
+                    />
+                  </View>
+                  <View style={[styles.compareDivider, { left: `${compareRatio * 100}%` }]}>
+                    <View style={styles.compareHandle}>
+                      <Ionicons name="swap-horizontal" size={16} color="#091114" />
+                    </View>
+                  </View>
+                  <View style={styles.compareLabelRow}>
+                    <Text style={styles.compareLabel}>Before</Text>
+                    <Text style={styles.compareLabel}>After</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
             <Image
               source={{ uri: `data:image/png;base64,${resultBase64}` }}
               style={styles.resultImage}
@@ -1517,7 +2201,7 @@ export default function InstaMeScreen() {
                 {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Export: {activeGenerationTier?.label || "High Res"}
               </Text>
               <Text style={styles.resultMetaText}>
-                Mode: {resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "1024 x 1024"}
+                Mode: {resultMeta?.stylePresetId === INSTAME_OWN_STYLE_ID ? "Own Style" : resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "1024 x 1024"}
               </Text>
             </View>
             <View style={styles.postGenerationSection}>
@@ -1553,6 +2237,14 @@ export default function InstaMeScreen() {
                 <Ionicons name="create-outline" size={18} color="#FFD6E3" />
                 <Text style={styles.editButtonText}>Edit</Text>
               </Pressable>
+              <Pressable
+                style={[styles.resultActionButton, styles.resultActionButtonSecondary]}
+                onPress={() => void handleSaveResultAsOwnStyle()}
+                disabled={savingResultAsStyle}
+              >
+                <Ionicons name="bookmark-outline" size={18} color="#FFD6E3" />
+                <Text style={styles.editButtonText}>{savingResultAsStyle ? "Saving..." : "Save as style"}</Text>
+              </Pressable>
             </View>
             {showEditComposer ? (
               <View style={styles.editComposer}>
@@ -1587,11 +2279,39 @@ export default function InstaMeScreen() {
                     </>
                   )}
                 </Pressable>
+                {editLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
               </View>
             ) : null}
             <Text style={styles.resultFootnote}>
               Download is free. Every edit is charged separately.
             </Text>
+          </View>
+        ) : null}
+
+        {generationHistory.length > 0 ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Recent Results</Text>
+            <Text style={styles.ownStylesLibraryText}>Reload a setup, reopen a result, or jump straight back into edit.</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+              {generationHistory.map((entry) => (
+                <View key={entry.id} style={styles.historyCard}>
+                  <Image source={{ uri: entry.previewUri }} style={styles.historyCardImage} contentFit="cover" />
+                  <View style={styles.historyCardBody}>
+                    <Text style={styles.historyCardTitle}>{entry.styleLabel}</Text>
+                    <Text style={styles.historyCardMeta}>{entry.creditsCharged} credits - {entry.source.replace(/_/g, " ")}</Text>
+                    <Text numberOfLines={2} style={styles.historyCardPrompt}>{entry.customPrompt || "No extra prompt"}</Text>
+                  </View>
+                  <View style={styles.historyActionRow}>
+                    <Pressable onPress={() => void restoreHistoryEntry(entry)} style={styles.historyActionButton}>
+                      <Text style={styles.historyActionText}>Use setup</Text>
+                    </Pressable>
+                    <Pressable onPress={() => void restoreHistoryEntry(entry, true)} style={styles.historyActionButton}>
+                      <Text style={styles.historyActionText}>Edit again</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         ) : null}
       </ScrollView>
@@ -1823,6 +2543,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  processingHintText: {
+    color: "#9FB0B6",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+  },
   ownStyleUploadBox: {
     borderRadius: 14,
     overflow: "hidden",
@@ -1854,6 +2581,128 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",
+  },
+  ownStyleSavedMeta: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(134,244,255,0.18)",
+    backgroundColor: "rgba(134,244,255,0.05)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  ownStyleSavedMetaTitle: {
+    color: "#E7FDFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  ownStyleSavedMetaText: {
+    color: "#A9C4CB",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  renameOwnStyleRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  renameOwnStyleInput: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(134,244,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    color: "#FFF",
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    paddingHorizontal: 12,
+  },
+  renameOwnStyleButton: {
+    minWidth: 92,
+    minHeight: 42,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(134,244,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(134,244,255,0.24)",
+  },
+  renameOwnStyleButtonText: {
+    color: "#E7FDFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  ownStylesLibrarySection: {
+    gap: 10,
+    marginTop: 4,
+  },
+  ownStylesLibraryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  ownStylesLibraryTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  ownStylesLibraryCount: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    textAlign: "center",
+    textAlignVertical: "center",
+    overflow: "hidden",
+    color: "#E7FDFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    backgroundColor: "rgba(134,244,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(134,244,255,0.24)",
+    paddingTop: 6,
+  },
+  ownStylesLibraryText: {
+    color: "#B7C9CE",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  ownStylesRow: {
+    gap: 14,
+    paddingLeft: 2,
+    paddingRight: 10,
+  },
+  savedOwnStyleCardOuter: {
+    width: 156,
+    height: 198,
+    borderRadius: 24,
+    backgroundColor: "rgba(134,244,255,0.08)",
+    padding: 1,
+    shadowOpacity: 0.32,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
+  },
+  savedOwnStyleCard: {
+    flex: 1,
+    borderRadius: 23,
+    overflow: "hidden",
+    borderWidth: 1,
+  },
+  savedOwnStyleCardTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  savedOwnStyleCardText: {
+    color: "#D8E7EA",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 4,
   },
   uploadedImagesSection: {
     marginTop: 16,
@@ -2153,15 +3002,42 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 12,
   },
+  favoriteStylesSection: {
+    gap: 10,
+    marginBottom: 8,
+  },
+  selectedStyleRow: {
+    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   selectedStyleText: {
     color: "#D7D7D7",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
-    marginTop: 2,
+    flex: 1,
   },
   selectedStyleAccent: {
     color: "#FF9EBC",
     fontFamily: "Inter_700Bold",
+  },
+  favoriteStyleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  favoriteStyleButtonText: {
+    color: "#FFD6E3",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   fineTuneDropdownWrap: {
     marginTop: 10,
@@ -2555,6 +3431,77 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
   },
+  compareSection: {
+    gap: 8,
+  },
+  compareHeader: {
+    gap: 4,
+  },
+  compareTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  compareSubtitle: {
+    color: "#C9C9C9",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  compareFrame: {
+    position: "relative",
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#090909",
+  },
+  compareImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  compareOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
+  },
+  compareDivider: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 2,
+    marginLeft: -1,
+    backgroundColor: "rgba(255,255,255,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  compareHandle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#E7FDFF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(9,17,20,0.12)",
+  },
+  compareLabelRow: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    top: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  compareLabel: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    backgroundColor: "rgba(0,0,0,0.46)",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
   resultMetaCard: {
     borderRadius: 12,
     borderWidth: 1,
@@ -2577,6 +3524,7 @@ const styles = StyleSheet.create({
   },
   resultActionRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
   resultActionButton: {
@@ -2627,6 +3575,60 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
+  },
+  historyCard: {
+    width: 220,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  historyCardImage: {
+    width: "100%",
+    aspectRatio: 1,
+  },
+  historyCardBody: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    gap: 4,
+  },
+  historyCardTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  historyCardMeta: {
+    color: "#FFB1C9",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+  },
+  historyCardPrompt: {
+    color: "#C5C5C5",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+    minHeight: 34,
+  },
+  historyActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    padding: 12,
+  },
+  historyActionButton: {
+    flex: 1,
+    minHeight: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  historyActionText: {
+    color: "#FFE1EA",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   modalBackdrop: {
     flex: 1,

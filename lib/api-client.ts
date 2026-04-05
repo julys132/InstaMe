@@ -16,13 +16,23 @@ export const STORAGE_KEYS = {
 export type InstaMeUploadedImage = {
   id: string;
   name: string;
-  kind?: "uploaded" | "enhanced";
+  kind?: "uploaded" | "enhanced" | "own_style";
   mimeType: string;
   width: number;
   height: number;
   fileSizeBytes: number;
   createdAt: string;
   previewUri: string;
+};
+
+export type InstaMeOwnStyle = {
+  id: string;
+  name: string;
+  mimeType: string;
+  createdAt: string;
+  previewUri: string;
+  promptPreview: string;
+  imageHash?: string;
 };
 
 export type InstaMeUploadedImageAsset = InstaMeUploadedImage & {
@@ -463,7 +473,17 @@ class ApiClient {
 
   async transformOldMoney(payload: {
     photo: { base64: string; mimeType?: string };
-    stylePhoto?: { base64: string; mimeType?: string };
+    stylePhoto?: {
+      base64: string;
+      mimeType?: string;
+      previewBase64?: string;
+      width?: number;
+      height?: number;
+      fileSizeBytes?: number;
+      name?: string;
+    };
+    savedOwnStyleId?: string;
+    saveOwnStyle?: boolean;
     customPrompt?: string;
     intensity?: "soft" | "editorial" | "dramatic";
     preserveBackground?: boolean;
@@ -480,6 +500,7 @@ class ApiClient {
       stylePresetId?: string | null;
       promptOnlyMode?: boolean;
       generationTierId?: string;
+      savedOwnStyle?: InstaMeOwnStyle | null;
     }>(
       "/instame/transform",
       {
@@ -516,6 +537,48 @@ class ApiClient {
       portraitEnhanceTier: InstaMePortraitEnhanceTier;
       liveGenerationTierId: string;
     }>("/instame/pricing", {}, true);
+  }
+
+  async getInstaMeOwnStyles() {
+    return this.request<{
+      ownStyles: InstaMeOwnStyle[];
+    }>("/instame/own-styles", {}, true);
+  }
+
+  async saveInstaMeOwnStyle(payload: {
+    image: {
+      name?: string;
+      mimeType?: string;
+      base64: string;
+      previewBase64?: string;
+      width?: number;
+      height?: number;
+      fileSizeBytes?: number;
+    };
+  }) {
+    return this.request<{
+      ownStyle: InstaMeOwnStyle;
+    }>(
+      "/instame/own-styles",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      true,
+    );
+  }
+
+  async renameInstaMeOwnStyle(styleId: string, name: string) {
+    return this.request<{
+      ownStyle: InstaMeOwnStyle;
+    }>(
+      `/instame/own-styles/${encodeURIComponent(styleId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      },
+      true,
+    );
   }
 
   async getInstaMeUploadedImages(kind?: "uploaded" | "enhanced") {
@@ -557,6 +620,16 @@ class ApiClient {
   async deleteInstaMeUploadedImage(imageId: string) {
     return this.request<{ success: boolean }>(
       `/instame/uploaded-images/${encodeURIComponent(imageId)}`,
+      {
+        method: "DELETE",
+      },
+      true,
+    );
+  }
+
+  async deleteInstaMeOwnStyle(styleId: string) {
+    return this.request<{ success: boolean }>(
+      `/instame/own-styles/${encodeURIComponent(styleId)}`,
       {
         method: "DELETE",
       },

@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
+  createHash,
   createHmac,
   createPublicKey,
   createSign,
@@ -27,6 +28,7 @@ import {
 import {
   INSTAME_EDIT_TIERS,
   INSTAME_GENERATION_TIERS,
+  INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS,
   INSTAME_PORTRAIT_ENHANCE_TIER,
   getLiveInstaMeGenerationTier,
 } from "../shared/instame-pricing";
@@ -431,10 +433,13 @@ const MAX_IMAGE_COUNT_BY_MODE: Record<ImageInputMode, number> = {
 const MAX_IMAGE_BASE64_LENGTH = 2_500_000;
 const MAX_INSTAME_UPLOADED_IMAGES = 10;
 const MAX_INSTAME_ENHANCED_IMAGES = 10;
-const MAX_INSTAME_LIBRARY_IMAGES_TOTAL = MAX_INSTAME_UPLOADED_IMAGES + MAX_INSTAME_ENHANCED_IMAGES;
+const MAX_INSTAME_OWN_STYLES = 12;
+const MAX_INSTAME_LIBRARY_IMAGES_TOTAL =
+  MAX_INSTAME_UPLOADED_IMAGES + MAX_INSTAME_ENHANCED_IMAGES + MAX_INSTAME_OWN_STYLES;
 const MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1_000_000;
 const MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 const MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 220_000;
+const MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 4_000;
 const STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 
 const DEFAULT_IAP_PRODUCT_CREDITS: Record<string, number> = {
@@ -1043,14 +1048,22 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
           : "image/jpeg";
       const base64 = normalizeStringValue(candidate.base64);
       const previewBase64 = normalizeStringValue(candidate.previewBase64);
-      const name = normalizeStringValue(candidate.name) || "Portrait";
-      const kind = candidate.kind === "enhanced" ? "enhanced" : "uploaded";
+      const kind =
+        candidate.kind === "enhanced"
+          ? "enhanced"
+          : candidate.kind === "own_style"
+            ? "own_style"
+            : "uploaded";
+      const analyzedPrompt = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
+      const imageHash = normalizeStringValue(candidate.imageHash);
+      const name = normalizeStringValue(candidate.name) || (kind === "own_style" ? "Own Style" : "Portrait");
       const width = Number(candidate.width);
       const height = Number(candidate.height);
       const fileSizeBytes = Number(candidate.fileSizeBytes);
       const createdAt = normalizeStringValue(candidate.createdAt);
 
       if (!id || !base64 || !previewBase64) return null;
+      if (kind === "own_style" && !analyzedPrompt) return null;
       if (!Number.isFinite(width) || width <= 0) return null;
       if (!Number.isFinite(height) || height <= 0) return null;
 
@@ -1067,6 +1080,8 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
           Number.isFinite(fileSizeBytes) && fileSizeBytes > 0
             ? Math.round(fileSizeBytes)
             : estimateBase64Bytes(base64),
+        analyzedPrompt: analyzedPrompt || undefined,
+        imageHash: imageHash || undefined,
         createdAt: createdAt || new Date().toISOString(),
       };
     })
@@ -1085,6 +1100,137 @@ function toInstaMeUploadedImageSummary(image: InstaMeUploadedImageRecord) {
     fileSizeBytes: image.fileSizeBytes,
     createdAt: image.createdAt,
     previewUri: `data:${image.mimeType};base64,${image.previewBase64}`,
+  };
+}
+
+function toInstaMeOwnStyleSummary(image: InstaMeUploadedImageRecord) {
+  const promptPreview = normalizeStringValue(image.analyzedPrompt)
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
+
+  return {
+    id: image.id,
+    name: image.name || "Own Style",
+    mimeType: image.mimeType,
+    createdAt: image.createdAt,
+    previewUri: `data:${image.mimeType};base64,${image.previewBase64}`,
+    promptPreview,
+    imageHash: normalizeStringValue(image.imageHash) || undefined,
+  };
+}
+
+function computeImageHash(base64: string): string {
+  const normalized = stripDataUriPrefix(base64).replace(/\s+/g, "");
+  if (!normalized) return "";
+  return createHash("sha256").update(normalized).digest("hex");
+}
+
+function normalizeOwnStyleSavePayload(input: unknown): {
+  name: string;
+  mimeType: string;
+  previewBase64: string;
+  width: number;
+  height: number;
+  fileSizeBytes: number;
+} | null {
+  if (!input || typeof input !== "object") return null;
+
+  const candidate = input as {
+    name?: unknown;
+    mimeType?: unknown;
+    previewBase64?: unknown;
+    base64?: unknown;
+    width?: unknown;
+    height?: unknown;
+    fileSizeBytes?: unknown;
+  };
+
+  const previewBase64 = stripDataUriPrefix(
+    normalizeStringValue(candidate.previewBase64) || normalizeStringValue(candidate.base64),
+  );
+  const mimeType =
+    typeof candidate.mimeType === "string" && String(candidate.mimeType).startsWith("image/")
+      ? String(candidate.mimeType)
+      : "image/jpeg";
+  const width = Number(candidate.width);
+  const height = Number(candidate.height);
+  const fileSizeBytes = Number(candidate.fileSizeBytes);
+
+  if (!previewBase64) return null;
+  if (!Number.isFinite(width) || width <= 0) return null;
+  if (!Number.isFinite(height) || height <= 0) return null;
+
+  return {
+    name: normalizeStringValue(candidate.name) || "Own Style",
+    mimeType,
+    previewBase64,
+    width: Math.min(Math.round(width), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
+    height: Math.min(Math.round(height), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
+    fileSizeBytes:
+      Number.isFinite(fileSizeBytes) && fileSizeBytes > 0
+        ? Math.round(fileSizeBytes)
+        : estimateBase64Bytes(previewBase64),
+  };
+}
+
+function buildSavedOwnStyleRecord(options: {
+  stylePayload: ReturnType<typeof normalizeOwnStyleSavePayload>;
+  analyzedPrompt: string;
+}): InstaMeUploadedImageRecord {
+  return {
+    id: randomUUID(),
+    name: options.stylePayload?.name || "Own Style",
+    kind: "own_style",
+    mimeType: options.stylePayload?.mimeType || "image/jpeg",
+    base64: options.stylePayload?.previewBase64 || "",
+    previewBase64: options.stylePayload?.previewBase64 || "",
+    width: options.stylePayload?.width || 1,
+    height: options.stylePayload?.height || 1,
+    fileSizeBytes: options.stylePayload?.fileSizeBytes || 0,
+    analyzedPrompt: options.analyzedPrompt.slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH),
+    imageHash: computeImageHash(options.stylePayload?.previewBase64 || ""),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function upsertOwnStyleRecord(options: {
+  existingImages: InstaMeUploadedImageRecord[];
+  savedOwnStyle: InstaMeUploadedImageRecord;
+}): { nextImages: InstaMeUploadedImageRecord[]; savedOwnStyle: InstaMeUploadedImageRecord } {
+  const duplicate = options.existingImages.find(
+    (entry) =>
+      entry.kind === "own_style" &&
+      (normalizeStringValue(entry.imageHash)
+        ? normalizeStringValue(entry.imageHash) === normalizeStringValue(options.savedOwnStyle.imageHash)
+        : entry.previewBase64 === options.savedOwnStyle.previewBase64),
+  );
+
+  const nextOwnStyle = duplicate
+    ? {
+        ...duplicate,
+        name: options.savedOwnStyle.name,
+        mimeType: options.savedOwnStyle.mimeType,
+        previewBase64: options.savedOwnStyle.previewBase64,
+        base64: options.savedOwnStyle.base64,
+        width: options.savedOwnStyle.width,
+        height: options.savedOwnStyle.height,
+        fileSizeBytes: options.savedOwnStyle.fileSizeBytes,
+        analyzedPrompt: options.savedOwnStyle.analyzedPrompt,
+        imageHash: options.savedOwnStyle.imageHash,
+        createdAt: new Date().toISOString(),
+      }
+    : options.savedOwnStyle;
+
+  const nonOwnStyleImages = options.existingImages.filter((entry) => entry.kind !== "own_style");
+  const previousOwnStyles = options.existingImages.filter(
+    (entry) => entry.kind === "own_style" && entry.id !== nextOwnStyle.id,
+  );
+  const nextOwnStyles = [nextOwnStyle, ...previousOwnStyles].slice(0, MAX_INSTAME_OWN_STYLES);
+
+  return {
+    savedOwnStyle: nextOwnStyle,
+    nextImages: [...nextOwnStyles, ...nonOwnStyleImages].slice(0, MAX_INSTAME_LIBRARY_IMAGES_TOTAL),
   };
 }
 
@@ -1779,17 +1925,16 @@ function buildOwnStyleTransformPrompt(options: {
 
 async function generateOwnStyleImage(options: {
   uploadedImages: UploadedReferenceImage[];
-  styleImage: UploadedReferenceImage;
+  analyzedStylePrompt: string;
   customPrompt: string;
   preserveBackground: boolean;
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
-  const analyzedStylePrompt = await analyzeOwnStyleReferenceImage(options.styleImage);
   const imageResponse = await generateGeminiContent({
     model: DEFAULT_STYLE_IMAGE_MODEL,
     parts: [
       {
         text: buildOwnStyleTransformPrompt({
-          analyzedStylePrompt,
+          analyzedStylePrompt: options.analyzedStylePrompt,
           customPrompt: options.customPrompt,
           preserveBackground: options.preserveBackground,
         }),
@@ -3563,6 +3708,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.get("/api/instame/own-styles", authMiddleware, async (req, res) => {
+    const [user] = await db
+      .select({ instameUploadedImages: users.instameUploadedImages })
+      .from(users)
+      .where(eq(users.id, req.user!.id));
+
+    const ownStyles = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages)
+      .filter((image) => image.kind === "own_style" && image.analyzedPrompt)
+      .slice()
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((image) => toInstaMeOwnStyleSummary(image));
+
+    return res.json({ ownStyles });
+  });
+
+  app.post("/api/instame/own-styles", authMiddleware, async (req, res) => {
+    const body = req.body || {};
+    const ownStylePayload = normalizeOwnStyleSavePayload(body.image);
+
+    if (!ownStylePayload) {
+      return res.status(400).json({ error: "Valid own style image payload is required." });
+    }
+    if (ownStylePayload.fileSizeBytes > MAX_INSTAME_LIBRARY_IMAGE_BYTES) {
+      return res.status(400).json({ error: "Own Style image must be 1MB or smaller after optimization." });
+    }
+    if (ownStylePayload.previewBase64.length > MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH) {
+      return res.status(400).json({ error: "Own Style preview image is too large." });
+    }
+
+    let normalizedStyleImages: UploadedReferenceImage[] = [];
+    try {
+      normalizedStyleImages = normalizeUploadedImages([{ base64: ownStylePayload.previewBase64, mimeType: ownStylePayload.mimeType }], "single_item");
+    } catch (error: unknown) {
+      return res.status(400).json({ error: toErrorMessage(error, "Invalid own style image payload") });
+    }
+
+    try {
+      const analyzedPrompt = await analyzeOwnStyleReferenceImage(normalizedStyleImages[0]!);
+
+      const [user] = await db
+        .select({ instameUploadedImages: users.instameUploadedImages })
+        .from(users)
+        .where(eq(users.id, req.user!.id));
+
+      const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
+      const saveResult = upsertOwnStyleRecord({
+        existingImages,
+        savedOwnStyle: buildSavedOwnStyleRecord({
+          stylePayload: ownStylePayload,
+          analyzedPrompt,
+        }),
+      });
+
+      await db
+        .update(users)
+        .set({
+          instameUploadedImages: saveResult.nextImages,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, req.user!.id));
+
+      return res.status(201).json({
+        ownStyle: toInstaMeOwnStyleSummary(saveResult.savedOwnStyle),
+      });
+    } catch (error: unknown) {
+      console.error("Save Own Style error:", error);
+      return res.status(500).json({ error: toErrorMessage(error, "Failed to save Own Style") });
+    }
+  });
+
+  app.patch("/api/instame/own-styles/:styleId", authMiddleware, async (req, res) => {
+    const nextName = normalizeStringValue(req.body?.name).slice(0, 48);
+    if (!nextName) {
+      return res.status(400).json({ error: "Style name is required." });
+    }
+
+    const [user] = await db
+      .select({ instameUploadedImages: users.instameUploadedImages })
+      .from(users)
+      .where(eq(users.id, req.user!.id));
+
+    const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
+    const targetOwnStyle = existingImages.find(
+      (entry) => entry.kind === "own_style" && entry.id === req.params.styleId,
+    );
+
+    if (!targetOwnStyle) {
+      return res.status(404).json({ error: "Saved own style not found." });
+    }
+
+    const nextImages = existingImages.map((entry) =>
+      entry.id === targetOwnStyle.id ? { ...entry, name: nextName } : entry,
+    );
+
+    await db
+      .update(users)
+      .set({
+        instameUploadedImages: nextImages,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, req.user!.id));
+
+    return res.json({
+      ownStyle: toInstaMeOwnStyleSummary({
+        ...targetOwnStyle,
+        name: nextName,
+      }),
+    });
+  });
+
   app.get("/api/instame/uploaded-images", authMiddleware, async (req, res) => {
     const requestedKind = normalizeStringValue(req.query.kind);
     const imageKind = requestedKind === "enhanced" ? "enhanced" : requestedKind === "uploaded" ? "uploaded" : "";
@@ -3708,11 +3963,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json({ success: true });
   });
 
+  app.delete("/api/instame/own-styles/:styleId", authMiddleware, async (req, res) => {
+    const [user] = await db
+      .select({ instameUploadedImages: users.instameUploadedImages })
+      .from(users)
+      .where(eq(users.id, req.user!.id));
+
+    const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
+    const nextImages = existingImages.filter(
+      (entry) => !(entry.kind === "own_style" && entry.id === req.params.styleId),
+    );
+
+    if (nextImages.length === existingImages.length) {
+      return res.status(404).json({ error: "Saved own style not found." });
+    }
+
+    await db
+      .update(users)
+      .set({
+        instameUploadedImages: nextImages,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, req.user!.id));
+
+    return res.json({ success: true });
+  });
+
   app.post("/api/instame/transform", authMiddleware, async (req, res) => {
     const userId = req.user!.id;
     const body = req.body || {};
     const customPrompt = normalizeStringValue(body.customPrompt);
     const requestedStylePresetId = normalizeStringValue(body.stylePresetId);
+    const requestedSavedOwnStyleId = normalizeStringValue(body.savedOwnStyleId);
+    const shouldSaveOwnStyle = body.saveOwnStyle !== false;
     const isOwnStyleRequested = requestedStylePresetId === INSTAME_OWN_STYLE_ID;
     const resolvedStylePreset = isOwnStyleRequested ? null : resolveInstaMeStylePreset(body.stylePresetId);
     const stylePresetId = isOwnStyleRequested ? INSTAME_OWN_STYLE_ID : resolvedStylePreset?.id || "";
@@ -3722,12 +4005,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const preserveBackground = body.preserveBackground !== false;
     const generationTier = resolveGenerationTierById(body.generationTierId);
     const generationMode = resolveGenerationMode(generationTier.id);
-    const transformCost =
+    const baseTransformCost =
       Number.isInteger(generationTier.credits) && generationTier.credits > 0
         ? generationTier.credits
         : Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0
           ? INSTAME_TRANSFORM_COST
           : 5;
+    const ownStyleFirstUseSurcharge =
+      isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
+    const transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
 
     const photoInput = body.photo
       ? [body.photo]
@@ -3755,7 +4041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: toErrorMessage(error, "Invalid own style image payload") });
       }
 
-      if (ownStyleImages.length === 0) {
+      if (!requestedSavedOwnStyleId && ownStyleImages.length === 0) {
         return res.status(400).json({ error: "Upload one style reference image for Own Style." });
       }
     }
@@ -3765,15 +4051,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [userBeforeTransform] = await db
         .select({
           instameStyleUsage: users.instameStyleUsage,
+          instameUploadedImages: users.instameUploadedImages,
         })
         .from(users)
         .where(eq(users.id, userId));
+
+      const existingImages = normalizeStoredInstaMeUploadedImages(userBeforeTransform?.instameUploadedImages);
+      const savedOwnStyles = existingImages.filter(
+        (entry) => entry.kind === "own_style" && Boolean(entry.analyzedPrompt),
+      );
+      const selectedSavedOwnStyle = requestedSavedOwnStyleId
+        ? savedOwnStyles.find((entry) => entry.id === requestedSavedOwnStyleId) || null
+        : null;
+
+      if (requestedSavedOwnStyleId && !selectedSavedOwnStyle) {
+        return res.status(404).json({ error: "Saved own style not found." });
+      }
+
       const styleUsageMap = normalizeUsageMap(userBeforeTransform?.instameStyleUsage);
       const priorStyleUseCount = stylePresetId ? styleUsageMap[stylePresetId] || 0 : 0;
       const promptVariant = isOwnStyleRequested
         ? null
         : choosePromptVariant(resolvedStylePreset || undefined, priorStyleUseCount);
-      const shouldUseOwnStyle = isOwnStyleRequested && ownStyleImages.length > 0;
+      const shouldUseOwnStyle = isOwnStyleRequested && (ownStyleImages.length > 0 || Boolean(selectedSavedOwnStyle));
       const shouldUsePromptOnly =
         !shouldUseOwnStyle &&
         Boolean(stylePresetId) &&
@@ -3798,10 +4098,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .join(" "),
           });
 
+      let savedOwnStyleSummary: ReturnType<typeof toInstaMeOwnStyleSummary> | null = selectedSavedOwnStyle
+        ? toInstaMeOwnStyleSummary(selectedSavedOwnStyle)
+        : null;
+
+      let analyzedOwnStylePrompt = selectedSavedOwnStyle?.analyzedPrompt || "";
+      if (shouldUseOwnStyle && !analyzedOwnStylePrompt) {
+        analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(ownStyleImages[0]!);
+      }
+
       const generationResult = shouldUseOwnStyle
         ? await generateOwnStyleImage({
             uploadedImages,
-            styleImage: ownStyleImages[0]!,
+            analyzedStylePrompt: analyzedOwnStylePrompt,
             customPrompt,
             preserveBackground,
           })
@@ -3837,16 +4146,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
               stylePresetPromptHint,
             });
 
+      let nextUsageMap = styleUsageMap;
+      let nextStoredImages = existingImages;
+
+      if (shouldUseOwnStyle && !selectedSavedOwnStyle && shouldSaveOwnStyle) {
+        const ownStyleSavePayload = normalizeOwnStyleSavePayload(body.stylePhoto);
+        if (ownStyleSavePayload && ownStyleSavePayload.previewBase64.length <= MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH) {
+          const savedOwnStyleRecord = buildSavedOwnStyleRecord({
+            stylePayload: ownStyleSavePayload,
+            analyzedPrompt: analyzedOwnStylePrompt,
+          });
+          const saveResult = upsertOwnStyleRecord({
+            existingImages,
+            savedOwnStyle: savedOwnStyleRecord,
+          });
+          nextStoredImages = saveResult.nextImages;
+          savedOwnStyleSummary = toInstaMeOwnStyleSummary(saveResult.savedOwnStyle);
+        }
+      }
+
       if (stylePresetId && stylePresetId !== INSTAME_OWN_STYLE_ID) {
-        const nextUsageMap = {
+        nextUsageMap = {
           ...styleUsageMap,
           [stylePresetId]: priorStyleUseCount + 1,
         };
+      }
 
+      if (nextUsageMap !== styleUsageMap || nextStoredImages !== existingImages) {
         await db
           .update(users)
           .set({
             instameStyleUsage: nextUsageMap,
+            instameUploadedImages: nextStoredImages,
             updatedAt: new Date(),
           })
           .where(eq(users.id, userId));
@@ -3867,6 +4198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stylePresetId: stylePresetId || null,
         promptOnlyMode: shouldUsePromptOnly || shouldUseOwnStyle,
         generationTierId: generationTier.id,
+        savedOwnStyle: savedOwnStyleSummary,
       });
     } catch (error: unknown) {
       console.error("InstaMe transform error:", error);

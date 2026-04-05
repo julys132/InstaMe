@@ -16,13 +16,15 @@ import { z } from "zod";
 export type InstaMeUploadedImageRecord = {
   id: string;
   name: string;
-  kind?: "uploaded" | "enhanced";
+  kind?: "uploaded" | "enhanced" | "own_style";
   mimeType: string;
   base64: string;
   previewBase64: string;
   width: number;
   height: number;
   fileSizeBytes: number;
+  analyzedPrompt?: string;
+  imageHash?: string;
   createdAt: string;
 };
 
