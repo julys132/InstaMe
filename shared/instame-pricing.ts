@@ -75,10 +75,10 @@ export function getInstaMeQualityTierSubtitle(
   }
 
   return qualityTier === "pro"
-    ? "Top-tier cinematic generation"
+    ? "Highest quality result"
     : qualityTier === "premium"
-      ? "High-fidelity portrait generation"
-      : "Quick everyday generation";
+      ? "High-quality result"
+      : "Faster result";
 }
 
 export function getHigherInstaMeQualityTier(

@@ -1,19 +1,17 @@
 {
-  "generatedAt": "2026-03-29T07:20:31.353073+00:00",
+  "generatedAt": "2026-04-05T15:45:23.481795+00:00",
   "sourceFolder": "C:\\Users\\stiul\\OneDrive\\Pictures\\Screenshots\\Styles\\Styles Representative Image",
-  "presetCount": 12,
+  "presetCount": 13,
   "presets": [
     {
       "id": "analog_night_flash",
       "label": "Analog Night Flash",
       "subtitle": "Prompt-led portrait transformation preset",
       "promptHint": "Analog Night Flash",
-      "cover": "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160604.png",
-      "representativeImage": "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160604.png",
+      "cover": "assets/instame-style-presets/styles/analog_night_flash/gpt-image-1.5-high-fidelity_b_Edit_the_image,_keep.png",
+      "representativeImage": "assets/instame-style-presets/styles/analog_night_flash/gpt-image-1.5-high-fidelity_b_Edit_the_image,_keep.png",
       "examples": [
-        "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160604.png",
-        "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160611.png",
-        "assets/instame-style-presets/styles/analog_night_flash/Screenshot 2026-03-10 160617.png"
+        "assets/instame-style-presets/styles/analog_night_flash/gpt-image-1.5-high-fidelity_b_Edit_the_image,_keep.png"
       ],
       "promptFile": "assets/instame-style-presets/styles/analog_night_flash/prompt.txt",
       "promptVariants": [
@@ -104,6 +102,27 @@
       "promptOnlyAfterFirstUse": false
     },
     {
+      "id": "glam_portrait",
+      "label": "glam portrait",
+      "subtitle": "Curated glam portrait preset",
+      "promptHint": "glam portrait",
+      "cover": "assets/instame-style-presets/styles/glam_portrait/gpt-image-1.5-high-fidelity_b_Edit_the_image,_ensu.png",
+      "representativeImage": "assets/instame-style-presets/styles/glam_portrait/gpt-image-1.5-high-fidelity_b_Edit_the_image,_ensu.png",
+      "examples": [
+        "assets/instame-style-presets/styles/glam_portrait/gpt-image-1.5-high-fidelity_b_Edit_the_image,_ensu.png"
+      ],
+      "promptFile": "assets/instame-style-presets/styles/glam_portrait/prompt 2.txt",
+      "promptVariants": [
+        {
+          "id": "prompt_1",
+          "label": "Prompt 1",
+          "prompt": "image model: chat gpt latest image model high fidelity .\nEdit the image, ensuring the new target face's features are preserved exactly (1:1 mapping), while applying the specific styling and composition of the original..\n\n\nA high-quality 90s cinematic film cose up portrait of a seducer woman  She has styled volume  ,  hair  framing her face, like in old vintage movies, sof make up . She is wearing a classic turtleneck. red lipstick The lighting is cold and moody with a heavy  tint, creating deep 'inky' shadows and a soft on the skin. 90s supermodel aesthetic, sultry and knowing expression with a faint 'Mona Lisa' smile. Shot on 35mm film, visible fine grain, muted contrast, earthy tones of terracotta, espresso, and bronze. High-end editorial style, 'Femme Fatale' vibe, sophisticated and mysterious.\nEdit the image, ensuring the new target face's features are preserved exactly (1:1 mapping), while applying the specific styling and composition of the original..\n\n\nA high-quality 90s cinematic film cose up portrait of a seducer woman  She has voluminous,  hair  framing her face, like in old vintage movies, sof make up . She is wearing a classic turtleneck. The lighting is cold and moody with a heavy  tint, creating deep 'inky' shadows and a soft on the skin. 90s supermodel aesthetic, sultry and knowing expression with a faint 'Mona Lisa' smile. Shot on 35mm film, visible fine grain, muted contrast, earthy tones of terracotta, espresso, and bronze. High-end editorial style, 'Femme Fatale' vibe, sophisticated and mysterious. colors, grey, blue, white, black\n\n\n3. Edit the image, ensuring the new target face's features are preserved exactly (1:1 mapping), while applying the specific styling and composition of the original..\n\n\nA high-quality 90s cinematic film cose up portrait of a seducer woman  She has voluminous,  hair  framing her face, like in old vintage movies, sof make up . She is wearing a classic turtleneck. The lighting is cold and moody with a heavy  tint, creating deep 'inky' shadows and a soft on the skin. 90s supermodel aesthetic, sultry and knowing expression with a faint 'Mona Lisa' smile. Shot on 35mm film, visible fine grain, muted contrast, earthy tones of terracotta, espresso, and bronze. High-end editorial style, 'Femme Fatale' vibe, sophisticated and mysterious. colors,black, white, grey, , visible thick grain",
+          "requestedModels": []
+        }
+      ],
+      "promptOnlyAfterFirstUse": false
+    },
+    {
       "id": "luxurious_mediterranean_glamour",
       "label": "Luxurious Mediterranean Glamour",
       "subtitle": "Curated glam portrait preset",
@@ -152,11 +171,10 @@
       "label": "Minimalist Chic",
       "subtitle": "Prompt-led portrait transformation preset",
       "promptHint": "Minimalist Chic",
-      "cover": "assets/instame-style-presets/styles/minimalist_chic/Screenshot 2026-03-10 141405.png",
-      "representativeImage": "assets/instame-style-presets/styles/minimalist_chic/Screenshot 2026-03-10 141405.png",
+      "cover": "assets/instame-style-presets/styles/minimalist_chic/Gemini_Generated_Image_2eg16t2eg16t2eg1.png",
+      "representativeImage": "assets/instame-style-presets/styles/minimalist_chic/Gemini_Generated_Image_2eg16t2eg16t2eg1.png",
       "examples": [
-        "assets/instame-style-presets/styles/minimalist_chic/Screenshot 2026-03-10 141405.png",
-        "assets/instame-style-presets/styles/minimalist_chic/Screenshot 2026-03-10 141647.png"
+        "assets/instame-style-presets/styles/minimalist_chic/Gemini_Generated_Image_2eg16t2eg16t2eg1.png"
       ],
       "promptFile": "assets/instame-style-presets/styles/minimalist_chic/prompt.txt",
       "promptVariants": [
@@ -191,10 +209,10 @@
       "label": "Monochromatic Urban Elegance",
       "subtitle": "Prompt-led portrait transformation preset",
       "promptHint": "Monochromatic Urban Elegance",
-      "cover": "assets/instame-style-presets/styles/monochromatic_urban_elegance/Screenshot 2026-03-10 141629.png",
-      "representativeImage": "assets/instame-style-presets/styles/monochromatic_urban_elegance/Screenshot 2026-03-10 141629.png",
+      "cover": "assets/instame-style-presets/styles/monochromatic_urban_elegance/epsilon_a_Edit_the_image,_keep.png",
+      "representativeImage": "assets/instame-style-presets/styles/monochromatic_urban_elegance/epsilon_a_Edit_the_image,_keep.png",
       "examples": [
-        "assets/instame-style-presets/styles/monochromatic_urban_elegance/Screenshot 2026-03-10 141629.png"
+        "assets/instame-style-presets/styles/monochromatic_urban_elegance/epsilon_a_Edit_the_image,_keep.png"
       ],
       "promptFile": "assets/instame-style-presets/styles/monochromatic_urban_elegance/prompt.txt",
       "promptVariants": [
@@ -392,16 +410,10 @@
       "label": "Timeless Cinematic Chic",
       "subtitle": "Prompt-led portrait transformation preset",
       "promptHint": "Timeless Cinematic Chic",
-      "cover": "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 133556.png",
-      "representativeImage": "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 133556.png",
+      "cover": "assets/instame-style-presets/styles/timeless_cinematic_chic/gpt-image-1.5-high-fidelity_b_creeaza_o_imagine__p.png",
+      "representativeImage": "assets/instame-style-presets/styles/timeless_cinematic_chic/gpt-image-1.5-high-fidelity_b_creeaza_o_imagine__p.png",
       "examples": [
-        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 133556.png",
-        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 134133.png",
-        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141412.png",
-        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141543.png",
-        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141548.png",
-        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141557.png",
-        "assets/instame-style-presets/styles/timeless_cinematic_chic/Screenshot 2026-03-10 141943.png"
+        "assets/instame-style-presets/styles/timeless_cinematic_chic/gpt-image-1.5-high-fidelity_b_creeaza_o_imagine__p.png"
       ],
       "promptFile": "assets/instame-style-presets/styles/timeless_cinematic_chic/Prompt.txt",
       "promptVariants": [

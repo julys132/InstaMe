@@ -432,7 +432,7 @@ export default function InstaMeScreen() {
   const [selectedEditTierId, setSelectedEditTierId] = useState<string>(
     INSTAME_EDIT_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_EDIT_TIERS[0]?.id || "edit",
   );
-  const [selectedStyleId, setSelectedStyleId] = useState<string>(INSTAME_STYLE_PRESETS[0]?.id || "");
+  const [selectedStyleId, setSelectedStyleId] = useState<string>("");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
@@ -1386,6 +1386,10 @@ export default function InstaMeScreen() {
       Alert.alert("Missing image", "Upload one photo before transforming.");
       return;
     }
+    if (!isOwnStyleSelected && !stylePresets.some((preset) => preset.id === selectedStyleId)) {
+      Alert.alert("Style unavailable", "The selected style is no longer available. Please choose another style and try again.");
+      return;
+    }
     if (ownStyleNeedsActivation) {
       Alert.alert(
         "Own Style not active",
@@ -1491,6 +1495,8 @@ export default function InstaMeScreen() {
     refreshCredits,
     activeGenerationTier,
     selectedGenerationTierId,
+    selectedStyleId,
+    stylePresets,
   ]);
 
   const handleEditResult = useCallback(async () => {

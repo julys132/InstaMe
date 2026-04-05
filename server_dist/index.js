@@ -1678,12 +1678,10 @@ function normalizeOwnStyleGenerationMode(input) {
 }
 function resolveInstaMeStylePreset(input) {
   const presetId = normalizeStringValue(input);
-  const catalogPresets = getInstaMeStylePresetsFromCatalog();
-  const catalogDefault = catalogPresets[0];
   if (!presetId) {
-    return catalogDefault || INSTAME_STYLE_PRESETS[0] || null;
+    return getInstaMeStylePresetsFromCatalog()[0] || INSTAME_STYLE_PRESETS[0] || null;
   }
-  return findCatalogStylePresetById(presetId) || findInstaMeStylePresetById(presetId) || catalogDefault || INSTAME_STYLE_PRESETS[0] || null;
+  return findCatalogStylePresetById(presetId) || findInstaMeStylePresetById(presetId) || null;
 }
 function normalizeStringValue(input) {
   if (typeof input === "string") return input.trim();
@@ -4355,6 +4353,9 @@ async function registerRoutes(app2) {
     const ownStyleMode = normalizeOwnStyleGenerationMode(body.ownStyleMode);
     const isOwnStyleRequested = requestedStylePresetId === INSTAME_OWN_STYLE_ID;
     const resolvedStylePreset = isOwnStyleRequested ? null : resolveInstaMeStylePreset(body.stylePresetId);
+    if (!isOwnStyleRequested && requestedStylePresetId && !resolvedStylePreset) {
+      return res.status(400).json({ error: "The selected style is no longer available. Please choose another style and try again." });
+    }
     const stylePresetId = isOwnStyleRequested ? INSTAME_OWN_STYLE_ID : resolvedStylePreset?.id || "";
     const stylePresetLabel = isOwnStyleRequested ? "Own Style" : resolvedStylePreset?.label || "";
     const stylePresetPromptHint = isOwnStyleRequested ? "" : resolvedStylePreset?.promptHint || "";
