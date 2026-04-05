@@ -1589,6 +1589,9 @@ function normalizeTransformIntensity(input) {
   }
   return "editorial";
 }
+function normalizeOwnStyleGenerationMode(input) {
+  return input === "creative_prompt" ? "creative_prompt" : "reference_locked";
+}
 function resolveInstaMeStylePreset(input) {
   const presetId = normalizeStringValue(input);
   const catalogPresets = getInstaMeStylePresetsFromCatalog();
@@ -2437,6 +2440,44 @@ function buildOwnStyleTransformPrompt(options) {
   }
   return promptParts.join("\n");
 }
+function buildOwnStyleReferenceLockedPrompt(options) {
+  const promptParts = [
+    "Use the style reference image as a strong visual guide for pose, expression, hair shape, wardrobe direction, framing, lighting, camera angle, composition, and scene mood.",
+    `Style direction extracted from the reference image: ${options.analyzedStylePrompt}`,
+    "Apply that direction closely to the user base photo while preserving the user subject's identity, facial features, skin tone, and likeness exactly.",
+    "Do not copy the reference person's identity or face.",
+    "Keep the result photorealistic, cohesive, and premium.",
+    "Use the largest native output resolution available from the model."
+  ];
+  if (options.preserveBackground) {
+    promptParts.push(
+      "Keep the original background structure where possible unless the reference styling clearly suggests a different scene treatment."
+    );
+  }
+  if (options.customPrompt.trim()) {
+    promptParts.push(`Additional user notes: ${options.customPrompt.trim()}`);
+  }
+  return promptParts.join("\n");
+}
+function buildOwnStyleCreativeTogetherFallbackPrompt(options) {
+  const promptParts = [
+    "Create a photorealistic edit of the uploaded user portrait.",
+    `Use this analyzed style direction as inspiration: ${options.analyzedStylePrompt}`,
+    "Interpret the styling with more creative freedom instead of matching the original reference image too literally.",
+    "Preserve the uploaded subject's identity, facial structure, skin tone, and likeness exactly.",
+    "Keep the result realistic, editorial, and cohesive.",
+    "Use the largest native output resolution available from the model."
+  ];
+  if (options.preserveBackground) {
+    promptParts.push(
+      "Keep the original background structure where possible unless the style direction clearly requires a different scene treatment."
+    );
+  }
+  if (options.customPrompt.trim()) {
+    promptParts.push(`Additional user notes: ${options.customPrompt.trim()}`);
+  }
+  return promptParts.join("\n");
+}
 function buildOwnStyleTogetherFallbackPrompt(options) {
   const promptParts = [
     "Create a photorealistic edit of the user portrait using the uploaded style reference image as the primary guide.",
@@ -2460,18 +2501,28 @@ function buildOwnStyleTogetherFallbackPrompt(options) {
 }
 async function generateOwnStyleImage(options) {
   try {
+    const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleReferenceLockedPrompt({
+      analyzedStylePrompt: options.analyzedStylePrompt,
+      customPrompt: options.customPrompt,
+      preserveBackground: options.preserveBackground
+    }) : buildOwnStyleTransformPrompt({
+      analyzedStylePrompt: options.analyzedStylePrompt,
+      customPrompt: options.customPrompt,
+      preserveBackground: options.preserveBackground
+    });
+    const parts = options.ownStyleMode === "reference_locked" ? [
+      { text: prompt },
+      { text: "Style reference image:" },
+      ...toGeminiInlineImageParts([options.styleReferenceImage]),
+      { text: "User base photo to transform:" },
+      ...toGeminiInlineImageParts(options.uploadedImages)
+    ] : [
+      { text: prompt },
+      ...toGeminiInlineImageParts(options.uploadedImages)
+    ];
     const imageResponse = await generateGeminiContent({
       model: DEFAULT_STYLE_IMAGE_MODEL,
-      parts: [
-        {
-          text: buildOwnStyleTransformPrompt({
-            analyzedStylePrompt: options.analyzedStylePrompt,
-            customPrompt: options.customPrompt,
-            preserveBackground: options.preserveBackground
-          })
-        },
-        ...toGeminiInlineImageParts(options.uploadedImages)
-      ],
+      parts,
       responseModalities: ["IMAGE", "TEXT"],
       maxOutputTokens: 1200
     });
@@ -2490,16 +2541,21 @@ async function generateOwnStyleImage(options) {
     }
     console.warn("Own Style generation falling back to Together:", error);
     const { width, height } = resolveGenerationResolution(options.generationMode);
-    const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
     const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
+    const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
+    const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleTogetherFallbackPrompt({
+      analyzedStylePrompt: options.analyzedStylePrompt,
+      customPrompt: options.customPrompt,
+      preserveBackground: options.preserveBackground
+    }) : buildOwnStyleCreativeTogetherFallbackPrompt({
+      analyzedStylePrompt: options.analyzedStylePrompt,
+      customPrompt: options.customPrompt,
+      preserveBackground: options.preserveBackground
+    });
     const imageBase64 = await generateTogetherImage({
       model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
-      prompt: buildOwnStyleTogetherFallbackPrompt({
-        analyzedStylePrompt: options.analyzedStylePrompt,
-        customPrompt: options.customPrompt,
-        preserveBackground: options.preserveBackground
-      }),
-      referenceImages: [styleReferenceUrl, userImageUrl],
+      prompt,
+      referenceImages: options.ownStyleMode === "reference_locked" ? [styleReferenceUrl, userImageUrl] : [userImageUrl],
       width,
       height
     });
@@ -4167,6 +4223,7 @@ async function registerRoutes(app2) {
     const requestedStylePresetId = normalizeStringValue(body.stylePresetId);
     const requestedSavedOwnStyleId = normalizeStringValue(body.savedOwnStyleId);
     const shouldSaveOwnStyle = body.saveOwnStyle !== false;
+    const ownStyleMode = normalizeOwnStyleGenerationMode(body.ownStyleMode);
     const isOwnStyleRequested = requestedStylePresetId === INSTAME_OWN_STYLE_ID;
     const resolvedStylePreset = isOwnStyleRequested ? null : resolveInstaMeStylePreset(body.stylePresetId);
     const stylePresetId = isOwnStyleRequested ? INSTAME_OWN_STYLE_ID : resolvedStylePreset?.id || "";
@@ -4254,7 +4311,8 @@ async function registerRoutes(app2) {
         analyzedStylePrompt: analyzedOwnStylePrompt,
         customPrompt,
         preserveBackground,
-        generationMode
+        generationMode,
+        ownStyleMode
       }) : shouldUsePromptOnly && promptVariant ? await generatePromptOnlyPresetImage({
         req,
         uploadedImages,
@@ -4321,7 +4379,7 @@ async function registerRoutes(app2) {
         qualityLabel: getInstaMeQualityTierLabel(transformQualityTier),
         styleReferenceIds: selectedStyleReferences.map((reference) => reference.id),
         stylePresetId: stylePresetId || null,
-        promptOnlyMode: shouldUsePromptOnly || shouldUseOwnStyle,
+        promptOnlyMode: shouldUsePromptOnly || shouldUseOwnStyle && ownStyleMode === "creative_prompt",
         generationTierId: generationTier.id,
         savedOwnStyle: savedOwnStyleSummary
       });

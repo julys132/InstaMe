@@ -74,6 +74,7 @@ type UploadedPhoto = {
 
 type TransformIntensity = "soft" | "editorial" | "dramatic";
 type OptionalTransformIntensity = TransformIntensity | null;
+type OwnStyleGenerationMode = "reference_locked" | "creative_prompt";
 type GenerationResultMeta = {
   qualityTier?: InstaMeQualityTier;
   qualityLabel?: string;
@@ -209,6 +210,23 @@ const INTENSITY_OPTIONS: {
     label: "Dramatic",
     subtitle: "Stronger cinematic effect",
     details: "Pushes the chosen style further with bolder lighting, contrast, pose energy, and atmosphere.",
+  },
+];
+
+const OWN_STYLE_MODE_OPTIONS: {
+  value: OwnStyleGenerationMode;
+  label: string;
+  subtitle: string;
+}[] = [
+  {
+    value: "reference_locked",
+    label: "Signature Match",
+    subtitle: "Closest match to your reference look",
+  },
+  {
+    value: "creative_prompt",
+    label: "Creative Freedom",
+    subtitle: "More variety from the same style direction",
   },
 ];
 
@@ -421,6 +439,7 @@ export default function InstaMeScreen() {
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
   const [ownStylesLoaded, setOwnStylesLoaded] = useState(false);
   const [selectedOwnStyleId, setSelectedOwnStyleId] = useState<string | null>(null);
+  const [ownStyleMode, setOwnStyleMode] = useState<OwnStyleGenerationMode>("reference_locked");
   const [ownStyleDraftReady, setOwnStyleDraftReady] = useState(false);
   const [favoriteStyleKeys, setFavoriteStyleKeys] = useState<FavoriteStyleKey[]>([]);
   const [generationHistory, setGenerationHistory] = useState<InstaMeHistoryEntry[]>([]);
@@ -676,6 +695,7 @@ export default function InstaMeScreen() {
           selectedStyleId?: unknown;
           selectedOwnStyleId?: unknown;
           ownStylePhoto?: unknown;
+          ownStyleMode?: unknown;
         };
 
         if (parsed.selectedStyleId !== INSTAME_OWN_STYLE_ID) {
@@ -687,6 +707,8 @@ export default function InstaMeScreen() {
           typeof parsed.selectedOwnStyleId === "string" && parsed.selectedOwnStyleId.trim().length > 0
             ? parsed.selectedOwnStyleId
             : null;
+        const restoredOwnStyleMode =
+          parsed.ownStyleMode === "creative_prompt" ? "creative_prompt" : "reference_locked";
 
         if (!restoredOwnStylePhoto && !restoredOwnStyleId) {
           return;
@@ -697,6 +719,7 @@ export default function InstaMeScreen() {
         setIntensity(null);
         setSelectedOwnStyleId(restoredOwnStyleId);
         setOwnStylePhoto(restoredOwnStylePhoto);
+        setOwnStyleMode(restoredOwnStyleMode);
       })
       .catch(() => {
         // no-op
@@ -726,13 +749,14 @@ export default function InstaMeScreen() {
           selectedStyleId: INSTAME_OWN_STYLE_ID,
           selectedOwnStyleId,
           ownStylePhoto,
+          ownStyleMode,
         }),
       );
       return;
     }
 
     void AsyncStorage.removeItem(storageKey);
-  }, [ownStyleDraftReady, ownStylePhoto, selectedOwnStyleId, selectedStyleId, user?.id]);
+  }, [ownStyleDraftReady, ownStyleMode, ownStylePhoto, selectedOwnStyleId, selectedStyleId, user?.id]);
 
   useEffect(() => {
     const storageKey = getInstaMeFavoritesStorageKey(user?.id);
@@ -1393,6 +1417,7 @@ export default function InstaMeScreen() {
           : undefined,
         savedOwnStyleId: isOwnStyleSelected ? selectedOwnStyleId || undefined : undefined,
         saveOwnStyle: Boolean(isOwnStyleSelected && ownStylePhoto && !selectedOwnStyleId),
+        ownStyleMode: isOwnStyleSelected ? ownStyleMode : undefined,
         customPrompt: composedPrompt,
         intensity: selectedArtStyle || isOwnStyleSelected ? undefined : intensity || undefined,
         preserveBackground,
@@ -1450,6 +1475,7 @@ export default function InstaMeScreen() {
     intensity,
     ownStylePhoto,
     selectedOwnStyleId,
+    ownStyleMode,
     preserveBackground,
     persistHistoryResult,
     refreshCredits,
@@ -1910,6 +1936,40 @@ export default function InstaMeScreen() {
               </Text>
               <Text style={styles.processingHintText}>
                 First-time Own Style generation costs {transformCost} credits. Saved Own Styles return to {activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST} credits.
+              </Text>
+              <View style={styles.uploadActionRow}>
+                {OWN_STYLE_MODE_OPTIONS.map((option) => {
+                  const active = ownStyleMode === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => setOwnStyleMode(option.value)}
+                      style={({ pressed }) => [
+                        styles.secondaryActionButton,
+                        active && styles.secondaryActionButtonAccent,
+                        { flex: 1 },
+                        pressed && { opacity: 0.88 },
+                      ]}
+                    >
+                      <Ionicons
+                        name={active ? "radio-button-on-outline" : "radio-button-off-outline"}
+                        size={16}
+                        color={active ? Colors.accentLight : "#FFE1EA"}
+                      />
+                      <Text style={[
+                        styles.secondaryActionButtonText,
+                        active && styles.secondaryActionButtonTextAccent,
+                      ]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.processingHintText}>
+                {ownStyleMode === "reference_locked"
+                  ? "Signature Match keeps the style reference image involved in generation for the closest result."
+                  : "Creative Freedom uses only the analyzed style prompt during generation, so the result can explore more beyond the original reference image."}
               </Text>
               <Pressable onPress={pickOwnStyleImage} style={styles.ownStyleUploadBox}>
                 {ownStylePhoto ? (

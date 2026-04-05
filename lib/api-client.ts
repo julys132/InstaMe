@@ -515,6 +515,7 @@ class ApiClient {
     };
     savedOwnStyleId?: string;
     saveOwnStyle?: boolean;
+    ownStyleMode?: "reference_locked" | "creative_prompt";
     customPrompt?: string;
     intensity?: "soft" | "editorial" | "dramatic";
     preserveBackground?: boolean;
