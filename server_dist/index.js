@@ -1394,8 +1394,8 @@ var MAX_DEV_CREDIT_GRANT = 500;
 var DEFAULT_ALLOWED_DEV_CREDIT_EMAILS = ["iuliastarcean@gmail.com"];
 var GEMINI_API_BASE_URL = process.env.GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
 var DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
-var DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
-var DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || "gemini-3.1-pro";
+var DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3-pro-image-preview";
+var DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
 var DEFAULT_TOGETHER_FLASH_IMAGE_MODEL = process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-3.1";
 var DEFAULT_TOGETHER_PRO_IMAGE_MODEL = process.env.STYLE_HIGH_RES_TOGETHER_MODEL || "google/gemini-3-pro-image";
 var STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
@@ -2423,7 +2423,12 @@ function hasTogetherImageConfig() {
 function shouldFallbackOwnStyleToTogether(error) {
   const message = normalizeStringValue(error instanceof Error ? error.message : String(error || ""));
   if (!message) return false;
-  return message.includes("AI_NOT_CONFIGURED") || /gemini_api_key|google_api_key/i.test(message) || /api key not valid/i.test(message) || /invalid api key/i.test(message) || /gemini api error \((400|401|403)\)/i.test(message);
+  return message.includes("AI_NOT_CONFIGURED") || /gemini_api_key|google_api_key/i.test(message) || /api key not valid/i.test(message) || /invalid api key/i.test(message) || /gemini api error \((400|401|403|404)\)/i.test(message) || /is not found for api version|model .* not found/i.test(message);
+}
+function isGeminiModelNotFoundError(error) {
+  const message = normalizeStringValue(error instanceof Error ? error.message : String(error || ""));
+  if (!message) return false;
+  return /gemini api error \(404\)/i.test(message) || /is not found for api version|model .* not found/i.test(message);
 }
 function buildOwnStyleFallbackAnalysisPrompt() {
   return [
@@ -2521,9 +2526,9 @@ async function generatePromptOnlyPresetImage(options) {
   };
 }
 async function analyzeOwnStyleReferenceImage(styleImage, options) {
-  try {
+  const runAnalysis = async (model) => {
     const analysisResponse = await generateGeminiContent({
-      model: DEFAULT_OWN_STYLE_ANALYSIS_MODEL,
+      model,
       parts: [{ text: OWN_STYLE_ANALYSIS_PROMPT }, ...toGeminiInlineImageParts([styleImage])],
       responseMimeType: "text/plain",
       maxOutputTokens: 1200,
@@ -2534,7 +2539,20 @@ async function analyzeOwnStyleReferenceImage(styleImage, options) {
       throw new Error("Own Style analysis returned no prompt text.");
     }
     return analysisText;
+  };
+  try {
+    return await runAnalysis(DEFAULT_OWN_STYLE_ANALYSIS_MODEL);
   } catch (error) {
+    if (isGeminiModelNotFoundError(error) && DEFAULT_STYLE_TEXT_MODEL !== DEFAULT_OWN_STYLE_ANALYSIS_MODEL) {
+      try {
+        console.warn(
+          `Own Style analysis model ${DEFAULT_OWN_STYLE_ANALYSIS_MODEL} was not found. Retrying with ${DEFAULT_STYLE_TEXT_MODEL}.`
+        );
+        return await runAnalysis(DEFAULT_STYLE_TEXT_MODEL);
+      } catch (retryError) {
+        error = retryError;
+      }
+    }
     if (options?.allowStaticFallback && hasTogetherImageConfig() && shouldFallbackOwnStyleToTogether(error)) {
       console.warn("Own Style analysis falling back to Together-compatible prompt:", error);
       return buildOwnStyleFallbackAnalysisPrompt();
@@ -4452,7 +4470,7 @@ async function registerRoutes(app2) {
       }
       if (shouldUseOwnStyle && !analyzedOwnStylePrompt) {
         analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage, {
-          allowStaticFallback: ownStyleMode === "reference_locked"
+          allowStaticFallback: true
         });
       }
       const generationResult = shouldUseOwnStyle ? await generateOwnStyleImage({

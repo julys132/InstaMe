@@ -455,8 +455,8 @@ const GEMINI_API_BASE_URL =
   process.env.GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
 // Override these defaults with STYLE_TEXT_MODEL / STYLE_IMAGE_MODEL env vars.
 const DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
-const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
-const DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || "gemini-3.1-pro";
+const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3-pro-image-preview";
+const DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
 const DEFAULT_TOGETHER_FLASH_IMAGE_MODEL =
   process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-3.1";
 const DEFAULT_TOGETHER_PRO_IMAGE_MODEL =
@@ -1915,7 +1915,18 @@ function shouldFallbackOwnStyleToTogether(error: unknown): boolean {
     /gemini_api_key|google_api_key/i.test(message) ||
     /api key not valid/i.test(message) ||
     /invalid api key/i.test(message) ||
-    /gemini api error \((400|401|403)\)/i.test(message)
+    /gemini api error \((400|401|403|404)\)/i.test(message) ||
+    /is not found for api version|model .* not found/i.test(message)
+  );
+}
+
+function isGeminiModelNotFoundError(error: unknown): boolean {
+  const message = normalizeStringValue(error instanceof Error ? error.message : String(error || ""));
+  if (!message) return false;
+
+  return (
+    /gemini api error \(404\)/i.test(message) ||
+    /is not found for api version|model .* not found/i.test(message)
   );
 }
 
@@ -2044,9 +2055,9 @@ async function analyzeOwnStyleReferenceImage(
   styleImage: UploadedReferenceImage,
   options?: { allowStaticFallback?: boolean },
 ): Promise<string> {
-  try {
+  const runAnalysis = async (model: string): Promise<string> => {
     const analysisResponse = await generateGeminiContent({
-      model: DEFAULT_OWN_STYLE_ANALYSIS_MODEL,
+      model,
       parts: [{ text: OWN_STYLE_ANALYSIS_PROMPT }, ...toGeminiInlineImageParts([styleImage])],
       responseMimeType: "text/plain",
       maxOutputTokens: 1200,
@@ -2063,7 +2074,24 @@ async function analyzeOwnStyleReferenceImage(
     }
 
     return analysisText;
+  };
+
+  try {
+    return await runAnalysis(DEFAULT_OWN_STYLE_ANALYSIS_MODEL);
   } catch (error: unknown) {
+    if (
+      isGeminiModelNotFoundError(error) &&
+      DEFAULT_STYLE_TEXT_MODEL !== DEFAULT_OWN_STYLE_ANALYSIS_MODEL
+    ) {
+      try {
+        console.warn(
+          `Own Style analysis model ${DEFAULT_OWN_STYLE_ANALYSIS_MODEL} was not found. Retrying with ${DEFAULT_STYLE_TEXT_MODEL}.`,
+        );
+        return await runAnalysis(DEFAULT_STYLE_TEXT_MODEL);
+      } catch (retryError: unknown) {
+        error = retryError;
+      }
+    }
     if (options?.allowStaticFallback && hasTogetherImageConfig() && shouldFallbackOwnStyleToTogether(error)) {
       console.warn("Own Style analysis falling back to Together-compatible prompt:", error);
       return buildOwnStyleFallbackAnalysisPrompt();
@@ -4628,7 +4656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (shouldUseOwnStyle && !analyzedOwnStylePrompt) {
         analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage!, {
-          allowStaticFallback: ownStyleMode === "reference_locked",
+          allowStaticFallback: true,
         });
       }
 
