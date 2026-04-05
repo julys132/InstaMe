@@ -63,6 +63,7 @@ type UploadedPhoto = {
   uri: string;
   base64: string;
   mimeType: string;
+  kind?: "uploaded" | "enhanced" | "own_style";
   previewBase64?: string;
   width?: number;
   height?: number;
@@ -165,6 +166,10 @@ function normalizeStoredUploadedPhoto(input: unknown): UploadedPhoto | null {
     base64,
     previewBase64,
     mimeType,
+    kind:
+      candidate.kind === "uploaded" || candidate.kind === "enhanced" || candidate.kind === "own_style"
+        ? candidate.kind
+        : undefined,
     width: typeof candidate.width === "number" ? candidate.width : undefined,
     height: typeof candidate.height === "number" ? candidate.height : undefined,
     fileSizeBytes: typeof candidate.fileSizeBytes === "number" ? candidate.fileSizeBytes : undefined,
@@ -788,6 +793,7 @@ export default function InstaMeScreen() {
           base64: image.base64,
           previewBase64: image.previewUri ? image.previewUri.split(",")[1] || image.base64 : image.base64,
           mimeType: image.mimeType,
+          kind: image.kind,
           width: image.width,
           height: image.height,
           fileSizeBytes: image.fileSizeBytes,
@@ -796,7 +802,7 @@ export default function InstaMeScreen() {
         });
         setComparisonImageUri(image.previewUri || image.dataUri);
         setPortraitEnhanceCandidate(null);
-        setUsingEnhancedPortrait(false);
+        setUsingEnhancedPortrait(image.kind === "enhanced");
         setResultBase64(null);
         setResultMeta(null);
         setShowEditComposer(false);
@@ -828,6 +834,10 @@ export default function InstaMeScreen() {
       setSelectedStyleId(defaultStylePreset.id);
     }
   }, [defaultStylePreset, selectedStyleId, stylePresets]);
+
+  useEffect(() => {
+    setUsingEnhancedPortrait(photo?.kind === "enhanced");
+  }, [photo?.kind]);
 
   useEffect(() => {
     if (!generationTiers.some((tier) => tier.id === selectedGenerationTierId) && generationTiers[0]) {
@@ -920,6 +930,7 @@ export default function InstaMeScreen() {
       base64: prepared.base64,
       previewBase64: prepared.previewBase64,
       mimeType: prepared.mimeType,
+      kind: "uploaded",
       width: prepared.width,
       height: prepared.height,
       fileSizeBytes: prepared.fileSizeBytes,
@@ -1127,6 +1138,7 @@ export default function InstaMeScreen() {
         base64: sourceBase64 || current?.base64 || "",
         previewBase64: sourceBase64 || current?.previewBase64,
         mimeType: current?.mimeType || "image/jpeg",
+        kind: current?.kind,
         width: current?.width,
         height: current?.height,
         fileSizeBytes: current?.fileSizeBytes,
@@ -1260,6 +1272,7 @@ export default function InstaMeScreen() {
         base64: result.imageBase64,
         previewBase64: result.imageBase64,
         mimeType: "image/png",
+        kind: "enhanced",
         width: 1024,
         height: 1024,
         name: `${photo.name || "Portrait"} Enhanced`,
@@ -1642,7 +1655,7 @@ export default function InstaMeScreen() {
             ) : (
               <>
                 <Ionicons name="sparkles-outline" size={18} color="#000" />
-                <Text style={styles.enhanceButtonText}>Enhance portrait first</Text>
+                <Text style={styles.enhanceButtonText}>Enhance portrait (recommended)</Text>
                 <Text style={styles.enhanceButtonCost}>{portraitEnhanceCost} credits</Text>
               </>
             )}
@@ -1650,7 +1663,7 @@ export default function InstaMeScreen() {
           {portraitEnhanceLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
 
           <Text style={styles.enhanceHintText}>
-            Improve the selfie first to reduce face distortion in later styled generations.
+            Optional but recommended. It can reduce face distortion in later styled generations, but you can also skip it or reuse a saved image from Enhanced Portraits.
           </Text>
           {usingEnhancedPortrait ? (
             <Text style={styles.enhanceSelectedText}>
