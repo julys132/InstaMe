@@ -1776,6 +1776,33 @@ function hasTogetherImageConfig(): boolean {
   return Boolean(process.env.TOGETHER_API_KEY);
 }
 
+function shouldFallbackOwnStyleToTogether(error: unknown): boolean {
+  const message = normalizeStringValue(error instanceof Error ? error.message : String(error || ""));
+  if (!message) return false;
+
+  return (
+    message.includes("AI_NOT_CONFIGURED") ||
+    /gemini_api_key|google_api_key/i.test(message) ||
+    /api key not valid/i.test(message) ||
+    /invalid api key/i.test(message) ||
+    /gemini api error \((400|401|403)\)/i.test(message)
+  );
+}
+
+function buildOwnStyleFallbackAnalysisPrompt(): string {
+  return [
+    "Use the uploaded style reference as the guide for pose, facial expression, facial micro-expression, hair arrangement, wardrobe, lighting, camera angle, framing, composition, background mood, color palette, texture, and overall aesthetic.",
+    "Preserve the uploaded subject's identity exactly and transfer only the style direction from the reference image.",
+  ].join(" ");
+}
+
+function toUploadedReferenceImageFromStoredOwnStyle(image: InstaMeUploadedImageRecord): UploadedReferenceImage {
+  return {
+    base64: image.base64 || image.previewBase64,
+    mimeType: image.mimeType || "image/jpeg",
+  };
+}
+
 function hasReveImageConfig(): boolean {
   return Boolean(process.env.REVE_API_KEY);
 }
@@ -1880,22 +1907,31 @@ async function generatePromptOnlyPresetImage(options: {
 }
 
 async function analyzeOwnStyleReferenceImage(styleImage: UploadedReferenceImage): Promise<string> {
-  const analysisResponse = await generateGeminiContent({
-    model: DEFAULT_OWN_STYLE_ANALYSIS_MODEL,
-    parts: [{ text: OWN_STYLE_ANALYSIS_PROMPT }, ...toGeminiInlineImageParts([styleImage])],
-    responseMimeType: "text/plain",
-    maxOutputTokens: 1200,
-    temperature: 0.3,
-  });
+  try {
+    const analysisResponse = await generateGeminiContent({
+      model: DEFAULT_OWN_STYLE_ANALYSIS_MODEL,
+      parts: [{ text: OWN_STYLE_ANALYSIS_PROMPT }, ...toGeminiInlineImageParts([styleImage])],
+      responseMimeType: "text/plain",
+      maxOutputTokens: 1200,
+      temperature: 0.3,
+    });
 
-  const analysisText = extractGeminiText(analysisResponse)
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!analysisText) {
-    throw new Error("Own Style analysis returned no prompt text.");
+    const analysisText = extractGeminiText(analysisResponse)
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!analysisText) {
+      throw new Error("Own Style analysis returned no prompt text.");
+    }
+
+    return analysisText;
+  } catch (error: unknown) {
+    if (hasTogetherImageConfig() && shouldFallbackOwnStyleToTogether(error)) {
+      console.warn("Own Style analysis falling back to Together-compatible prompt:", error);
+      return buildOwnStyleFallbackAnalysisPrompt();
+    }
+
+    throw error;
   }
-
-  return analysisText;
 }
 
 function buildOwnStyleTransformPrompt(options: {
@@ -1923,38 +1959,99 @@ function buildOwnStyleTransformPrompt(options: {
   return promptParts.join("\n");
 }
 
-async function generateOwnStyleImage(options: {
-  uploadedImages: UploadedReferenceImage[];
+function buildOwnStyleTogetherFallbackPrompt(options: {
   analyzedStylePrompt: string;
   customPrompt: string;
   preserveBackground: boolean;
-}): Promise<{ imageBase64: string; model: string; provider: string }> {
-  const imageResponse = await generateGeminiContent({
-    model: DEFAULT_STYLE_IMAGE_MODEL,
-    parts: [
-      {
-        text: buildOwnStyleTransformPrompt({
-          analyzedStylePrompt: options.analyzedStylePrompt,
-          customPrompt: options.customPrompt,
-          preserveBackground: options.preserveBackground,
-        }),
-      },
-      ...toGeminiInlineImageParts(options.uploadedImages),
-    ],
-    responseModalities: ["IMAGE", "TEXT"],
-    maxOutputTokens: 1200,
-  });
+}): string {
+  const promptParts = [
+    "Create a photorealistic edit of the user portrait using the uploaded style reference image as the primary guide.",
+    "Transfer the style reference image's pose, facial expression, hair arrangement, wardrobe direction, lighting, camera angle, framing, composition, background mood, color palette, and overall aesthetic.",
+    "Do not copy the reference person's identity or face. Preserve the user portrait subject's identity, facial structure, skin tone, and likeness exactly.",
+    "Keep the result realistic, editorial, and cohesive.",
+    "Use the largest native output resolution available from the model.",
+  ];
 
-  const imageBase64 = extractGeminiImageBase64(imageResponse);
-  if (!imageBase64) {
-    throw new Error("Own Style generation failed. No image data returned.");
+  if (options.analyzedStylePrompt.trim()) {
+    promptParts.push(`Style direction to reinforce: ${options.analyzedStylePrompt.trim()}`);
   }
 
-  return {
-    imageBase64,
-    model: DEFAULT_STYLE_IMAGE_MODEL,
-    provider: "Google",
-  };
+  if (options.preserveBackground) {
+    promptParts.push(
+      "Keep the original background structure where possible unless the style reference clearly implies a different scene treatment.",
+    );
+  }
+
+  if (options.customPrompt.trim()) {
+    promptParts.push(`Additional user notes: ${options.customPrompt.trim()}`);
+  }
+
+  return promptParts.join("\n");
+}
+
+async function generateOwnStyleImage(options: {
+  req: Request;
+  uploadedImages: UploadedReferenceImage[];
+  styleReferenceImage: UploadedReferenceImage;
+  analyzedStylePrompt: string;
+  customPrompt: string;
+  preserveBackground: boolean;
+  generationMode: InstaMeGenerationMode;
+}): Promise<{ imageBase64: string; model: string; provider: string }> {
+  try {
+    const imageResponse = await generateGeminiContent({
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      parts: [
+        {
+          text: buildOwnStyleTransformPrompt({
+            analyzedStylePrompt: options.analyzedStylePrompt,
+            customPrompt: options.customPrompt,
+            preserveBackground: options.preserveBackground,
+          }),
+        },
+        ...toGeminiInlineImageParts(options.uploadedImages),
+      ],
+      responseModalities: ["IMAGE", "TEXT"],
+      maxOutputTokens: 1200,
+    });
+
+    const imageBase64 = extractGeminiImageBase64(imageResponse);
+    if (!imageBase64) {
+      throw new Error("Own Style generation failed. No image data returned.");
+    }
+
+    return {
+      imageBase64,
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      provider: "Google",
+    };
+  } catch (error: unknown) {
+    if (!hasTogetherImageConfig() || !shouldFallbackOwnStyleToTogether(error)) {
+      throw error;
+    }
+
+    console.warn("Own Style generation falling back to Together:", error);
+    const { width, height } = resolveGenerationResolution(options.generationMode);
+    const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
+    const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]!);
+    const imageBase64 = await generateTogetherImage({
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt: buildOwnStyleTogetherFallbackPrompt({
+        analyzedStylePrompt: options.analyzedStylePrompt,
+        customPrompt: options.customPrompt,
+        preserveBackground: options.preserveBackground,
+      }),
+      referenceImages: [styleReferenceUrl, userImageUrl],
+      width,
+      height,
+    });
+
+    return {
+      imageBase64,
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      provider: "Together",
+    };
+  }
 }
 
 async function generateReferenceGuidedHighResImage(options: {
@@ -4102,17 +4199,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? toInstaMeOwnStyleSummary(selectedSavedOwnStyle)
         : null;
 
+      const activeOwnStyleReferenceImage = selectedSavedOwnStyle
+        ? toUploadedReferenceImageFromStoredOwnStyle(selectedSavedOwnStyle)
+        : ownStyleImages[0] || null;
+
       let analyzedOwnStylePrompt = selectedSavedOwnStyle?.analyzedPrompt || "";
+      if (shouldUseOwnStyle && !activeOwnStyleReferenceImage) {
+        return res.status(400).json({ error: "Own Style reference image is missing." });
+      }
       if (shouldUseOwnStyle && !analyzedOwnStylePrompt) {
-        analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(ownStyleImages[0]!);
+        analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage!);
       }
 
       const generationResult = shouldUseOwnStyle
         ? await generateOwnStyleImage({
+            req,
             uploadedImages,
+            styleReferenceImage: activeOwnStyleReferenceImage!,
             analyzedStylePrompt: analyzedOwnStylePrompt,
             customPrompt,
             preserveBackground,
+            generationMode,
           })
         : shouldUsePromptOnly && promptVariant
         ? await generatePromptOnlyPresetImage({
