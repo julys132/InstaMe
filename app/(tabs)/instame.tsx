@@ -1945,8 +1945,11 @@ export default function InstaMeScreen() {
                       key={option.value}
                       onPress={() => setOwnStyleMode(option.value)}
                       style={({ pressed }) => [
-                        styles.secondaryActionButton,
-                        active && styles.secondaryActionButtonAccent,
+                        styles.ownStyleModeButton,
+                        option.value === "reference_locked"
+                          ? styles.ownStyleModeButtonMatch
+                          : styles.ownStyleModeButtonCreative,
+                        active && styles.ownStyleModeButtonActive,
                         { flex: 1 },
                         pressed && { opacity: 0.88 },
                       ]}
@@ -1954,11 +1957,11 @@ export default function InstaMeScreen() {
                       <Ionicons
                         name={active ? "radio-button-on-outline" : "radio-button-off-outline"}
                         size={16}
-                        color={active ? Colors.accentLight : "#FFE1EA"}
+                        color={active ? "#0B0B0B" : "#FFF3F7"}
                       />
                       <Text style={[
-                        styles.secondaryActionButtonText,
-                        active && styles.secondaryActionButtonTextAccent,
+                        styles.ownStyleModeButtonText,
+                        active && styles.ownStyleModeButtonTextActive,
                       ]}>
                         {option.label}
                       </Text>
@@ -2368,7 +2371,7 @@ export default function InstaMeScreen() {
                         {transformCost} credits
                       </Text>
                       <Text style={styles.pricingMetaText}>
-                        {highResGenerationTier?.output || "1024 x 1024"}
+                        {highResGenerationTier?.output || "High native resolution"}
                       </Text>
                     </View>
                   </View>
@@ -2395,7 +2398,7 @@ export default function InstaMeScreen() {
 
                     <View style={styles.pricingMetaRow}>
                       <Text style={styles.pricingCredits}>{transformCost} credits</Text>
-                      <Text style={styles.pricingMetaText}>{activeGenerationTier?.output || "1024 x 1024"}</Text>
+                      <Text style={styles.pricingMetaText}>{activeGenerationTier?.output || "High native resolution"}</Text>
                     </View>
                   </View>
                 </View>
@@ -2471,7 +2474,7 @@ export default function InstaMeScreen() {
                 {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Quality: {resultMeta?.qualityLabel || activeGenerationQualityLabel}
               </Text>
               <Text style={styles.resultMetaText}>
-                Mode: {resultMeta?.stylePresetId === INSTAME_OWN_STYLE_ID ? "Own Style" : resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "1024 x 1024"}
+                Mode: {resultMeta?.stylePresetId === INSTAME_OWN_STYLE_ID ? "Own Style" : resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"} - Resolution: {activeGenerationTier?.output || "High native resolution"}
               </Text>
             </View>
             <View style={styles.postGenerationSection}>
@@ -2797,6 +2800,38 @@ const styles = StyleSheet.create({
   },
   secondaryActionButtonTextAccent: {
     color: Colors.accentLight,
+  },
+  ownStyleModeButton: {
+    flex: 1,
+    minHeight: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  ownStyleModeButtonMatch: {
+    borderColor: "rgba(255, 210, 126, 0.42)",
+    backgroundColor: "rgba(255, 196, 92, 0.18)",
+  },
+  ownStyleModeButtonCreative: {
+    borderColor: "rgba(127, 228, 255, 0.42)",
+    backgroundColor: "rgba(78, 214, 255, 0.18)",
+  },
+  ownStyleModeButtonActive: {
+    borderColor: "rgba(255,255,255,0.72)",
+    backgroundColor: "rgba(255,255,255,0.92)",
+  },
+  ownStyleModeButtonText: {
+    color: "#FFF7FA",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  ownStyleModeButtonTextActive: {
+    color: "#0B0B0B",
   },
   ownStylePanel: {
     marginTop: 8,

@@ -184,7 +184,7 @@ export const INSTAME_GENERATION_TIERS: InstaMeGenerationTier[] = [
     qualityTier: "premium",
     provider: "Together",
     model: "FLUX.2 Pro",
-    output: "1024 x 1024",
+    output: "High native resolution",
     badge: "Included",
     availability: "live",
   },

@@ -310,7 +310,7 @@ var INSTAME_GENERATION_TIERS = [
     qualityTier: "premium",
     provider: "Together",
     model: "FLUX.2 Pro",
-    output: "1024 x 1024",
+    output: "High native resolution",
     badge: "Included",
     availability: "live"
   }
@@ -1332,8 +1332,21 @@ var MAX_INSTAME_LIBRARY_IMAGES_TOTAL = MAX_INSTAME_UPLOADED_IMAGES + MAX_INSTAME
 var MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1e6;
 var MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 var MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 22e4;
-var MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 4e3;
+var MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8e3;
 var STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
+function normalizeGeneratedImageDimension(rawValue, fallback) {
+  const parsed = Number.parseInt((rawValue || "").trim(), 10);
+  if (!Number.isFinite(parsed) || parsed < 1024) {
+    return fallback;
+  }
+  const clamped = Math.min(parsed, 2048);
+  const snapped = Math.round(clamped / 64) * 64;
+  return Math.max(1024, snapped);
+}
+var INSTAME_HIGH_RES_OUTPUT_DIMENSION = normalizeGeneratedImageDimension(
+  process.env.INSTAME_HIGH_RES_OUTPUT_DIMENSION,
+  1536
+);
 var DEFAULT_IAP_PRODUCT_CREDITS = {
   "com.instame.app.credits.5": 5,
   "com.instame.app.credits.15": 15,
@@ -1663,7 +1676,11 @@ function toRuntimeAssetUrl(req, image) {
 }
 function resolveGenerationResolution(generationTierId) {
   if (generationTierId === "high_res") {
-    return { width: 1024, height: 1024, sizeLabel: "1024x1024" };
+    return {
+      width: INSTAME_HIGH_RES_OUTPUT_DIMENSION,
+      height: INSTAME_HIGH_RES_OUTPUT_DIMENSION,
+      sizeLabel: `${INSTAME_HIGH_RES_OUTPUT_DIMENSION}x${INSTAME_HIGH_RES_OUTPUT_DIMENSION}`
+    };
   }
   return { width: 512, height: 512, sizeLabel: "512x512" };
 }
@@ -1671,10 +1688,12 @@ function resolveOpenAiSize(generationTierId) {
   return "1024x1024";
 }
 var OWN_STYLE_ANALYSIS_PROMPT = [
-  "Analyze this image from the perspective of an elite-level professional photographer.",
-  "Include exact body posing, facial expression, facial micro-expression, and exactly how the hair falls or is arranged.",
-  "Also describe wardrobe, lighting, camera angle, framing, composition, background, mood, color palette, texture, and the overall aesthetic.",
-  "Write the result in English as one precise editing instruction paragraph without bullet points or numbering."
+  "Analyze this style-reference image in English from the perspective of an elite-level professional photographer and fashion art director.",
+  "Be extremely concrete and observational.",
+  "Include the exact body pose, shoulder line, torso angle, hand placement, head angle, eye direction, facial expression, facial micro-expression, and exactly how the hair falls or is arranged.",
+  "Also describe wardrobe, lighting pattern, camera angle, lens feeling, framing, composition, background treatment, mood, color palette, texture, and the overall aesthetic.",
+  "Write a rich, detailed English analysis that can be reused as style direction for a separate image generation step.",
+  "Do not ask questions. Do not mention limitations. Return only the analysis."
 ].join(" ");
 function normalizeStringList(input) {
   if (!Array.isArray(input)) return [];
@@ -2410,7 +2429,7 @@ async function analyzeOwnStyleReferenceImage(styleImage) {
       maxOutputTokens: 1200,
       temperature: 0.3
     });
-    const analysisText = extractGeminiText(analysisResponse).replace(/\s+/g, " ").trim();
+    const analysisText = extractGeminiText(analysisResponse).replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
     if (!analysisText) {
       throw new Error("Own Style analysis returned no prompt text.");
     }
@@ -2425,9 +2444,17 @@ async function analyzeOwnStyleReferenceImage(styleImage) {
 }
 function buildOwnStyleTransformPrompt(options) {
   const promptParts = [
-    `Edit the image following these instructions: ${options.analyzedStylePrompt}`,
+    "This is a full style transformation request, not a simple cleanup, beauty retouch, or portrait enhancement.",
+    "Treat the following style analysis as direct, executable art direction for the uploaded user photo.",
+    "Apply the described pose, expression, hair placement, wardrobe feeling, lighting, framing, camera angle, palette, and mood as concrete styling instructions, not as passive commentary.",
+    "Do not summarize, dilute, or ignore the style analysis.",
+    "Style analysis to apply verbatim:",
+    options.analyzedStylePrompt,
+    "Restyle the image clearly and visibly. Change wardrobe, hair styling, makeup feeling, pose energy, expression, framing, camera angle, lighting, color palette, and background mood so the final image strongly reflects the target style direction.",
+    "Do not keep the result too close to the original photo styling. Do not respond with only a subtle enhancement.",
+    "There is no style reference image attached in this generation step. Use only the extracted style direction and the uploaded user photo.",
     "Preserve the uploaded subject's identity, facial features, and overall likeness exactly.",
-    "Keep the result photorealistic and cohesive.",
+    "Keep the result photorealistic, editorial, and cohesive.",
     "Use the largest native output resolution available from the model."
   ];
   if (options.preserveBackground) {
@@ -2443,7 +2470,8 @@ function buildOwnStyleTransformPrompt(options) {
 function buildOwnStyleReferenceLockedPrompt(options) {
   const promptParts = [
     "Use the style reference image as a strong visual guide for pose, expression, hair shape, wardrobe direction, framing, lighting, camera angle, composition, and scene mood.",
-    `Style direction extracted from the reference image: ${options.analyzedStylePrompt}`,
+    "Also apply this detailed style analysis directly as art direction:",
+    options.analyzedStylePrompt,
     "Apply that direction closely to the user base photo while preserving the user subject's identity, facial features, skin tone, and likeness exactly.",
     "Do not copy the reference person's identity or face.",
     "Keep the result photorealistic, cohesive, and premium.",
@@ -2462,8 +2490,9 @@ function buildOwnStyleReferenceLockedPrompt(options) {
 function buildOwnStyleCreativeTogetherFallbackPrompt(options) {
   const promptParts = [
     "Create a photorealistic edit of the uploaded user portrait.",
-    `Use this analyzed style direction as inspiration: ${options.analyzedStylePrompt}`,
-    "Interpret the styling with more creative freedom instead of matching the original reference image too literally.",
+    "Apply the following detailed style analysis directly to the uploaded user portrait:",
+    options.analyzedStylePrompt,
+    "Interpret the styling with more creative freedom instead of matching the original reference image too literally, but still execute the described pose, expression, hair placement, lighting, framing, and aesthetic direction clearly.",
     "Preserve the uploaded subject's identity, facial structure, skin tone, and likeness exactly.",
     "Keep the result realistic, editorial, and cohesive.",
     "Use the largest native output resolution available from the model."
@@ -2482,13 +2511,12 @@ function buildOwnStyleTogetherFallbackPrompt(options) {
   const promptParts = [
     "Create a photorealistic edit of the user portrait using the uploaded style reference image as the primary guide.",
     "Transfer the style reference image's pose, facial expression, hair arrangement, wardrobe direction, lighting, camera angle, framing, composition, background mood, color palette, and overall aesthetic.",
+    "Reinforce the transformation with this detailed style analysis:",
+    options.analyzedStylePrompt,
     "Do not copy the reference person's identity or face. Preserve the user portrait subject's identity, facial structure, skin tone, and likeness exactly.",
     "Keep the result realistic, editorial, and cohesive.",
     "Use the largest native output resolution available from the model."
   ];
-  if (options.analyzedStylePrompt.trim()) {
-    promptParts.push(`Style direction to reinforce: ${options.analyzedStylePrompt.trim()}`);
-  }
   if (options.preserveBackground) {
     promptParts.push(
       "Keep the original background structure where possible unless the style reference clearly implies a different scene treatment."
