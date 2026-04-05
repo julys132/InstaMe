@@ -43,22 +43,36 @@ function getOpenAiClient(): OpenAI {
   });
 }
 
-function resolveOpenAiImageModelAlias(model: string): string {
+function resolveOpenAiImageRequest(model: string): {
+  model: string;
+  inputFidelity?: "high" | "low";
+} {
   const normalized = model.trim().toLowerCase();
-  const latestHighFidelityWithVersion = "chatgpt-image-latest-high-fidelity (20251216)";
-  if (!normalized) return model;
-
-  if (
-    normalized === "gpt-image-1.5" ||
-    normalized === "gpt-image-1" ||
-    normalized === "chatgpt-image-latest-high-fidelity" ||
-    normalized === "chatgpt image latest high fidelity" ||
-    normalized === latestHighFidelityWithVersion
-  ) {
-    return "chatgpt-image-latest-high-fidelity";
+  if (!normalized) {
+    return { model };
   }
 
-  return model;
+  const aliases = new Map<string, { model: string; inputFidelity?: "high" | "low" }>([
+    ["gpt-image-1.5", { model: "gpt-image-1.5" }],
+    ["gpt image 1.5", { model: "gpt-image-1.5" }],
+    ["gpt-image-1", { model: "gpt-image-1" }],
+    ["gpt image 1", { model: "gpt-image-1" }],
+    ["gpt-image-1-mini", { model: "gpt-image-1-mini" }],
+    ["gpt image 1 mini", { model: "gpt-image-1-mini" }],
+    ["chatgpt-image-latest", { model: "chatgpt-image-latest" }],
+    ["chatgpt image latest", { model: "chatgpt-image-latest" }],
+    ["chatgpt-image-latest-high-fidelity", { model: "chatgpt-image-latest", inputFidelity: "high" }],
+    ["chatgpt image latest high fidelity", { model: "chatgpt-image-latest", inputFidelity: "high" }],
+    ["chatgpt-image-latest-high-fidelity (20251216)", { model: "chatgpt-image-latest", inputFidelity: "high" }],
+    ["gpt-image-1.5-high-fidelity", { model: "gpt-image-1.5", inputFidelity: "high" }],
+    ["gpt image 1.5 high fidelity", { model: "gpt-image-1.5", inputFidelity: "high" }],
+    ["gpt-image-1-high-fidelity", { model: "gpt-image-1", inputFidelity: "high" }],
+    ["gpt image 1 high fidelity", { model: "gpt-image-1", inputFidelity: "high" }],
+    ["gpt-image-1-mini-high-fidelity", { model: "gpt-image-1-mini", inputFidelity: "high" }],
+    ["gpt image 1 mini high fidelity", { model: "gpt-image-1-mini", inputFidelity: "high" }],
+  ]);
+
+  return aliases.get(normalized) || { model };
 }
 
 function getTogetherApiKey(): string {
@@ -248,7 +262,7 @@ export async function generateOpenAiImage(options: {
   quality?: "low" | "medium" | "high" | "auto";
 }): Promise<string> {
   const client = getOpenAiClient();
-  const resolvedModel = resolveOpenAiImageModelAlias(options.model);
+  const resolvedRequest = resolveOpenAiImageRequest(options.model);
   const size = options.size || "1024x1024";
   const quality = options.quality || "auto";
   const inputImages = Array.isArray(options.images) ? options.images : [];
@@ -259,11 +273,12 @@ export async function generateOpenAiImage(options: {
     );
 
     const response = await client.images.edit({
-      model: resolvedModel,
+      model: resolvedRequest.model,
       prompt: options.prompt,
       image: files as any,
       size,
       quality,
+      input_fidelity: resolvedRequest.inputFidelity,
     } as any);
 
     const base64 = response.data?.[0]?.b64_json;
@@ -274,7 +289,7 @@ export async function generateOpenAiImage(options: {
   }
 
   const response = await client.images.generate({
-    model: resolvedModel,
+    model: resolvedRequest.model,
     prompt: options.prompt,
     size,
     quality,

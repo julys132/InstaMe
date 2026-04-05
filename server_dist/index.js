@@ -864,14 +864,31 @@ function getOpenAiClient() {
     baseURL: process.env.OPENAI_BASE_URL || process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || void 0
   });
 }
-function resolveOpenAiImageModelAlias(model) {
+function resolveOpenAiImageRequest(model) {
   const normalized = model.trim().toLowerCase();
-  const latestHighFidelityWithVersion = "chatgpt-image-latest-high-fidelity (20251216)";
-  if (!normalized) return model;
-  if (normalized === "gpt-image-1.5" || normalized === "gpt-image-1" || normalized === "chatgpt-image-latest-high-fidelity" || normalized === "chatgpt image latest high fidelity" || normalized === latestHighFidelityWithVersion) {
-    return "chatgpt-image-latest-high-fidelity";
+  if (!normalized) {
+    return { model };
   }
-  return model;
+  const aliases = /* @__PURE__ */ new Map([
+    ["gpt-image-1.5", { model: "gpt-image-1.5" }],
+    ["gpt image 1.5", { model: "gpt-image-1.5" }],
+    ["gpt-image-1", { model: "gpt-image-1" }],
+    ["gpt image 1", { model: "gpt-image-1" }],
+    ["gpt-image-1-mini", { model: "gpt-image-1-mini" }],
+    ["gpt image 1 mini", { model: "gpt-image-1-mini" }],
+    ["chatgpt-image-latest", { model: "chatgpt-image-latest" }],
+    ["chatgpt image latest", { model: "chatgpt-image-latest" }],
+    ["chatgpt-image-latest-high-fidelity", { model: "chatgpt-image-latest", inputFidelity: "high" }],
+    ["chatgpt image latest high fidelity", { model: "chatgpt-image-latest", inputFidelity: "high" }],
+    ["chatgpt-image-latest-high-fidelity (20251216)", { model: "chatgpt-image-latest", inputFidelity: "high" }],
+    ["gpt-image-1.5-high-fidelity", { model: "gpt-image-1.5", inputFidelity: "high" }],
+    ["gpt image 1.5 high fidelity", { model: "gpt-image-1.5", inputFidelity: "high" }],
+    ["gpt-image-1-high-fidelity", { model: "gpt-image-1", inputFidelity: "high" }],
+    ["gpt image 1 high fidelity", { model: "gpt-image-1", inputFidelity: "high" }],
+    ["gpt-image-1-mini-high-fidelity", { model: "gpt-image-1-mini", inputFidelity: "high" }],
+    ["gpt image 1 mini high fidelity", { model: "gpt-image-1-mini", inputFidelity: "high" }]
+  ]);
+  return aliases.get(normalized) || { model };
 }
 function getTogetherApiKey() {
   const apiKey = process.env.TOGETHER_API_KEY;
@@ -997,7 +1014,7 @@ async function toOpenAiUpload(input, fallbackName) {
 }
 async function generateOpenAiImage(options) {
   const client = getOpenAiClient();
-  const resolvedModel = resolveOpenAiImageModelAlias(options.model);
+  const resolvedRequest = resolveOpenAiImageRequest(options.model);
   const size = options.size || "1024x1024";
   const quality = options.quality || "auto";
   const inputImages = Array.isArray(options.images) ? options.images : [];
@@ -1006,11 +1023,12 @@ async function generateOpenAiImage(options) {
       inputImages.map((image, index) => toOpenAiUpload(image, `instame-edit-${index + 1}`))
     );
     const response2 = await client.images.edit({
-      model: resolvedModel,
+      model: resolvedRequest.model,
       prompt: options.prompt,
       image: files,
       size,
-      quality
+      quality,
+      input_fidelity: resolvedRequest.inputFidelity
     });
     const base642 = response2.data?.[0]?.b64_json;
     if (!base642) {
@@ -1019,7 +1037,7 @@ async function generateOpenAiImage(options) {
     return base642;
   }
   const response = await client.images.generate({
-    model: resolvedModel,
+    model: resolvedRequest.model,
     prompt: options.prompt,
     size,
     quality
@@ -2488,7 +2506,7 @@ async function generatePromptOnlyPresetImage(options) {
       provider: "Reve"
     };
   }
-  const openAiModel = selectedModel?.model || "chatgpt-image-latest-high-fidelity";
+  const openAiModel = selectedModel?.model || "chatgpt-image-latest";
   const imageBase64 = await generateOpenAiImage({
     model: openAiModel,
     prompt,
