@@ -117,6 +117,41 @@ function getInstaMeHistoryStorageKey(userId?: string | null): string {
   return `@instame_generation_history_${userId || "guest"}`;
 }
 
+function getInstaMeOwnStyleDraftStorageKey(userId?: string | null): string {
+  return `@instame_own_style_draft_${userId || "guest"}`;
+}
+
+function normalizeStoredUploadedPhoto(input: unknown): UploadedPhoto | null {
+  if (!input || typeof input !== "object") {
+    return null;
+  }
+
+  const candidate = input as Partial<UploadedPhoto>;
+  const uri = typeof candidate.uri === "string" ? candidate.uri : "";
+  const base64 = typeof candidate.base64 === "string" ? candidate.base64 : "";
+  const previewBase64 = typeof candidate.previewBase64 === "string" ? candidate.previewBase64 : base64;
+  const mimeType =
+    typeof candidate.mimeType === "string" && candidate.mimeType.startsWith("image/")
+      ? candidate.mimeType
+      : "image/jpeg";
+
+  if (!uri || !base64) {
+    return null;
+  }
+
+  return {
+    uri,
+    base64,
+    previewBase64,
+    mimeType,
+    width: typeof candidate.width === "number" ? candidate.width : undefined,
+    height: typeof candidate.height === "number" ? candidate.height : undefined,
+    fileSizeBytes: typeof candidate.fileSizeBytes === "number" ? candidate.fileSizeBytes : undefined,
+    sourceImageId: typeof candidate.sourceImageId === "string" ? candidate.sourceImageId : undefined,
+    name: typeof candidate.name === "string" ? candidate.name : undefined,
+  };
+}
+
 function toPresetFavoriteKey(styleId: string): FavoriteStyleKey {
   return `preset:${styleId}`;
 }
@@ -358,7 +393,9 @@ export default function InstaMeScreen() {
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
+  const [ownStylesLoaded, setOwnStylesLoaded] = useState(false);
   const [selectedOwnStyleId, setSelectedOwnStyleId] = useState<string | null>(null);
+  const [ownStyleDraftReady, setOwnStyleDraftReady] = useState(false);
   const [favoriteStyleKeys, setFavoriteStyleKeys] = useState<FavoriteStyleKey[]>([]);
   const [generationHistory, setGenerationHistory] = useState<InstaMeHistoryEntry[]>([]);
   const [ownStyleNameDraft, setOwnStyleNameDraft] = useState("");
@@ -386,6 +423,9 @@ export default function InstaMeScreen() {
     () => savedOwnStyles.find((style) => style.id === selectedOwnStyleId) || null,
     [savedOwnStyles, selectedOwnStyleId],
   );
+
+  const hasOwnStyleInput = Boolean(ownStylePhoto || selectedOwnStyleId);
+  const ownStyleNeedsActivation = hasOwnStyleInput && selectedStyleId !== INSTAME_OWN_STYLE_ID;
 
   const currentFavoriteStyleKey = useMemo(() => {
     if (selectedStyleId === INSTAME_OWN_STYLE_ID && selectedSavedOwnStyle) {
@@ -558,6 +598,8 @@ export default function InstaMeScreen() {
         } else {
           setSavedOwnStyles([]);
         }
+
+        setOwnStylesLoaded(true);
       });
 
     return () => {
@@ -566,10 +608,88 @@ export default function InstaMeScreen() {
   }, []);
 
   useEffect(() => {
+    if (!ownStylesLoaded) {
+      return;
+    }
+
     if (selectedOwnStyleId && !savedOwnStyles.some((style) => style.id === selectedOwnStyleId)) {
       setSelectedOwnStyleId(null);
     }
-  }, [savedOwnStyles, selectedOwnStyleId]);
+  }, [ownStylesLoaded, savedOwnStyles, selectedOwnStyleId]);
+
+  useEffect(() => {
+    const storageKey = getInstaMeOwnStyleDraftStorageKey(user?.id);
+    let cancelled = false;
+
+    setOwnStyleDraftReady(false);
+
+    AsyncStorage.getItem(storageKey)
+      .then((stored) => {
+        if (cancelled || !stored) {
+          return;
+        }
+
+        const parsed = JSON.parse(stored) as {
+          selectedStyleId?: unknown;
+          selectedOwnStyleId?: unknown;
+          ownStylePhoto?: unknown;
+        };
+
+        if (parsed.selectedStyleId !== INSTAME_OWN_STYLE_ID) {
+          return;
+        }
+
+        const restoredOwnStylePhoto = normalizeStoredUploadedPhoto(parsed.ownStylePhoto);
+        const restoredOwnStyleId =
+          typeof parsed.selectedOwnStyleId === "string" && parsed.selectedOwnStyleId.trim().length > 0
+            ? parsed.selectedOwnStyleId
+            : null;
+
+        if (!restoredOwnStylePhoto && !restoredOwnStyleId) {
+          return;
+        }
+
+        setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+        setPreviewStyleId(null);
+        setIntensity(null);
+        setSelectedOwnStyleId(restoredOwnStyleId);
+        setOwnStylePhoto(restoredOwnStylePhoto);
+      })
+      .catch(() => {
+        // no-op
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setOwnStyleDraftReady(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!ownStyleDraftReady) {
+      return;
+    }
+
+    const storageKey = getInstaMeOwnStyleDraftStorageKey(user?.id);
+
+    if (selectedStyleId === INSTAME_OWN_STYLE_ID && (selectedOwnStyleId || ownStylePhoto)) {
+      void AsyncStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          selectedStyleId: INSTAME_OWN_STYLE_ID,
+          selectedOwnStyleId,
+          ownStylePhoto,
+        }),
+      );
+      return;
+    }
+
+    void AsyncStorage.removeItem(storageKey);
+  }, [ownStyleDraftReady, ownStylePhoto, selectedOwnStyleId, selectedStyleId, user?.id]);
 
   useEffect(() => {
     const storageKey = getInstaMeFavoritesStorageKey(user?.id);
@@ -659,16 +779,17 @@ export default function InstaMeScreen() {
   }, [uploadedImageIdParam, uploadedImageNonce]);
 
   useEffect(() => {
-    if (!selectedStyleId && stylePresets[0]) {
-      setSelectedStyleId(stylePresets[0].id);
+    if (!selectedStyleId && defaultStylePreset) {
+      setSelectedStyleId(defaultStylePreset.id);
       return;
     }
 
-    const exists = stylePresets.some((preset) => preset.id === selectedStyleId);
-    if (!exists && stylePresets[0]) {
-      setSelectedStyleId(stylePresets[0].id);
+    const exists =
+      selectedStyleId === INSTAME_OWN_STYLE_ID || stylePresets.some((preset) => preset.id === selectedStyleId);
+    if (!exists && defaultStylePreset) {
+      setSelectedStyleId(defaultStylePreset.id);
     }
-  }, [selectedStyleId, stylePresets]);
+  }, [defaultStylePreset, selectedStyleId, stylePresets]);
 
   useEffect(() => {
     if (!generationTiers.some((tier) => tier.id === selectedGenerationTierId) && generationTiers[0]) {
@@ -692,10 +813,11 @@ export default function InstaMeScreen() {
     () => Boolean(
       photo &&
       !loading &&
+      !ownStyleNeedsActivation &&
       credits >= transformCost &&
       (!isOwnStyleSelected || ownStylePhoto || selectedOwnStyleId),
     ),
-    [photo, loading, credits, transformCost, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId],
+    [photo, loading, ownStyleNeedsActivation, credits, transformCost, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId],
   );
 
   const handleStyleRowScroll = useCallback((event: any) => {
@@ -805,6 +927,9 @@ export default function InstaMeScreen() {
             text: "Keep new upload",
             style: "cancel",
             onPress: () => {
+              setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+              setIntensity(null);
+              setPreviewStyleId(null);
               setOwnStylePhoto({
                 uri: prepared.uri,
                 base64: prepared.base64,
@@ -854,6 +979,9 @@ export default function InstaMeScreen() {
       sourceImageId: undefined,
       name: asset.fileName || "Style reference",
     });
+    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+    setIntensity(null);
+    setPreviewStyleId(null);
     setSelectedOwnStyleId(null);
     setResultBase64(null);
     setResultMeta(null);
@@ -879,6 +1007,18 @@ export default function InstaMeScreen() {
 
     setPreviewStyleId(preset.id);
   }, [ownStylePhoto, pickOwnStyleImage, selectedOwnStyleId]);
+
+  const handleUseCurrentOwnStyle = useCallback(async () => {
+    if (!ownStylePhoto && !selectedOwnStyleId) {
+      Alert.alert("Missing style image", "Upload or select one Own Style before activating it.");
+      return;
+    }
+
+    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+    setIntensity(null);
+    setPreviewStyleId(null);
+    await Haptics.selectionAsync();
+  }, [ownStylePhoto, selectedOwnStyleId]);
 
   const handleSelectSavedOwnStyle = useCallback(async (style: InstaMeOwnStyle) => {
     setSelectedStyleId(INSTAME_OWN_STYLE_ID);
@@ -1166,6 +1306,13 @@ export default function InstaMeScreen() {
       Alert.alert("Missing image", "Upload one photo before transforming.");
       return;
     }
+    if (ownStyleNeedsActivation) {
+      Alert.alert(
+        "Own Style not active",
+        "You uploaded an Own Style image, but another main style is still selected. Tap 'Use this style' before generating so the app cannot fall back to another preset.",
+      );
+      return;
+    }
     if (isOwnStyleSelected && !ownStylePhoto && !selectedOwnStyleId) {
       Alert.alert("Missing style image", "Upload one style reference image for Own Style before generating.");
       return;
@@ -1241,6 +1388,7 @@ export default function InstaMeScreen() {
     }
   }, [
     photo,
+    ownStyleNeedsActivation,
     credits,
     transformCost,
     selectedStylePreset,
@@ -1726,6 +1874,30 @@ export default function InstaMeScreen() {
                   </View>
                 )}
               </Pressable>
+              {hasOwnStyleInput ? (
+                <>
+                  <Pressable
+                    onPress={() => void handleUseCurrentOwnStyle()}
+                    disabled={!ownStyleNeedsActivation}
+                    style={({ pressed }) => [
+                      styles.secondaryActionButton,
+                      styles.secondaryActionButtonAccent,
+                      !ownStyleNeedsActivation && styles.secondaryActionButtonDisabled,
+                      pressed && ownStyleNeedsActivation ? { opacity: 0.9 } : undefined,
+                    ]}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={16} color={Colors.accentLight} />
+                    <Text style={[styles.secondaryActionButtonText, styles.secondaryActionButtonTextAccent]}>
+                      {ownStyleNeedsActivation ? "Use this style" : "Using this style"}
+                    </Text>
+                  </Pressable>
+                  {ownStyleNeedsActivation ? (
+                    <Text style={styles.processingHintText}>
+                      Own Style is loaded, but another main style is still selected. Generate stays locked until you tap "Use this style".
+                    </Text>
+                  ) : null}
+                </>
+              ) : null}
               {selectedSavedOwnStyle ? (
                 <View style={styles.ownStyleSavedMeta}>
                   <Text style={styles.ownStyleSavedMetaTitle}>Using saved style: {selectedSavedOwnStyle.name}</Text>
