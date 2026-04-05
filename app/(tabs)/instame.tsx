@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  InteractionManager,
   useWindowDimensions,
   Modal,
   Platform,
@@ -607,6 +608,24 @@ export default function InstaMeScreen() {
     await Haptics.selectionAsync();
   }, [pickRawImage]);
 
+  const handleStylePresetPress = useCallback((preset: InstaMeStylePreset) => {
+    setSelectedStyleId(preset.id);
+
+    if (preset.id === INSTAME_OWN_STYLE_ID) {
+      setIntensity(null);
+      setPreviewStyleId(null);
+
+      if (!ownStylePhoto) {
+        InteractionManager.runAfterInteractions(() => {
+          void pickOwnStyleImage();
+        });
+      }
+      return;
+    }
+
+    setPreviewStyleId(preset.id);
+  }, [ownStylePhoto, pickOwnStyleImage]);
+
   const handleEnhancePortrait = useCallback(async () => {
     if (!photo) {
       Alert.alert("Missing image", "Upload one portrait before enhancing it.");
@@ -1024,15 +1043,7 @@ export default function InstaMeScreen() {
                 return (
                   <Pressable
                     key={preset.id}
-                    onPress={() => {
-                      setSelectedStyleId(preset.id);
-                      if (isOwnStylePreset) {
-                        setIntensity(null);
-                        setPreviewStyleId(null);
-                      } else {
-                        setPreviewStyleId(preset.id);
-                      }
-                    }}
+                    onPress={() => handleStylePresetPress(preset)}
                     style={[
                       styles.styleCardOuter,
                       isFirst && styles.styleCardOuterFirst,
