@@ -982,7 +982,7 @@ const OWN_STYLE_ANALYSIS_PROMPT = [
 ].join(" ");
 
 const CREATIVE_OWN_STYLE_ANALYSIS_PROMPT =
-  "Analyze this image from the point of view of an elite-level professional photographer, and do not forget to include the exact body posing, the facial expression and mimicry, and the way the hair falls or is arranged.";
+  "Analizeaza aceasta imagine din punctul de vedere al unui fotograf profesionist elite level, nu uita sa incluzi exact posingul corpului, expresia si mimica fetei, si felul in care cade sau este asezat parul.";
 
 function normalizeStringList(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
@@ -2133,20 +2133,7 @@ function buildOwnStyleTransformPrompt(options: {
   customPrompt: string;
   preserveBackground: boolean;
 }): string {
-  const trimmedCustomPrompt = options.customPrompt.trim();
-  const promptParts = [
-    `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}.`,
-    "Non-negotiable identity rules: preserve the uploaded subject's original hair color exactly.",
-    "Never transfer or invent the style reference person's hair color.",
-    "Do not add bangs, fringe, or a new front hairline unless bangs are already clearly present in the uploaded user base photo.",
-    "Do not change the haircut category of the uploaded user. Keep the same visible hairline and overall cut, and only adapt styling details such as placement, softness, texture emphasis, or volume where compatible.",
-  ];
-
-  if (trimmedCustomPrompt) {
-    promptParts.push(`Additional user notes: ${trimmedCustomPrompt}`);
-  }
-
-  return promptParts.join("\n\n");
+  return `Editeaza imaginea ${options.analyzedStylePrompt}`;
 }
 
 function buildOwnStyleReferenceLockedPrompt(options: {
