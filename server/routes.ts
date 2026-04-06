@@ -2134,11 +2134,19 @@ function buildOwnStyleTransformPrompt(options: {
   preserveBackground: boolean;
 }): string {
   const trimmedCustomPrompt = options.customPrompt.trim();
-  if (!trimmedCustomPrompt) {
-    return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}.`;
+  const promptParts = [
+    `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}.`,
+    "Non-negotiable identity rules: preserve the uploaded subject's original hair color exactly.",
+    "Never transfer or invent the style reference person's hair color.",
+    "Do not add bangs, fringe, or a new front hairline unless bangs are already clearly present in the uploaded user base photo.",
+    "Do not change the haircut category of the uploaded user. Keep the same visible hairline and overall cut, and only adapt styling details such as placement, softness, texture emphasis, or volume where compatible.",
+  ];
+
+  if (trimmedCustomPrompt) {
+    promptParts.push(`Additional user notes: ${trimmedCustomPrompt}`);
   }
 
-  return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}.\n\nAdditional user notes: ${trimmedCustomPrompt}`;
+  return promptParts.join("\n\n");
 }
 
 function buildOwnStyleReferenceLockedPrompt(options: {
@@ -2154,6 +2162,10 @@ function buildOwnStyleReferenceLockedPrompt(options: {
     "Also apply this detailed style analysis directly as art direction:",
     options.analyzedStylePrompt,
     "Apply that direction closely to the user base photo while preserving the user subject's identity, facial features, skin tone, and likeness exactly.",
+    "Preserve the uploaded subject's original hair color exactly.",
+    "Transfer hair styling cues only when compatible, but never copy the reference person's hair color.",
+    "Do not add bangs, fringe, or a new front hairline unless those features already exist in the uploaded user base photo.",
+    "Keep the uploaded user's existing haircut category and hairline; do not replace it with the reference person's haircut.",
     "Restyle the image clearly and visibly so the output reflects the full reference look, not just the pose or head angle.",
     "Make the wardrobe, hair styling, makeup feeling, lighting, framing, camera distance, palette, and scene mood noticeably align with the reference direction.",
     "If the output mainly copies the pose while leaving the original styling mostly unchanged, the task has failed.",
@@ -2186,6 +2198,9 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options: {
     "Apply the following detailed style analysis directly to the uploaded user portrait:",
     options.analyzedStylePrompt,
     "Interpret the styling with more creative freedom instead of matching the original reference image too literally, but still execute the described pose, expression, exact hair placement, lighting, framing, and aesthetic direction clearly.",
+    "Preserve the uploaded subject's original hair color exactly and never copy hair color from the style direction.",
+    "Do not add bangs, fringe, or a new front hairline unless the uploaded user portrait already shows them clearly.",
+    "Keep the user's existing haircut category and visible hairline; only adapt compatible styling details such as placement or volume.",
     "Do not return a light beauty pass, simple enhance, or near-unchanged version of the input image.",
     "Preserve the uploaded subject's identity, facial structure, skin tone, and likeness exactly.",
     "Keep the result realistic, editorial, and cohesive.",
@@ -2216,6 +2231,9 @@ function buildOwnStyleTogetherFallbackPrompt(options: {
     "Transfer the style reference image's pose, facial expression, facial micro-expression, hair arrangement, makeup feeling, wardrobe direction, lighting, camera angle, framing, composition, background mood, color palette, and overall aesthetic.",
     "Reinforce the transformation with this detailed style analysis:",
     options.analyzedStylePrompt,
+    "Preserve the uploaded subject's original hair color exactly and never copy the reference person's hair color.",
+    "Do not add bangs, fringe, or a new front hairline unless those features already exist in the uploaded user portrait.",
+    "Keep the user's existing haircut category and visible hairline; do not replace them with the reference person's haircut.",
     "Do not stop at pose matching. The final image should clearly reflect the full reference styling, not just the body position.",
     "If the output mostly preserves the original styling and only changes pose, the task has failed.",
     "Do not copy the reference person's identity or face. Preserve the user portrait subject's identity, facial structure, skin tone, and likeness exactly.",
@@ -2264,7 +2282,7 @@ async function generateOwnStyleImage(options: {
           { text: prompt },
           { text: "User base photo to transform. This person must remain the final subject:" },
           ...toGeminiInlineImageParts(options.uploadedImages),
-          { text: "Style reference image. Use it for the full styling direction, not just pose; never use it as the output identity:" },
+          { text: "Style reference image. Use it for styling direction such as pose, lighting, and mood, but never copy its hair color, bangs, haircut, or identity into the output:" },
           ...toGeminiInlineImageParts([options.styleReferenceImage]),
         ]
       : [
