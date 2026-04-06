@@ -1396,6 +1396,7 @@ var GEMINI_API_BASE_URL = process.env.GEMINI_API_BASE_URL || "https://generative
 var DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 var DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3-pro-image-preview";
 var DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
+var DEFAULT_CREATIVE_OWN_STYLE_ANALYSIS_MODEL = process.env.CREATIVE_OWN_STYLE_ANALYSIS_MODEL || "gemini-3.1-pro";
 var DEFAULT_TOGETHER_FLASH_IMAGE_MODEL = process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-3.1";
 var DEFAULT_TOGETHER_PRO_IMAGE_MODEL = process.env.STYLE_HIGH_RES_TOGETHER_MODEL || "google/gemini-3-pro-image";
 var STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
@@ -1784,6 +1785,7 @@ var OWN_STYLE_ANALYSIS_PROMPT = [
   "Write a rich, detailed English analysis that can be reused as style direction for a separate image generation step.",
   "Do not ask questions. Do not mention limitations. Return only the analysis."
 ].join(" ");
+var CREATIVE_OWN_STYLE_ANALYSIS_PROMPT = "Analyze this image from the point of view of an elite-level professional photographer, and do not forget to include the exact body posing, the facial expression and mimicry, and the way the hair falls or is arranged.";
 function normalizeStringList(input) {
   if (!Array.isArray(input)) return [];
   return input.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean);
@@ -2526,31 +2528,44 @@ async function generatePromptOnlyPresetImage(options) {
   };
 }
 async function analyzeOwnStyleReferenceImage(styleImage, options) {
+  const isCreativePromptMode = options?.ownStyleMode === "creative_prompt";
+  const analysisPrompt = isCreativePromptMode ? CREATIVE_OWN_STYLE_ANALYSIS_PROMPT : OWN_STYLE_ANALYSIS_PROMPT;
+  const primaryModel = isCreativePromptMode ? DEFAULT_CREATIVE_OWN_STYLE_ANALYSIS_MODEL : DEFAULT_OWN_STYLE_ANALYSIS_MODEL;
+  const fallbackModels = Array.from(
+    new Set(
+      [DEFAULT_OWN_STYLE_ANALYSIS_MODEL, DEFAULT_STYLE_TEXT_MODEL].filter(
+        (model) => Boolean(model) && model !== primaryModel
+      )
+    )
+  );
   const runAnalysis = async (model) => {
     const analysisResponse = await generateGeminiContent({
       model,
-      parts: [{ text: OWN_STYLE_ANALYSIS_PROMPT }, ...toGeminiInlineImageParts([styleImage])],
+      parts: [{ text: analysisPrompt }, ...toGeminiInlineImageParts([styleImage])],
       responseMimeType: "text/plain",
       maxOutputTokens: 1200,
       temperature: 0.3
     });
-    const analysisText = extractGeminiText(analysisResponse).replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    const rawAnalysisText = extractGeminiText(analysisResponse);
+    const analysisText = isCreativePromptMode ? rawAnalysisText.trim() : rawAnalysisText.replace(/\r\n/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
     if (!analysisText) {
       throw new Error("Own Style analysis returned no prompt text.");
     }
     return analysisText;
   };
   try {
-    return await runAnalysis(DEFAULT_OWN_STYLE_ANALYSIS_MODEL);
+    return await runAnalysis(primaryModel);
   } catch (error) {
-    if (isGeminiModelNotFoundError(error) && DEFAULT_STYLE_TEXT_MODEL !== DEFAULT_OWN_STYLE_ANALYSIS_MODEL) {
-      try {
-        console.warn(
-          `Own Style analysis model ${DEFAULT_OWN_STYLE_ANALYSIS_MODEL} was not found. Retrying with ${DEFAULT_STYLE_TEXT_MODEL}.`
-        );
-        return await runAnalysis(DEFAULT_STYLE_TEXT_MODEL);
-      } catch (retryError) {
-        error = retryError;
+    if (isGeminiModelNotFoundError(error)) {
+      for (const fallbackModel of fallbackModels) {
+        try {
+          console.warn(
+            `Own Style analysis model ${primaryModel} was not found. Retrying with ${fallbackModel}.`
+          );
+          return await runAnalysis(fallbackModel);
+        } catch (retryError) {
+          error = retryError;
+        }
       }
     }
     if (options?.allowStaticFallback && hasTogetherImageConfig() && shouldFallbackOwnStyleToTogether(error)) {
@@ -2564,48 +2579,33 @@ async function analyzeOwnStyleReferenceImage(styleImage, options) {
   }
 }
 function buildOwnStyleTransformPrompt(options) {
-  const promptParts = [
-    "This is a full style transformation request, not a simple cleanup, beauty retouch, or portrait enhancement.",
-    "Treat the following style analysis as direct, executable art direction for the uploaded user photo.",
-    "The uploaded user base photo is the only identity source for the final result.",
-    "The final image must depict only the person from the user base photo, never the person from the style reference image.",
-    "Apply the described pose, expression, hair placement, wardrobe feeling, lighting, framing, camera angle, palette, and mood as concrete styling instructions, not as passive commentary.",
-    "Do not summarize, dilute, or ignore the style analysis.",
-    "Style analysis to apply verbatim:",
-    options.analyzedStylePrompt,
-    "Restyle the image clearly and visibly. Change wardrobe, hair styling, makeup feeling, pose energy, expression, framing, camera angle, lighting, color palette, and background mood so the final image strongly reflects the target style direction.",
-    "Do not keep the result too close to the original photo styling. Do not respond with only a subtle enhancement.",
-    "If the output looks like the original photo with only light cleanup, the task has failed. Apply a real visual restyle.",
-    "There is no style reference image attached in this generation step. Use only the extracted style direction and the uploaded user photo.",
-    "Preserve the uploaded subject's identity, facial features, and overall likeness exactly.",
-    "Keep the result photorealistic, editorial, and cohesive.",
-    "Use the largest native output resolution available from the model."
-  ];
-  if (options.preserveBackground) {
-    promptParts.push(
-      "Keep the original background structure where possible unless the style instructions clearly require a different scene."
-    );
+  const trimmedCustomPrompt = options.customPrompt.trim();
+  if (!trimmedCustomPrompt) {
+    return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}.`;
   }
-  if (options.customPrompt.trim()) {
-    promptParts.push(`Additional user notes: ${options.customPrompt.trim()}`);
-  }
-  return promptParts.join("\n");
+  return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}.
+
+Additional user notes: ${trimmedCustomPrompt}`;
 }
 function buildOwnStyleReferenceLockedPrompt(options) {
   const promptParts = [
-    "Use the style reference image as a strong visual guide for pose, expression, hair shape, wardrobe direction, framing, lighting, camera angle, composition, and scene mood.",
+    "This is a full style-transfer request, not a pose-only match, simple cleanup, or light beauty retouch.",
+    "Use the style reference image as a strong visual guide for the complete visual language: pose, expression, facial micro-expression, hair shape and placement, makeup feeling, wardrobe silhouette and materials, framing, lighting, camera angle, composition, background mood, color palette, and overall editorial finish.",
     "The uploaded user base photo is the actual source subject and must remain the final person shown in the output.",
     "Never return the style reference image itself and never reproduce the reference person's identity or face.",
     "Also apply this detailed style analysis directly as art direction:",
     options.analyzedStylePrompt,
     "Apply that direction closely to the user base photo while preserving the user subject's identity, facial features, skin tone, and likeness exactly.",
+    "Restyle the image clearly and visibly so the output reflects the full reference look, not just the pose or head angle.",
+    "Make the wardrobe, hair styling, makeup feeling, lighting, framing, camera distance, palette, and scene mood noticeably align with the reference direction.",
+    "If the output mainly copies the pose while leaving the original styling mostly unchanged, the task has failed.",
     "Do not copy the reference person's identity or face.",
     "Keep the result photorealistic, cohesive, and premium.",
     "Use the largest native output resolution available from the model."
   ];
   if (options.preserveBackground) {
     promptParts.push(
-      "Keep the original background structure where possible unless the reference styling clearly suggests a different scene treatment."
+      "Keep the original background structure where possible unless the reference styling clearly suggests a different scene treatment, but do not let background preservation weaken the wardrobe, lighting, color palette, or overall style transformation."
     );
   }
   if (options.customPrompt.trim()) {
@@ -2619,7 +2619,7 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options) {
     "The uploaded user portrait is the only identity source for the final output.",
     "Apply the following detailed style analysis directly to the uploaded user portrait:",
     options.analyzedStylePrompt,
-    "Interpret the styling with more creative freedom instead of matching the original reference image too literally, but still execute the described pose, expression, hair placement, lighting, framing, and aesthetic direction clearly.",
+    "Interpret the styling with more creative freedom instead of matching the original reference image too literally, but still execute the described pose, expression, exact hair placement, lighting, framing, and aesthetic direction clearly.",
     "Do not return a light beauty pass, simple enhance, or near-unchanged version of the input image.",
     "Preserve the uploaded subject's identity, facial structure, skin tone, and likeness exactly.",
     "Keep the result realistic, editorial, and cohesive.",
@@ -2637,18 +2637,20 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options) {
 }
 function buildOwnStyleTogetherFallbackPrompt(options) {
   const promptParts = [
-    "Create a photorealistic edit of the user portrait using the uploaded style reference image as the primary guide.",
+    "Create a photorealistic full style-transfer edit of the user portrait using the uploaded style reference image as the primary guide.",
     "The uploaded user portrait is the source subject for the final output. Never return the style reference image itself.",
-    "Transfer the style reference image's pose, facial expression, hair arrangement, wardrobe direction, lighting, camera angle, framing, composition, background mood, color palette, and overall aesthetic.",
+    "Transfer the style reference image's pose, facial expression, facial micro-expression, hair arrangement, makeup feeling, wardrobe direction, lighting, camera angle, framing, composition, background mood, color palette, and overall aesthetic.",
     "Reinforce the transformation with this detailed style analysis:",
     options.analyzedStylePrompt,
+    "Do not stop at pose matching. The final image should clearly reflect the full reference styling, not just the body position.",
+    "If the output mostly preserves the original styling and only changes pose, the task has failed.",
     "Do not copy the reference person's identity or face. Preserve the user portrait subject's identity, facial structure, skin tone, and likeness exactly.",
     "Keep the result realistic, editorial, and cohesive.",
     "Use the largest native output resolution available from the model."
   ];
   if (options.preserveBackground) {
     promptParts.push(
-      "Keep the original background structure where possible unless the style reference clearly implies a different scene treatment."
+      "Keep the original background structure where possible unless the style reference clearly implies a different scene treatment, but do not let that reduce the strength of the wardrobe, lighting, palette, and mood transfer."
     );
   }
   if (options.customPrompt.trim()) {
@@ -2671,7 +2673,7 @@ async function generateOwnStyleImage(options) {
       { text: prompt },
       { text: "User base photo to transform. This person must remain the final subject:" },
       ...toGeminiInlineImageParts(options.uploadedImages),
-      { text: "Style reference image. Use only for styling cues, never as the output identity:" },
+      { text: "Style reference image. Use it for the full styling direction, not just pose; never use it as the output identity:" },
       ...toGeminiInlineImageParts([options.styleReferenceImage])
     ] : [
       { text: prompt },
@@ -4203,6 +4205,7 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/instame/own-styles", authMiddleware, async (req, res) => {
     const body = req.body || {};
+    const ownStyleMode = normalizeOwnStyleGenerationMode(body.ownStyleMode);
     const ownStylePayload = normalizeOwnStyleSavePayload(body.image);
     if (!ownStylePayload) {
       return res.status(400).json({ error: "Valid own style image payload is required." });
@@ -4220,7 +4223,9 @@ async function registerRoutes(app2) {
       return res.status(400).json({ error: toErrorMessage(error, "Invalid own style image payload") });
     }
     try {
-      const analyzedPrompt = await analyzeOwnStyleReferenceImage(normalizedStyleImages[0]);
+      const analyzedPrompt = await analyzeOwnStyleReferenceImage(normalizedStyleImages[0], {
+        ownStyleMode
+      });
       const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
       const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
       const saveResult = upsertOwnStyleRecord({
@@ -4470,7 +4475,8 @@ async function registerRoutes(app2) {
       }
       if (shouldUseOwnStyle && !analyzedOwnStylePrompt) {
         analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage, {
-          allowStaticFallback: true
+          allowStaticFallback: true,
+          ownStyleMode
         });
       }
       const generationResult = shouldUseOwnStyle ? await generateOwnStyleImage({

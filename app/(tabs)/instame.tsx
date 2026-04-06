@@ -144,6 +144,10 @@ function getInstaMeOwnStyleDraftStorageKey(userId?: string | null): string {
   return `@instame_own_style_draft_${userId || "guest"}`;
 }
 
+function getInstaMeBasePhotoDraftStorageKey(userId?: string | null): string {
+  return `@instame_base_photo_draft_${userId || "guest"}`;
+}
+
 function normalizeStoredUploadedPhoto(input: unknown): UploadedPhoto | null {
   if (!input || typeof input !== "object") {
     return null;
@@ -441,6 +445,7 @@ export default function InstaMeScreen() {
   const [selectedOwnStyleId, setSelectedOwnStyleId] = useState<string | null>(null);
   const [ownStyleMode, setOwnStyleMode] = useState<OwnStyleGenerationMode>("reference_locked");
   const [ownStyleDraftReady, setOwnStyleDraftReady] = useState(false);
+  const [basePhotoDraftReady, setBasePhotoDraftReady] = useState(false);
   const [favoriteStyleKeys, setFavoriteStyleKeys] = useState<FavoriteStyleKey[]>([]);
   const [generationHistory, setGenerationHistory] = useState<InstaMeHistoryEntry[]>([]);
   const [ownStyleNameDraft, setOwnStyleNameDraft] = useState("");
@@ -511,6 +516,17 @@ export default function InstaMeScreen() {
       }),
     [compareWidth],
   );
+
+  const applyBasePhoto = useCallback((nextPhoto: UploadedPhoto) => {
+    setPhoto(nextPhoto);
+    setComparisonImageUri(buildDataUri(nextPhoto.previewBase64 || nextPhoto.base64, nextPhoto.mimeType));
+    setPortraitEnhanceCandidate(null);
+    setUsingEnhancedPortrait(nextPhoto.kind === "enhanced");
+    setResultBase64(null);
+    setResultMeta(null);
+    setShowEditComposer(false);
+    setEditInstruction("");
+  }, []);
 
   const ownStylePreset = useMemo<InstaMeStylePreset>(() => ({
     id: INSTAME_OWN_STYLE_ID,
@@ -736,6 +752,71 @@ export default function InstaMeScreen() {
   }, [user?.id]);
 
   useEffect(() => {
+    if (uploadedImageIdParam && uploadedImageNonce) {
+      setBasePhotoDraftReady(true);
+      return;
+    }
+
+    const storageKey = getInstaMeBasePhotoDraftStorageKey(user?.id);
+    let cancelled = false;
+
+    setBasePhotoDraftReady(false);
+
+    AsyncStorage.getItem(storageKey)
+      .then(async (stored) => {
+        if (cancelled || !stored) {
+          return;
+        }
+
+        const parsed = JSON.parse(stored) as {
+          sourceImageId?: unknown;
+          photo?: unknown;
+        };
+
+        const storedSourceImageId =
+          typeof parsed.sourceImageId === "string" && parsed.sourceImageId.trim().length > 0
+            ? parsed.sourceImageId
+            : "";
+
+        if (storedSourceImageId) {
+          const result = await apiClient.getInstaMeUploadedImage(storedSourceImageId);
+          if (cancelled) return;
+          const image: InstaMeUploadedImageAsset = result.image;
+          applyBasePhoto({
+            uri: image.previewUri || image.dataUri,
+            base64: image.base64,
+            previewBase64: image.previewUri ? image.previewUri.split(",")[1] || image.base64 : image.base64,
+            mimeType: image.mimeType,
+            kind: image.kind,
+            width: image.width,
+            height: image.height,
+            fileSizeBytes: image.fileSizeBytes,
+            sourceImageId: image.id,
+            name: image.name,
+          });
+          return;
+        }
+
+        const restoredPhoto = normalizeStoredUploadedPhoto(parsed.photo);
+        if (restoredPhoto) {
+          applyBasePhoto(restoredPhoto);
+        }
+      })
+      .catch(() => {
+        // no-op
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBasePhotoDraftReady(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyBasePhoto, uploadedImageIdParam, uploadedImageNonce, user?.id]);
+
+  useEffect(() => {
     if (!ownStyleDraftReady) {
       return;
     }
@@ -757,6 +838,24 @@ export default function InstaMeScreen() {
 
     void AsyncStorage.removeItem(storageKey);
   }, [ownStyleDraftReady, ownStyleMode, ownStylePhoto, selectedOwnStyleId, selectedStyleId, user?.id]);
+
+  useEffect(() => {
+    if (!basePhotoDraftReady) {
+      return;
+    }
+
+    const storageKey = getInstaMeBasePhotoDraftStorageKey(user?.id);
+
+    if (photo) {
+      const payload = photo.sourceImageId
+        ? { sourceImageId: photo.sourceImageId }
+        : { photo };
+      void AsyncStorage.setItem(storageKey, JSON.stringify(payload));
+      return;
+    }
+
+    void AsyncStorage.removeItem(storageKey);
+  }, [basePhotoDraftReady, photo, user?.id]);
 
   useEffect(() => {
     const storageKey = getInstaMeFavoritesStorageKey(user?.id);
@@ -812,7 +911,7 @@ export default function InstaMeScreen() {
       .then((result) => {
         if (cancelled) return;
         const image: InstaMeUploadedImageAsset = result.image;
-        setPhoto({
+        applyBasePhoto({
           uri: image.previewUri || image.dataUri,
           base64: image.base64,
           previewBase64: image.previewUri ? image.previewUri.split(",")[1] || image.base64 : image.base64,
@@ -824,13 +923,6 @@ export default function InstaMeScreen() {
           sourceImageId: image.id,
           name: image.name,
         });
-        setComparisonImageUri(image.previewUri || image.dataUri);
-        setPortraitEnhanceCandidate(null);
-        setUsingEnhancedPortrait(image.kind === "enhanced");
-        setResultBase64(null);
-        setResultMeta(null);
-        setShowEditComposer(false);
-        setEditInstruction("");
       })
       .catch((error: any) => {
         if (!cancelled) {
@@ -844,7 +936,7 @@ export default function InstaMeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [uploadedImageIdParam, uploadedImageNonce]);
+  }, [applyBasePhoto, uploadedImageIdParam, uploadedImageNonce]);
 
   useEffect(() => {
     if (!selectedStyleId && defaultStylePreset) {
@@ -949,7 +1041,7 @@ export default function InstaMeScreen() {
       return;
     }
 
-    setPhoto({
+    applyBasePhoto({
       uri: prepared.uri,
       base64: prepared.base64,
       previewBase64: prepared.previewBase64,
@@ -961,15 +1053,8 @@ export default function InstaMeScreen() {
       sourceImageId: undefined,
       name: asset.fileName || "Portrait",
     });
-    setComparisonImageUri(buildDataUri(prepared.previewBase64 || prepared.base64, prepared.mimeType));
-    setPortraitEnhanceCandidate(null);
-    setUsingEnhancedPortrait(false);
-    setResultBase64(null);
-    setResultMeta(null);
-    setShowEditComposer(false);
-    setEditInstruction("");
     await Haptics.selectionAsync();
-  }, [pickRawImage]);
+  }, [applyBasePhoto, pickRawImage]);
 
   const pickOwnStyleImage = useCallback(async () => {
     const asset = await pickRawImage();
@@ -1369,17 +1454,16 @@ export default function InstaMeScreen() {
       );
     }
 
-    setPhoto({
+    applyBasePhoto({
       ...optimizedEnhanced,
       sourceImageId: savedImageId || optimizedEnhanced.sourceImageId,
     });
     setPortraitEnhanceCandidate(null);
-    setUsingEnhancedPortrait(true);
     await Haptics.selectionAsync();
     if (savedImageId) {
       Alert.alert("Saved", "Your enhanced portrait was saved to Enhanced Portraits for later use.");
     }
-  }, [photo?.name, portraitEnhanceCandidate]);
+  }, [applyBasePhoto, photo?.name, portraitEnhanceCandidate]);
 
   const handleTransform = useCallback(async () => {
     if (!photo) {
@@ -1682,7 +1766,14 @@ export default function InstaMeScreen() {
 
           <View style={styles.uploadActionRow}>
             <Pressable
-              onPress={() => router.push("/enhanced-portraits")}
+              onPress={() =>
+                router.push({
+                  pathname: "/enhanced-portraits",
+                  params: {
+                    selectedImageId: photo?.kind === "enhanced" ? photo.sourceImageId || "" : "",
+                  },
+                })
+              }
               style={({ pressed }) => [
                 styles.secondaryActionButton,
                 pressed && { opacity: 0.88 },
