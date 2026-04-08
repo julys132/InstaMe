@@ -2311,38 +2311,20 @@ function buildOwnStyleTransformPrompt(options: {
 }
 
 function buildOwnStyleReferenceLockedPrompt(options: {
-  analyzedStylePrompt: string;
   customPrompt: string;
   preserveBackground: boolean;
 }): string {
   const promptParts = [
-    "This is a full style-transfer request, not a pose-only match, simple cleanup, or light beauty retouch.",
-    "Use the style reference image as a strong visual guide for the complete visual language: pose, expression, facial micro-expression, hair shape and placement, makeup feeling, wardrobe silhouette and materials, framing, lighting, camera angle, composition, background mood, color palette, and overall editorial finish.",
-    "The uploaded user base photo is the actual source subject and must remain the final person shown in the output.",
-    "Never return the style reference image itself and never reproduce the reference person's identity or face.",
-    "Also apply this detailed style analysis directly as art direction:",
-    options.analyzedStylePrompt,
-    "Apply that direction closely to the user base photo while preserving the user subject's identity, facial features, skin tone, and likeness exactly.",
-    "Preserve the uploaded subject's original hair color exactly.",
-    "Transfer hair styling cues only when compatible, but never copy the reference person's hair color.",
-    "Do not add bangs, fringe, or a new front hairline unless those features already exist in the uploaded user base photo.",
-    "Keep the uploaded user's existing haircut category and hairline; do not replace it with the reference person's haircut.",
-    "Restyle the image clearly and visibly so the output reflects the full reference look, not just the pose or head angle.",
-    "Make the wardrobe, hair styling, makeup feeling, lighting, framing, camera distance, palette, and scene mood noticeably align with the reference direction.",
-    "If the output mainly copies the pose while leaving the original styling mostly unchanged, the task has failed.",
-    "Do not copy the reference person's identity or face.",
-    "Keep the result photorealistic, cohesive, and premium.",
-    "Use the largest native output resolution available from the model.",
+    "Replace the face and head of the person in the style reference image with the face and head from the uploaded base photo.",
+    "This is a face swap: the final output must look exactly like the style reference image but with the base photo person's face, skin tone, and facial features.",
+    "Keep the hair styling and coiffure from the style reference image, but preserve the base photo person's natural hair color and hair length.",
+    "Do not add bangs or fringe unless they already exist in the base photo.",
+    "Keep everything else from the style reference image exactly as-is: clothing, pose, body, lighting, framing, background, and overall composition.",
+    "The result must be photorealistic and seamless.",
   ];
 
-  if (options.preserveBackground) {
-    promptParts.push(
-      "Keep the original background structure where possible unless the reference styling clearly suggests a different scene treatment, but do not let background preservation weaken the wardrobe, lighting, color palette, or overall style transformation.",
-    );
-  }
-
   if (options.customPrompt.trim()) {
-    promptParts.push(`Additional user notes: ${options.customPrompt.trim()}`);
+    promptParts.push(`Apply these changes to the result: ${options.customPrompt.trim()}`);
   }
 
   return promptParts.join("\n");
@@ -2382,34 +2364,20 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options: {
 }
 
 function buildOwnStyleTogetherFallbackPrompt(options: {
-  analyzedStylePrompt: string;
   customPrompt: string;
   preserveBackground: boolean;
 }): string {
   const promptParts = [
-    "Create a photorealistic full style-transfer edit of the user portrait using the uploaded style reference image as the primary guide.",
-    "The uploaded user portrait is the source subject for the final output. Never return the style reference image itself.",
-    "Transfer the style reference image's pose, facial expression, facial micro-expression, hair arrangement, makeup feeling, wardrobe direction, lighting, camera angle, framing, composition, background mood, color palette, and overall aesthetic.",
-    "Reinforce the transformation with this detailed style analysis:",
-    options.analyzedStylePrompt,
-    "Preserve the uploaded subject's original hair color exactly and never copy the reference person's hair color.",
-    "Do not add bangs, fringe, or a new front hairline unless those features already exist in the uploaded user portrait.",
-    "Keep the user's existing haircut category and visible hairline; do not replace them with the reference person's haircut.",
-    "Do not stop at pose matching. The final image should clearly reflect the full reference styling, not just the body position.",
-    "If the output mostly preserves the original styling and only changes pose, the task has failed.",
-    "Do not copy the reference person's identity or face. Preserve the user portrait subject's identity, facial structure, skin tone, and likeness exactly.",
-    "Keep the result realistic, editorial, and cohesive.",
-    "Use the largest native output resolution available from the model.",
+    "Replace the face and head of the person in the style reference image with the face and head from the uploaded user portrait.",
+    "This is a face swap: the output must look exactly like the style reference but with the user's face, skin tone, and facial features.",
+    "Keep the hair styling from the style reference, but preserve the user's natural hair color and hair length.",
+    "Do not add bangs or fringe unless they exist in the user portrait.",
+    "Keep everything else from the style reference exactly as-is: clothing, pose, body, lighting, framing, background, and composition.",
+    "The result must be photorealistic and seamless.",
   ];
 
-  if (options.preserveBackground) {
-    promptParts.push(
-      "Keep the original background structure where possible unless the style reference clearly implies a different scene treatment, but do not let that reduce the strength of the wardrobe, lighting, palette, and mood transfer.",
-    );
-  }
-
   if (options.customPrompt.trim()) {
-    promptParts.push(`Additional user notes: ${options.customPrompt.trim()}`);
+    promptParts.push(`Apply these changes to the result: ${options.customPrompt.trim()}`);
   }
 
   return promptParts.join("\n");
@@ -2431,7 +2399,6 @@ async function generateOwnStyleImage(options: {
   try {
     const prompt = options.ownStyleMode === "reference_locked"
       ? buildOwnStyleReferenceLockedPrompt({
-          analyzedStylePrompt: options.analyzedStylePrompt,
           customPrompt: options.customPrompt,
           preserveBackground: options.preserveBackground,
         })
@@ -2501,7 +2468,6 @@ async function generateOwnStyleImage(options: {
     const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
     const prompt = options.ownStyleMode === "reference_locked"
       ? buildOwnStyleTogetherFallbackPrompt({
-          analyzedStylePrompt: options.analyzedStylePrompt,
           customPrompt: options.customPrompt,
           preserveBackground: options.preserveBackground,
         })
@@ -4913,7 +4879,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : ownStyleImages[0] || null;
 
       let analyzedOwnStylePrompt = refreshedSavedOwnStyle?.analyzedPrompt || "";
-      const shouldReanalyzeSavedOwnStyle = Boolean(
+      const needsAnalysis = ownStyleMode === "creative_prompt";
+      const shouldReanalyzeSavedOwnStyle = needsAnalysis && Boolean(
         refreshedSavedOwnStyle && shouldRefreshSavedOwnStyleAnalysis(refreshedSavedOwnStyle, ownStyleMode),
       );
       if (shouldUseOwnStyle && !activeOwnStyleReferenceImage) {
@@ -4932,7 +4899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         );
       }
-      if (shouldUseOwnStyle && (!analyzedOwnStylePrompt || shouldReanalyzeSavedOwnStyle)) {
+      if (shouldUseOwnStyle && needsAnalysis && (!analyzedOwnStylePrompt || shouldReanalyzeSavedOwnStyle)) {
         analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage!, {
           allowStaticFallback: true,
           ownStyleMode,
