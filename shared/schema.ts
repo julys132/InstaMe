@@ -24,6 +24,8 @@ export type InstaMeUploadedImageRecord = {
   height: number;
   fileSizeBytes: number;
   analyzedPrompt?: string;
+  analysisMode?: "reference_locked" | "creative_prompt";
+  analysisVersion?: number;
   imageHash?: string;
   createdAt: string;
 };

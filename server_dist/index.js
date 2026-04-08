@@ -1172,6 +1172,10 @@ function getGeminiApiKey() {
   }
   return apiKey;
 }
+var OWN_STYLE_ANALYSIS_VERSIONS = {
+  reference_locked: 1,
+  creative_prompt: 2
+};
 function firstHeaderValue(value) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -1966,6 +1970,8 @@ function normalizeStoredInstaMeUploadedImages(input) {
     const previewBase64 = normalizeStringValue(candidate.previewBase64);
     const kind = candidate.kind === "enhanced" ? "enhanced" : candidate.kind === "own_style" ? "own_style" : "uploaded";
     const analyzedPrompt = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
+    const analysisMode = candidate.analysisMode === "creative_prompt" || candidate.analysisMode === "reference_locked" ? candidate.analysisMode : void 0;
+    const analysisVersion = Number(candidate.analysisVersion);
     const imageHash = normalizeStringValue(candidate.imageHash);
     const name = normalizeStringValue(candidate.name) || (kind === "own_style" ? "Own Style" : "Portrait");
     const width = Number(candidate.width);
@@ -1987,6 +1993,8 @@ function normalizeStoredInstaMeUploadedImages(input) {
       height: Math.min(Math.round(height), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
       fileSizeBytes: Number.isFinite(fileSizeBytes) && fileSizeBytes > 0 ? Math.round(fileSizeBytes) : estimateBase64Bytes(base64),
       analyzedPrompt: analyzedPrompt || void 0,
+      analysisMode,
+      analysisVersion: Number.isInteger(analysisVersion) && analysisVersion > 0 ? analysisVersion : void 0,
       imageHash: imageHash || void 0,
       createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
     };
@@ -2056,6 +2064,8 @@ function buildSavedOwnStyleRecord(options) {
     height: options.stylePayload?.height || 1,
     fileSizeBytes: options.stylePayload?.fileSizeBytes || 0,
     analyzedPrompt: options.analyzedPrompt.slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH),
+    analysisMode: options.ownStyleMode,
+    analysisVersion: OWN_STYLE_ANALYSIS_VERSIONS[options.ownStyleMode],
     imageHash: computeImageHash(options.stylePayload?.previewBase64 || ""),
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
@@ -2074,6 +2084,8 @@ function upsertOwnStyleRecord(options) {
     height: options.savedOwnStyle.height,
     fileSizeBytes: options.savedOwnStyle.fileSizeBytes,
     analyzedPrompt: options.savedOwnStyle.analyzedPrompt,
+    analysisMode: options.savedOwnStyle.analysisMode,
+    analysisVersion: options.savedOwnStyle.analysisVersion,
     imageHash: options.savedOwnStyle.imageHash,
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   } : options.savedOwnStyle;
@@ -2512,6 +2524,11 @@ function buildOwnStyleFallbackAnalysisPrompt() {
     "Preserve the uploaded subject's identity exactly and transfer only the style direction from the reference image."
   ].join(" ");
 }
+function shouldRefreshSavedOwnStyleAnalysis(image, ownStyleMode) {
+  const expectedVersion = OWN_STYLE_ANALYSIS_VERSIONS[ownStyleMode];
+  const storedVersion = Number(image.analysisVersion);
+  return image.analysisMode !== ownStyleMode || !Number.isInteger(storedVersion) || storedVersion !== expectedVersion;
+}
 function toUploadedReferenceImageFromStoredOwnStyle(image) {
   return {
     base64: image.base64 || image.previewBase64,
@@ -2627,7 +2644,7 @@ async function analyzeOwnStyleReferenceImage(styleImage, options) {
       model,
       parts: [{ text: analysisPrompt }, ...toGeminiInlineImageParts([styleImage])],
       responseMimeType: "text/plain",
-      maxOutputTokens: 1200,
+      maxOutputTokens: isCreativePromptMode ? 4e3 : 1200,
       temperature: 0.3
     });
     const rawAnalysisText = extractGeminiText(analysisResponse);
@@ -2670,7 +2687,7 @@ async function analyzeOwnStyleReferenceImage(styleImage, options) {
   }
 }
 function buildOwnStyleTransformPrompt(options) {
-  return `Editeaza imaginea ${options.analyzedStylePrompt}`;
+  return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}`;
 }
 function buildOwnStyleReferenceLockedPrompt(options) {
   const promptParts = [
@@ -4372,7 +4389,8 @@ async function registerRoutes(app2) {
         existingImages,
         savedOwnStyle: buildSavedOwnStyleRecord({
           stylePayload: ownStylePayload,
-          analyzedPrompt
+          analyzedPrompt,
+          ownStyleMode
         })
       });
       await db.update(users).set({
@@ -4623,19 +4641,50 @@ async function registerRoutes(app2) {
         intensity,
         customPrompt: [customPrompt, stylePresetId, stylePresetLabel, stylePresetPromptHint].filter(Boolean).join(" ")
       });
-      let savedOwnStyleSummary = selectedSavedOwnStyle ? toInstaMeOwnStyleSummary(selectedSavedOwnStyle) : null;
-      const activeOwnStyleReferenceImage = selectedSavedOwnStyle ? toUploadedReferenceImageFromStoredOwnStyle(selectedSavedOwnStyle) : ownStyleImages[0] || null;
-      let analyzedOwnStylePrompt = selectedSavedOwnStyle?.analyzedPrompt || "";
+      let nextUsageMap = styleUsageMap;
+      let nextStoredImages = existingImages;
+      let refreshedSavedOwnStyle = selectedSavedOwnStyle;
+      let savedOwnStyleSummary = refreshedSavedOwnStyle ? toInstaMeOwnStyleSummary(refreshedSavedOwnStyle) : null;
+      const activeOwnStyleReferenceImage = refreshedSavedOwnStyle ? toUploadedReferenceImageFromStoredOwnStyle(refreshedSavedOwnStyle) : ownStyleImages[0] || null;
+      let analyzedOwnStylePrompt = refreshedSavedOwnStyle?.analyzedPrompt || "";
+      const shouldReanalyzeSavedOwnStyle = Boolean(
+        refreshedSavedOwnStyle && shouldRefreshSavedOwnStyleAnalysis(refreshedSavedOwnStyle, ownStyleMode)
+      );
       if (shouldUseOwnStyle && !activeOwnStyleReferenceImage) {
         return res.status(400).json({ error: "Own Style reference image is missing." });
       }
-      if (shouldUseOwnStyle && !analyzedOwnStylePrompt) {
+      if (shouldUseOwnStyle && refreshedSavedOwnStyle && shouldReanalyzeSavedOwnStyle) {
+        logInstaMeDebugTrace(
+          debugTraceContext,
+          `${getOwnStyleTracePrefix(debugTraceContext)}.transform.saved_style_reanalysis`,
+          {
+            savedOwnStyleId: refreshedSavedOwnStyle.id,
+            previousAnalysisMode: refreshedSavedOwnStyle.analysisMode || null,
+            previousAnalysisVersion: refreshedSavedOwnStyle.analysisVersion || null,
+            nextAnalysisMode: ownStyleMode,
+            nextAnalysisVersion: OWN_STYLE_ANALYSIS_VERSIONS[ownStyleMode]
+          }
+        );
+      }
+      if (shouldUseOwnStyle && (!analyzedOwnStylePrompt || shouldReanalyzeSavedOwnStyle)) {
         analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage, {
           allowStaticFallback: true,
           ownStyleMode,
           debugTraceContext,
           traceLabel: "own_style.transform"
         });
+        if (refreshedSavedOwnStyle) {
+          refreshedSavedOwnStyle = {
+            ...refreshedSavedOwnStyle,
+            analyzedPrompt: analyzedOwnStylePrompt,
+            analysisMode: ownStyleMode,
+            analysisVersion: OWN_STYLE_ANALYSIS_VERSIONS[ownStyleMode]
+          };
+          nextStoredImages = existingImages.map(
+            (entry) => entry.id === refreshedSavedOwnStyle.id ? refreshedSavedOwnStyle : entry
+          );
+          savedOwnStyleSummary = toInstaMeOwnStyleSummary(refreshedSavedOwnStyle);
+        }
       }
       const generationResult = shouldUseOwnStyle ? await generateOwnStyleImage({
         req,
@@ -4674,17 +4723,16 @@ async function registerRoutes(app2) {
         stylePresetLabel,
         stylePresetPromptHint
       });
-      let nextUsageMap = styleUsageMap;
-      let nextStoredImages = existingImages;
       if (shouldUseOwnStyle && !selectedSavedOwnStyle && shouldSaveOwnStyle) {
         const ownStyleSavePayload = normalizeOwnStyleSavePayload(body.stylePhoto);
         if (ownStyleSavePayload && ownStyleSavePayload.previewBase64.length <= MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH) {
           const savedOwnStyleRecord = buildSavedOwnStyleRecord({
             stylePayload: ownStyleSavePayload,
-            analyzedPrompt: analyzedOwnStylePrompt
+            analyzedPrompt: analyzedOwnStylePrompt,
+            ownStyleMode
           });
           const saveResult = upsertOwnStyleRecord({
-            existingImages,
+            existingImages: nextStoredImages,
             savedOwnStyle: savedOwnStyleRecord
           });
           nextStoredImages = saveResult.nextImages;
