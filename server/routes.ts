@@ -460,6 +460,9 @@ const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3-pro
 const DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
 const DEFAULT_CREATIVE_OWN_STYLE_ANALYSIS_MODEL =
   process.env.CREATIVE_OWN_STYLE_ANALYSIS_MODEL || "gemini-3.1-pro";
+const INSTAME_DEBUG_TRACE_ENABLED = ["1", "true", "yes", "on"].includes(
+  normalizeStringValue(process.env.INSTAME_DEBUG_TRACE).toLowerCase(),
+);
 const DEFAULT_TOGETHER_FLASH_IMAGE_MODEL =
   process.env.STYLE_PREVIEW_TOGETHER_MODEL || "google/flash-image-3.1";
 const DEFAULT_TOGETHER_PRO_IMAGE_MODEL =
@@ -984,12 +987,126 @@ const OWN_STYLE_ANALYSIS_PROMPT = [
 const CREATIVE_OWN_STYLE_ANALYSIS_PROMPT =
   "Analizeaza aceasta imagine din punctul de vedere al unui fotograf profesionist elite level, nu uita sa incluzi exact posingul corpului, expresia si mimica fetei, si felul in care cade sau este asezat parul.";
 
+type GeminiUsageMetrics = {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  totalTokenCount?: number;
+  thoughtsTokenCount?: number;
+  cachedContentTokenCount?: number;
+};
+
+type InstaMeDebugTraceContext = {
+  requestId: string;
+  route: string;
+  userId: string;
+  email: string;
+  ownStyleMode?: OwnStyleGenerationMode;
+};
+
 function normalizeStringList(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   return input
     .filter((value): value is string => typeof value === "string")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function getInstaMeDebugTraceEmails(): string[] {
+  const configured = normalizeStringList(
+    (process.env.INSTAME_DEBUG_TRACE_EMAILS || "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+
+  return Array.from(
+    new Set(
+      [...DEFAULT_ALLOWED_DEV_CREDIT_EMAILS, ...configured]
+        .map((value) => value.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function createInstaMeDebugTraceContext(
+  req: Request,
+  route: string,
+  ownStyleMode?: OwnStyleGenerationMode,
+): InstaMeDebugTraceContext | null {
+  if (!INSTAME_DEBUG_TRACE_ENABLED) {
+    return null;
+  }
+
+  const email = normalizeStringValue(req.user?.email).toLowerCase();
+  if (!email) {
+    return null;
+  }
+
+  const allowedEmails = getInstaMeDebugTraceEmails();
+  if (allowedEmails.length > 0 && !allowedEmails.includes(email)) {
+    return null;
+  }
+
+  return {
+    requestId: randomUUID(),
+    route,
+    userId: req.user?.id || "",
+    email,
+    ownStyleMode,
+  };
+}
+
+function logInstaMeDebugTrace(
+  context: InstaMeDebugTraceContext | null | undefined,
+  stage: string,
+  details?: Record<string, unknown>,
+): void {
+  if (!context) {
+    return;
+  }
+
+  console.info(
+    "[instame-debug]",
+    JSON.stringify({
+      requestId: context.requestId,
+      route: context.route,
+      userId: context.userId,
+      email: context.email,
+      ownStyleMode: context.ownStyleMode || null,
+      stage,
+      timestamp: new Date().toISOString(),
+      ...(details || {}),
+    }),
+  );
+}
+
+function getOwnStyleTracePrefix(context: InstaMeDebugTraceContext | null | undefined): string {
+  if (!context?.ownStyleMode) {
+    return "own_style.unknown";
+  }
+
+  return `own_style.${context.ownStyleMode}`;
+}
+
+function extractGeminiUsageMetrics(responseJson: unknown): GeminiUsageMetrics | null {
+  const root = getObjectRecord(responseJson);
+  const usage = getObjectRecord(root?.usageMetadata);
+  if (!usage) return null;
+
+  const toOptionalNumber = (value: unknown): number | undefined => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  const metrics: GeminiUsageMetrics = {
+    promptTokenCount: toOptionalNumber(usage.promptTokenCount),
+    candidatesTokenCount: toOptionalNumber(usage.candidatesTokenCount),
+    totalTokenCount: toOptionalNumber(usage.totalTokenCount),
+    thoughtsTokenCount: toOptionalNumber(usage.thoughtsTokenCount),
+    cachedContentTokenCount: toOptionalNumber(usage.cachedContentTokenCount),
+  };
+
+  return Object.values(metrics).some((value) => typeof value === "number") ? metrics : null;
 }
 
 function isDevCreditGrantEnabled(): boolean {
@@ -2059,7 +2176,12 @@ async function generatePromptOnlyPresetImage(options: {
 
 async function analyzeOwnStyleReferenceImage(
   styleImage: UploadedReferenceImage,
-  options?: { allowStaticFallback?: boolean; ownStyleMode?: OwnStyleGenerationMode },
+  options?: {
+    allowStaticFallback?: boolean;
+    ownStyleMode?: OwnStyleGenerationMode;
+    debugTraceContext?: InstaMeDebugTraceContext | null;
+    traceLabel?: string;
+  },
 ): Promise<string> {
   const isCreativePromptMode = options?.ownStyleMode === "creative_prompt";
   const analysisPrompt = isCreativePromptMode
@@ -2077,6 +2199,18 @@ async function analyzeOwnStyleReferenceImage(
   );
 
   const runAnalysis = async (model: string): Promise<string> => {
+    const tracePrefix = options?.traceLabel || getOwnStyleTracePrefix(options?.debugTraceContext);
+
+    logInstaMeDebugTrace(options?.debugTraceContext, `${tracePrefix}.analysis.request`, {
+      provider: "Google",
+      model,
+      prompt: analysisPrompt,
+      styleImageMimeType: styleImage.mimeType || "image/jpeg",
+      styleImageWidth: styleImage.width || null,
+      styleImageHeight: styleImage.height || null,
+      styleImageFileSizeBytes: styleImage.fileSizeBytes || null,
+    });
+
     const analysisResponse = await generateGeminiContent({
       model,
       parts: [{ text: analysisPrompt }, ...toGeminiInlineImageParts([styleImage])],
@@ -2096,6 +2230,14 @@ async function analyzeOwnStyleReferenceImage(
     if (!analysisText) {
       throw new Error("Own Style analysis returned no prompt text.");
     }
+
+    logInstaMeDebugTrace(options?.debugTraceContext, `${tracePrefix}.analysis.response`, {
+      provider: "Google",
+      model,
+      prompt: analysisPrompt,
+      responseText: analysisText,
+      usage: extractGeminiUsageMetrics(analysisResponse),
+    });
 
     return analysisText;
   };
@@ -2250,7 +2392,10 @@ async function generateOwnStyleImage(options: {
   preserveBackground: boolean;
   generationMode: InstaMeGenerationMode;
   ownStyleMode: OwnStyleGenerationMode;
+  debugTraceContext?: InstaMeDebugTraceContext | null;
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
+  const tracePrefix = getOwnStyleTracePrefix(options.debugTraceContext);
+
   try {
     const prompt = options.ownStyleMode === "reference_locked"
       ? buildOwnStyleReferenceLockedPrompt({
@@ -2277,6 +2422,16 @@ async function generateOwnStyleImage(options: {
           ...toGeminiInlineImageParts(options.uploadedImages),
         ];
 
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.request`, {
+      provider: "Google",
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      prompt,
+      generationMode: options.generationMode,
+      preserveBackground: options.preserveBackground,
+      uploadedImageCount: options.uploadedImages.length,
+      includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+    });
+
     const imageResponse = await generateGeminiContent({
       model: DEFAULT_STYLE_IMAGE_MODEL,
       parts,
@@ -2288,6 +2443,15 @@ async function generateOwnStyleImage(options: {
     if (!imageBase64) {
       throw new Error("Own Style generation failed. No image data returned.");
     }
+
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.response`, {
+      provider: "Google",
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      prompt,
+      usage: extractGeminiUsageMetrics(imageResponse),
+      responseText: extractGeminiText(imageResponse) || null,
+      imageReturned: Boolean(imageBase64),
+    });
 
     return {
       imageBase64,
@@ -2314,6 +2478,17 @@ async function generateOwnStyleImage(options: {
           customPrompt: options.customPrompt,
           preserveBackground: options.preserveBackground,
         });
+
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.fallback_request`, {
+      provider: "Together",
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      generationMode: options.generationMode,
+      uploadedImageCount: options.uploadedImages.length,
+      includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+      tokenUsage: "unavailable_from_provider_helper",
+    });
+
     const imageBase64 = await generateTogetherImage({
       model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
       prompt,
@@ -2322,6 +2497,14 @@ async function generateOwnStyleImage(options: {
       height,
       sourceWidth: options.uploadedImages[0]?.width,
       sourceHeight: options.uploadedImages[0]?.height,
+    });
+
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.fallback_response`, {
+      provider: "Together",
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      imageReturned: Boolean(imageBase64),
+      tokenUsage: "unavailable_from_provider_helper",
     });
 
     return {
@@ -4272,7 +4455,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/instame/own-styles", authMiddleware, async (req, res) => {
     const body = req.body || {};
     const ownStyleMode = normalizeOwnStyleGenerationMode(body.ownStyleMode);
+    const debugTraceContext = createInstaMeDebugTraceContext(req, "/api/instame/own-styles", ownStyleMode);
     const ownStylePayload = normalizeOwnStyleSavePayload(body.image);
+
+    logInstaMeDebugTrace(debugTraceContext, `${getOwnStyleTracePrefix(debugTraceContext)}.save.request`, {
+      hasOwnStylePayload: Boolean(ownStylePayload),
+      ownStyleMode,
+      mimeType: ownStylePayload?.mimeType || null,
+      width: ownStylePayload?.width || null,
+      height: ownStylePayload?.height || null,
+      fileSizeBytes: ownStylePayload?.fileSizeBytes || null,
+    });
 
     if (!ownStylePayload) {
       return res.status(400).json({ error: "Valid own style image payload is required." });
@@ -4294,6 +4487,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const analyzedPrompt = await analyzeOwnStyleReferenceImage(normalizedStyleImages[0]!, {
         ownStyleMode,
+        debugTraceContext,
+        traceLabel: "own_style.save",
       });
 
       const [user] = await db
@@ -4322,6 +4517,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownStyle: toInstaMeOwnStyleSummary(saveResult.savedOwnStyle),
       });
     } catch (error: unknown) {
+      logInstaMeDebugTrace(debugTraceContext, `${getOwnStyleTracePrefix(debugTraceContext)}.save.error`, {
+        error: toErrorMessage(error, "Failed to save Own Style"),
+      });
       console.error("Save Own Style error:", error);
       return res.status(500).json({ error: toErrorMessage(error, "Failed to save Own Style") });
     }
@@ -4546,6 +4744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const requestedSavedOwnStyleId = normalizeStringValue(body.savedOwnStyleId);
     const shouldSaveOwnStyle = body.saveOwnStyle !== false;
     const ownStyleMode = normalizeOwnStyleGenerationMode(body.ownStyleMode);
+    const debugTraceContext = createInstaMeDebugTraceContext(req, "/api/instame/transform", ownStyleMode);
     const isOwnStyleRequested = requestedStylePresetId === INSTAME_OWN_STYLE_ID;
     const resolvedStylePreset = isOwnStyleRequested ? null : resolveInstaMeStylePreset(body.stylePresetId);
     if (!isOwnStyleRequested && requestedStylePresetId && !resolvedStylePreset) {
@@ -4593,6 +4792,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let creditsConsumed = false;
     let transformCost = 0;
     try {
+      logInstaMeDebugTrace(debugTraceContext, `${getOwnStyleTracePrefix(debugTraceContext)}.transform.request`, {
+        requestedStylePresetId,
+        requestedSavedOwnStyleId,
+        ownStyleMode,
+        customPrompt,
+        preserveBackground,
+        generationTierId: generationTier.id,
+        generationMode,
+        photoMimeType: uploadedImages[0]?.mimeType || null,
+        photoWidth: uploadedImages[0]?.width || null,
+        photoHeight: uploadedImages[0]?.height || null,
+      });
+
       const [userBeforeTransform] = await db
         .select({
           instameStyleUsage: users.instameStyleUsage,
@@ -4672,6 +4884,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         analyzedOwnStylePrompt = await analyzeOwnStyleReferenceImage(activeOwnStyleReferenceImage!, {
           allowStaticFallback: true,
           ownStyleMode,
+          debugTraceContext,
+          traceLabel: "own_style.transform",
         });
       }
 
@@ -4685,6 +4899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             preserveBackground,
             generationMode,
             ownStyleMode,
+            debugTraceContext,
           })
         : shouldUsePromptOnly && promptVariant
         ? await generatePromptOnlyPresetImage({
@@ -4773,6 +4988,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         savedOwnStyle: savedOwnStyleSummary,
       });
     } catch (error: unknown) {
+      logInstaMeDebugTrace(debugTraceContext, `${getOwnStyleTracePrefix(debugTraceContext)}.transform.error`, {
+        error: toErrorMessage(error, "Failed to transform image"),
+        creditsConsumed,
+        transformCost,
+      });
       console.error("InstaMe transform error:", error);
       if (creditsConsumed) {
         await refundCredits(userId, transformCost, "instame_old_money_transform_failed");
