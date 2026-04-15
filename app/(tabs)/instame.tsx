@@ -462,6 +462,8 @@ export default function InstaMeScreen() {
   const [portraitEnhanceLoading, setPortraitEnhanceLoading] = useState(false);
   const [usingEnhancedPortrait, setUsingEnhancedPortrait] = useState(false);
   const styleListRef = useRef<ScrollView | null>(null);
+  const mainScrollRef = useRef<ScrollView | null>(null);
+  const resultCardRef = useRef<View | null>(null);
   const [canScrollMoreRight, setCanScrollMoreRight] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showEditComposer, setShowEditComposer] = useState(false);
@@ -1533,9 +1535,10 @@ export default function InstaMeScreen() {
         stylePresetId: result.stylePresetId,
       });
       if (result.savedOwnStyle) {
+        const savedStyle = result.savedOwnStyle as InstaMeOwnStyle;
         setSavedOwnStyles((current) => {
-          const rest = current.filter((entry) => entry.id !== result.savedOwnStyle?.id);
-          return [result.savedOwnStyle, ...rest];
+          const rest = current.filter((entry) => entry.id !== savedStyle.id);
+          return [savedStyle, ...rest];
         });
         setSelectedOwnStyleId(result.savedOwnStyle.id);
         setOwnStylePhoto(null);
@@ -1555,6 +1558,13 @@ export default function InstaMeScreen() {
       });
       await refreshCredits();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      InteractionManager.runAfterInteractions(() => {
+        resultCardRef.current?.measureLayout(
+          mainScrollRef.current?.getInnerViewNode?.() as any,
+          (_x, y) => { mainScrollRef.current?.scrollTo({ y: y - 20, animated: true }); },
+          () => {},
+        );
+      });
     } catch (error: any) {
       Alert.alert("Error", error?.message || "Transformation failed.");
     } finally {
@@ -1696,9 +1706,10 @@ export default function InstaMeScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#050505", "#1A0E13", "#0A0A0A"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={["#050505", "#0A080A", "#080808"]} style={StyleSheet.absoluteFill} />
 
       <ScrollView
+        ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: 120 }}
       >
@@ -1709,9 +1720,6 @@ export default function InstaMeScreen() {
             <Ionicons name="sparkles" size={14} color={Colors.accent} />
             <Text style={styles.creditText}>{credits} credits</Text>
           </View>
-          {lastUsedStyleRefs.length > 0 ? (
-            <Text style={styles.libraryHintMuted}>Last transform anchors: {lastUsedStyleRefs.join(", ")}</Text>
-          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -1738,7 +1746,7 @@ export default function InstaMeScreen() {
                 pressed && { opacity: 0.88 },
               ]}
             >
-              <Ionicons name="cloud-upload-outline" size={16} color="#FFE1EA" />
+              <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
               <Text style={styles.secondaryActionButtonText}>Upload from device</Text>
             </Pressable>
 
@@ -1779,7 +1787,7 @@ export default function InstaMeScreen() {
                 pressed && { opacity: 0.88 },
               ]}
             >
-              <Ionicons name="sparkles-outline" size={16} color="#FFE1EA" />
+              <Ionicons name="sparkles-outline" size={16} color={Colors.accentPale} />
               <Text style={styles.secondaryActionButtonText}>Enhanced Portraits</Text>
             </Pressable>
           </View>
@@ -2027,7 +2035,7 @@ export default function InstaMeScreen() {
                     pressed && { transform: [{ scale: 0.96 }] },
                   ]}
                 >
-                  <Ionicons name="chevron-forward" size={18} color="#FFD7E3" />
+                  <Ionicons name="chevron-forward" size={18} color={Colors.accentSoft} />
                 </Pressable>
               </View>
             ) : null}
@@ -2039,7 +2047,7 @@ export default function InstaMeScreen() {
             </Text>
             {currentFavoriteStyleKey ? (
               <Pressable onPress={() => void toggleCurrentStyleFavorite()} style={styles.favoriteStyleButton}>
-                <Ionicons name={isCurrentStyleFavorite ? "heart" : "heart-outline"} size={18} color={isCurrentStyleFavorite ? "#FF7CA9" : "#FFD6E3"} />
+                <Ionicons name={isCurrentStyleFavorite ? "heart" : "heart-outline"} size={18} color={isCurrentStyleFavorite ? Colors.accentPink : Colors.accentSoft} />
                 <Text style={styles.favoriteStyleButtonText}>{isCurrentStyleFavorite ? "Favorited" : "Favorite"}</Text>
               </Pressable>
             ) : null}
@@ -2154,7 +2162,7 @@ export default function InstaMeScreen() {
                   onPress={pickOwnStyleImage}
                   style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
                 >
-                  <Ionicons name="cloud-upload-outline" size={16} color="#FFE1EA" />
+                  <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
                   <Text style={styles.secondaryActionButtonText}>
                     {ownStylePhoto || selectedSavedOwnStyle ? "Use another style image" : "Upload style image"}
                   </Text>
@@ -2164,7 +2172,7 @@ export default function InstaMeScreen() {
                     onPress={() => setOwnStylePhoto(null)}
                     style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
                   >
-                    <Ionicons name="trash-outline" size={16} color="#FFE1EA" />
+                    <Ionicons name="trash-outline" size={16} color={Colors.accentPale} />
                     <Text style={styles.secondaryActionButtonText}>Remove</Text>
                   </Pressable>
                 ) : selectedSavedOwnStyle ? (
@@ -2172,7 +2180,7 @@ export default function InstaMeScreen() {
                     onPress={() => handleDeleteSavedOwnStyle(selectedSavedOwnStyle)}
                     style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
                   >
-                    <Ionicons name="trash-outline" size={16} color="#FFE1EA" />
+                    <Ionicons name="trash-outline" size={16} color={Colors.accentPale} />
                     <Text style={styles.secondaryActionButtonText}>Delete saved style</Text>
                   </Pressable>
                 ) : null}
@@ -2242,7 +2250,9 @@ export default function InstaMeScreen() {
               ) : null}
             </View>
           ) : null}
+        </View>
 
+        <View style={styles.card}>
           <View style={styles.fineTuneDropdownWrap}>
             <Pressable
               onPress={() => setShowFineTunePanel((prev) => !prev)}
@@ -2266,7 +2276,7 @@ export default function InstaMeScreen() {
               <Ionicons
                 name={showFineTunePanel ? "chevron-up" : "chevron-down"}
                 size={18}
-                color={showFineTunePanel ? Colors.accentLight : "#D7D7D7"}
+                color={showFineTunePanel ? Colors.accentLight : Colors.textSecondary}
               />
             </Pressable>
 
@@ -2452,7 +2462,9 @@ export default function InstaMeScreen() {
               Art finish: <Text style={styles.selectedStyleAccent}>{selectedArtStyle?.label || "None"}</Text>
             </Text>
           </View>
+        </View>
 
+        <View style={styles.card}>
           <View style={styles.pricingSection}>
             <Text style={styles.pricingSectionTitle}>Generate</Text>
             {selectedArtStyle ? (
@@ -2527,7 +2539,7 @@ export default function InstaMeScreen() {
         </View>
 
         {resultBase64 ? (
-          <View style={styles.card}>
+          <View ref={resultCardRef} style={styles.card}>
             <Text style={styles.cardTitle}>{selectedArtStyle ? "3. Your Chicoo result" : "4. Your Chicoo result"}</Text>
             {comparisonImageUri ? (
               <View style={styles.compareSection}>
@@ -2605,7 +2617,7 @@ export default function InstaMeScreen() {
                 style={[styles.resultActionButton, styles.resultActionButtonSecondary]}
                 onPress={() => setShowEditComposer((prev) => !prev)}
               >
-                <Ionicons name="create-outline" size={18} color="#FFD6E3" />
+                <Ionicons name="create-outline" size={18} color={Colors.accentSoft} />
                 <Text style={styles.editButtonText}>Edit</Text>
               </Pressable>
               <Pressable
@@ -2613,7 +2625,7 @@ export default function InstaMeScreen() {
                 onPress={() => void handleSaveResultAsOwnStyle()}
                 disabled={savingResultAsStyle}
               >
-                <Ionicons name="bookmark-outline" size={18} color="#FFD6E3" />
+                <Ionicons name="bookmark-outline" size={18} color={Colors.accentSoft} />
                 <Text style={styles.editButtonText}>{savingResultAsStyle ? "Saving..." : "Save as style"}</Text>
               </Pressable>
             </View>
@@ -2720,7 +2732,7 @@ export default function InstaMeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  header: { paddingHorizontal: 20, gap: 6, marginBottom: 12 },
+  header: { paddingHorizontal: 16, gap: 6, marginBottom: 12 },
   headerEyebrow: {
     color: Colors.accent,
     fontFamily: "Inter_600SemiBold",
@@ -2728,45 +2740,45 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontSize: 12,
   },
-  headerTitle: { color: "#FFF", fontFamily: "PlayfairDisplay_700Bold", fontSize: 30, lineHeight: 34 },
+  headerTitle: { color: "#FFF", fontFamily: "PlayfairDisplay_700Bold", fontSize: 24, lineHeight: 30 },
   creditBadge: {
-    marginTop: 2,
+    marginTop: 4,
     alignSelf: "flex-start",
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
-    backgroundColor: "rgba(255,79,125,0.20)",
+    backgroundColor: "rgba(255,79,125,0.14)",
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.42)",
-    borderRadius: 999,
+    borderColor: "rgba(255,79,125,0.30)",
+    borderRadius: Colors.radiusFull,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  creditText: { color: "#FFD8E4", fontFamily: "Inter_600SemiBold", fontSize: 13 },
-  libraryHint: { color: "#CFCFCF", fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
-  libraryHintMuted: { color: "#8B8B8B", fontFamily: "Inter_400Regular", fontSize: 11 },
+  creditText: { color: Colors.accentSoft, fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  libraryHint: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
+  libraryHintMuted: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 11 },
   card: {
-    marginHorizontal: 20,
+    marginHorizontal: 16,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.30)",
-    borderRadius: 18,
-    backgroundColor: "rgba(7,7,7,0.86)",
+    borderColor: Colors.borderSubtle,
+    borderRadius: Colors.radiusMd,
+    backgroundColor: Colors.card,
     padding: 12,
-    gap: 10,
+    gap: 12,
   },
   cardTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 16 },
   uploadBox: {
-    borderRadius: 14,
+    borderRadius: Colors.radiusMd,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
   },
   uploadImage: { width: "100%", height: 250 },
-  uploadPlaceholder: { height: 160, justifyContent: "center", alignItems: "center", paddingHorizontal: 18, gap: 8 },
-  uploadPlaceholderTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 15 },
-  uploadPlaceholderSubtitle: { color: "#A3A3A3", fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center" },
+  uploadPlaceholder: { height: 160, justifyContent: "center", alignItems: "center", paddingHorizontal: 16, gap: 8 },
+  uploadPlaceholderTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  uploadPlaceholderSubtitle: { color: Colors.textMuted, fontFamily: "Inter_400Regular", fontSize: 12, textAlign: "center" },
   uploadActionRow: {
     flexDirection: "row",
     gap: 10,
@@ -2775,7 +2787,7 @@ const styles = StyleSheet.create({
   enhanceButton: {
     marginTop: 12,
     minHeight: 48,
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     backgroundColor: Colors.accent,
     flexDirection: "row",
     alignItems: "center",
@@ -2795,12 +2807,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 11,
     backgroundColor: "rgba(0,0,0,0.12)",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Colors.radiusSm,
   },
   enhanceHintText: {
-    color: "#A8A0A6",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
@@ -2811,13 +2823,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   enhancePreviewCard: {
-    marginTop: 6,
-    borderRadius: 14,
+    marginTop: 8,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.24)",
-    backgroundColor: "rgba(255,79,125,0.06)",
+    borderColor: "rgba(255,79,125,0.20)",
+    backgroundColor: "rgba(255,79,125,0.04)",
     padding: 12,
-    gap: 10,
+    gap: 12,
   },
   enhancePreviewTitle: {
     color: "#FFF",
@@ -2825,7 +2837,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   enhancePreviewSubtitle: {
-    color: "#C9C0C6",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
@@ -2833,32 +2845,32 @@ const styles = StyleSheet.create({
   enhancePreviewImage: {
     width: "100%",
     aspectRatio: 1,
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: Colors.borderLight,
   },
   enhanceDecisionRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
   },
   enhanceDecisionButton: {
     flex: 1,
     minHeight: 46,
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
   },
   enhanceRetryButton: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
   },
   enhanceKeepButton: {
     backgroundColor: Colors.accent,
   },
   enhanceRetryButtonText: {
-    color: "#F5E7EC",
+    color: Colors.accentPale,
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     textAlign: "center",
@@ -2874,27 +2886,27 @@ const styles = StyleSheet.create({
   secondaryActionButton: {
     flex: 1,
     minHeight: 44,
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
   secondaryActionButtonAccent: {
-    borderColor: "rgba(255,79,125,0.35)",
-    backgroundColor: "rgba(255,79,125,0.08)",
+    borderColor: "rgba(255,79,125,0.30)",
+    backgroundColor: "rgba(255,79,125,0.06)",
   },
   secondaryActionButtonDisabled: {
     opacity: 0.45,
   },
   secondaryActionButtonText: {
-    color: "#FFE1EA",
+    color: Colors.accentPale,
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
+    fontSize: 12,
   },
   secondaryActionButtonTextAccent: {
     color: Colors.accentLight,
@@ -2902,10 +2914,10 @@ const styles = StyleSheet.create({
   ownStyleModeButton: {
     flex: 1,
     minHeight: 46,
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -2924,16 +2936,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.92)",
   },
   ownStyleModeButtonText: {
-    color: "#FFF7FA",
+    color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
   },
   ownStyleModeButtonTextActive: {
     color: "#0B0B0B",
   },
   ownStylePanel: {
     marginTop: 8,
-    gap: 10,
+    gap: 12,
   },
   ownStylePanelTitle: {
     color: "#FFF",
@@ -2941,24 +2953,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   ownStylePanelText: {
-    color: "#BFBFBF",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
   },
   processingHintText: {
-    color: "#9FB0B6",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
     marginTop: 4,
   },
   ownStyleUploadBox: {
-    borderRadius: 14,
+    borderRadius: Colors.radiusMd,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(134,244,255,0.28)",
-    backgroundColor: "rgba(134,244,255,0.08)",
+    backgroundColor: "rgba(134,244,255,0.06)",
     minHeight: 220,
     justifyContent: "center",
   },
@@ -2970,37 +2982,37 @@ const styles = StyleSheet.create({
     minHeight: 220,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     gap: 8,
   },
   ownStyleUploadPlaceholderTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 14,
   },
   ownStyleUploadPlaceholderText: {
-    color: "#A9BCC2",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
     textAlign: "center",
   },
   ownStyleSavedMeta: {
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
     borderColor: "rgba(134,244,255,0.18)",
-    backgroundColor: "rgba(134,244,255,0.05)",
+    backgroundColor: "rgba(134,244,255,0.04)",
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 6,
+    paddingVertical: 12,
+    gap: 8,
   },
   ownStyleSavedMetaTitle: {
     color: "#E7FDFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
   },
   ownStyleSavedMetaText: {
-    color: "#A9C4CB",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
@@ -3013,19 +3025,19 @@ const styles = StyleSheet.create({
   renameOwnStyleInput: {
     flex: 1,
     minHeight: 42,
-    borderRadius: 10,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
     borderColor: "rgba(134,244,255,0.16)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    backgroundColor: Colors.surfaceFaint,
     color: "#FFF",
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
+    fontSize: 12,
     paddingHorizontal: 12,
   },
   renameOwnStyleButton: {
     minWidth: 92,
     minHeight: 42,
-    borderRadius: 10,
+    borderRadius: Colors.radiusMd,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -3039,7 +3051,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   ownStylesLibrarySection: {
-    gap: 10,
+    gap: 12,
     marginTop: 4,
   },
   ownStylesLibraryHeader: {
@@ -3069,21 +3081,21 @@ const styles = StyleSheet.create({
     paddingTop: 6,
   },
   ownStylesLibraryText: {
-    color: "#B7C9CE",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
   },
   ownStylesRow: {
-    gap: 14,
+    gap: 12,
     paddingLeft: 2,
-    paddingRight: 10,
+    paddingRight: 12,
   },
   savedOwnStyleCardOuter: {
     width: 156,
     height: 198,
-    borderRadius: 24,
-    backgroundColor: "rgba(134,244,255,0.08)",
+    borderRadius: Colors.radiusLg,
+    backgroundColor: "rgba(134,244,255,0.06)",
     padding: 1,
     shadowOpacity: 0.32,
     shadowRadius: 18,
@@ -3092,16 +3104,16 @@ const styles = StyleSheet.create({
   },
   savedOwnStyleCard: {
     flex: 1,
-    borderRadius: 23,
+    borderRadius: Colors.radiusLg,
     overflow: "hidden",
     borderWidth: 1,
   },
   savedOwnStyleCardTitle: {
     fontFamily: "Inter_700Bold",
-    fontSize: 13,
+    fontSize: 12,
   },
   savedOwnStyleCardText: {
-    color: "#D8E7EA",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     lineHeight: 15,
@@ -3109,10 +3121,10 @@ const styles = StyleSheet.create({
   },
   uploadedImagesSection: {
     marginTop: 16,
-    borderRadius: 16,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.025)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
     padding: 12,
     gap: 12,
   },
@@ -3130,16 +3142,16 @@ const styles = StyleSheet.create({
   uploadedImagesTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 14,
   },
   uploadedImagesSubtitle: {
-    color: "#AFAFAF",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     marginTop: 2,
   },
   uploadedImagesCount: {
-    color: "#FFB6CC",
+    color: Colors.accentLight,
     fontFamily: "Inter_700Bold",
     fontSize: 12,
   },
@@ -3151,37 +3163,37 @@ const styles = StyleSheet.create({
   viewModeChip: {
     minWidth: 40,
     height: 34,
-    borderRadius: 999,
+    borderRadius: Colors.radiusFull,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
   },
   viewModeChipActive: {
-    borderColor: "rgba(255,79,125,0.64)",
-    backgroundColor: "rgba(255,79,125,0.14)",
+    borderColor: "rgba(255,79,125,0.50)",
+    backgroundColor: "rgba(255,79,125,0.10)",
   },
   viewModeChipText: {
-    color: "#D4D4D4",
+    color: Colors.textSecondary,
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
   },
   viewModeChipTextActive: {
-    color: "#FFE1EA",
+    color: Colors.accentPale,
   },
   uploadedImagesEmptyState: {
     minHeight: 124,
-    borderRadius: 14,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.02)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   uploadedImagesEmptyTitle: {
     color: "#FFF",
@@ -3190,7 +3202,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   uploadedImagesEmptySubtitle: {
-    color: "#9B9B9B",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
@@ -3199,17 +3211,17 @@ const styles = StyleSheet.create({
   uploadedImagesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 12,
   },
   uploadedImageTileWrap: {
     position: "relative",
   },
   uploadedImageTile: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: Colors.radiusMd,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: Colors.borderLight,
     backgroundColor: "#0B0B0B",
   },
   uploadedImageTileActive: {
@@ -3252,7 +3264,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   uploadedImageTileInfo: {
-    color: "#D5D5D5",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     marginTop: 2,
@@ -3272,24 +3284,24 @@ const styles = StyleSheet.create({
   },
   styleCarouselWrap: {
     position: "relative",
-    marginRight: -14,
+    marginRight: -16,
   },
   styleRow: {
-    gap: 18,
+    gap: 16,
     paddingLeft: 2,
     paddingRight: 86,
   },
   styleCardOuter: {
-    width: 198,
-    height: 246,
-    borderRadius: 30,
-    backgroundColor: "rgba(255,79,125,0.06)",
+    width: 180,
+    height: 230,
+    borderRadius: Colors.radiusLg,
+    backgroundColor: "rgba(255,79,125,0.04)",
     padding: 2,
     shadowColor: "#FF4FBE",
-    shadowOpacity: 0.32,
-    shadowRadius: 26,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 14,
+    shadowOpacity: 0.24,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
   },
   styleCardOuterFirst: {
     marginLeft: 2,
@@ -3299,14 +3311,14 @@ const styles = StyleSheet.create({
   },
   styleCardOuterActive: {
     shadowColor: "#FF5CB8",
-    shadowOpacity: 0.7,
-    shadowRadius: 34,
-    shadowOffset: { width: 0, height: 16 },
-    elevation: 20,
+    shadowOpacity: 0.5,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 16,
   },
   styleCard: {
     flex: 1,
-    borderRadius: 28,
+    borderRadius: Colors.radiusLg,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,180,215,0.28)",
@@ -3323,9 +3335,9 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
-    gap: 10,
-    backgroundColor: "rgba(134,244,255,0.10)",
+    paddingHorizontal: 16,
+    gap: 12,
+    backgroundColor: "rgba(134,244,255,0.08)",
   },
   ownStyleCardPlaceholderText: {
     fontFamily: "Inter_600SemiBold",
@@ -3341,9 +3353,9 @@ const styles = StyleSheet.create({
   },
   styleCardInnerRing: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 28,
+    borderRadius: Colors.radiusLg,
     borderWidth: 1,
-    borderColor: "rgba(255,210,228,0.16)",
+    borderColor: "rgba(255,210,228,0.12)",
   },
   styleCardInnerRingActive: {
     borderColor: "rgba(255,179,210,0.62)",
@@ -3360,22 +3372,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 18,
-    paddingBottom: 18,
-    minHeight: 92,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    minHeight: 80,
     justifyContent: "flex-end",
   },
   styleCardTitle: {
-    color: "#FFD9E5",
+    color: Colors.accentSoft,
     fontFamily: "Inter_700Bold",
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: 20,
     textShadowColor: "rgba(0,0,0,0.75)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 10,
   },
   styleCardTitleActive: {
-    color: "#FFE7F0",
+    color: Colors.accentPale,
   },
   styleScrollHintWrap: {
     position: "absolute",
@@ -3391,22 +3403,22 @@ const styles = StyleSheet.create({
   },
   styleScrollArrow: {
     marginRight: 16,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "rgba(255,79,125,0.22)",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,79,125,0.18)",
     borderWidth: 1,
-    borderColor: "rgba(255,173,212,0.58)",
+    borderColor: "rgba(255,173,212,0.40)",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#FF5CB8",
-    shadowOpacity: 0.48,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
   favoriteStylesSection: {
-    gap: 10,
+    gap: 12,
     marginBottom: 8,
   },
   selectedStyleRow: {
@@ -3417,40 +3429,40 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   selectedStyleText: {
-    color: "#D7D7D7",
+    color: Colors.textSecondary,
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     flex: 1,
   },
   selectedStyleAccent: {
-    color: "#FF9EBC",
+    color: Colors.accentPink,
     fontFamily: "Inter_700Bold",
   },
   favoriteStyleButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderRadius: 999,
+    borderRadius: Colors.radiusFull,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    paddingHorizontal: 10,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
+    paddingHorizontal: 12,
     paddingVertical: 6,
   },
   favoriteStyleButtonText: {
-    color: "#FFD6E3",
+    color: Colors.accentSoft,
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
   },
   fineTuneDropdownWrap: {
-    marginTop: 10,
+    marginTop: 12,
     gap: 8,
   },
   fineTuneDropdownTrigger: {
-    borderRadius: 14,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.035)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
     paddingVertical: 12,
     flexDirection: "row",
@@ -3459,8 +3471,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   fineTuneDropdownTriggerActive: {
-    borderColor: "rgba(255,79,125,0.54)",
-    backgroundColor: "rgba(255,79,125,0.08)",
+    borderColor: "rgba(255,79,125,0.40)",
+    backgroundColor: "rgba(255,79,125,0.06)",
   },
   fineTuneDropdownHeaderText: {
     flex: 1,
@@ -3472,17 +3484,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   fineTuneDropdownSummary: {
-    color: "#C5C5C5",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
-    fontSize: 12.5,
+    fontSize: 12,
     lineHeight: 18,
   },
   fineTuneDropdownBody: {
     gap: 8,
   },
   artStylesPanel: {
-    marginTop: 10,
-    gap: 10,
+    marginTop: 12,
+    gap: 12,
   },
   artStylesPanelHeader: {
     gap: 4,
@@ -3490,12 +3502,12 @@ const styles = StyleSheet.create({
   artStylesPanelTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 14,
   },
   artStylesPanelSubtitle: {
-    color: "#C8C8C8",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
-    fontSize: 12.5,
+    fontSize: 12,
     lineHeight: 18,
   },
   artStylesRow: {
@@ -3503,16 +3515,16 @@ const styles = StyleSheet.create({
     paddingRight: 2,
   },
   artStyleOption: {
-    width: 180,
-    height: 200,
-    borderRadius: 22,
+    width: 170,
+    height: 190,
+    borderRadius: Colors.radiusLg,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: Colors.borderSubtle,
     backgroundColor: "#09090C",
   },
   artStyleOptionEmpty: {
-    backgroundColor: "rgba(255,255,255,0.035)",
+    backgroundColor: Colors.surfaceFaint,
     justifyContent: "flex-end",
   },
   artStyleOptionActive: {
@@ -3531,52 +3543,52 @@ const styles = StyleSheet.create({
   },
   artStyleOptionTextWrap: {
     position: "absolute",
-    left: 14,
-    right: 14,
-    bottom: 14,
+    left: 12,
+    right: 12,
+    bottom: 12,
     gap: 4,
   },
   artStyleOptionTitle: {
-    color: "#F3EDF0",
+    color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13.5,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 16,
   },
   artStyleOptionTitleActive: {
-    color: "#FFF2F7",
+    color: Colors.accentPale,
   },
   artStyleOptionSubtitle: {
-    color: "#C2BAC0",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
-    fontSize: 11.5,
+    fontSize: 11,
     lineHeight: 16,
   },
   artStyleOptionSubtitleActive: {
-    color: "#E5D3DB",
+    color: Colors.textSecondary,
   },
   pricingSection: {
-    gap: 10,
+    gap: 12,
     marginTop: 4,
   },
   pricingSectionTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 14,
   },
   pricingCardsRow: {
     flexDirection: "row",
     alignItems: "stretch",
-    gap: 10,
+    gap: 12,
   },
   pricingCardsStacked: {
     flexDirection: "column",
   },
   pricingCard: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
     paddingVertical: 12,
     minHeight: 132,
@@ -3589,13 +3601,13 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   pricingCardActive: {
-    borderColor: "rgba(255,79,125,0.62)",
-    backgroundColor: "rgba(255,79,125,0.10)",
+    borderColor: "rgba(255,79,125,0.50)",
+    backgroundColor: "rgba(255,79,125,0.08)",
     shadowColor: "#FF5CB8",
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    elevation: 6,
   },
   pricingTopRow: {
     flexDirection: "row",
@@ -3608,19 +3620,19 @@ const styles = StyleSheet.create({
   pricingLabel: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 14,
   },
   pricingSubtitle: {
-    color: "#BEBEBE",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 17,
     marginTop: 2,
   },
   pricingBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    borderRadius: Colors.radiusFull,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderWidth: 1,
   },
   pricingBadgeStacked: {
@@ -3635,7 +3647,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
   },
   pricingBadgeText: {
-    color: "#FFD8E4",
+    color: Colors.accentSoft,
     fontFamily: "Inter_700Bold",
     fontSize: 10,
     letterSpacing: 0.3,
@@ -3648,41 +3660,41 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   pricingCredits: {
-    color: "#FF9EBC",
+    color: Colors.accentPink,
     fontFamily: "Inter_700Bold",
-    fontSize: 13,
+    fontSize: 12,
   },
   pricingMetaText: {
-    color: "#D2D2D2",
+    color: Colors.textSecondary,
     fontFamily: "Inter_500Medium",
     fontSize: 12,
   },
   postGenerationSection: {
-    gap: 10,
+    gap: 12,
   },
   fineTuneIntro: {
-    color: "#C9C9C9",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 18,
     marginTop: -2,
   },
   fineTuneExplanationCard: {
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.035)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    gap: 6,
+    gap: 8,
   },
   fineTuneExplanationTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
   },
   fineTuneExplanationText: {
-    color: "#BDBDBD",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
@@ -3692,37 +3704,37 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   fineTuneArtStyleNotice: {
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.035)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    gap: 6,
+    gap: 8,
   },
   fineTuneArtStyleNoticeTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
   },
   fineTuneArtStyleNoticeText: {
-    color: "#C2C2C2",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
   },
   fineTuneSkipCard: {
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    gap: 6,
+    gap: 8,
   },
   fineTuneSkipCardActive: {
-    borderColor: "rgba(255,79,125,0.66)",
-    backgroundColor: "rgba(255,79,125,0.16)",
+    borderColor: "rgba(255,79,125,0.50)",
+    backgroundColor: "rgba(255,79,125,0.10)",
   },
   fineTuneSkipTopRow: {
     flexDirection: "row",
@@ -3733,69 +3745,69 @@ const styles = StyleSheet.create({
   fineTuneSkipTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
   },
   fineTuneSkipTitleActive: {
     color: Colors.accentLight,
   },
   fineTuneSkipText: {
-    color: "#9A9A9A",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 17,
   },
   fineTuneSkipTextActive: {
-    color: "#FFD3DF",
+    color: Colors.accentSoft,
   },
   intensityRow: { gap: 8 },
   chip: {
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
-    paddingVertical: 11,
+    paddingVertical: 12,
     gap: 2,
   },
   chipActive: {
-    borderColor: "rgba(255,79,125,0.70)",
-    backgroundColor: "rgba(255,79,125,0.20)",
+    borderColor: "rgba(255,79,125,0.50)",
+    backgroundColor: "rgba(255,79,125,0.14)",
   },
-  chipLabel: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  chipLabel: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 12 },
   chipLabelActive: { color: Colors.accentLight },
-  chipSubtitle: { color: "#8D8D8D", fontFamily: "Inter_400Regular", fontSize: 12 },
-  chipSubtitleActive: { color: "#FFD3DF" },
+  chipSubtitle: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 12 },
+  chipSubtitleActive: { color: Colors.accentSoft },
   chipDetails: {
-    color: "#9B9B9B",
+    color: Colors.textMuted,
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     lineHeight: 16,
     marginTop: 2,
   },
   chipDetailsActive: {
-    color: "#FFE2EA",
+    color: Colors.accentPale,
   },
   toggle: {
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
   toggleActive: {
-    borderColor: "rgba(255,79,125,0.62)",
+    borderColor: "rgba(255,79,125,0.50)",
   },
-  toggleText: { color: "#FFF", fontFamily: "Inter_500Medium", fontSize: 13 },
+  toggleText: { color: "#FFF", fontFamily: "Inter_500Medium", fontSize: 12 },
   promptInput: {
     minHeight: 86,
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
     paddingVertical: 12,
     color: "#FFF",
@@ -3804,9 +3816,9 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   generateButton: {
-    marginTop: 2,
-    height: 52,
-    borderRadius: 13,
+    marginTop: 4,
+    height: 56,
+    borderRadius: Colors.radiusMd,
     backgroundColor: Colors.accent,
     flexDirection: "row",
     justifyContent: "center",
@@ -3816,23 +3828,23 @@ const styles = StyleSheet.create({
   generateButtonDisabled: {
     opacity: 0.5,
   },
-  generateButtonText: { color: "#000", fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  generateButtonText: { color: "#000", fontFamily: "Inter_600SemiBold", fontSize: 16 },
   costText: {
     marginLeft: 4,
     color: "#111",
     fontFamily: "Inter_500Medium",
     fontSize: 11,
     backgroundColor: "rgba(0,0,0,0.12)",
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: Colors.radiusSm,
   },
   resultImage: {
     width: "100%",
     aspectRatio: 3 / 4,
-    borderRadius: 14,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: Colors.borderLight,
   },
   compareSection: {
     gap: 8,
@@ -3846,7 +3858,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   compareSubtitle: {
-    color: "#C9C9C9",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
@@ -3855,10 +3867,10 @@ const styles = StyleSheet.create({
     position: "relative",
     width: "100%",
     aspectRatio: 1,
-    borderRadius: 14,
+    borderRadius: Colors.radiusMd,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
+    borderColor: Colors.borderSubtle,
     backgroundColor: "#090909",
   },
   compareImage: {
@@ -3902,25 +3914,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     backgroundColor: "rgba(0,0,0,0.46)",
     paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 999,
+    paddingVertical: 4,
+    borderRadius: Colors.radiusFull,
   },
   resultMetaCard: {
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 4,
   },
   resultMetaTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
   },
   resultMetaText: {
-    color: "#C7C7C7",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
@@ -3928,11 +3940,11 @@ const styles = StyleSheet.create({
   resultActionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 12,
   },
   resultActionButton: {
     height: 44,
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
@@ -3941,55 +3953,55 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   resultActionButtonPrimary: {
-    borderColor: "rgba(255,79,125,0.55)",
-    backgroundColor: "rgba(255,79,125,0.10)",
+    borderColor: "rgba(255,79,125,0.40)",
+    backgroundColor: "rgba(255,79,125,0.08)",
   },
   resultActionButtonSecondary: {
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
   },
   downloadText: { color: Colors.accentLight, fontFamily: "Inter_600SemiBold", fontSize: 14 },
   editButtonText: {
-    color: "#FFE1EA",
+    color: Colors.accentPale,
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
   },
   editComposer: {
-    borderRadius: 14,
+    borderRadius: Colors.radiusMd,
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.28)",
-    backgroundColor: "rgba(255,79,125,0.06)",
+    borderColor: "rgba(255,79,125,0.20)",
+    backgroundColor: "rgba(255,79,125,0.04)",
     padding: 12,
-    gap: 10,
+    gap: 12,
   },
   editComposerTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 14,
   },
   editComposerSubtitle: {
-    color: "#C7C7C7",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 17,
   },
   resultFootnote: {
-    color: "#8F8F8F",
+    color: Colors.textDim,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
   },
   historyCard: {
-    width: 220,
-    borderRadius: 16,
+    width: 180,
+    borderRadius: Colors.radiusMd,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
   },
   historyCardImage: {
     width: "100%",
-    aspectRatio: 1,
+    aspectRatio: 3 / 4,
   },
   historyCardBody: {
     paddingHorizontal: 12,
@@ -3999,19 +4011,18 @@ const styles = StyleSheet.create({
   historyCardTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
   },
   historyCardMeta: {
-    color: "#FFB1C9",
+    color: Colors.accentLight,
     fontFamily: "Inter_500Medium",
     fontSize: 11,
   },
   historyCardPrompt: {
-    color: "#C5C5C5",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 17,
-    minHeight: 34,
   },
   historyActionRow: {
     flexDirection: "row",
@@ -4021,15 +4032,15 @@ const styles = StyleSheet.create({
   historyActionButton: {
     flex: 1,
     minHeight: 36,
-    borderRadius: 10,
+    borderRadius: Colors.radiusSm,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.03)",
+    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surfaceFaint,
   },
   historyActionText: {
-    color: "#FFE1EA",
+    color: Colors.accentPale,
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
   },
@@ -4044,11 +4055,11 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 520,
     backgroundColor: "#111111",
-    borderRadius: 18,
+    borderRadius: Colors.radiusLg,
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.35)",
-    padding: 14,
-    gap: 10,
+    borderColor: Colors.borderLight,
+    padding: 16,
+    gap: 12,
   },
   modalCloseButton: {
     position: "absolute",
@@ -4065,13 +4076,13 @@ const styles = StyleSheet.create({
   modalTitle: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 18,
+    fontSize: 16,
     paddingRight: 36,
   },
   modalSubtitle: {
-    color: "#BFBFBF",
+    color: Colors.textSecondary,
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
+    fontSize: 12,
     marginTop: -2,
     marginBottom: 4,
     paddingRight: 24,
@@ -4079,11 +4090,11 @@ const styles = StyleSheet.create({
   modalImageWrap: {
     width: 290,
     height: 360,
-    marginRight: 10,
-    borderRadius: 14,
+    marginRight: 12,
+    borderRadius: Colors.radiusMd,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: Colors.borderLight,
     backgroundColor: "#0E0E0E",
   },
   modalImage: {
@@ -4091,15 +4102,15 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   modalFootnote: {
-    color: "#8A8A8A",
+    color: Colors.textDim,
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     textAlign: "center",
   },
   modalApplyButton: {
-    marginTop: 2,
+    marginTop: 4,
     height: 46,
-    borderRadius: 12,
+    borderRadius: Colors.radiusMd,
     backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
@@ -4107,6 +4118,6 @@ const styles = StyleSheet.create({
   modalApplyButtonText: {
     color: "#090909",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
+    fontSize: 14,
   },
 });
