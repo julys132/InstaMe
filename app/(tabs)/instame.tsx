@@ -2151,7 +2151,6 @@ export default function InstaMeScreen() {
               {selectedSavedOwnStyle ? (
                 <View style={styles.ownStyleSavedMeta}>
                   <Text style={styles.ownStyleSavedMetaTitle}>Using: {selectedSavedOwnStyle.name}</Text>
-                  <Text style={styles.ownStyleSavedMetaText}>{selectedSavedOwnStyle.promptPreview}</Text>
                   <View style={styles.renameOwnStyleRow}>
                     <TextInput
                       value={ownStyleNameDraft}
@@ -2784,8 +2783,8 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
   },
   uploadThumbBox: {
-    width: 100,
-    height: 100,
+    flex: 1,
+    aspectRatio: 1,
     borderRadius: Colors.radiusMd,
     overflow: "hidden",
     borderWidth: 1,
