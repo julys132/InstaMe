@@ -1049,6 +1049,25 @@ export default function InstaMeScreen() {
       return;
     }
 
+    let savedImageId = "";
+    try {
+      const saved = await apiClient.saveInstaMeUploadedImage({
+        image: {
+          name: asset.fileName || "Portrait",
+          kind: "uploaded",
+          mimeType: prepared.mimeType,
+          base64: prepared.base64,
+          previewBase64: prepared.previewBase64 || prepared.base64,
+          width: prepared.width,
+          height: prepared.height,
+          fileSizeBytes: prepared.fileSizeBytes || Math.ceil((prepared.base64.length * 3) / 4),
+        },
+      });
+      savedImageId = saved.image?.id || "";
+    } catch (_) {
+      // Save failed silently – user can still use the photo for this session
+    }
+
     applyBasePhoto({
       uri: prepared.uri,
       base64: prepared.base64,
@@ -1058,7 +1077,7 @@ export default function InstaMeScreen() {
       width: prepared.width,
       height: prepared.height,
       fileSizeBytes: prepared.fileSizeBytes,
-      sourceImageId: undefined,
+      sourceImageId: savedImageId || undefined,
       name: asset.fileName || "Portrait",
     });
     await Haptics.selectionAsync();
@@ -1729,146 +1748,7 @@ export default function InstaMeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>1. Upload your photo</Text>
-          <Pressable style={styles.uploadBox} onPress={pickImage}>
-            {photo ? (
-              <Image source={{ uri: photo.uri }} style={styles.uploadImage} contentFit="cover" />
-            ) : (
-              <View style={styles.uploadPlaceholder}>
-                <Ionicons name="image-outline" size={30} color={Colors.accent} />
-                <Text style={styles.uploadPlaceholderTitle}>Select an image</Text>
-                <Text style={styles.uploadPlaceholderSubtitle}>
-                  Front-facing portrait selfies work best for identity-preserving edits.
-                </Text>
-              </View>
-            )}
-          </Pressable>
-
-          <View style={styles.uploadActionRow}>
-            <Pressable
-              onPress={pickImage}
-              style={({ pressed }) => [
-                styles.secondaryActionButton,
-                pressed && { opacity: 0.88 },
-              ]}
-            >
-              <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
-              <Text style={styles.secondaryActionButtonText}>Upload from device</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/uploaded-images",
-                  params: {
-                    selectedImageId: photo?.sourceImageId || "",
-                  },
-                })
-              }
-              style={({ pressed }) => [
-                styles.secondaryActionButton,
-                styles.secondaryActionButtonAccent,
-                pressed ? { opacity: 0.9 } : undefined,
-              ]}
-            >
-              <Ionicons name="images-outline" size={16} color={Colors.accentLight} />
-              <Text style={[styles.secondaryActionButtonText, styles.secondaryActionButtonTextAccent]}>
-                Uploaded Images
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={styles.uploadActionRow}>
-            <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/enhanced-portraits",
-                  params: {
-                    selectedImageId: photo?.kind === "enhanced" ? photo.sourceImageId || "" : "",
-                  },
-                })
-              }
-              style={({ pressed }) => [
-                styles.secondaryActionButton,
-                pressed && { opacity: 0.88 },
-              ]}
-            >
-              <Ionicons name="sparkles-outline" size={16} color={Colors.accentPale} />
-              <Text style={styles.secondaryActionButtonText}>Enhanced Portraits</Text>
-            </Pressable>
-          </View>
-
-          <Pressable
-            onPress={handleEnhancePortrait}
-            disabled={!photo || portraitEnhanceLoading}
-            style={({ pressed }) => [
-              styles.enhanceButton,
-              (!photo || portraitEnhanceLoading) && styles.enhanceButtonDisabled,
-              pressed && photo && !portraitEnhanceLoading ? { opacity: 0.9 } : undefined,
-            ]}
-          >
-            {portraitEnhanceLoading ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <>
-                <Ionicons name="sparkles-outline" size={18} color="#000" />
-                <Text style={styles.enhanceButtonText}>Enhance portrait (recommended)</Text>
-                <Text style={styles.enhanceButtonCost}>{portraitEnhanceCost} credits</Text>
-              </>
-            )}
-          </Pressable>
-          {portraitEnhanceLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
-
-          <Text style={styles.enhanceHintText}>
-            Optional but recommended. It can reduce face distortion in later styled generations, but you can also skip it or reuse a saved image from Enhanced Portraits.
-          </Text>
-          {usingEnhancedPortrait ? (
-            <Text style={styles.enhanceSelectedText}>
-              Enhanced portrait selected as your current base image.
-            </Text>
-          ) : null}
-
-          {portraitEnhanceCandidate ? (
-            <View style={styles.enhancePreviewCard}>
-              <Text style={styles.enhancePreviewTitle}>Enhanced portrait preview</Text>
-              <Text style={styles.enhancePreviewSubtitle}>
-                If you like this improved version, keep it as your new base image and save it to Enhanced Portraits.
-              </Text>
-              <Image
-                source={{ uri: portraitEnhanceCandidate.uri }}
-                style={styles.enhancePreviewImage}
-                contentFit="cover"
-              />
-              <View style={styles.enhanceDecisionRow}>
-                <Pressable
-                  onPress={handleEnhancePortrait}
-                  disabled={portraitEnhanceLoading}
-                  style={({ pressed }) => [
-                    styles.enhanceDecisionButton,
-                    styles.enhanceRetryButton,
-                    pressed && !portraitEnhanceLoading ? { opacity: 0.88 } : undefined,
-                  ]}
-                >
-                  <Text style={styles.enhanceRetryButtonText}>I don&apos;t like it / Try again</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleKeepEnhancedPortrait}
-                  style={({ pressed }) => [
-                    styles.enhanceDecisionButton,
-                    styles.enhanceKeepButton,
-                    pressed ? { opacity: 0.9 } : undefined,
-                  ]}
-                >
-                  <Text style={styles.enhanceKeepButtonText}>Yes, I like it / Keep this one</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-
-        </View>
-
-        <View style={styles.card}>
-          {/* ── Section tab bar ── */}
+          {/* ── Section tab bar (moved above upload) ── */}
           <View style={styles.sectionTabBar}>
             {([
               { key: "main" as const, label: "Main Styles" },
@@ -1892,6 +1772,117 @@ export default function InstaMeScreen() {
               );
             })}
           </View>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>1. Upload your photo</Text>
+          <View style={styles.uploadCompactRow}>
+            <Pressable style={styles.uploadThumbBox} onPress={pickImage}>
+              {photo ? (
+                <Image source={{ uri: photo.uri }} style={styles.uploadThumbImage} contentFit="contain" />
+              ) : (
+                <View style={styles.uploadThumbPlaceholder}>
+                  <Ionicons name="add" size={32} color={Colors.accent} />
+                </View>
+              )}
+            </Pressable>
+            <View style={styles.uploadButtonsColumn}>
+              <Pressable
+                onPress={pickImage}
+                style={({ pressed }) => [styles.uploadCompactButton, pressed && { opacity: 0.88 }]}
+              >
+                <Ionicons name="cloud-upload-outline" size={15} color={Colors.accentPale} />
+                <Text style={styles.uploadCompactButtonText}>Upload from device</Text>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/uploaded-images",
+                    params: { selectedImageId: photo?.sourceImageId || "" },
+                  })
+                }
+                style={({ pressed }) => [styles.uploadCompactButton, styles.uploadCompactButtonAccent, pressed && { opacity: 0.88 }]}
+              >
+                <Ionicons name="images-outline" size={15} color={Colors.accentLight} />
+                <Text style={[styles.uploadCompactButtonText, styles.uploadCompactButtonTextAccent]}>Uploaded Images</Text>
+              </Pressable>
+              <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "/enhanced-portraits",
+                    params: { selectedImageId: photo?.kind === "enhanced" ? photo.sourceImageId || "" : "" },
+                  })
+                }
+                style={({ pressed }) => [styles.uploadCompactButton, pressed && { opacity: 0.88 }]}
+              >
+                <Ionicons name="sparkles-outline" size={15} color={Colors.accentPale} />
+                <Text style={styles.uploadCompactButtonText}>Enhanced Portraits</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <Pressable
+            onPress={handleEnhancePortrait}
+            disabled={!photo || portraitEnhanceLoading}
+            style={({ pressed }) => [
+              styles.enhanceButton,
+              (!photo || portraitEnhanceLoading) && styles.enhanceButtonDisabled,
+              pressed && photo && !portraitEnhanceLoading ? { opacity: 0.9 } : undefined,
+            ]}
+          >
+            {portraitEnhanceLoading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <>
+                <Ionicons name="sparkles-outline" size={18} color="#000" />
+                <Text style={styles.enhanceButtonText}>Enhance portrait (recommended)</Text>
+                <Text style={styles.enhanceButtonCost}>{portraitEnhanceCost} credits</Text>
+              </>
+            )}
+          </Pressable>
+          {portraitEnhanceLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
+
+          {usingEnhancedPortrait ? (
+            <Text style={styles.enhanceSelectedText}>Enhanced portrait active.</Text>
+          ) : null}
+
+          {portraitEnhanceCandidate ? (
+            <View style={styles.enhancePreviewCard}>
+              <Text style={styles.enhancePreviewTitle}>Enhanced preview</Text>
+              <Image
+                source={{ uri: portraitEnhanceCandidate.uri }}
+                style={styles.enhancePreviewImage}
+                contentFit="contain"
+              />
+              <View style={styles.enhanceDecisionRow}>
+                <Pressable
+                  onPress={handleEnhancePortrait}
+                  disabled={portraitEnhanceLoading}
+                  style={({ pressed }) => [
+                    styles.enhanceDecisionButton,
+                    styles.enhanceRetryButton,
+                    pressed && !portraitEnhanceLoading ? { opacity: 0.88 } : undefined,
+                  ]}
+                >
+                  <Text style={styles.enhanceRetryButtonText}>Try again</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleKeepEnhancedPortrait}
+                  style={({ pressed }) => [
+                    styles.enhanceDecisionButton,
+                    styles.enhanceKeepButton,
+                    pressed ? { opacity: 0.9 } : undefined,
+                  ]}
+                >
+                  <Text style={styles.enhanceKeepButtonText}>Keep this one</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+
+        </View>
+
+        <View style={styles.card}>
 
           {/* ── Sub-tabs: Signature Match / Creative Freedom (Main & Own) ── */}
           {styleSectionTab !== "art" ? (
@@ -2128,9 +2119,9 @@ export default function InstaMeScreen() {
               </Text>
               <Pressable onPress={pickOwnStyleImage} style={styles.ownStyleUploadBox}>
                 {ownStylePhoto ? (
-                  <Image source={{ uri: ownStylePhoto.uri }} style={styles.ownStyleUploadImage} contentFit="cover" />
+                  <Image source={{ uri: ownStylePhoto.uri }} style={styles.ownStyleUploadImage} contentFit="contain" />
                 ) : selectedSavedOwnStyle ? (
-                  <Image source={{ uri: selectedSavedOwnStyle.previewUri }} style={styles.ownStyleUploadImage} contentFit="cover" />
+                  <Image source={{ uri: selectedSavedOwnStyle.previewUri }} style={styles.ownStyleUploadImage} contentFit="contain" />
                 ) : (
                   <View style={styles.ownStyleUploadPlaceholder}>
                     <Ionicons name="images-outline" size={28} color={Colors.accent} />
@@ -2787,6 +2778,59 @@ const styles = StyleSheet.create({
   uploadPlaceholder: { height: 160, justifyContent: "center", alignItems: "center", paddingHorizontal: 16, gap: 8 },
   uploadPlaceholderTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 14 },
   uploadPlaceholderSubtitle: { color: Colors.textMuted, fontFamily: "Inter_400Regular", fontSize: 12, textAlign: "center" },
+  uploadCompactRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "stretch",
+  },
+  uploadThumbBox: {
+    width: 100,
+    height: 100,
+    borderRadius: Colors.radiusMd,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    backgroundColor: Colors.surfaceFaint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uploadThumbImage: {
+    width: "100%",
+    height: "100%",
+  },
+  uploadThumbPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uploadButtonsColumn: {
+    flex: 1,
+    gap: 6,
+    justifyContent: "center",
+  },
+  uploadCompactButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: Colors.radiusSm,
+    borderWidth: 1,
+    borderColor: Colors.borderSubtle,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  uploadCompactButtonAccent: {
+    borderColor: "rgba(255,79,125,0.25)",
+    backgroundColor: "rgba(255,79,125,0.06)",
+  },
+  uploadCompactButtonText: {
+    color: Colors.textSecondary,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  uploadCompactButtonTextAccent: {
+    color: Colors.accentLight,
+  },
   uploadActionRow: {
     flexDirection: "row",
     gap: 10,
