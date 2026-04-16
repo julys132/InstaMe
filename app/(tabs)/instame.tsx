@@ -2805,13 +2805,13 @@ const styles = StyleSheet.create({
   uploadButtonsColumn: {
     flex: 1,
     gap: 6,
-    justifyContent: "center",
   },
   uploadCompactButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
-    paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: Colors.radiusSm,
     borderWidth: 1,
