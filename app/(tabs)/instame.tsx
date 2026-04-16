@@ -1884,8 +1884,8 @@ export default function InstaMeScreen() {
 
         <View style={styles.card}>
 
-          {/* ── Sub-tabs: Signature Match / Creative Freedom (Main & Own) ── */}
-          {styleSectionTab !== "art" ? (
+          {/* ── Sub-tabs: Signature Match / Creative Freedom (Own Styles only) ── */}
+          {styleSectionTab === "own" ? (
             <View style={styles.subTabBar}>
               {OWN_STYLE_MODE_OPTIONS.map((option) => {
                 const active = ownStyleMode === option.value;
