@@ -438,6 +438,7 @@ export default function InstaMeScreen() {
   );
   const [selectedStyleId, setSelectedStyleId] = useState<string>("");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
+  const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art">("main");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
@@ -557,6 +558,11 @@ export default function InstaMeScreen() {
   const visibleStylePresets = useMemo(
     () => [ownStylePreset, ...stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID)],
     [ownStylePreset, stylePresets],
+  );
+
+  const mainOnlyStylePresets = useMemo(
+    () => stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID),
+    [stylePresets],
   );
 
   const defaultStylePreset = useMemo(
@@ -1862,238 +1868,264 @@ export default function InstaMeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>2. Main Styles</Text>
-          {favoritePresetCards.length > 0 || favoriteOwnStyleCards.length > 0 ? (
-            <View style={styles.favoriteStylesSection}>
-              <View style={styles.ownStylesLibraryHeader}>
-                <Text style={styles.ownStylesLibraryTitle}>Favorite Styles</Text>
-                <Text style={styles.ownStylesLibraryCount}>{favoritePresetCards.length + favoriteOwnStyleCards.length}</Text>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
-                {favoritePresetCards.map((preset) => {
-                  const theme = getStyleCardTheme(preset.id);
-                  return (
-                    <Pressable
-                      key={`favorite-preset-${preset.id}`}
-                      onPress={() => handleStylePresetPress(preset)}
-                      style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
-                    >
-                      <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
-                        <Image source={{ uri: preset.cover || preset.representativeImage }} contentFit="cover" style={styles.styleCardImage} />
-                        <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
-                        <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
-                        <View style={styles.styleCardTextWrap}>
-                          <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{preset.label}</Text>
-                          <Text numberOfLines={2} style={styles.savedOwnStyleCardText}>{preset.subtitle}</Text>
-                        </View>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-                {favoriteOwnStyleCards.map((style) => {
-                  const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
-                  return (
-                    <Pressable
-                      key={`favorite-own-${style.id}`}
-                      onPress={() => handleSelectSavedOwnStyle(style)}
-                      style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
-                    >
-                      <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
-                        <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
-                        <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
-                        <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
-                        <View style={styles.styleCardTextWrap}>
-                          <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
-                          <Text numberOfLines={2} style={styles.savedOwnStyleCardText}>{style.promptPreview}</Text>
-                        </View>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          ) : null}
-          <View style={styles.styleCarouselWrap}>
-            <ScrollView
-              ref={styleListRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.styleRow}
-              onScroll={handleStyleRowScroll}
-              scrollEventThrottle={16}
-            >
-              {visibleStylePresets.map((preset, index) => {
-                const active = selectedStyleId === preset.id;
-                const isOwnStylePreset = preset.id === INSTAME_OWN_STYLE_ID;
-                const isFirst = index === 0;
-                const isLast = index === visibleStylePresets.length - 1;
-                const theme = getStyleCardTheme(preset.id);
+          {/* ── Section tab bar ── */}
+          <View style={styles.sectionTabBar}>
+            {([
+              { key: "main" as const, label: "Main Styles" },
+              { key: "own" as const, label: "Own Styles" },
+              { key: "art" as const, label: "Art Styles" },
+            ]).map((tab) => {
+              const active = styleSectionTab === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => {
+                    setStyleSectionTab(tab.key);
+                    if (tab.key === "own" && selectedStyleId !== INSTAME_OWN_STYLE_ID) {
+                      handleStylePresetPress(ownStylePreset);
+                    }
+                  }}
+                  style={[styles.sectionTab, active && styles.sectionTabActive]}
+                >
+                  <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>{tab.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
+          {/* ── Sub-tabs: Signature Match / Creative Freedom (Main & Own) ── */}
+          {styleSectionTab !== "art" ? (
+            <View style={styles.subTabBar}>
+              {OWN_STYLE_MODE_OPTIONS.map((option) => {
+                const active = ownStyleMode === option.value;
                 return (
                   <Pressable
-                    key={preset.id}
-                    onPress={() => handleStylePresetPress(preset)}
-                    style={[
-                      styles.styleCardOuter,
-                      isFirst && styles.styleCardOuterFirst,
-                      isLast && styles.styleCardOuterLast,
-                      {
-                        backgroundColor: theme.ambient,
-                        shadowColor: theme.glow,
-                      },
-                      active && styles.styleCardOuterActive,
-                      active && {
-                        shadowColor: theme.glow,
-                      },
-                    ]}
+                    key={option.value}
+                    onPress={() => setOwnStyleMode(option.value)}
+                    style={[styles.subTab, active && styles.subTabActive]}
                   >
-                    <View
-                      style={[
-                        styles.styleCard,
-                        {
-                          borderColor: theme.border,
-                          backgroundColor: theme.footerBottom,
-                        },
-                        active && styles.styleCardActive,
-                        active && {
-                          borderColor: theme.glow,
-                        },
-                      ]}
-                    >
-                      {isOwnStylePreset && !ownStylePhoto && !selectedSavedOwnStyle ? (
-                        <View style={styles.ownStyleCardPlaceholder}>
-                          <Ionicons name="sparkles-outline" size={36} color={theme.text} />
-                          <Text style={[styles.ownStyleCardPlaceholderText, { color: theme.text }]}>Upload a look you love</Text>
-                        </View>
-                      ) : (
-                        <Image
-                          source={{ uri: preset.cover || preset.representativeImage }}
-                          contentFit="cover"
-                          style={styles.styleCardImage}
-                        />
-                      )}
-
-                      <LinearGradient
-                        colors={
-                          active
-                            ? [theme.glowSoft, "rgba(0,0,0,0.10)", "rgba(0,0,0,0.58)"]
-                            : [theme.ambient, "rgba(0,0,0,0.10)", "rgba(0,0,0,0.62)"]
-                        }
-                        locations={[0, 0.22, 1]}
-                        style={styles.styleCardAtmosphere}
-                      />
-                      <LinearGradient
-                        colors={["rgba(255,255,255,0.10)", "rgba(0,0,0,0.06)", "rgba(0,0,0,0.18)"]}
-                        locations={[0, 0.14, 1]}
-                        style={styles.styleCardImageWash}
-                      />
-                      <View
-                        style={[
-                          styles.styleCardInnerRing,
-                          {
-                            borderColor: active ? theme.border : "rgba(255,255,255,0.12)",
-                          },
-                          active && styles.styleCardInnerRingActive,
-                        ]}
-                      />
-                      <LinearGradient
-                        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.74)", "rgba(0,0,0,0.92)"]}
-                        locations={[0, 0.4, 1]}
-                        style={styles.styleCardFooter}
-                      />
-
-                      <View style={styles.styleCardTextWrap}>
-                        <Text
-                          style={[
-                            styles.styleCardTitle,
-                            { color: theme.text },
-                            active && styles.styleCardTitleActive,
-                            active && { color: theme.text },
-                          ]}
-                        >
-                          {preset.label}
-                        </Text>
-                      </View>
-                    </View>
+                    <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{option.label}</Text>
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
+          ) : null}
 
-            {canScrollMoreRight ? (
-              <View pointerEvents="box-none" style={styles.styleScrollHintWrap}>
-                <LinearGradient
-                  colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.94)"]}
-                  locations={[0, 0.45, 1]}
-                  style={styles.styleScrollFade}
-                />
+          {/* ════════════  MAIN STYLES TAB  ════════════ */}
+          {styleSectionTab === "main" ? (
+            <>
+              {favoritePresetCards.length > 0 ? (
+                <View style={styles.favoriteStylesSection}>
+                  <View style={styles.ownStylesLibraryHeader}>
+                    <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
+                    <Text style={styles.ownStylesLibraryCount}>{favoritePresetCards.length}</Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+                    {favoritePresetCards.map((preset) => {
+                      const theme = getStyleCardTheme(preset.id);
+                      return (
+                        <Pressable
+                          key={`favorite-preset-${preset.id}`}
+                          onPress={() => handleStylePresetPress(preset)}
+                          style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
+                        >
+                          <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
+                            <Image source={{ uri: preset.cover || preset.representativeImage }} contentFit="cover" style={styles.styleCardImage} />
+                            <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
+                            <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
+                            <View style={styles.styleCardTextWrap}>
+                              <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{preset.label}</Text>
+                            </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              ) : null}
 
-                <Pressable
-                  onPress={scrollStylesRight}
-                  style={({ pressed }) => [
-                    styles.styleScrollArrow,
-                    pressed && { transform: [{ scale: 0.96 }] },
-                  ]}
+              <View style={styles.styleCarouselWrap}>
+                <ScrollView
+                  ref={styleListRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.styleRow}
+                  onScroll={handleStyleRowScroll}
+                  scrollEventThrottle={16}
                 >
-                  <Ionicons name="chevron-forward" size={18} color={Colors.accentSoft} />
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
+                  {mainOnlyStylePresets.map((preset, index) => {
+                    const active = selectedStyleId === preset.id;
+                    const isFirst = index === 0;
+                    const isLast = index === mainOnlyStylePresets.length - 1;
+                    const theme = getStyleCardTheme(preset.id);
 
-          <View style={styles.selectedStyleRow}>
-            <Text style={styles.selectedStyleText}>
-              Selected style: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
-            </Text>
-            {currentFavoriteStyleKey ? (
-              <Pressable onPress={() => void toggleCurrentStyleFavorite()} style={styles.favoriteStyleButton}>
-                <Ionicons name={isCurrentStyleFavorite ? "heart" : "heart-outline"} size={18} color={isCurrentStyleFavorite ? Colors.accentPink : Colors.accentSoft} />
-                <Text style={styles.favoriteStyleButtonText}>{isCurrentStyleFavorite ? "Favorited" : "Favorite"}</Text>
-              </Pressable>
-            ) : null}
-          </View>
+                    return (
+                      <Pressable
+                        key={preset.id}
+                        onPress={() => handleStylePresetPress(preset)}
+                        style={[
+                          styles.styleCardOuter,
+                          isFirst && styles.styleCardOuterFirst,
+                          isLast && styles.styleCardOuterLast,
+                          { backgroundColor: theme.ambient, shadowColor: theme.glow },
+                          active && styles.styleCardOuterActive,
+                          active && { shadowColor: theme.glow },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.styleCard,
+                            { borderColor: theme.border, backgroundColor: theme.footerBottom },
+                            active && styles.styleCardActive,
+                            active && { borderColor: theme.glow },
+                          ]}
+                        >
+                          <Image
+                            source={{ uri: preset.cover || preset.representativeImage }}
+                            contentFit="cover"
+                            style={styles.styleCardImage}
+                          />
+                          <LinearGradient
+                            colors={active
+                              ? [theme.glowSoft, "rgba(0,0,0,0.10)", "rgba(0,0,0,0.58)"]
+                              : [theme.ambient, "rgba(0,0,0,0.10)", "rgba(0,0,0,0.62)"]}
+                            locations={[0, 0.22, 1]}
+                            style={styles.styleCardAtmosphere}
+                          />
+                          <LinearGradient
+                            colors={["rgba(255,255,255,0.10)", "rgba(0,0,0,0.06)", "rgba(0,0,0,0.18)"]}
+                            locations={[0, 0.14, 1]}
+                            style={styles.styleCardImageWash}
+                          />
+                          <View
+                            style={[
+                              styles.styleCardInnerRing,
+                              { borderColor: active ? theme.border : "rgba(255,255,255,0.12)" },
+                              active && styles.styleCardInnerRingActive,
+                            ]}
+                          />
+                          <LinearGradient
+                            colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.74)", "rgba(0,0,0,0.92)"]}
+                            locations={[0, 0.4, 1]}
+                            style={styles.styleCardFooter}
+                          />
+                          <View style={styles.styleCardTextWrap}>
+                            <Text
+                              style={[
+                                styles.styleCardTitle,
+                                { color: theme.text },
+                                active && styles.styleCardTitleActive,
+                                active && { color: theme.text },
+                              ]}
+                            >
+                              {preset.label}
+                            </Text>
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
 
-          {isOwnStyleSelected ? (
-            <View style={styles.ownStylePanel}>
-              <Text style={styles.ownStylePanelTitle}>Upload your style reference</Text>
-              <Text style={styles.ownStylePanelText}>
-                Add one image whose styling you want to transfer. After the first successful generation, we save a compact thumbnail and the analyzed prompt so you can reuse that look instantly later.
-              </Text>
-              <Text style={styles.processingHintText}>
-                First-time Own Style generation costs {transformCost} credits. Saved Own Styles return to {activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST} credits.
-              </Text>
-              <View style={styles.uploadActionRow}>
-                {OWN_STYLE_MODE_OPTIONS.map((option) => {
-                  const active = ownStyleMode === option.value;
-                  return (
+                {canScrollMoreRight ? (
+                  <View pointerEvents="box-none" style={styles.styleScrollHintWrap}>
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.94)"]}
+                      locations={[0, 0.45, 1]}
+                      style={styles.styleScrollFade}
+                    />
                     <Pressable
-                      key={option.value}
-                      onPress={() => setOwnStyleMode(option.value)}
-                      style={({ pressed }) => [
-                        styles.ownStyleModeButton,
-                        option.value === "reference_locked"
-                          ? styles.ownStyleModeButtonMatch
-                          : styles.ownStyleModeButtonCreative,
-                        active && styles.ownStyleModeButtonActive,
-                        { flex: 1 },
-                        pressed && { opacity: 0.88 },
-                      ]}
+                      onPress={scrollStylesRight}
+                      style={({ pressed }) => [styles.styleScrollArrow, pressed && { transform: [{ scale: 0.96 }] }]}
                     >
-                      <Ionicons
-                        name={active ? "radio-button-on-outline" : "radio-button-off-outline"}
-                        size={16}
-                        color={active ? "#0B0B0B" : "#FFF3F7"}
-                      />
-                      <Text style={[
-                        styles.ownStyleModeButtonText,
-                        active && styles.ownStyleModeButtonTextActive,
-                      ]}>
-                        {option.label}
-                      </Text>
+                      <Ionicons name="chevron-forward" size={18} color={Colors.accentSoft} />
                     </Pressable>
-                  );
-                })}
+                  </View>
+                ) : null}
               </View>
+
+              <View style={styles.selectedStyleRow}>
+                <Text style={styles.selectedStyleText}>
+                  Selected: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
+                </Text>
+                {currentFavoriteStyleKey ? (
+                  <Pressable onPress={() => void toggleCurrentStyleFavorite()} style={styles.favoriteStyleButton}>
+                    <Ionicons name={isCurrentStyleFavorite ? "heart" : "heart-outline"} size={18} color={isCurrentStyleFavorite ? Colors.accentPink : Colors.accentSoft} />
+                    <Text style={styles.favoriteStyleButtonText}>{isCurrentStyleFavorite ? "Favorited" : "Favorite"}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              {/* Fine tune (collapsed) */}
+              <View style={styles.fineTuneDropdownWrap}>
+                <Pressable
+                  onPress={() => setShowFineTunePanel((prev) => !prev)}
+                  style={[styles.fineTuneDropdownTrigger, showFineTunePanel && styles.fineTuneDropdownTriggerActive]}
+                >
+                  <View style={styles.fineTuneDropdownHeaderText}>
+                    <Text style={styles.fineTuneDropdownTitle}>Fine tune</Text>
+                    <Text style={styles.fineTuneDropdownSummary}>
+                      {selectedIntensityOption
+                        ? `${selectedIntensityOption.label}`
+                        : "Default"}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={showFineTunePanel ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color={showFineTunePanel ? Colors.accentLight : Colors.textSecondary}
+                  />
+                </Pressable>
+                {showFineTunePanel ? (
+                  <View style={styles.fineTuneDropdownBody}>
+                    <Pressable
+                      onPress={() => { setIntensity(null); setShowFineTunePanel(false); }}
+                      style={[styles.fineTuneSkipCard, intensity === null && styles.fineTuneSkipCardActive]}
+                    >
+                      <View style={styles.fineTuneSkipTopRow}>
+                        <Text style={[styles.fineTuneSkipTitle, intensity === null && styles.fineTuneSkipTitleActive]}>No fine tune</Text>
+                        {intensity === null ? <Ionicons name="checkmark-circle" size={18} color={Colors.accent} /> : null}
+                      </View>
+                    </Pressable>
+                    <View style={styles.intensityRow}>
+                      {INTENSITY_OPTIONS.map((option) => (
+                        <Pressable
+                          key={option.value}
+                          onPress={() => { setIntensity(option.value); setShowFineTunePanel(false); }}
+                          style={[styles.chip, intensity === option.value && styles.chipActive]}
+                        >
+                          <Text style={[styles.chipLabel, intensity === option.value && styles.chipLabelActive]}>{option.label}</Text>
+                          <Text style={[styles.chipSubtitle, intensity === option.value && styles.chipSubtitleActive]}>{option.subtitle}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                    <Pressable
+                      onPress={() => setPreserveBackground((prev) => !prev)}
+                      style={[styles.toggle, preserveBackground && styles.toggleActive]}
+                    >
+                      <Ionicons name={preserveBackground ? "checkmark-circle" : "ellipse-outline"} size={18} color={preserveBackground ? Colors.accent : "#8E8E8E"} />
+                      <Text style={styles.toggleText}>Keep original background</Text>
+                    </Pressable>
+                    <TextInput
+                      value={customPrompt}
+                      onChangeText={setCustomPrompt}
+                      placeholder="Extra notes: colder shadows, softer makeup..."
+                      placeholderTextColor="#7A7A7A"
+                      multiline
+                      style={styles.promptInput}
+                    />
+                  </View>
+                ) : null}
+              </View>
+            </>
+          ) : null}
+
+          {/* ════════════  OWN STYLES TAB  ════════════ */}
+          {styleSectionTab === "own" ? (
+            <View style={styles.ownStylePanel}>
+              <Text style={styles.processingHintText}>
+                First use: {transformCost} cr. Saved styles: {activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST} cr.
+              </Text>
               <Pressable onPress={pickOwnStyleImage} style={styles.ownStyleUploadBox}>
                 {ownStylePhoto ? (
                   <Image source={{ uri: ownStylePhoto.uri }} style={styles.ownStyleUploadImage} contentFit="cover" />
@@ -2103,7 +2135,6 @@ export default function InstaMeScreen() {
                   <View style={styles.ownStyleUploadPlaceholder}>
                     <Ionicons name="images-outline" size={28} color={Colors.accent} />
                     <Text style={styles.ownStyleUploadPlaceholderTitle}>Choose style image</Text>
-                    <Text style={styles.ownStyleUploadPlaceholderText}>Use a photo with the exact pose and styling direction you want.</Text>
                   </View>
                 )}
               </Pressable>
@@ -2124,16 +2155,11 @@ export default function InstaMeScreen() {
                       {ownStyleNeedsActivation ? "Use this style" : "Using this style"}
                     </Text>
                   </Pressable>
-                  {ownStyleNeedsActivation ? (
-                    <Text style={styles.processingHintText}>
-                      Own Style is loaded, but another main style is still selected. Generate stays locked until you tap &quot;Use this style&quot;.
-                    </Text>
-                  ) : null}
                 </>
               ) : null}
               {selectedSavedOwnStyle ? (
                 <View style={styles.ownStyleSavedMeta}>
-                  <Text style={styles.ownStyleSavedMetaTitle}>Using saved style: {selectedSavedOwnStyle.name}</Text>
+                  <Text style={styles.ownStyleSavedMetaTitle}>Using: {selectedSavedOwnStyle.name}</Text>
                   <Text style={styles.ownStyleSavedMetaText}>{selectedSavedOwnStyle.promptPreview}</Text>
                   <View style={styles.renameOwnStyleRow}>
                     <TextInput
@@ -2164,7 +2190,7 @@ export default function InstaMeScreen() {
                 >
                   <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
                   <Text style={styles.secondaryActionButtonText}>
-                    {ownStylePhoto || selectedSavedOwnStyle ? "Use another style image" : "Upload style image"}
+                    {ownStylePhoto || selectedSavedOwnStyle ? "Change image" : "Upload"}
                   </Text>
                 </Pressable>
                 {ownStylePhoto ? (
@@ -2181,7 +2207,7 @@ export default function InstaMeScreen() {
                     style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
                   >
                     <Ionicons name="trash-outline" size={16} color={Colors.accentPale} />
-                    <Text style={styles.secondaryActionButtonText}>Delete saved style</Text>
+                    <Text style={styles.secondaryActionButtonText}>Delete</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -2189,23 +2215,15 @@ export default function InstaMeScreen() {
               {savedOwnStyles.length > 0 ? (
                 <View style={styles.ownStylesLibrarySection}>
                   <View style={styles.ownStylesLibraryHeader}>
-                    <Text style={styles.ownStylesLibraryTitle}>Your Own Styles</Text>
+                    <Text style={styles.ownStylesLibraryTitle}>Saved</Text>
                     <Text style={styles.ownStylesLibraryCount}>{savedOwnStyles.length}</Text>
                   </View>
-                  <Text style={styles.ownStylesLibraryText}>
-                    Reuse the looks you already analyzed. Each one keeps a compact preview plus the saved styling prompt.
-                  </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.ownStylesRow}
-                  >
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
                     {savedOwnStyles.map((style, index) => {
                       const active = selectedOwnStyleId === style.id;
                       const isFirst = index === 0;
                       const isLast = index === savedOwnStyles.length - 1;
                       const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
-
                       return (
                         <Pressable
                           key={style.id}
@@ -2239,7 +2257,6 @@ export default function InstaMeScreen() {
                             />
                             <View style={styles.styleCardTextWrap}>
                               <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
-                              <Text numberOfLines={2} style={styles.savedOwnStyleCardText}>{style.promptPreview}</Text>
                             </View>
                           </View>
                         </Pressable>
@@ -2248,220 +2265,157 @@ export default function InstaMeScreen() {
                   </ScrollView>
                 </View>
               ) : null}
+
+              {favoriteOwnStyleCards.length > 0 ? (
+                <View style={styles.favoriteStylesSection}>
+                  <View style={styles.ownStylesLibraryHeader}>
+                    <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
+                    <Text style={styles.ownStylesLibraryCount}>{favoriteOwnStyleCards.length}</Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+                    {favoriteOwnStyleCards.map((style) => {
+                      const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
+                      return (
+                        <Pressable
+                          key={`favorite-own-${style.id}`}
+                          onPress={() => handleSelectSavedOwnStyle(style)}
+                          style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
+                        >
+                          <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
+                            <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
+                            <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
+                            <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
+                            <View style={styles.styleCardTextWrap}>
+                              <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
+                            </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              ) : null}
+
+              {/* Fine tune (collapsed) – own style */}
+              <View style={styles.fineTuneDropdownWrap}>
+                <Pressable
+                  onPress={() => setShowFineTunePanel((prev) => !prev)}
+                  style={[styles.fineTuneDropdownTrigger, showFineTunePanel && styles.fineTuneDropdownTriggerActive]}
+                >
+                  <View style={styles.fineTuneDropdownHeaderText}>
+                    <Text style={styles.fineTuneDropdownTitle}>Fine tune</Text>
+                    <Text style={styles.fineTuneDropdownSummary}>Background & notes</Text>
+                  </View>
+                  <Ionicons
+                    name={showFineTunePanel ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color={showFineTunePanel ? Colors.accentLight : Colors.textSecondary}
+                  />
+                </Pressable>
+                {showFineTunePanel ? (
+                  <View style={styles.fineTuneDropdownBody}>
+                    <Pressable
+                      onPress={() => setPreserveBackground((prev) => !prev)}
+                      style={[styles.toggle, preserveBackground && styles.toggleActive]}
+                    >
+                      <Ionicons name={preserveBackground ? "checkmark-circle" : "ellipse-outline"} size={18} color={preserveBackground ? Colors.accent : "#8E8E8E"} />
+                      <Text style={styles.toggleText}>Keep original background</Text>
+                    </Pressable>
+                    <TextInput
+                      value={customPrompt}
+                      onChangeText={setCustomPrompt}
+                      placeholder="Extra notes: colder shadows, softer makeup..."
+                      placeholderTextColor="#7A7A7A"
+                      multiline
+                      style={styles.promptInput}
+                    />
+                  </View>
+                ) : null}
+              </View>
             </View>
           ) : null}
-        </View>
 
-        <View style={styles.card}>
-          <View style={styles.fineTuneDropdownWrap}>
-            <Pressable
-              onPress={() => setShowFineTunePanel((prev) => !prev)}
-              style={[
-                styles.fineTuneDropdownTrigger,
-                showFineTunePanel && styles.fineTuneDropdownTriggerActive,
-              ]}
-            >
-              <View style={styles.fineTuneDropdownHeaderText}>
-                <Text style={styles.fineTuneDropdownTitle}>Fine tune (optional)</Text>
-                <Text style={styles.fineTuneDropdownSummary}>
-                  {selectedArtStyle
-                    ? "Art Styles take priority. You can still keep the background and add notes here."
-                    : isOwnStyleSelected
-                      ? "Own Style uses your uploaded or saved reference. You can still keep the background and add notes here."
-                    : selectedIntensityOption
-                      ? `${selectedIntensityOption.label}: ${selectedIntensityOption.subtitle}`
-                      : "No extra fine tune selected."}
-                </Text>
-              </View>
-              <Ionicons
-                name={showFineTunePanel ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={showFineTunePanel ? Colors.accentLight : Colors.textSecondary}
-              />
-            </Pressable>
-
-            {showFineTunePanel ? (
-              <View style={styles.fineTuneDropdownBody}>
-                <Text style={styles.fineTuneIntro}>
-                  Your selected style sets the main look. Fine tune only adjusts how strongly that style is applied.
-                </Text>
-                <View style={styles.fineTuneExplanationCard}>
-                  <Text style={styles.fineTuneExplanationTitle}>What it changes</Text>
-                  <Text style={styles.fineTuneExplanationText}>
-                    It can change lighting strength, contrast, mood, styling polish, and overall cinematic impact.
-                  </Text>
-                  <Text style={styles.fineTuneExplanationText}>
-                    It does not replace your selected style. If you choose{" "}
-                    <Text style={styles.fineTuneAccent}>{selectedStylePreset?.label || "a style"}</Text>, the result stays in
-                    that style family.
-                  </Text>
-                </View>
-
-                {!selectedArtStyle && !isOwnStyleSelected ? (
-                  <>
-                    <Pressable
-                      onPress={() => {
-                        setIntensity(null);
-                        setShowFineTunePanel(false);
-                      }}
-                      style={[styles.fineTuneSkipCard, intensity === null && styles.fineTuneSkipCardActive]}
-                    >
-                      <View style={styles.fineTuneSkipTopRow}>
-                        <Text
-                          style={[styles.fineTuneSkipTitle, intensity === null && styles.fineTuneSkipTitleActive]}
-                        >
-                          No extra fine tune
-                        </Text>
-                        {intensity === null ? (
-                          <Ionicons name="checkmark-circle" size={18} color={Colors.accent} />
-                        ) : null}
-                      </View>
-                      <Text
-                        style={[styles.fineTuneSkipText, intensity === null && styles.fineTuneSkipTextActive]}
-                      >
-                        Use the selected style as-is, with standard balanced styling.
-                      </Text>
-                    </Pressable>
-                    <View style={styles.intensityRow}>
-                      {INTENSITY_OPTIONS.map((option) => (
-                        <Pressable
-                          key={option.value}
-                          onPress={() => {
-                            setIntensity(option.value);
-                            setShowFineTunePanel(false);
-                          }}
-                          style={[styles.chip, intensity === option.value && styles.chipActive]}
-                        >
-                          <Text
-                            style={[styles.chipLabel, intensity === option.value && styles.chipLabelActive]}
-                          >
-                            {option.label}
-                          </Text>
-                          <Text
-                            style={[styles.chipSubtitle, intensity === option.value && styles.chipSubtitleActive]}
-                          >
-                            {option.subtitle}
-                          </Text>
-                          <Text
-                            style={[styles.chipDetails, intensity === option.value && styles.chipDetailsActive]}
-                          >
-                            {option.details}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </>
-                ) : isOwnStyleSelected ? (
-                  <View style={styles.fineTuneArtStyleNotice}>
-                    <Text style={styles.fineTuneArtStyleNoticeTitle}>Own Style selected</Text>
-                    <Text style={styles.fineTuneArtStyleNoticeText}>
-                      Your uploaded or saved Own Style drives the look here. You can still preserve the background and add custom notes below.
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.fineTuneArtStyleNotice}>
-                    <Text style={styles.fineTuneArtStyleNoticeTitle}>Art Style selected</Text>
-                    <Text style={styles.fineTuneArtStyleNoticeText}>
-                      Fine tune strength is skipped while an Art Style is active. Background and notes still apply.
-                    </Text>
-                  </View>
-                )}
-
+          {/* ════════════  ART STYLES TAB  ════════════ */}
+          {styleSectionTab === "art" ? (
+            <View style={styles.artStylesPanel}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.artStylesRow}
+              >
                 <Pressable
-                  onPress={() => setPreserveBackground((prev) => !prev)}
-                  style={[styles.toggle, preserveBackground && styles.toggleActive]}
+                  onPress={() => setSelectedArtStyleId("")}
+                  style={[styles.artStyleOption, styles.artStyleOptionEmpty, !selectedArtStyleId && styles.artStyleOptionActive]}
                 >
-                  <Ionicons
-                    name={preserveBackground ? "checkmark-circle" : "ellipse-outline"}
-                    size={18}
-                    color={preserveBackground ? Colors.accent : "#8E8E8E"}
-                  />
-                  <Text style={styles.toggleText}>Keep original background</Text>
+                  <View style={styles.artStyleOptionTextWrap}>
+                    <Text style={[styles.artStyleOptionTitle, !selectedArtStyleId && styles.artStyleOptionTitleActive]}>None</Text>
+                    <Text style={[styles.artStyleOptionSubtitle, !selectedArtStyleId && styles.artStyleOptionSubtitleActive]}>Photographic</Text>
+                  </View>
                 </Pressable>
 
-                <TextInput
-                  value={customPrompt}
-                  onChangeText={setCustomPrompt}
-                  placeholder="Extra notes (optional): colder shadows, softer makeup, stronger grain, pearl earrings..."
-                  placeholderTextColor="#7A7A7A"
-                  multiline
-                  style={styles.promptInput}
-                />
-              </View>
-            ) : null}
-          </View>
+                {INSTAME_ART_STYLES.map((style) => {
+                  const active = selectedArtStyleId === style.id;
+                  return (
+                    <Pressable
+                      key={style.id}
+                      onPress={() => setSelectedArtStyleId(style.id)}
+                      style={[styles.artStyleOption, active && styles.artStyleOptionActive]}
+                    >
+                      <Image source={style.preview} style={styles.artStyleOptionImage} contentFit="cover" />
+                      <LinearGradient
+                        colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.88)"]}
+                        style={styles.artStyleOptionOverlay}
+                      />
+                      <View style={styles.artStyleOptionTextWrap}>
+                        <Text style={[styles.artStyleOptionTitle, active && styles.artStyleOptionTitleActive]}>{style.label}</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
 
-          <View style={styles.artStylesPanel}>
-            <View style={styles.artStylesPanelHeader}>
-              <Text style={styles.artStylesPanelTitle}>Art Styles</Text>
-              <Text style={styles.artStylesPanelSubtitle}>
-                Optional. Art styles export in High Res and override fine tune strength while active.
+              <Text style={styles.selectedStyleText}>
+                Art finish: <Text style={styles.selectedStyleAccent}>{selectedArtStyle?.label || "None"}</Text>
               </Text>
-            </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.artStylesRow}
-            >
-              <Pressable
-                onPress={() => setSelectedArtStyleId("")}
-                style={[
-                  styles.artStyleOption,
-                  styles.artStyleOptionEmpty,
-                  !selectedArtStyleId && styles.artStyleOptionActive,
-                ]}
-              >
-                <View style={styles.artStyleOptionTextWrap}>
-                  <Text style={[styles.artStyleOptionTitle, !selectedArtStyleId && styles.artStyleOptionTitleActive]}>
-                    No art style
-                  </Text>
-                  <Text
-                    style={[
-                      styles.artStyleOptionSubtitle,
-                      !selectedArtStyleId && styles.artStyleOptionSubtitleActive,
-                    ]}
-                  >
-                    Keep the result fully photographic.
-                  </Text>
-                </View>
-              </Pressable>
-
-              {INSTAME_ART_STYLES.map((style) => {
-                const active = selectedArtStyleId === style.id;
-                return (
-                  <Pressable
-                    key={style.id}
-                    onPress={() => setSelectedArtStyleId(style.id)}
-                    style={[styles.artStyleOption, active && styles.artStyleOptionActive]}
-                  >
-                    <Image source={style.preview} style={styles.artStyleOptionImage} contentFit="cover" />
-                    <LinearGradient
-                      colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.88)"]}
-                      style={styles.artStyleOptionOverlay}
+              {/* Fine tune (collapsed) – art style */}
+              <View style={styles.fineTuneDropdownWrap}>
+                <Pressable
+                  onPress={() => setShowFineTunePanel((prev) => !prev)}
+                  style={[styles.fineTuneDropdownTrigger, showFineTunePanel && styles.fineTuneDropdownTriggerActive]}
+                >
+                  <View style={styles.fineTuneDropdownHeaderText}>
+                    <Text style={styles.fineTuneDropdownTitle}>Fine tune</Text>
+                    <Text style={styles.fineTuneDropdownSummary}>Background & notes</Text>
+                  </View>
+                  <Ionicons
+                    name={showFineTunePanel ? "chevron-up" : "chevron-down"}
+                    size={18}
+                    color={showFineTunePanel ? Colors.accentLight : Colors.textSecondary}
+                  />
+                </Pressable>
+                {showFineTunePanel ? (
+                  <View style={styles.fineTuneDropdownBody}>
+                    <Pressable
+                      onPress={() => setPreserveBackground((prev) => !prev)}
+                      style={[styles.toggle, preserveBackground && styles.toggleActive]}
+                    >
+                      <Ionicons name={preserveBackground ? "checkmark-circle" : "ellipse-outline"} size={18} color={preserveBackground ? Colors.accent : "#8E8E8E"} />
+                      <Text style={styles.toggleText}>Keep original background</Text>
+                    </Pressable>
+                    <TextInput
+                      value={customPrompt}
+                      onChangeText={setCustomPrompt}
+                      placeholder="Extra notes: colder shadows, softer makeup..."
+                      placeholderTextColor="#7A7A7A"
+                      multiline
+                      style={styles.promptInput}
                     />
-                    <View style={styles.artStyleOptionTextWrap}>
-                      <Text style={[styles.artStyleOptionTitle, active && styles.artStyleOptionTitleActive]}>
-                        {style.label}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.artStyleOptionSubtitle,
-                          active && styles.artStyleOptionSubtitleActive,
-                        ]}
-                      >
-                        {style.subtitle}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            <Text style={styles.selectedStyleText}>
-              Art finish: <Text style={styles.selectedStyleAccent}>{selectedArtStyle?.label || "None"}</Text>
-            </Text>
-          </View>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -2540,7 +2494,7 @@ export default function InstaMeScreen() {
 
         {resultBase64 ? (
           <View ref={resultCardRef} style={styles.card}>
-            <Text style={styles.cardTitle}>{selectedArtStyle ? "3. Your Chicoo result" : "4. Your Chicoo result"}</Text>
+            <Text style={styles.cardTitle}>3. Your Chicoo result</Text>
             {comparisonImageUri ? (
               <View style={styles.compareSection}>
                 <View style={styles.compareHeader}>
@@ -2768,6 +2722,60 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   cardTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 16 },
+  sectionTabBar: {
+    flexDirection: "row",
+    borderRadius: Colors.radiusMd,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    padding: 3,
+    gap: 2,
+  },
+  sectionTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: Colors.radiusSm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTabActive: {
+    backgroundColor: "rgba(255,79,125,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,79,125,0.32)",
+  },
+  sectionTabText: {
+    color: Colors.textSecondary,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+  },
+  sectionTabTextActive: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+  },
+  subTabBar: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  subTab: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: Colors.radiusSm,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  subTabActive: {
+    borderColor: Colors.accent,
+    backgroundColor: "rgba(255,79,125,0.10)",
+  },
+  subTabText: {
+    color: Colors.textMuted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  subTabTextActive: {
+    color: Colors.accentLight,
+  },
   uploadBox: {
     borderRadius: Colors.radiusMd,
     overflow: "hidden",
