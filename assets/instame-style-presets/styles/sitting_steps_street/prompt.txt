@@ -1,0 +1,6 @@
+
+a black and white high\-fashion studio portrait of a woman sitting on a modern chair, facing the camera directly \(front view\), confident expression, wearing an oversized leather jacket with broad shoulders, sheer tights, white knee\-high socks, and adidas samba sneakers, no sunglasses, elegant minimalistic background, soft directional lighting with dramatic shadows, cinematic mood, editorial Vogue\-style 35mm film photography, extremely realistic and detailed, accurate facial structure and resemblance to the reference photo, perfect skin texture and natural proportions, with \[your face photo uploaded as reference\]
+
+Negative prompt:
+low quality, blurry, distorted or inaccurate face, extra limbs, asymmetrical eyes, bad lighting, deformed anatomy, overexposed, pixelated, cropped face, unrealistic proportions, watermark, text, logo
+Формат 9:16

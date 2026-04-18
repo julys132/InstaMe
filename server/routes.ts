@@ -2396,6 +2396,62 @@ async function generateOwnStyleImage(options: {
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
   const tracePrefix = getOwnStyleTracePrefix(options.debugTraceContext);
 
+  // For high_res mode, use Together as primary (explicit resolution control).
+  // For preview mode, use Gemini as primary with Together fallback.
+  if (options.generationMode === "high_res" && hasTogetherImageConfig()) {
+    try {
+      const { width, height } = resolveGenerationResolution(options.generationMode);
+      const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]!);
+      const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
+      const prompt = options.ownStyleMode === "reference_locked"
+        ? buildOwnStyleTogetherFallbackPrompt({
+            customPrompt: options.customPrompt,
+            preserveBackground: options.preserveBackground,
+          })
+        : buildOwnStyleCreativeTogetherFallbackPrompt({
+            analyzedStylePrompt: options.analyzedStylePrompt,
+            customPrompt: options.customPrompt,
+            preserveBackground: options.preserveBackground,
+          });
+
+      logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.high_res_request`, {
+        provider: "Together",
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        generationMode: options.generationMode,
+        width,
+        height,
+        uploadedImageCount: options.uploadedImages.length,
+        includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+      });
+
+      const imageBase64 = await generateTogetherImage({
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        referenceImages: options.ownStyleMode === "reference_locked" ? [userImageUrl, styleReferenceUrl] : [userImageUrl],
+        width,
+        height,
+        sourceWidth: options.uploadedImages[0]?.width,
+        sourceHeight: options.uploadedImages[0]?.height,
+      });
+
+      logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.high_res_response`, {
+        provider: "Together",
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        imageReturned: Boolean(imageBase64),
+      });
+
+      return {
+        imageBase64,
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        provider: "Together",
+      };
+    } catch (highResError: unknown) {
+      console.warn("Own Style high_res Together generation failed, falling back to Gemini:", highResError);
+    }
+  }
+
   try {
     const prompt = options.ownStyleMode === "reference_locked"
       ? buildOwnStyleReferenceLockedPrompt({
@@ -4814,7 +4870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const existingImages = normalizeStoredInstaMeUploadedImages(userBeforeTransform?.instameUploadedImages);
       const savedOwnStyles = existingImages.filter(
-        (entry) => entry.kind === "own_style" && Boolean(entry.analyzedPrompt),
+        (entry) => entry.kind === "own_style",
       );
       const selectedSavedOwnStyle = requestedSavedOwnStyleId
         ? savedOwnStyles.find((entry) => entry.id === requestedSavedOwnStyleId) || null
