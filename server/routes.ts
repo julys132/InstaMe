@@ -516,7 +516,7 @@ function normalizeGeneratedImageDimension(rawValue: string | undefined, fallback
 
 const INSTAME_HIGH_RES_OUTPUT_DIMENSION = normalizeGeneratedImageDimension(
   process.env.INSTAME_HIGH_RES_OUTPUT_DIMENSION,
-  1536,
+  1024,
 );
 
 const DEFAULT_IAP_PRODUCT_CREDITS: Record<string, number> = {
