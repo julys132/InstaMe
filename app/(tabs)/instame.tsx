@@ -423,7 +423,6 @@ export default function InstaMeScreen() {
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
   const [customPrompt, setCustomPrompt] = useState("");
   const [intensity, setIntensity] = useState<OptionalTransformIntensity>(null);
-  const [showFineTunePanel, setShowFineTunePanel] = useState(false);
   const [stylePresets, setStylePresets] = useState<InstaMeStylePreset[]>(INSTAME_STYLE_PRESETS);
   const [generationTiers, setGenerationTiers] = useState<PublicInstaMeGenerationTier[]>(INSTAME_GENERATION_TIERS);
   const [editTiers, setEditTiers] = useState<PublicInstaMeEditTier[]>(INSTAME_EDIT_TIERS);
@@ -634,10 +633,6 @@ export default function InstaMeScreen() {
     [editTiers, selectedEditTierId],
   );
 
-  const selectedIntensityOption = useMemo(
-    () => INTENSITY_OPTIONS.find((option) => option.value === intensity) || null,
-    [intensity],
-  );
   const uploadedImageIdParam = Array.isArray(params.uploadedImageId)
     ? params.uploadedImageId[0]
     : params.uploadedImageId;
@@ -1753,32 +1748,13 @@ export default function InstaMeScreen() {
       >
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
-            <View style={styles.headerCopy}>
-              <Text style={styles.headerEyebrow}>Chicoo</Text>
-              <Text style={styles.headerTitle}>{"Portrait\nStudio"}</Text>
+            <View style={styles.headerCopySolo}>
+              <Text style={styles.headerBrand}>Chicoo</Text>
+              <Text style={styles.headerTitle}>Portrait Studio</Text>
               <View style={styles.headerCreditsLine}>
                 <Text style={styles.headerCreditsCount}>{credits}</Text>
                 <Text style={styles.headerCreditsLabel}>Credits</Text>
               </View>
-            </View>
-
-            <View style={styles.headerPreviewShell}>
-              <Image
-                source={{
-                  uri:
-                    selectedStylePreset?.cover ||
-                    selectedStylePreset?.representativeImage ||
-                    mainOnlyStylePresets[0]?.cover ||
-                    mainOnlyStylePresets[0]?.representativeImage,
-                }}
-                style={styles.headerPreviewImage}
-                contentFit="cover"
-              />
-              <LinearGradient
-                colors={["rgba(255,146,196,0.10)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.45)"]}
-                locations={[0, 0.42, 1]}
-                style={styles.headerPreviewOverlay}
-              />
             </View>
           </View>
         </View>
@@ -2100,66 +2076,38 @@ export default function InstaMeScreen() {
                 ) : null}
               </View>
 
-              {/* Fine tune (collapsed) */}
-              <View style={styles.fineTuneDropdownWrap}>
-                <Pressable
-                  onPress={() => setShowFineTunePanel((prev) => !prev)}
-                  style={[styles.fineTuneDropdownTrigger, showFineTunePanel && styles.fineTuneDropdownTriggerActive]}
-                >
-                  <View style={styles.fineTuneDropdownHeaderText}>
-                    <Text style={styles.fineTuneDropdownTitle}>Fine tune</Text>
-                    <Text style={styles.fineTuneDropdownSummary}>
-                      {selectedIntensityOption
-                        ? `${selectedIntensityOption.label}`
-                        : "Default"}
-                    </Text>
+              <View style={styles.customChangesPanel}>
+                <View style={styles.customChangesHeader}>
+                  <Text style={styles.customChangesTitle}>Custom Changes</Text>
+                  <Text style={styles.customChangesSubtitle}>
+                    Write any extra changes you want over the preset.
+                  </Text>
+                </View>
+                <View style={styles.customChangesHintRow}>
+                  <View style={styles.customChangesHintChip}>
+                    <Text style={styles.customChangesHintChipText}>colors</Text>
                   </View>
-                  <Ionicons
-                    name={showFineTunePanel ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color={showFineTunePanel ? Colors.accentLight : Colors.textSecondary}
-                  />
-                </Pressable>
-                {showFineTunePanel ? (
-                  <View style={styles.fineTuneDropdownBody}>
-                    <Pressable
-                      onPress={() => { setIntensity(null); setShowFineTunePanel(false); }}
-                      style={[styles.fineTuneSkipCard, intensity === null && styles.fineTuneSkipCardActive]}
-                    >
-                      <View style={styles.fineTuneSkipTopRow}>
-                        <Text style={[styles.fineTuneSkipTitle, intensity === null && styles.fineTuneSkipTitleActive]}>No fine tune</Text>
-                        {intensity === null ? <Ionicons name="checkmark-circle" size={18} color={Colors.accent} /> : null}
-                      </View>
-                    </Pressable>
-                    <View style={styles.intensityRow}>
-                      {INTENSITY_OPTIONS.map((option) => (
-                        <Pressable
-                          key={option.value}
-                          onPress={() => { setIntensity(option.value); setShowFineTunePanel(false); }}
-                          style={[styles.chip, intensity === option.value && styles.chipActive]}
-                        >
-                          <Text style={[styles.chipLabel, intensity === option.value && styles.chipLabelActive]}>{option.label}</Text>
-                          <Text style={[styles.chipSubtitle, intensity === option.value && styles.chipSubtitleActive]}>{option.subtitle}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                    <Pressable
-                      onPress={() => setPreserveBackground((prev) => !prev)}
-                      style={[styles.toggle, preserveBackground && styles.toggleActive]}
-                    >
-                      <Ionicons name={preserveBackground ? "checkmark-circle" : "ellipse-outline"} size={18} color={preserveBackground ? Colors.accent : "#8E8E8E"} />
-                      <Text style={styles.toggleText}>Keep original background</Text>
-                    </Pressable>
-                    <TextInput
-                      value={customPrompt}
-                      onChangeText={setCustomPrompt}
-                      placeholder="Extra notes: colder shadows, softer makeup..."
-                      placeholderTextColor="#7A7A7A"
-                      multiline
-                      style={styles.promptInput}
-                    />
+                  <View style={styles.customChangesHintChip}>
+                    <Text style={styles.customChangesHintChipText}>clothes</Text>
                   </View>
-                ) : null}
+                  <View style={styles.customChangesHintChip}>
+                    <Text style={styles.customChangesHintChipText}>expression</Text>
+                  </View>
+                  <View style={styles.customChangesHintChip}>
+                    <Text style={styles.customChangesHintChipText}>hair</Text>
+                  </View>
+                </View>
+                <TextInput
+                  value={customPrompt}
+                  onChangeText={setCustomPrompt}
+                  placeholder="Example: make the outfit white, softer makeup, stronger smile, warmer pink tones, gold earrings."
+                  placeholderTextColor="rgba(255,255,255,0.34)"
+                  multiline
+                  style={styles.customChangesInput}
+                />
+                <Text style={styles.customChangesFootnote}>
+                  These notes are added over the generic preset styling.
+                </Text>
               </View>
             </>
           ) : null}
@@ -2339,41 +2287,24 @@ export default function InstaMeScreen() {
                 </View>
               ) : null}
 
-              {/* Fine tune (collapsed) – own style */}
-              <View style={styles.fineTuneDropdownWrap}>
-                <Pressable
-                  onPress={() => setShowFineTunePanel((prev) => !prev)}
-                  style={[styles.fineTuneDropdownTrigger, showFineTunePanel && styles.fineTuneDropdownTriggerActive]}
-                >
-                  <View style={styles.fineTuneDropdownHeaderText}>
-                    <Text style={styles.fineTuneDropdownTitle}>Fine tune</Text>
-                    <Text style={styles.fineTuneDropdownSummary}>Background & notes</Text>
-                  </View>
-                  <Ionicons
-                    name={showFineTunePanel ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color={showFineTunePanel ? Colors.accentLight : Colors.textSecondary}
-                  />
-                </Pressable>
-                {showFineTunePanel ? (
-                  <View style={styles.fineTuneDropdownBody}>
-                    <Pressable
-                      onPress={() => setPreserveBackground((prev) => !prev)}
-                      style={[styles.toggle, preserveBackground && styles.toggleActive]}
-                    >
-                      <Ionicons name={preserveBackground ? "checkmark-circle" : "ellipse-outline"} size={18} color={preserveBackground ? Colors.accent : "#8E8E8E"} />
-                      <Text style={styles.toggleText}>Keep original background</Text>
-                    </Pressable>
-                    <TextInput
-                      value={customPrompt}
-                      onChangeText={setCustomPrompt}
-                      placeholder="Extra notes: colder shadows, softer makeup..."
-                      placeholderTextColor="#7A7A7A"
-                      multiline
-                      style={styles.promptInput}
-                    />
-                  </View>
-                ) : null}
+              <View style={styles.customChangesPanel}>
+                <View style={styles.customChangesHeader}>
+                  <Text style={styles.customChangesTitle}>Custom Changes</Text>
+                  <Text style={styles.customChangesSubtitle}>
+                    Add any clothing, color or expression notes for this own style.
+                  </Text>
+                </View>
+                <TextInput
+                  value={customPrompt}
+                  onChangeText={setCustomPrompt}
+                  placeholder="Example: keep the same pose, white blazer, cleaner background, softer smile."
+                  placeholderTextColor="rgba(255,255,255,0.34)"
+                  multiline
+                  style={styles.customChangesInput}
+                />
+                <Text style={styles.customChangesFootnote}>
+                  Your notes guide the final result on top of the selected own style.
+                </Text>
               </View>
             </View>
           ) : null}
@@ -2421,41 +2352,24 @@ export default function InstaMeScreen() {
                 Art finish: <Text style={styles.selectedStyleAccent}>{selectedArtStyle?.label || "None"}</Text>
               </Text>
 
-              {/* Fine tune (collapsed) – art style */}
-              <View style={styles.fineTuneDropdownWrap}>
-                <Pressable
-                  onPress={() => setShowFineTunePanel((prev) => !prev)}
-                  style={[styles.fineTuneDropdownTrigger, showFineTunePanel && styles.fineTuneDropdownTriggerActive]}
-                >
-                  <View style={styles.fineTuneDropdownHeaderText}>
-                    <Text style={styles.fineTuneDropdownTitle}>Fine tune</Text>
-                    <Text style={styles.fineTuneDropdownSummary}>Background & notes</Text>
-                  </View>
-                  <Ionicons
-                    name={showFineTunePanel ? "chevron-up" : "chevron-down"}
-                    size={18}
-                    color={showFineTunePanel ? Colors.accentLight : Colors.textSecondary}
-                  />
-                </Pressable>
-                {showFineTunePanel ? (
-                  <View style={styles.fineTuneDropdownBody}>
-                    <Pressable
-                      onPress={() => setPreserveBackground((prev) => !prev)}
-                      style={[styles.toggle, preserveBackground && styles.toggleActive]}
-                    >
-                      <Ionicons name={preserveBackground ? "checkmark-circle" : "ellipse-outline"} size={18} color={preserveBackground ? Colors.accent : "#8E8E8E"} />
-                      <Text style={styles.toggleText}>Keep original background</Text>
-                    </Pressable>
-                    <TextInput
-                      value={customPrompt}
-                      onChangeText={setCustomPrompt}
-                      placeholder="Extra notes: colder shadows, softer makeup..."
-                      placeholderTextColor="#7A7A7A"
-                      multiline
-                      style={styles.promptInput}
-                    />
-                  </View>
-                ) : null}
+              <View style={styles.customChangesPanel}>
+                <View style={styles.customChangesHeader}>
+                  <Text style={styles.customChangesTitle}>Custom Changes</Text>
+                  <Text style={styles.customChangesSubtitle}>
+                    Add optional notes if you want this art finish to lean a certain way.
+                  </Text>
+                </View>
+                <TextInput
+                  value={customPrompt}
+                  onChangeText={setCustomPrompt}
+                  placeholder="Example: more pastel colors, brighter skin, softer facial expression, longer hair."
+                  placeholderTextColor="rgba(255,255,255,0.34)"
+                  multiline
+                  style={styles.customChangesInput}
+                />
+                <Text style={styles.customChangesFootnote}>
+                  Leave it empty if you want only the default preset + art style behavior.
+                </Text>
               </View>
             </View>
           ) : null}
@@ -2776,24 +2690,30 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, gap: 6, marginBottom: 10 },
   headerTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "flex-start",
-    gap: 16,
+    justifyContent: "flex-start",
   },
-  headerCopy: {
+  headerCopySolo: {
     flex: 1,
-    paddingTop: 2,
+    paddingTop: 4,
   },
-  headerEyebrow: {
+  headerBrand: {
     color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
     letterSpacing: 0,
     textTransform: "none",
-    fontSize: 17,
+    fontSize: 28,
+    lineHeight: 32,
   },
-  headerTitle: { color: "#FFF", fontFamily: "PlayfairDisplay_700Bold", fontSize: 30, lineHeight: 30, marginTop: 12 },
+  headerTitle: {
+    color: "rgba(255,255,255,0.92)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 18,
+    lineHeight: 22,
+    marginTop: 6,
+  },
   headerCreditsLine: {
-    marginTop: 14,
+    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
@@ -2809,29 +2729,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 17,
     lineHeight: 22,
-  },
-  headerPreviewShell: {
-    width: 98,
-    height: 98,
-    borderRadius: 24,
-    padding: 2,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(255,178,212,0.22)",
-    shadowColor: "#FF76AA",
-    shadowOpacity: 0.24,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
-  },
-  headerPreviewImage: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 22,
-  },
-  headerPreviewOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 24,
   },
   libraryHint: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
   libraryHintMuted: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 11 },
@@ -3972,66 +3869,67 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  fineTuneSkipCard: {
-    borderRadius: Colors.radiusMd,
+  customChangesPanel: {
+    marginTop: 12,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
-    backgroundColor: Colors.surfaceFaint,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 8,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(24,27,34,0.88)",
+    padding: 14,
+    gap: 12,
   },
-  fineTuneSkipCardActive: {
-    borderColor: "rgba(255,79,125,0.50)",
-    backgroundColor: "rgba(255,79,125,0.10)",
+  customChangesHeader: {
+    gap: 4,
   },
-  fineTuneSkipTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  fineTuneSkipTitle: {
+  customChangesTitle: {
     color: "#FFF",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
   },
-  fineTuneSkipTitleActive: {
-    color: Colors.accentLight,
-  },
-  fineTuneSkipText: {
-    color: Colors.textMuted,
+  customChangesSubtitle: {
+    color: "rgba(255,255,255,0.68)",
     fontFamily: "Inter_400Regular",
     fontSize: 12,
-    lineHeight: 17,
+    lineHeight: 18,
   },
-  fineTuneSkipTextActive: {
-    color: Colors.accentSoft,
+  customChangesHintRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
-  intensityRow: { gap: 8 },
-  chip: {
-    borderRadius: Colors.radiusMd,
+  customChangesHintChip: {
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
-    backgroundColor: Colors.surfaceFaint,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 2,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  chipActive: {
-    borderColor: "rgba(255,79,125,0.50)",
-    backgroundColor: "rgba(255,79,125,0.14)",
+  customChangesHintChipText: {
+    color: Colors.accentSoft,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    textTransform: "lowercase",
   },
-  chipLabel: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 12 },
-  chipLabelActive: { color: Colors.accentLight },
-  chipSubtitle: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 12 },
-  chipSubtitleActive: { color: Colors.accentSoft },
-  chipDetails: {
-    color: Colors.textMuted,
+  customChangesInput: {
+    minHeight: 118,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(10,12,16,0.72)",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    color: "#FFF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: "top",
+  },
+  customChangesFootnote: {
+    color: "rgba(255,255,255,0.46)",
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     lineHeight: 16,
-    marginTop: 2,
   },
   chipDetailsActive: {
     color: Colors.accentPale,
