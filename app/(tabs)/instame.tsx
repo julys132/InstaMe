@@ -2387,20 +2387,9 @@ export default function InstaMeScreen() {
                     onPress={() => setSelectedGenerationTierId(tier.id)}
                     style={[styles.pricingCard, isSelected && styles.pricingCardActive]}
                   >
-                    <View style={styles.pricingTopRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.pricingLabel}>{tier.label}</Text>
-                        <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
-                      </View>
-                      {tier.badge ? (
-                        <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
-                          <Text style={styles.pricingBadgeText}>{tier.badge}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <View style={styles.pricingMetaRow}>
-                      <Text style={styles.pricingCredits}>{tierCost} credits</Text>
-                    </View>
+                    <Text style={styles.pricingLabel}>{tier.label}</Text>
+                    <Text style={styles.pricingSubtitle}>{tier.output}</Text>
+                    <Text style={styles.pricingCredits}>{tierCost} credits</Text>
                   </Pressable>
                 );
               })}
@@ -3691,24 +3680,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   pricingCardsRow: {
-    flexDirection: "column",
+    flexDirection: "row",
     alignItems: "stretch",
-    gap: 10,
+    gap: 8,
   },
   pricingCardsStacked: {
     flexDirection: "column",
   },
   pricingCard: {
-    flex: 0,
+    flex: 1,
     borderRadius: Colors.radiusMd,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
     backgroundColor: Colors.surfaceFaint,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     minHeight: 0,
     justifyContent: "space-between",
-    gap: 8,
+    gap: 4,
   },
   pricingCardStacked: {
     flex: 0,
@@ -3881,13 +3870,13 @@ const styles = StyleSheet.create({
     textTransform: "lowercase",
   },
   customChangesInput: {
-    minHeight: 118,
-    borderRadius: 18,
+    minHeight: 44,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(10,12,16,0.72)",
     paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingVertical: 12,
     color: "#FFF",
     fontFamily: "Inter_400Regular",
     fontSize: 14,
@@ -3937,17 +3926,17 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     overflow: "hidden",
     shadowColor: "#FF4F7D",
-    shadowOpacity: 0.6,
-    shadowRadius: 24,
+    shadowOpacity: 0.85,
+    shadowRadius: 40,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 12,
+    elevation: 16,
   },
   generateButtonInner: {
     flex: 1,
     borderRadius: 28,
     borderWidth: 1.5,
-    borderColor: "rgba(255,127,177,0.7)",
-    backgroundColor: "rgba(20,14,24,0.85)",
+    borderColor: "rgba(255,127,177,0.85)",
+    backgroundColor: "rgba(20,14,24,0.82)",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
