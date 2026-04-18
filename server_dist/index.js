@@ -1431,19 +1431,7 @@ var MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 var MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 22e4;
 var MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8e3;
 var STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
-function normalizeGeneratedImageDimension(rawValue, fallback) {
-  const parsed = Number.parseInt((rawValue || "").trim(), 10);
-  if (!Number.isFinite(parsed) || parsed < 1024) {
-    return fallback;
-  }
-  const clamped = Math.min(parsed, 2048);
-  const snapped = Math.round(clamped / 64) * 64;
-  return Math.max(1024, snapped);
-}
-var INSTAME_HIGH_RES_OUTPUT_DIMENSION = normalizeGeneratedImageDimension(
-  process.env.INSTAME_HIGH_RES_OUTPUT_DIMENSION,
-  1536
-);
+var INSTAME_HIGH_RES_OUTPUT_DIMENSION = 1024;
 var DEFAULT_IAP_PRODUCT_CREDITS = {
   "com.instame.app.credits.5": 5,
   "com.instame.app.credits.15": 15,
@@ -2744,6 +2732,53 @@ function buildOwnStyleTogetherFallbackPrompt(options) {
 }
 async function generateOwnStyleImage(options) {
   const tracePrefix = getOwnStyleTracePrefix(options.debugTraceContext);
+  if (options.generationMode === "high_res" && hasTogetherImageConfig()) {
+    try {
+      const { width, height } = resolveGenerationResolution(options.generationMode);
+      const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
+      const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
+      const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleTogetherFallbackPrompt({
+        customPrompt: options.customPrompt,
+        preserveBackground: options.preserveBackground
+      }) : buildOwnStyleCreativeTogetherFallbackPrompt({
+        analyzedStylePrompt: options.analyzedStylePrompt,
+        customPrompt: options.customPrompt,
+        preserveBackground: options.preserveBackground
+      });
+      logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.high_res_request`, {
+        provider: "Together",
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        generationMode: options.generationMode,
+        width,
+        height,
+        uploadedImageCount: options.uploadedImages.length,
+        includesStyleReferenceImage: options.ownStyleMode === "reference_locked"
+      });
+      const imageBase64 = await generateTogetherImage({
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        referenceImages: options.ownStyleMode === "reference_locked" ? [userImageUrl, styleReferenceUrl] : [userImageUrl],
+        width,
+        height,
+        sourceWidth: options.uploadedImages[0]?.width,
+        sourceHeight: options.uploadedImages[0]?.height
+      });
+      logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.high_res_response`, {
+        provider: "Together",
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        imageReturned: Boolean(imageBase64)
+      });
+      return {
+        imageBase64,
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        provider: "Together"
+      };
+    } catch (highResError) {
+      console.warn("Own Style high_res Together generation failed, falling back to Gemini:", highResError);
+    }
+  }
   try {
     const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleReferenceLockedPrompt({
       customPrompt: options.customPrompt,
@@ -4579,7 +4614,7 @@ async function registerRoutes(app2) {
       }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       const existingImages = normalizeStoredInstaMeUploadedImages(userBeforeTransform?.instameUploadedImages);
       const savedOwnStyles = existingImages.filter(
-        (entry) => entry.kind === "own_style" && Boolean(entry.analyzedPrompt)
+        (entry) => entry.kind === "own_style"
       );
       const selectedSavedOwnStyle = requestedSavedOwnStyleId ? savedOwnStyles.find((entry) => entry.id === requestedSavedOwnStyleId) || null : null;
       if (requestedSavedOwnStyleId && !selectedSavedOwnStyle) {

@@ -503,21 +503,7 @@ const MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 220_000;
 const MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8_000;
 const STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 
-function normalizeGeneratedImageDimension(rawValue: string | undefined, fallback: number): number {
-  const parsed = Number.parseInt((rawValue || "").trim(), 10);
-  if (!Number.isFinite(parsed) || parsed < 1024) {
-    return fallback;
-  }
-
-  const clamped = Math.min(parsed, 2048);
-  const snapped = Math.round(clamped / 64) * 64;
-  return Math.max(1024, snapped);
-}
-
-const INSTAME_HIGH_RES_OUTPUT_DIMENSION = normalizeGeneratedImageDimension(
-  process.env.INSTAME_HIGH_RES_OUTPUT_DIMENSION,
-  1024,
-);
+const INSTAME_HIGH_RES_OUTPUT_DIMENSION = 1024;
 
 const DEFAULT_IAP_PRODUCT_CREDITS: Record<string, number> = {
   "com.instame.app.credits.5": 5,

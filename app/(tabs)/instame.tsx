@@ -1731,7 +1731,20 @@ export default function InstaMeScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#080608", "#0C0A0E", "#080808"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={["#0E1219", "#171C24", "#0B0E14"]} locations={[0, 0.45, 1]} style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={["rgba(255,93,159,0.34)", "rgba(255,93,159,0.14)", "rgba(255,93,159,0)"]}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0.15, y: 0.85 }}
+        style={styles.backgroundGlowTopRight}
+      />
+      <LinearGradient
+        colors={["rgba(255,255,255,0.18)", "rgba(125,134,148,0.08)", "rgba(0,0,0,0)"]}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.backgroundGlowBottomLeft}
+      />
+      <View style={styles.backgroundVignette} />
 
       <ScrollView
         ref={mainScrollRef}
@@ -1739,11 +1752,34 @@ export default function InstaMeScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 14, paddingBottom: 120 }}
       >
         <View style={styles.header}>
-          <Text style={styles.headerEyebrow}>Chicoo</Text>
-          <Text style={styles.headerTitle}>Portrait Studio</Text>
-          <View style={styles.creditBadge}>
-            <Ionicons name="sparkles" size={14} color={Colors.accent} />
-            <Text style={styles.creditText}>{credits} credits</Text>
+          <View style={styles.headerTopRow}>
+            <View style={styles.headerCopy}>
+              <Text style={styles.headerEyebrow}>Chicoo</Text>
+              <Text style={styles.headerTitle}>{"Portrait\nStudio"}</Text>
+              <View style={styles.headerCreditsLine}>
+                <Text style={styles.headerCreditsCount}>{credits}</Text>
+                <Text style={styles.headerCreditsLabel}>Credits</Text>
+              </View>
+            </View>
+
+            <View style={styles.headerPreviewShell}>
+              <Image
+                source={{
+                  uri:
+                    selectedStylePreset?.cover ||
+                    selectedStylePreset?.representativeImage ||
+                    mainOnlyStylePresets[0]?.cover ||
+                    mainOnlyStylePresets[0]?.representativeImage,
+                }}
+                style={styles.headerPreviewImage}
+                contentFit="cover"
+              />
+              <LinearGradient
+                colors={["rgba(255,146,196,0.10)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.45)"]}
+                locations={[0, 0.42, 1]}
+                style={styles.headerPreviewOverlay}
+              />
+            </View>
           </View>
         </View>
 
@@ -1834,12 +1870,26 @@ export default function InstaMeScreen() {
             ]}
           >
             {portraitEnhanceLoading ? (
-              <ActivityIndicator color="#000" />
+              <ActivityIndicator color="#FFF" />
             ) : (
               <>
-                <Ionicons name="sparkles-outline" size={18} color="#000" />
-                <Text style={styles.enhanceButtonText}>Enhance portrait (recommended)</Text>
-                <Text style={styles.enhanceButtonCost}>{portraitEnhanceCost} credits</Text>
+                <View style={styles.enhanceButtonIconWrap}>
+                  <LinearGradient
+                    colors={["#FF7BAF", "#FF5D90", "#FF4F7D"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.enhanceButtonIconFill}
+                  >
+                    <Ionicons name="sparkles-outline" size={18} color="#FFF" />
+                  </LinearGradient>
+                </View>
+                <View style={styles.enhanceButtonCopy}>
+                  <Text style={styles.enhanceButtonText}>Enhance Portrait</Text>
+                  <Text style={styles.enhanceButtonSubtitle}>(Recommended)</Text>
+                </View>
+                <View style={styles.enhanceButtonTrailing}>
+                  <Ionicons name="add" size={22} color="rgba(255,255,255,0.92)" />
+                </View>
               </>
             )}
           </Pressable>
@@ -2473,13 +2523,23 @@ export default function InstaMeScreen() {
             ]}
           >
             {loading ? (
-              <ActivityIndicator color="#000" />
+              <LinearGradient
+                colors={["#FF7FB1", "#FF6698", "#FF4F7D"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.generateButtonInner}
+              >
+                <ActivityIndicator color="#FFF" />
+              </LinearGradient>
             ) : (
-              <>
-                <Ionicons name="sparkles" size={18} color="#000" />
-                <Text style={styles.generateButtonText}>Transform now</Text>
-                <Text style={styles.costText}>{transformCost} credits</Text>
-              </>
+              <LinearGradient
+                colors={["#FF7FB1", "#FF6698", "#FF4F7D"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.generateButtonInner}
+              >
+                <Text style={styles.generateButtonText}>Transform Now</Text>
+              </LinearGradient>
             )}
           </Pressable>
           {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
@@ -2600,13 +2660,25 @@ export default function InstaMeScreen() {
                   ]}
                 >
                   {editLoading ? (
-                    <ActivityIndicator color="#000" />
+                    <LinearGradient
+                      colors={["#FF7FB1", "#FF6698", "#FF4F7D"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.generateButtonInner}
+                    >
+                      <ActivityIndicator color="#FFF" />
+                    </LinearGradient>
                   ) : (
-                    <>
-                      <Ionicons name="create-outline" size={18} color="#000" />
-                      <Text style={styles.generateButtonText}>Apply edit</Text>
+                    <LinearGradient
+                      colors={["#FF7FB1", "#FF6698", "#FF4F7D"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.generateButtonInner}
+                    >
+                      <Ionicons name="create-outline" size={18} color="#FFF" />
+                      <Text style={styles.generateButtonText}>Apply Edit</Text>
                       <Text style={styles.costText}>{selectedEditTier?.credits ?? 0} credits</Text>
-                    </>
+                    </LinearGradient>
                   )}
                 </Pressable>
                 {editLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
@@ -2679,34 +2751,88 @@ export default function InstaMeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  header: { paddingHorizontal: 16, gap: 6, marginBottom: 12 },
-  headerEyebrow: {
-    color: Colors.accent,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-    fontSize: 12,
+  backgroundGlowTopRight: {
+    position: "absolute",
+    top: -64,
+    right: -44,
+    width: 260,
+    height: 320,
+    borderRadius: 160,
+    transform: [{ rotate: "-14deg" }],
   },
-  headerTitle: { color: "#FFF", fontFamily: "PlayfairDisplay_700Bold", fontSize: 28, lineHeight: 34 },
-  creditBadge: {
-    marginTop: 6,
-    alignSelf: "flex-start",
+  backgroundGlowBottomLeft: {
+    position: "absolute",
+    left: -90,
+    bottom: 28,
+    width: 250,
+    height: 220,
+    borderRadius: 140,
+    transform: [{ rotate: "18deg" }],
+  },
+  backgroundVignette: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.14)",
+  },
+  header: { paddingHorizontal: 16, gap: 6, marginBottom: 10 },
+  headerTopRow: {
     flexDirection: "row",
-    gap: 8,
-    alignItems: "center",
-    backgroundColor: "rgba(255,79,125,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.24)",
-    borderRadius: Colors.radiusFull,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    shadowColor: Colors.accent,
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
   },
-  creditText: { color: Colors.accentSoft, fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  headerCopy: {
+    flex: 1,
+    paddingTop: 2,
+  },
+  headerEyebrow: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0,
+    textTransform: "none",
+    fontSize: 17,
+  },
+  headerTitle: { color: "#FFF", fontFamily: "PlayfairDisplay_700Bold", fontSize: 30, lineHeight: 30, marginTop: 12 },
+  headerCreditsLine: {
+    marginTop: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  headerCreditsCount: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  headerCreditsLabel: {
+    color: "rgba(255,255,255,0.92)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 17,
+    lineHeight: 22,
+  },
+  headerPreviewShell: {
+    width: 98,
+    height: 98,
+    borderRadius: 24,
+    padding: 2,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,178,212,0.22)",
+    shadowColor: "#FF76AA",
+    shadowOpacity: 0.24,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  headerPreviewImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 22,
+  },
+  headerPreviewOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+  },
   libraryHint: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
   libraryHintMuted: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 11 },
   card: {
@@ -2868,29 +2994,62 @@ const styles = StyleSheet.create({
   },
   enhanceButton: {
     marginTop: 12,
-    minHeight: 48,
-    borderRadius: Colors.radiusMd,
-    backgroundColor: Colors.accent,
+    minHeight: 92,
+    borderRadius: 28,
+    backgroundColor: "rgba(38,41,48,0.82)",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
+    gap: 14,
     shadowColor: Colors.accent,
-    shadowOpacity: 0.45,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 10,
+    shadowOpacity: 0.42,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,130,175,0.6)",
+    borderColor: "rgba(255,118,177,0.72)",
   },
   enhanceButtonDisabled: {
     opacity: 0.55,
     shadowOpacity: 0,
   },
+  enhanceButtonIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    overflow: "hidden",
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.32,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  enhanceButtonIconFill: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  enhanceButtonCopy: {
+    flex: 1,
+    gap: 2,
+  },
   enhanceButtonText: {
-    color: "#000",
+    color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  enhanceButtonSubtitle: {
+    color: "rgba(255,255,255,0.76)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  enhanceButtonTrailing: {
+    width: 34,
+    alignItems: "center",
+    justifyContent: "center",
   },
   enhanceButtonCost: {
     color: "#111",
@@ -3908,31 +4067,36 @@ const styles = StyleSheet.create({
   generateButton: {
     marginTop: 4,
     height: 56,
-    borderRadius: Colors.radiusMd,
-    backgroundColor: Colors.accent,
+    borderRadius: 28,
+    overflow: "hidden",
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+  },
+  generateButtonInner: {
+    flex: 1,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,204,222,0.42)",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 8,
-    shadowColor: Colors.accent,
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,130,175,0.6)",
+    gap: 10,
+    paddingHorizontal: 16,
   },
   generateButtonDisabled: {
     opacity: 0.5,
     shadowOpacity: 0,
   },
-  generateButtonText: { color: "#000", fontFamily: "Inter_600SemiBold", fontSize: 16 },
+  generateButtonText: { color: "#FFF", fontFamily: "Inter_700Bold", fontSize: 16 },
   costText: {
     marginLeft: 4,
-    color: "#111",
-    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.95)",
+    fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    backgroundColor: "rgba(0,0,0,0.12)",
+    backgroundColor: "rgba(255,255,255,0.16)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: Colors.radiusSm,
