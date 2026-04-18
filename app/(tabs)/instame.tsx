@@ -1731,7 +1731,7 @@ export default function InstaMeScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#050505", "#0A080A", "#080808"]} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={["#080608", "#0C0A0E", "#080808"]} style={StyleSheet.absoluteFill} />
 
       <ScrollView
         ref={mainScrollRef}
@@ -1747,13 +1747,12 @@ export default function InstaMeScreen() {
           </View>
         </View>
 
-        <View style={styles.card}>
-          {/* ── Section tab bar (moved above upload) ── */}
+        <View style={styles.sectionTabBarOuter}>
           <View style={styles.sectionTabBar}>
             {([
-              { key: "main" as const, label: "Main Styles" },
-              { key: "own" as const, label: "Own Styles" },
-              { key: "art" as const, label: "Art Styles" },
+              { key: "main" as const, label: "Main Styles", icon: "sparkles" as const },
+              { key: "own" as const, label: "Own Styles", icon: "person-outline" as const },
+              { key: "art" as const, label: "Art Styles", icon: "color-palette-outline" as const },
             ]).map((tab) => {
               const active = styleSectionTab === tab.key;
               return (
@@ -1767,7 +1766,11 @@ export default function InstaMeScreen() {
                   }}
                   style={[styles.sectionTab, active && styles.sectionTabActive]}
                 >
-                  <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>{tab.label}</Text>
+                  <View style={styles.sectionTabContent}>
+                    <Ionicons name={tab.icon} size={16} color={active ? Colors.accent : Colors.textMuted} />
+                    <Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>{tab.label}</Text>
+                  </View>
+                  {active ? <View style={styles.sectionTabIndicator} /> : null}
                 </Pressable>
               );
             })}
@@ -2684,55 +2687,78 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     fontSize: 12,
   },
-  headerTitle: { color: "#FFF", fontFamily: "PlayfairDisplay_700Bold", fontSize: 24, lineHeight: 30 },
+  headerTitle: { color: "#FFF", fontFamily: "PlayfairDisplay_700Bold", fontSize: 28, lineHeight: 34 },
   creditBadge: {
-    marginTop: 4,
+    marginTop: 6,
     alignSelf: "flex-start",
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
-    backgroundColor: "rgba(255,79,125,0.14)",
+    backgroundColor: "rgba(255,79,125,0.10)",
     borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.30)",
+    borderColor: "rgba(255,79,125,0.24)",
     borderRadius: Colors.radiusFull,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
   },
-  creditText: { color: Colors.accentSoft, fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  creditText: { color: Colors.accentSoft, fontFamily: "Inter_600SemiBold", fontSize: 13 },
   libraryHint: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
   libraryHintMuted: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 11 },
   card: {
     marginHorizontal: 16,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: Colors.borderSubtle,
-    borderRadius: Colors.radiusMd,
-    backgroundColor: Colors.card,
-    padding: 12,
+    borderColor: "rgba(255,255,255,0.06)",
+    borderRadius: Colors.radiusLg,
+    backgroundColor: "rgba(18,18,22,0.92)",
+    padding: 14,
     gap: 12,
   },
   cardTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 16 },
+  sectionTabBarOuter: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
   sectionTabBar: {
     flexDirection: "row",
-    borderRadius: Colors.radiusMd,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    padding: 3,
-    gap: 2,
+    gap: 0,
   },
   sectionTab: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: Colors.radiusSm,
+    paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
   },
-  sectionTabActive: {
-    backgroundColor: "rgba(255,79,125,0.18)",
-    borderWidth: 1,
-    borderColor: "rgba(255,79,125,0.32)",
+  sectionTabActive: {},
+  sectionTabContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  sectionTabIndicator: {
+    position: "absolute",
+    bottom: 0,
+    left: 16,
+    right: 16,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: Colors.accent,
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
   },
   sectionTabText: {
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     fontFamily: "Inter_500Medium",
     fontSize: 13,
   },
@@ -2785,13 +2811,18 @@ const styles = StyleSheet.create({
   uploadThumbBox: {
     flex: 1,
     aspectRatio: 1,
-    borderRadius: Colors.radiusMd,
+    borderRadius: Colors.radiusLg,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: Colors.borderLight,
-    backgroundColor: Colors.surfaceFaint,
+    borderColor: "rgba(255,79,125,0.28)",
+    backgroundColor: "rgba(18,18,22,0.6)",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   uploadThumbImage: {
     width: "100%",
@@ -2844,9 +2875,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,130,175,0.6)",
   },
   enhanceButtonDisabled: {
     opacity: 0.55,
+    shadowOpacity: 0,
   },
   enhanceButtonText: {
     color: "#000",
@@ -3875,9 +3914,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.5,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,130,175,0.6)",
   },
   generateButtonDisabled: {
     opacity: 0.5,
+    shadowOpacity: 0,
   },
   generateButtonText: { color: "#000", fontFamily: "Inter_600SemiBold", fontSize: 16 },
   costText: {
