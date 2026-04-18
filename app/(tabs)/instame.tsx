@@ -1750,10 +1750,10 @@ export default function InstaMeScreen() {
             <View style={styles.headerCopySolo}>
               <Text style={styles.headerBrand}>Chicoo</Text>
               <Text style={styles.headerTitle}>Portrait Studio</Text>
-              <View style={styles.headerCreditsLine}>
-                <Text style={styles.headerCreditsCount}>{credits}</Text>
-                <Text style={styles.headerCreditsLabel}>Credits</Text>
-              </View>
+            </View>
+            <View style={styles.headerCreditsLine}>
+              <Text style={styles.headerCreditsCount}>{credits}</Text>
+              <Text style={styles.headerCreditsLabel}>Credits</Text>
             </View>
           </View>
         </View>
@@ -2649,7 +2649,7 @@ const styles = StyleSheet.create({
   headerTopRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
   },
   headerCopySolo: {
     flex: 1,
@@ -2658,35 +2658,43 @@ const styles = StyleSheet.create({
   headerBrand: {
     color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
-    letterSpacing: 0,
-    textTransform: "none",
-    fontSize: 28,
-    lineHeight: 32,
+    letterSpacing: 3,
+    textTransform: "uppercase",
+    fontSize: 30,
+    lineHeight: 34,
   },
   headerTitle: {
-    color: "rgba(255,255,255,0.92)",
-    fontFamily: "Inter_500Medium",
-    fontSize: 18,
-    lineHeight: 22,
-    marginTop: 6,
+    color: "rgba(255,255,255,0.5)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+    letterSpacing: 2,
+    textTransform: "uppercase",
+    marginTop: 4,
   },
   headerCreditsLine: {
-    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
+    paddingTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
   headerCreditsCount: {
     color: Colors.accentLight,
     fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 18,
   },
   headerCreditsLabel: {
-    color: "rgba(255,255,255,0.92)",
+    color: "rgba(255,255,255,0.65)",
     fontFamily: "Inter_500Medium",
-    fontSize: 17,
-    lineHeight: 22,
+    fontSize: 12,
+    lineHeight: 18,
   },
   libraryHint: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
   libraryHintMuted: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 11 },
