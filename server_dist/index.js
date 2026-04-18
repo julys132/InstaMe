@@ -303,15 +303,37 @@ function toPublicInstaMePortraitEnhanceTier(tier) {
 var INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS = 1;
 var INSTAME_GENERATION_TIERS = [
   {
-    id: "high_res",
-    label: "Best",
-    subtitle: "High-fidelity portrait generation",
-    credits: getInstaMeCreditsForQualityTier("premium"),
+    id: "good",
+    label: "Good",
+    subtitle: "Fast result at 1K resolution",
+    credits: 2,
     qualityTier: "premium",
     provider: "Together",
     model: "FLUX.2 Pro",
-    output: "High native resolution",
-    badge: "Included",
+    output: "1K resolution",
+    badge: "Default",
+    availability: "live"
+  },
+  {
+    id: "best",
+    label: "Best",
+    subtitle: "High-quality result at 2K resolution",
+    credits: 4,
+    qualityTier: "pro",
+    provider: "Together",
+    model: "FLUX.2 Pro",
+    output: "2K resolution",
+    availability: "live"
+  },
+  {
+    id: "excellent",
+    label: "Excellent",
+    subtitle: "Maximum quality at 4K resolution",
+    credits: 6,
+    qualityTier: "pro",
+    provider: "Together",
+    model: "FLUX.2 Pro",
+    output: "4K resolution",
     availability: "live"
   }
 ];
@@ -1760,14 +1782,13 @@ function toRuntimeAssetUrl(req, image) {
   return `${origin}/api/instame/runtime-image/${encodeURIComponent(runtimeAsset.token)}`;
 }
 function resolveGenerationResolution(generationTierId) {
-  if (generationTierId === "high_res") {
-    return {
-      width: INSTAME_HIGH_RES_OUTPUT_DIMENSION,
-      height: INSTAME_HIGH_RES_OUTPUT_DIMENSION,
-      sizeLabel: `${INSTAME_HIGH_RES_OUTPUT_DIMENSION}x${INSTAME_HIGH_RES_OUTPUT_DIMENSION}`
-    };
+  if (generationTierId === "excellent") {
+    return { width: 3072, height: 3072, sizeLabel: "3072x3072" };
   }
-  return { width: 512, height: 512, sizeLabel: "512x512" };
+  if (generationTierId === "best") {
+    return { width: 1536, height: 1536, sizeLabel: "1536x1536" };
+  }
+  return { width: INSTAME_HIGH_RES_OUTPUT_DIMENSION, height: INSTAME_HIGH_RES_OUTPUT_DIMENSION, sizeLabel: `${INSTAME_HIGH_RES_OUTPUT_DIMENSION}x${INSTAME_HIGH_RES_OUTPUT_DIMENSION}` };
 }
 function resolveOpenAiSize(generationTierId) {
   return "1024x1024";
@@ -2253,7 +2274,7 @@ function buildOldMoneyTransformPrompt(options) {
     dramatic: "high-impact old money editorial, cinematic light, statement tailoring, maximal luxury details"
   };
   const backgroundRule = options.preserveBackground ? "Keep the original background recognizable and natural." : "You may refine the background with elegant, neutral old-money ambiance.";
-  const userPrompt = options.customPrompt ? `User custom direction: ${options.customPrompt}` : "No extra user direction.";
+  const hasUserDirection = Boolean(options.customPrompt && options.customPrompt.trim());
   const stylePresetLine = options.stylePresetLabel ? `Selected style preset: ${options.stylePresetLabel}.` : "No explicit style preset selected.";
   const stylePresetHintLine = options.stylePresetPromptHint ? `Preset guidance: ${options.stylePresetPromptHint}.` : "No extra preset guidance.";
   const styleReferenceContext = buildStyleReferenceContext(options.styleReferences);
@@ -2278,12 +2299,16 @@ function buildOldMoneyTransformPrompt(options) {
     backgroundRule,
     "Internal style-board descriptors:",
     ...styleReferenceContext,
-    userPrompt,
-    `Output one photorealistic image, ${options.sizeLabel || STYLE_IMAGE_SIZE}, with coherent light and color grading.`
+    `Output one photorealistic image, ${options.sizeLabel || STYLE_IMAGE_SIZE}, with coherent light and color grading.`,
+    ...hasUserDirection ? [
+      "",
+      "IMPORTANT \u2014 The user has requested the following specific changes. These take PRIORITY over the preset styling above. Apply them to the final result even if they contradict parts of the preset:",
+      options.customPrompt.trim()
+    ] : []
   ].join("\n");
 }
 function buildPromptOnlyPresetTransformPrompt(options) {
-  const extraUserDirection = options.customPrompt ? `Extra user direction: ${options.customPrompt}.` : "No extra user direction.";
+  const hasUserDirection = Boolean(options.customPrompt && options.customPrompt.trim());
   return [
     `Use the uploaded face photo as the only visual identity source for the ${options.presetLabel} transformation.`,
     "Preserve the exact facial identity, skin tone, facial structure, and the original hair color of the uploaded subject.",
@@ -2292,9 +2317,13 @@ function buildPromptOnlyPresetTransformPrompt(options) {
     "Hair guidance: you may adapt styling structure only if the prompt asks for it, but never recolor the subject's hair.",
     "Wardrobe guidance: only make tasteful, realistic outfit changes.",
     options.preserveBackground ? "Keep the original environment recognizable unless the prompt strongly requires a different scene." : "You may adapt the environment to match the prompt more closely.",
-    extraUserDirection,
     `Requested output tier: ${options.generationTierId === "high_res" ? "High Res" : "Preview"}.`,
-    options.variantPrompt
+    options.variantPrompt,
+    ...hasUserDirection ? [
+      "",
+      "IMPORTANT \u2014 The user has requested the following specific changes. These take PRIORITY over the preset styling above. Apply them to the final result even if they contradict parts of the preset prompt:",
+      options.customPrompt.trim()
+    ] : []
   ].join("\n");
 }
 function buildInstaMeEditPrompt(options) {
@@ -2443,7 +2472,10 @@ function resolveEditTierById(input) {
   return INSTAME_EDIT_TIERS.find((tier) => tier.id === editTierId) || INSTAME_EDIT_TIERS[0];
 }
 function resolveGenerationMode(generationTierId) {
-  return generationTierId === "high_res" ? "high_res" : "preview";
+  if (generationTierId === "good" || generationTierId === "best" || generationTierId === "excellent" || generationTierId === "high_res") {
+    return "high_res";
+  }
+  return "preview";
 }
 function resolvePromptOnlyFallbackModel(mode) {
   if (mode === "high_res") {
@@ -2558,10 +2590,10 @@ async function generatePromptOnlyPresetImage(options) {
     variantPrompt: options.variant.prompt,
     customPrompt: options.customPrompt,
     preserveBackground: options.preserveBackground,
-    generationTierId: options.generationMode
+    generationTierId: options.generationTierId
   });
   if (selectedModel?.provider === "together") {
-    const { width, height } = resolveGenerationResolution(options.generationMode);
+    const { width, height } = resolveGenerationResolution(options.generationTierId);
     const referenceImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
     const imageBase642 = await generateTogetherImage({
       model: selectedModel.model,
@@ -2734,7 +2766,7 @@ async function generateOwnStyleImage(options) {
   const tracePrefix = getOwnStyleTracePrefix(options.debugTraceContext);
   if (options.generationMode === "high_res" && hasTogetherImageConfig()) {
     try {
-      const { width, height } = resolveGenerationResolution(options.generationMode);
+      const { width, height } = resolveGenerationResolution(options.generationTierId);
       const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
       const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
       const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleTogetherFallbackPrompt({
@@ -2835,7 +2867,7 @@ async function generateOwnStyleImage(options) {
       throw error;
     }
     console.warn("Own Style generation falling back to Together:", error);
-    const { width, height } = resolveGenerationResolution(options.generationMode);
+    const { width, height } = resolveGenerationResolution(options.generationTierId);
     const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
     const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
     const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleTogetherFallbackPrompt({
@@ -2879,7 +2911,7 @@ async function generateOwnStyleImage(options) {
   }
 }
 async function generateReferenceGuidedHighResImage(options) {
-  const { width, height, sizeLabel } = resolveGenerationResolution("high_res");
+  const { width, height, sizeLabel } = resolveGenerationResolution(options.generationTierId);
   const referenceImageUrls = options.selectedStyleReferences.map((reference) => loadStyleReferenceImage(reference)).filter((image) => Boolean(image)).map((image) => toRuntimeAssetUrl(options.req, image));
   const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
   const prompt = buildOldMoneyTransformPrompt({
@@ -4631,7 +4663,7 @@ async function registerRoutes(app2) {
         resolvedStylePreset,
         promptVariant
       });
-      const baseTransformCost = getInstaMeCreditsForQualityTier(transformQualityTier) || (Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 2);
+      const baseTransformCost = generationTier.credits || getInstaMeCreditsForQualityTier(transformQualityTier) || (Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 2);
       const ownStyleFirstUseSurcharge = isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
       transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
@@ -4700,6 +4732,7 @@ async function registerRoutes(app2) {
         customPrompt,
         preserveBackground,
         generationMode,
+        generationTierId: generationTier.id,
         ownStyleMode,
         debugTraceContext
       }) : shouldUsePromptOnly && promptVariant ? await generatePromptOnlyPresetImage({
@@ -4709,6 +4742,7 @@ async function registerRoutes(app2) {
         variant: promptVariant,
         styleUsageCount: priorStyleUseCount,
         generationMode,
+        generationTierId: generationTier.id,
         preserveBackground,
         customPrompt
       }) : generationMode === "high_res" ? await generateReferenceGuidedHighResImage({
@@ -4719,7 +4753,8 @@ async function registerRoutes(app2) {
         customPrompt,
         preserveBackground,
         stylePresetLabel,
-        stylePresetPromptHint
+        stylePresetPromptHint,
+        generationTierId: generationTier.id
       }) : await generateReferenceGuidedPreviewImage({
         uploadedImages,
         selectedStyleReferences,

@@ -430,7 +430,7 @@ export default function InstaMeScreen() {
     INSTAME_PORTRAIT_ENHANCE_TIER,
   );
   const [selectedGenerationTierId, setSelectedGenerationTierId] = useState<string>(
-    INSTAME_GENERATION_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_GENERATION_TIERS[0]?.id || "high_res",
+    INSTAME_GENERATION_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_GENERATION_TIERS[0]?.id || "good",
   );
   const [selectedEditTierId, setSelectedEditTierId] = useState<string>(
     INSTAME_EDIT_TIERS.find((tier) => tier.availability === "live")?.id || INSTAME_EDIT_TIERS[0]?.id || "edit",
@@ -591,14 +591,13 @@ export default function InstaMeScreen() {
 
   const highResGenerationTier = useMemo(
     () =>
-      generationTiers.find((tier) => tier.id === "high_res") ||
-      INSTAME_GENERATION_TIERS.find((tier) => tier.id === "high_res") ||
+      generationTiers.find((tier) => tier.id === "excellent") ||
       generationTiers[generationTiers.length - 1] ||
       INSTAME_GENERATION_TIERS[INSTAME_GENERATION_TIERS.length - 1],
     [generationTiers],
   );
 
-  const activeGenerationTier = selectedArtStyle ? highResGenerationTier : liveGenerationTier;
+  const activeGenerationTier = liveGenerationTier;
   const isOwnStyleSelected = selectedStyleId === INSTAME_OWN_STYLE_ID;
 
   const activeGenerationQualityTier = useMemo(
@@ -622,7 +621,7 @@ export default function InstaMeScreen() {
     [activeGenerationQualityTier],
   );
   const isFirstOwnStyleGeneration = isOwnStyleSelected && !selectedOwnStyleId;
-  const transformBaseCost = getInstaMeCreditsForQualityTier(activeGenerationQualityTier);
+  const transformBaseCost = activeGenerationTier?.credits ?? getInstaMeCreditsForQualityTier(activeGenerationQualityTier);
   const transformCost =
     transformBaseCost +
     (isFirstOwnStyleGeneration ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0);
@@ -2378,53 +2377,34 @@ export default function InstaMeScreen() {
         <View style={styles.card}>
           <View style={styles.pricingSection}>
             <Text style={styles.pricingSectionTitle}>Generate</Text>
-            {selectedArtStyle ? (
-              <>
-                <View style={styles.pricingCardsRow}>
-                  <View style={[styles.pricingCard, styles.pricingCardActive]}>
+            <View style={styles.pricingCardsRow}>
+              {generationTiers.map((tier) => {
+                const isSelected = tier.id === (activeGenerationTier?.id || selectedGenerationTierId);
+                const tierCost = tier.credits + (isFirstOwnStyleGeneration ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0);
+                return (
+                  <Pressable
+                    key={tier.id}
+                    onPress={() => setSelectedGenerationTierId(tier.id)}
+                    style={[styles.pricingCard, isSelected && styles.pricingCardActive]}
+                  >
                     <View style={styles.pricingTopRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.pricingLabel}>{activeGenerationQualityLabel}</Text>
-                        <Text style={styles.pricingSubtitle}>
-                          {activeGenerationQualitySubtitle}
-                        </Text>
+                        <Text style={styles.pricingLabel}>{tier.label}</Text>
+                        <Text style={styles.pricingSubtitle}>{tier.subtitle}</Text>
                       </View>
-                      <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
-                        <Text style={styles.pricingBadgeText}>
-                          {highResGenerationTier?.badge || "Auto"}
-                        </Text>
-                      </View>
+                      {tier.badge ? (
+                        <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
+                          <Text style={styles.pricingBadgeText}>{tier.badge}</Text>
+                        </View>
+                      ) : null}
                     </View>
-
                     <View style={styles.pricingMetaRow}>
-                      <Text style={styles.pricingCredits}>
-                        {transformCost} credits
-                      </Text>
+                      <Text style={styles.pricingCredits}>{tierCost} credits</Text>
                     </View>
-                  </View>
-                </View>
-              </>
-            ) : (
-              <>
-                <View style={styles.pricingCardsRow}>
-                  <View style={[styles.pricingCard, styles.pricingCardActive]}>
-                    <View style={styles.pricingTopRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.pricingLabel}>{activeGenerationQualityLabel}</Text>
-                        <Text style={styles.pricingSubtitle}>{activeGenerationQualitySubtitle}</Text>
-                      </View>
-                      <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
-                        <Text style={styles.pricingBadgeText}>{liveGenerationTier?.badge || "Auto"}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.pricingMetaRow}>
-                      <Text style={styles.pricingCredits}>{transformCost} credits</Text>
-                    </View>
-                  </View>
-                </View>
-              </>
-            )}
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
           <Pressable
@@ -2436,26 +2416,15 @@ export default function InstaMeScreen() {
               pressed && canGenerate ? { opacity: 0.9 } : undefined,
             ]}
           >
-            {loading ? (
-              <LinearGradient
-                colors={["#FF7FB1", "#FF6698", "#FF4F7D"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.generateButtonInner}
-              >
-                <ActivityIndicator color="#FFF" />
-              </LinearGradient>
-            ) : (
-              <LinearGradient
-                colors={["#FF7FB1", "#FF6698", "#FF4F7D"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.generateButtonInner}
-              >
-                <Text style={styles.generateButtonText}>Transform Now</Text>
-              </LinearGradient>
-            )}
+            <View style={styles.generateButtonInner}>
+              {loading ? (
+                <ActivityIndicator color="#FF7FB1" />
+              ) : (
+                <Text style={styles.generateButtonText}>Transform now</Text>
+              )}
+            </View>
           </Pressable>
+          <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
           {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
         </View>
 
@@ -3722,24 +3691,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   pricingCardsRow: {
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "stretch",
-    gap: 12,
+    gap: 10,
   },
   pricingCardsStacked: {
     flexDirection: "column",
   },
   pricingCard: {
-    flex: 1,
+    flex: 0,
     borderRadius: Colors.radiusMd,
     borderWidth: 1,
     borderColor: Colors.borderSubtle,
     backgroundColor: Colors.surfaceFaint,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    minHeight: 132,
+    minHeight: 0,
     justifyContent: "space-between",
-    gap: 12,
+    gap: 8,
   },
   pricingCardStacked: {
     flex: 0,
@@ -3967,17 +3936,18 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     overflow: "hidden",
-    shadowColor: Colors.accent,
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 6 },
+    shadowColor: "#FF4F7D",
+    shadowOpacity: 0.6,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 0 },
     elevation: 12,
   },
   generateButtonInner: {
     flex: 1,
     borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "rgba(255,204,222,0.42)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,127,177,0.7)",
+    backgroundColor: "rgba(20,14,24,0.85)",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -3988,7 +3958,14 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     shadowOpacity: 0,
   },
-  generateButtonText: { color: "#FFF", fontFamily: "Inter_700Bold", fontSize: 16 },
+  generateButtonText: { color: "rgba(255,255,255,0.9)", fontFamily: "Inter_600SemiBold", fontSize: 16, letterSpacing: 0.3 },
+  generateCostLabel: {
+    textAlign: "center",
+    color: "rgba(255,255,255,0.55)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    marginTop: 6,
+  },
   costText: {
     marginLeft: 4,
     color: "rgba(255,255,255,0.95)",
