@@ -2545,28 +2545,13 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options: {
   preserveBackground: boolean;
 }): string {
   const promptParts = [
-    "Create a photorealistic edit of the uploaded user portrait.",
-    "The uploaded user portrait is the only identity source for the final output.",
-    "Apply the following detailed style analysis directly to the uploaded user portrait:",
+    "Edit the uploaded portrait to match the following style direction exactly.",
+    "Preserve the subject's face, identity, and skin tone from the uploaded portrait.",
     options.analyzedStylePrompt,
-    "Interpret the styling with more creative freedom instead of matching the original reference image too literally, but still execute the described pose, expression, exact hair placement, lighting, framing, and aesthetic direction clearly.",
-    "Preserve the uploaded subject's original hair color exactly and never copy hair color from the style direction.",
-    "Do not add bangs, fringe, or a new front hairline unless the uploaded user portrait already shows them clearly.",
-    "Keep the user's existing haircut category and visible hairline; only adapt compatible styling details such as placement or volume.",
-    "Do not return a light beauty pass, simple enhance, or near-unchanged version of the input image.",
-    "Preserve the uploaded subject's identity, facial structure, skin tone, and likeness exactly.",
-    "Keep the result realistic, editorial, and cohesive.",
-    "Use the largest native output resolution available from the model.",
   ];
 
-  if (options.preserveBackground) {
-    promptParts.push(
-      "Recreate the scene, environment, and background described in the style analysis. Do not keep the user portrait's original background; instead, build the setting from the style direction so the final image matches the described location, props, and atmosphere.",
-    );
-  }
-
   if (options.customPrompt.trim()) {
-    promptParts.push(`Additional user notes: ${options.customPrompt.trim()}`);
+    promptParts.push(options.customPrompt.trim());
   }
 
   return promptParts.join("\n");
