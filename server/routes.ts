@@ -595,7 +595,7 @@ const GEMINI_API_BASE_URL =
 const DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3-pro-image-preview";
 const DEFAULT_OWN_STYLE_IMAGE_MODEL =
-  process.env.OWN_STYLE_IMAGE_MODEL || "gemini-3.1-flash-preview";
+  process.env.OWN_STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 const DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
 const DEFAULT_CREATIVE_OWN_STYLE_ANALYSIS_MODEL =
   process.env.CREATIVE_OWN_STYLE_ANALYSIS_MODEL || "gemini-3.1-pro";
