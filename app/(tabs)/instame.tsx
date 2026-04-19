@@ -2503,22 +2503,22 @@ export default function InstaMeScreen() {
             <View style={styles.resultActionRow}>
               <Pressable style={[styles.resultActionButton, styles.resultActionButtonPrimary]} onPress={handleDownload}>
                 <Ionicons name="download-outline" size={18} color={Colors.accent} />
-                <Text style={styles.downloadText}>Download</Text>
+                <Text numberOfLines={1} style={styles.downloadText}>Download</Text>
               </Pressable>
               <Pressable
                 style={[styles.resultActionButton, styles.resultActionButtonSecondary]}
                 onPress={() => setShowEditComposer((prev) => !prev)}
               >
                 <Ionicons name="create-outline" size={18} color={Colors.accentSoft} />
-                <Text style={styles.editButtonText}>Edit</Text>
+                <Text numberOfLines={1} style={styles.editButtonText}>Edit</Text>
               </Pressable>
               <Pressable
-                style={[styles.resultActionButton, styles.resultActionButtonSecondary]}
+                style={[styles.resultActionButton, styles.resultActionButtonSecondary, styles.resultActionButtonWide]}
                 onPress={() => void handleSaveResultAsOwnStyle()}
                 disabled={savingResultAsStyle}
               >
                 <Ionicons name="bookmark-outline" size={18} color={Colors.accentSoft} />
-                <Text style={styles.editButtonText}>{savingResultAsStyle ? "Saving..." : "Save as style"}</Text>
+                <Text numberOfLines={1} style={styles.editButtonText}>{savingResultAsStyle ? "Saving..." : "Save as style"}</Text>
               </Pressable>
             </View>
             {showEditComposer ? (
@@ -4136,7 +4136,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   resultActionButton: {
-    height: 44,
+    minHeight: 44,
     borderRadius: Colors.radiusMd,
     borderWidth: 1,
     justifyContent: "center",
@@ -4144,6 +4144,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     flex: 1,
+    minWidth: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  resultActionButtonWide: {
+    flexBasis: "100%",
   },
   resultActionButtonPrimary: {
     borderColor: "rgba(255,79,125,0.40)",
@@ -4153,11 +4159,19 @@ const styles = StyleSheet.create({
     borderColor: Colors.borderLight,
     backgroundColor: Colors.surfaceFaint,
   },
-  downloadText: { color: Colors.accentLight, fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  downloadText: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    flexShrink: 1,
+    textAlign: "center",
+  },
   editButtonText: {
     color: Colors.accentPale,
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: 13,
+    flexShrink: 1,
+    textAlign: "center",
   },
   editComposer: {
     borderRadius: Colors.radiusMd,
