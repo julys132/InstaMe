@@ -3,6 +3,7 @@ import * as path from "node:path";
 import type {
   InstaMePromptVariant,
   InstaMeRequestedModel,
+  InstaMeStyleCategory,
   InstaMeStylePreset,
 } from "../../shared/instame-style-presets";
 
@@ -75,6 +76,9 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
         .filter((entry): entry is InstaMePromptVariant => Boolean(entry))
     : [];
   const promptOnlyAfterFirstUse = record?.promptOnlyAfterFirstUse === true;
+  const rawCategory = typeof record?.category === "string" ? record.category : "";
+  const category: InstaMeStyleCategory | undefined =
+    rawCategory === "men" ? "men" : rawCategory === "couple" ? "couple" : rawCategory === "women" ? "women" : undefined;
 
   if (!id || !label || !subtitle || !promptHint || !representativeImage || examples.length === 0) {
     return null;
@@ -84,6 +88,7 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
     id,
     label,
     subtitle,
+    category,
     promptHint,
     cover,
     representativeImage,

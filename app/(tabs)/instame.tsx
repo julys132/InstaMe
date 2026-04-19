@@ -44,6 +44,7 @@ import {
   INSTAME_OWN_STYLE_ID,
   INSTAME_STYLE_PRESETS,
   type InstaMeStylePreset,
+  type InstaMeStyleCategory,
 } from "@shared/instame-style-presets";
 import {
   INSTAME_EDIT_TIERS,
@@ -438,6 +439,7 @@ export default function InstaMeScreen() {
   const [selectedStyleId, setSelectedStyleId] = useState<string>("");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
   const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art">("main");
+  const [styleCategory, setStyleCategory] = useState<InstaMeStyleCategory>("women");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
@@ -560,8 +562,8 @@ export default function InstaMeScreen() {
   );
 
   const mainOnlyStylePresets = useMemo(
-    () => stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID),
-    [stylePresets],
+    () => stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID && (preset.category || "women") === styleCategory),
+    [stylePresets, styleCategory],
   );
 
   const defaultStylePreset = useMemo(
@@ -1933,6 +1935,28 @@ export default function InstaMeScreen() {
           {/* ════════════  MAIN STYLES TAB  ════════════ */}
           {styleSectionTab === "main" ? (
             <>
+              {/* ── Category pills ── */}
+              <View style={styles.categoryPillRow}>
+                {([
+                  { key: "women" as const, label: "Women" },
+                  { key: "men" as const, label: "Men" },
+                  { key: "couple" as const, label: "Couples" },
+                ] as const).map((cat) => {
+                  const active = styleCategory === cat.key;
+                  return (
+                    <Pressable
+                      key={cat.key}
+                      onPress={() => setStyleCategory(cat.key)}
+                      style={[styles.categoryPill, active && styles.categoryPillActive]}
+                    >
+                      <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>
+                        {cat.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
               {favoritePresetCards.length > 0 ? (
                 <View style={styles.favoriteStylesSection}>
                   <View style={styles.ownStylesLibraryHeader}>
@@ -1963,6 +1987,13 @@ export default function InstaMeScreen() {
                 </View>
               ) : null}
 
+              {mainOnlyStylePresets.length === 0 ? (
+                <View style={styles.categoryEmptyState}>
+                  <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.25)" />
+                  <Text style={styles.categoryEmptyText}>Coming soon</Text>
+                  <Text style={styles.categoryEmptySubtext}>Stay tuned — new styles are on the way!</Text>
+                </View>
+              ) : (
               <View style={styles.styleCarouselWrap}>
                 <ScrollView
                   ref={styleListRef}
@@ -2062,6 +2093,7 @@ export default function InstaMeScreen() {
                   </View>
                 ) : null}
               </View>
+              )}
 
               <View style={styles.selectedStyleRow}>
                 <Text style={styles.selectedStyleText}>
@@ -3528,6 +3560,48 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
+  },
+  categoryPillRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+  categoryPillActive: {
+    backgroundColor: "rgba(255,127,177,0.18)",
+    borderColor: "rgba(255,127,177,0.50)",
+  },
+  categoryPillText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.45)",
+    letterSpacing: 0.3,
+  },
+  categoryPillTextActive: {
+    color: "#fff",
+  },
+  categoryEmptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 8,
+  },
+  categoryEmptyText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.50)",
+  },
+  categoryEmptySubtext: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.30)",
   },
   favoriteStylesSection: {
     gap: 12,

@@ -1,0 +1,13 @@
+[Reference Image Identity Preservation: High Priority] Full-body cinematic portrait of the man from the reference image. Pose: Casual lean against vehicle; right forearm resting on SUV hood, left hand partially submerged in jean pocket. Weight centered on right leg, left leg crossed at the ankle with toe-ground contact. Expression: Stoic, calm confidence, looking slightly off-axis. Attire: Layered tan suede shearling jacket with high-pile off-white fleece trim over a heavy-gauge ribbed white turtleneck. Black distressed slim-fit denim with articulated knee blowouts. Wheat-colored nubuck high-top lug-sole boots. Accessories: 14k gold curb-link chain, matte black tactical chronograph (left wrist), subtle wooden bead bracelet (right wrist), gold-rimmed geometric aviators.
+
+VEHICLE & ENVIRONMENT
+Vehicle: Matte-black modified luxury 4x4 (G-Wagon silhouette). Features: illuminated circular LED halo DRLs, heavy-duty winch-integrated bumper, low-profile roof rack with integrated LED light bar, 20-inch multi-spoke satin black wheels on aggressive A/T tires. Environment: Modernist luxury plaza with dark-grey basalt stone paving. Background: Colossal futuristic toroid-shaped (ring) skyscraper with central void, wrapped in horizontal golden electroluminescent bands. Dramatic deep-blue metropolitan skyline.
+
+COMPOSITION & LIGHTING
+Framing: Eye-level 4:5 vertical fashion editorial. Lighting: Chiaroscuro-inspired urban night scheme. Soft-box diffused key light (3200K) at 45-degree camera-left for facial modeling. High-intensity golden architectural backlighting creating a sharp rim-glow on the shearling texture and subject silhouette. Reflections: Specular highlights on stone ground and matte vehicle surfaces. Teal-and-orange color science with deep blacks and vibrant golden accents.
+
+TECHNICAL SPECS
+Optics: Shot on 85mm f/1.4 prime lens. Texture: Macro-level epidermal resolution; visible skin pores, individual eyebrow follicles, and realistic beard stubble. No skin smoothing. Depth: Shallow depth-of-field with creamy architectural bokeh. Rendering: Subsurface scattering on skin, high-fidelity textile weaving, 8K resolution, ray-traced reflections, chromatic consistency, photorealistic fashion editorial aesthetic.
+
+NEGATIVE PROMPT
+Low-resolution, airbrushed skin, plastic texture, face-swap artifacts, distorted anatomy, cross-eyed, blurry facial features, flat lighting, overexposed highlights, CGI aesthetic, poorly rendered hands, messy fur texture, floating accessories, inconsistent lighting shadows.

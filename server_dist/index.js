@@ -730,6 +730,8 @@ function normalizePreset(input) {
   const examples = Array.isArray(record?.examples) ? record.examples.filter((entry) => typeof entry === "string") : [];
   const promptVariants = Array.isArray(record?.promptVariants) ? record.promptVariants.map((entry) => normalizePromptVariant(entry)).filter((entry) => Boolean(entry)) : [];
   const promptOnlyAfterFirstUse = record?.promptOnlyAfterFirstUse === true;
+  const rawCategory = typeof record?.category === "string" ? record.category : "";
+  const category = rawCategory === "men" ? "men" : rawCategory === "couple" ? "couple" : rawCategory === "women" ? "women" : void 0;
   if (!id || !label || !subtitle || !promptHint || !representativeImage || examples.length === 0) {
     return null;
   }
@@ -737,6 +739,7 @@ function normalizePreset(input) {
     id,
     label,
     subtitle,
+    category,
     promptHint,
     cover,
     representativeImage,

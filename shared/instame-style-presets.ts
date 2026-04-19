@@ -13,10 +13,13 @@ export type InstaMePromptVariant = {
   requestedModels: InstaMeRequestedModel[];
 };
 
+export type InstaMeStyleCategory = "women" | "men" | "couple";
+
 export type InstaMeStylePreset = {
   id: string;
   label: string;
   subtitle: string;
+  category?: InstaMeStyleCategory;
   qualityTier?: InstaMeQualityTier;
   promptHint: string;
   cover?: string;
