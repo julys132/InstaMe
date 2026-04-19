@@ -2033,6 +2033,7 @@ function toPublicStylePreset(req: Request, preset: InstaMeStylePreset): InstaMeS
     representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
     examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
     promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse,
+    category: preset.category,
   };
 }
 

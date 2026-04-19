@@ -2522,7 +2522,8 @@ function toPublicStylePreset(req, preset) {
     cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
     representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
     examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
-    promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse
+    promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse,
+    category: preset.category
   };
 }
 function hasOpenAiImageConfig() {
