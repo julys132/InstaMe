@@ -2721,7 +2721,13 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 12,
   },
-  cardTitle: { color: "#FFF", fontFamily: "Inter_400Regular", fontSize: 16, letterSpacing: 0.5, textTransform: "uppercase" as const },
+  cardTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 16,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
   sectionTabBarOuter: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -4025,13 +4031,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: Colors.radiusSm,
-    backgroundColor: "#000000",
+  },
   resultImage: {
-    borderColor: "rgba(255,255,255,0.14)",
+    width: "100%",
     aspectRatio: 3 / 4,
     borderRadius: Colors.radiusMd,
-    backgroundColor: "rgba(255,127,177,0.22)",
-    borderColor: "rgba(255,127,177,0.62)",
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
   },
   compareSection: {
     gap: 8,
