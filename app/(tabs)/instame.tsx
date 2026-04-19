@@ -1778,7 +1778,7 @@ export default function InstaMeScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>1. Upload your photo</Text>
+          <Text style={styles.cardTitle}>Upload your photo</Text>
           <View style={styles.uploadCompactRow}>
             <Pressable style={styles.uploadThumbBox} onPress={pickImage}>
               {photo ? (
@@ -2432,7 +2432,7 @@ export default function InstaMeScreen() {
 
         {resultBase64 ? (
           <View ref={resultCardRef} style={styles.card}>
-            <Text style={styles.cardTitle}>3. Your Chicoo result</Text>
+            <Text style={styles.cardTitle}>Your Chicoo result</Text>
             {comparisonImageUri ? (
               <View style={styles.compareSection}>
                 <View style={styles.compareHeader}>
@@ -2721,7 +2721,7 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 12,
   },
-  cardTitle: { color: "#FFF", fontFamily: "Inter_600SemiBold", fontSize: 16 },
+  cardTitle: { color: "#FFF", fontFamily: "Inter_400Regular", fontSize: 16, letterSpacing: 0.5, textTransform: "uppercase" as const },
   sectionTabBarOuter: {
     marginHorizontal: 16,
     marginTop: 12,
