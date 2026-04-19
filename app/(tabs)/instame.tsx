@@ -1830,11 +1830,11 @@ export default function InstaMeScreen() {
             style={({ pressed }) => [
               styles.enhanceButton,
               (!photo || portraitEnhanceLoading) && styles.enhanceButtonDisabled,
-              pressed && photo && !portraitEnhanceLoading ? { opacity: 0.9 } : undefined,
+              pressed && photo && !portraitEnhanceLoading ? { opacity: 0.85, transform: [{ scale: 0.97 }] } : undefined,
             ]}
           >
             {portraitEnhanceLoading ? (
-              <ActivityIndicator color="#FFF" />
+              <ActivityIndicator color="#FFF" size="small" />
             ) : (
               <>
                 <View style={styles.enhanceButtonIconWrap}>
@@ -1844,16 +1844,10 @@ export default function InstaMeScreen() {
                     end={{ x: 1, y: 1 }}
                     style={styles.enhanceButtonIconFill}
                   >
-                    <Ionicons name="sparkles-outline" size={18} color="#FFF" />
+                    <Ionicons name="sparkles" size={14} color="#FFF" />
                   </LinearGradient>
                 </View>
-                <View style={styles.enhanceButtonCopy}>
-                  <Text style={styles.enhanceButtonText}>Enhance Portrait</Text>
-                  <Text style={styles.enhanceButtonSubtitle}>(Recommended)</Text>
-                </View>
-                <View style={styles.enhanceButtonTrailing}>
-                  <Ionicons name="add" size={22} color="rgba(255,255,255,0.92)" />
-                </View>
+                <Text style={styles.enhanceButtonText}>Enhance Portrait</Text>
               </>
             )}
           </Pressable>
@@ -2876,36 +2870,33 @@ const styles = StyleSheet.create({
   },
   enhanceButton: {
     marginTop: 12,
-    minHeight: 92,
-    borderRadius: 28,
-    backgroundColor: "rgba(38,41,48,0.82)",
+    alignSelf: "center",
+    minHeight: 46,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    backgroundColor: "rgba(10,10,10,0.85)",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 18,
-    gap: 14,
-    shadowColor: Colors.accent,
-    shadowOpacity: 0.42,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
+    justifyContent: "center",
+    gap: 10,
+    shadowColor: "#FF5D9F",
+    shadowOpacity: 0.50,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,118,177,0.72)",
+    borderColor: "rgba(255,100,160,0.45)",
   },
   enhanceButtonDisabled: {
-    opacity: 0.55,
+    opacity: 0.45,
     shadowOpacity: 0,
   },
   enhanceButtonIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     overflow: "hidden",
-    shadowColor: Colors.accent,
-    shadowOpacity: 0.32,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
   },
   enhanceButtonIconFill: {
     flex: 1,
@@ -3900,8 +3891,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(24,27,34,0.88)",
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "#000000",
     padding: 14,
     gap: 12,
   },
@@ -3939,13 +3930,14 @@ const styles = StyleSheet.create({
     textTransform: "lowercase",
   },
   customChangesInput: {
-    minHeight: 44,
-    borderRadius: 14,
+    minHeight: 22,
+    maxHeight: 60,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(10,12,16,0.72)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     color: "#FFF",
     fontFamily: "Inter_400Regular",
     fontSize: 14,
