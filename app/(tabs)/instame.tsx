@@ -1727,20 +1727,7 @@ export default function InstaMeScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={["#0E1219", "#171C24", "#0B0E14"]} locations={[0, 0.45, 1]} style={StyleSheet.absoluteFill} />
-      <LinearGradient
-        colors={["rgba(255,93,159,0.34)", "rgba(255,93,159,0.14)", "rgba(255,93,159,0)"]}
-        start={{ x: 1, y: 0 }}
-        end={{ x: 0.15, y: 0.85 }}
-        style={styles.backgroundGlowTopRight}
-      />
-      <LinearGradient
-        colors={["rgba(255,255,255,0.18)", "rgba(125,134,148,0.08)", "rgba(0,0,0,0)"]}
-        start={{ x: 0, y: 1 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.backgroundGlowBottomLeft}
-      />
-      <View style={styles.backgroundVignette} />
+      <LinearGradient colors={["#000000", "#111111", "#000000"]} locations={[0, 0.5, 1]} style={StyleSheet.absoluteFill} />
 
       <ScrollView
         ref={mainScrollRef}
