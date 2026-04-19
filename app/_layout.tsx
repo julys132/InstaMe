@@ -24,6 +24,7 @@ function RootLayoutNav() {
       <Stack.Screen name="privacy" />
       <Stack.Screen name="terms" />
       <Stack.Screen name="contact" />
+      <Stack.Screen name="change-password" />
       <Stack.Screen name="delete-account" />
       <Stack.Screen name="(auth)" options={{ presentation: "modal", headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
@@ -27,7 +27,7 @@ import {
 
 export default function ChangePasswordScreen() {
   const insets = useSafeAreaInsets();
-  const { user, changePassword } = useAuth();
+  const { user, isLoading, changePassword } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -39,6 +39,23 @@ export default function ChangePasswordScreen() {
   const passwordChecks = useMemo(() => getPasswordRequirementChecks(newPassword), [newPassword]);
   const passwordReady = isStrongPassword(newPassword);
   const webTopInset = Platform.OS === "web" ? 67 : 0;
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loaderWrap]}>
+        <ChicooBackground />
+        <Text style={styles.loaderText}>Loading security settings...</Text>
+      </View>
+    );
+  }
+
+  if (!user) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  if (user.provider !== "email") {
+    return <Redirect href="/(tabs)/profile" />;
+  }
 
   async function handleChangePassword() {
     if (user?.provider !== "email") {
@@ -180,6 +197,8 @@ export default function ChangePasswordScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  loaderWrap: { justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
+  loaderText: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 14 },
   keyboardView: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: 20 },
   header: {
