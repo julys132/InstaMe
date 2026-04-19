@@ -1938,36 +1938,6 @@ export default function InstaMeScreen() {
                 })}
               </View>
 
-              {favoritePresetCards.length > 0 ? (
-                <View style={styles.favoriteStylesSection}>
-                  <View style={styles.ownStylesLibraryHeader}>
-                    <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
-                    <Text style={styles.ownStylesLibraryCount}>{favoritePresetCards.length}</Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
-                    {favoritePresetCards.map((preset) => {
-                      const theme = getStyleCardTheme(preset.id);
-                      return (
-                        <Pressable
-                          key={`favorite-preset-${preset.id}`}
-                          onPress={() => handleStylePresetPress(preset)}
-                          style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
-                        >
-                          <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
-                            <Image source={{ uri: preset.cover || preset.representativeImage }} contentFit="cover" style={styles.styleCardImage} />
-                            <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
-                            <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
-                            <View style={styles.styleCardTextWrap}>
-                              <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{preset.label}</Text>
-                            </View>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              ) : null}
-
               {mainOnlyStylePresets.length === 0 ? (
                 <View style={styles.categoryEmptyState}>
                   <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.25)" />
@@ -2121,6 +2091,36 @@ export default function InstaMeScreen() {
                   These notes are added over the generic preset styling.
                 </Text>
               </View>
+
+              {favoritePresetCards.length > 0 ? (
+                <View style={styles.favoriteStylesSection}>
+                  <View style={styles.ownStylesLibraryHeader}>
+                    <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
+                    <Text style={styles.ownStylesLibraryCount}>{favoritePresetCards.length}</Text>
+                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+                    {favoritePresetCards.map((preset) => {
+                      const theme = getStyleCardTheme(preset.id);
+                      return (
+                        <Pressable
+                          key={`favorite-preset-${preset.id}`}
+                          onPress={() => handleStylePresetPress(preset)}
+                          style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
+                        >
+                          <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
+                            <Image source={{ uri: preset.cover || preset.representativeImage }} contentFit="cover" style={styles.styleCardImage} />
+                            <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
+                            <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
+                            <View style={styles.styleCardTextWrap}>
+                              <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{preset.label}</Text>
+                            </View>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              ) : null}
             </>
           ) : null}
 
@@ -2269,6 +2269,26 @@ export default function InstaMeScreen() {
                 </View>
               ) : null}
 
+              <View style={styles.customChangesPanel}>
+                <View style={styles.customChangesHeader}>
+                  <Text style={styles.customChangesTitle}>Custom Changes</Text>
+                  <Text style={styles.customChangesSubtitle}>
+                    Add any clothing, color or expression notes for this own style.
+                  </Text>
+                </View>
+                <TextInput
+                  value={customPrompt}
+                  onChangeText={setCustomPrompt}
+                  placeholder="Example: keep the same pose, white blazer, cleaner background, softer smile."
+                  placeholderTextColor="rgba(255,255,255,0.34)"
+                  multiline
+                  style={styles.customChangesInput}
+                />
+                <Text style={styles.customChangesFootnote}>
+                  Your notes guide the final result on top of the selected own style.
+                </Text>
+              </View>
+
               {favoriteOwnStyleCards.length > 0 ? (
                 <View style={styles.favoriteStylesSection}>
                   <View style={styles.ownStylesLibraryHeader}>
@@ -2298,26 +2318,6 @@ export default function InstaMeScreen() {
                   </ScrollView>
                 </View>
               ) : null}
-
-              <View style={styles.customChangesPanel}>
-                <View style={styles.customChangesHeader}>
-                  <Text style={styles.customChangesTitle}>Custom Changes</Text>
-                  <Text style={styles.customChangesSubtitle}>
-                    Add any clothing, color or expression notes for this own style.
-                  </Text>
-                </View>
-                <TextInput
-                  value={customPrompt}
-                  onChangeText={setCustomPrompt}
-                  placeholder="Example: keep the same pose, white blazer, cleaner background, softer smile."
-                  placeholderTextColor="rgba(255,255,255,0.34)"
-                  multiline
-                  style={styles.customChangesInput}
-                />
-                <Text style={styles.customChangesFootnote}>
-                  Your notes guide the final result on top of the selected own style.
-                </Text>
-              </View>
             </View>
           ) : null}
 

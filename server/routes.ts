@@ -2561,7 +2561,7 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options: {
 
   if (options.preserveBackground) {
     promptParts.push(
-      "Keep the original background structure where possible unless the style direction clearly requires a different scene treatment.",
+      "Recreate the scene, environment, and background described in the style analysis. Do not keep the user portrait's original background; instead, build the setting from the style direction so the final image matches the described location, props, and atmosphere.",
     );
   }
 
