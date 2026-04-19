@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Platform } from "react-native";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
 
 type NativePlatform = "ios" | "android";
 
@@ -11,12 +12,20 @@ type PurchaseResult = {
   error?: string;
 };
 
-type IapProduct = {
+type SyncResult = {
+  success: boolean;
+  error?: string;
+};
+
+export type IapProduct = {
   productId: string;
   title: string;
   description: string;
   localizedPrice: string;
   currency?: string;
+  type: "in-app" | "subs";
+  subscriptionPeriodNumberIOS?: string;
+  subscriptionPeriodUnitIOS?: string;
 };
 
 type EventSubscription = {
@@ -24,18 +33,26 @@ type EventSubscription = {
 };
 
 const DEFAULT_IOS_PRODUCT_MAP: Record<string, string> = {
-  pack_5: "com.instame.app.credits.5",
-  pack_15: "com.instame.app.credits.15",
-  pack_30: "com.instame.app.credits.30",
-  pack_100: "com.instame.app.credits.100",
+  pack_5: "com.instame.app.credits.quickstart10",
+  pack_15: "com.instame.app.credits.creator30",
+  pack_30: "com.instame.app.credits.studio60",
+  pack_100: "com.instame.app.credits.bestvalue200",
 };
 
 const DEFAULT_ANDROID_PRODUCT_MAP: Record<string, string> = {
-  pack_5: "com.instame.app.credits.5",
-  pack_15: "com.instame.app.credits.15",
-  pack_30: "com.instame.app.credits.30",
-  pack_100: "com.instame.app.credits.100",
+  pack_5: "com.instame.app.credits.quickstart10",
+  pack_15: "com.instame.app.credits.creator30",
+  pack_30: "com.instame.app.credits.studio60",
+  pack_100: "com.instame.app.credits.bestvalue200",
 };
+
+const DEFAULT_IOS_SUBSCRIPTION_MAP: Record<string, string> = {
+  sub_basic: "com.instame.app.sub.lite.monthly",
+  sub_premium: "com.instame.app.sub.plus.monthly",
+  sub_unlimited: "com.instame.app.sub.studio.monthly",
+};
+
+const DEFAULT_ANDROID_SUBSCRIPTION_MAP: Record<string, string> = {};
 
 function parseProductMap(raw: string | undefined): Record<string, string> {
   if (!raw || !raw.trim()) return {};
@@ -65,20 +82,110 @@ const ANDROID_PRODUCT_MAP = {
   ...parseProductMap(process.env.EXPO_PUBLIC_IAP_PRODUCT_MAP),
 };
 
+const IOS_SUBSCRIPTION_MAP = {
+  ...DEFAULT_IOS_SUBSCRIPTION_MAP,
+  ...parseProductMap(process.env.EXPO_PUBLIC_IOS_IAP_SUBSCRIPTION_MAP),
+  ...parseProductMap(process.env.EXPO_PUBLIC_IAP_SUBSCRIPTION_MAP),
+};
+
+const ANDROID_SUBSCRIPTION_MAP = {
+  ...DEFAULT_ANDROID_SUBSCRIPTION_MAP,
+  ...parseProductMap(process.env.EXPO_PUBLIC_ANDROID_IAP_SUBSCRIPTION_MAP),
+  ...parseProductMap(process.env.EXPO_PUBLIC_IAP_SUBSCRIPTION_MAP),
+};
+
 function getProductMapForPlatform(platform: NativePlatform): Record<string, string> {
   return platform === "ios" ? IOS_PRODUCT_MAP : ANDROID_PRODUCT_MAP;
 }
 
+function getSubscriptionMapForPlatform(platform: NativePlatform): Record<string, string> {
+  return platform === "ios" ? IOS_SUBSCRIPTION_MAP : ANDROID_SUBSCRIPTION_MAP;
+}
+
+function normalizeProduct(entry: any, type: "in-app" | "subs"): IapProduct | null {
+  const productId = String(entry?.productId || entry?.id || "").trim();
+  if (!productId) return null;
+
+  return {
+    productId,
+    title: String(entry?.title || entry?.localizedTitle || entry?.displayName || "Credits"),
+    description: String(entry?.description || entry?.localizedDescription || ""),
+    localizedPrice: String(entry?.localizedPrice || entry?.displayPrice || entry?.price || ""),
+    currency: typeof entry?.currency === "string" ? entry.currency : undefined,
+    type,
+    subscriptionPeriodNumberIOS:
+      typeof entry?.subscriptionPeriodNumberIOS === "string" ? entry.subscriptionPeriodNumberIOS : undefined,
+    subscriptionPeriodUnitIOS:
+      typeof entry?.subscriptionPeriodUnitIOS === "string" ? entry.subscriptionPeriodUnitIOS : undefined,
+  };
+}
+
 export function resolveIapProductId(packageId: string, platform: NativePlatform): string | null {
-  const map = getProductMapForPlatform(platform);
-  return map[packageId] || null;
+  return getProductMapForPlatform(platform)[packageId] || null;
+}
+
+export function resolveIapSubscriptionProductId(planId: string, platform: NativePlatform): string | null {
+  return getSubscriptionMapForPlatform(platform)[planId] || null;
+}
+
+function isSubscriptionProductId(productId: string, platform: NativePlatform): boolean {
+  return Object.values(getSubscriptionMapForPlatform(platform)).includes(productId);
+}
+
+async function getIosReceipt(RNIap: any, purchase?: any): Promise<string> {
+  const purchaseReceipt = String(purchase?.transactionReceipt || "").trim();
+  if (purchaseReceipt) return purchaseReceipt;
+
+  if (typeof RNIap?.getReceiptIOS === "function") {
+    try {
+      const receipt = String(await RNIap.getReceiptIOS()).trim();
+      if (receipt) return receipt;
+    } catch {
+      // no-op
+    }
+  }
+
+  if (typeof RNIap?.requestReceiptRefreshIOS === "function") {
+    try {
+      const refreshedReceipt = String(await RNIap.requestReceiptRefreshIOS()).trim();
+      if (refreshedReceipt) return refreshedReceipt;
+    } catch {
+      // no-op
+    }
+  }
+
+  return "";
+}
+
+export async function openNativeSubscriptionManagement(): Promise<boolean> {
+  if (Platform.OS !== "ios" && Platform.OS !== "android") {
+    return false;
+  }
+
+  const RNIap = await import("react-native-iap");
+  if (Platform.OS === "ios" && typeof RNIap.deepLinkToSubscriptionsIOS === "function") {
+    return Boolean(await RNIap.deepLinkToSubscriptionsIOS());
+  }
+
+  if (typeof RNIap.deepLinkToSubscriptions === "function") {
+    await RNIap.deepLinkToSubscriptions(
+      Platform.OS === "android"
+        ? { packageNameAndroid: process.env.EXPO_PUBLIC_ANDROID_PACKAGE_NAME || "com.instame.app" }
+        : undefined,
+    );
+    return true;
+  }
+
+  return false;
 }
 
 export function useIAP() {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isAvailable, setIsAvailable] = useState(false);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [products, setProducts] = useState<IapProduct[]>([]);
+  const [subscriptions, setSubscriptions] = useState<IapProduct[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const iapModuleRef = useRef<any>(null);
@@ -114,38 +221,33 @@ export function useIAP() {
 
         await RNIap.initConnection();
 
-        const productIds = Object.values(getProductMapForPlatform(platform));
-        const uniqueProductIds = Array.from(new Set(productIds.filter(Boolean)));
+        const productIds = Array.from(new Set(Object.values(getProductMapForPlatform(platform)).filter(Boolean)));
+        const subscriptionIds = Array.from(
+          new Set(Object.values(getSubscriptionMapForPlatform(platform)).filter(Boolean)),
+        );
 
-        const fetchedProducts = uniqueProductIds.length > 0
-          ? await RNIap.fetchProducts({ skus: uniqueProductIds })
-          : [];
+        const [fetchedProducts, fetchedSubscriptions] = await Promise.all([
+          productIds.length > 0 ? RNIap.fetchProducts({ skus: productIds, type: "in-app" }) : Promise.resolve([]),
+          subscriptionIds.length > 0 ? RNIap.fetchProducts({ skus: subscriptionIds, type: "subs" }) : Promise.resolve([]),
+        ]);
 
-        const normalizedProducts: IapProduct[] = (Array.isArray(fetchedProducts) ? fetchedProducts : []).map(
-          (entry: any) => ({
-            productId: String(entry.productId || entry.id || ""),
-            title: String(entry.title || entry.localizedTitle || entry.displayName || "Credits"),
-            description: String(entry.description || entry.localizedDescription || ""),
-            localizedPrice: String(entry.localizedPrice || entry.displayPrice || entry.price || ""),
-            currency: typeof entry.currency === "string" ? entry.currency : undefined,
-          }),
-        ).filter((entry) => entry.productId.length > 0);
+        const normalizedProducts = (Array.isArray(fetchedProducts) ? fetchedProducts : [])
+          .map((entry: any) => normalizeProduct(entry, "in-app"))
+          .filter((entry: IapProduct | null): entry is IapProduct => Boolean(entry));
+
+        const normalizedSubscriptions = (Array.isArray(fetchedSubscriptions) ? fetchedSubscriptions : [])
+          .map((entry: any) => normalizeProduct(entry, "subs"))
+          .filter((entry: IapProduct | null): entry is IapProduct => Boolean(entry));
 
         purchaseUpdatedSubscription.current = RNIap.purchaseUpdatedListener(async (purchase: any) => {
-          const productId = String(purchase?.productId || purchase?.productIdentifier || "");
+          const productId = String(purchase?.productId || purchase?.productIdentifier || "").trim();
+          const isSubscription = productId ? isSubscriptionProductId(productId, platform) : false;
           let receipt = "";
 
           if (platform === "ios") {
-            receipt = String(purchase?.transactionReceipt || "");
-            if (!receipt && iapModuleRef.current?.getReceiptIOS) {
-              try {
-                receipt = String(await iapModuleRef.current.getReceiptIOS());
-              } catch {
-                receipt = "";
-              }
-            }
+            receipt = await getIosReceipt(RNIap, purchase);
           } else {
-            receipt = String(purchase?.purchaseToken || "");
+            receipt = String(purchase?.purchaseToken || "").trim();
           }
 
           if (!productId || !receipt) {
@@ -168,9 +270,9 @@ export function useIAP() {
             }
 
             try {
-              await RNIap.finishTransaction({ purchase, isConsumable: true });
+              await RNIap.finishTransaction({ purchase, isConsumable: !isSubscription });
             } catch {
-              // Credits are already granted server-side; do not fail user flow on finishTransaction errors.
+              // Credits and subscription state are already granted server-side.
             }
 
             resolvePending({
@@ -195,9 +297,10 @@ export function useIAP() {
         });
 
         setProducts(normalizedProducts);
-        setIsAvailable(normalizedProducts.length > 0);
+        setSubscriptions(normalizedSubscriptions);
+        setIsAvailable(normalizedProducts.length > 0 || normalizedSubscriptions.length > 0);
         setError(
-          normalizedProducts.length > 0
+          normalizedProducts.length > 0 || normalizedSubscriptions.length > 0
             ? null
             : "No in-app products are available. Store products may not be configured yet.",
         );
@@ -224,8 +327,8 @@ export function useIAP() {
     };
   }, [platform, resolvePending]);
 
-  const purchaseProduct = useCallback(
-    async (productId: string): Promise<PurchaseResult> => {
+  const startPurchase = useCallback(
+    async (productId: string, type: "in-app" | "subs"): Promise<PurchaseResult> => {
       if (platform === "web") {
         return { success: false, error: "In-app purchases are only available on mobile apps." };
       }
@@ -249,15 +352,17 @@ export function useIAP() {
 
         iapModuleRef.current
           .requestPurchase({
-            type: "in-app",
+            type,
             request: {
               apple: {
                 sku: productId,
-                andDangerouslyFinishTransactionAutomaticallyIOS: false,
+                andDangerouslyFinishTransactionAutomatically: false,
+                appAccountToken: platform === "ios" ? user?.id || undefined : undefined,
               },
-              google: {
-                skus: [productId],
-              },
+              google:
+                type === "subs"
+                  ? { skus: [productId] }
+                  : { skus: [productId] },
             },
           })
           .catch((requestError: any) => {
@@ -270,8 +375,45 @@ export function useIAP() {
           });
       });
     },
-    [platform, isAvailable, error, isPurchasing, resolvePending],
+    [platform, isAvailable, error, isPurchasing, resolvePending, user?.id],
   );
+
+  const purchaseProduct = useCallback(
+    async (productId: string): Promise<PurchaseResult> => startPurchase(productId, "in-app"),
+    [startPurchase],
+  );
+
+  const purchaseSubscription = useCallback(
+    async (productId: string): Promise<PurchaseResult> => startPurchase(productId, "subs"),
+    [startPurchase],
+  );
+
+  const syncAppleSubscriptions = useCallback(async (): Promise<SyncResult> => {
+    if (platform !== "ios") {
+      return { success: false, error: "Apple subscription sync is only available on iOS." };
+    }
+
+    const RNIap = iapModuleRef.current;
+    if (!RNIap || !isAvailable) {
+      return { success: false, error: error || "In-app purchases are unavailable right now." };
+    }
+
+    try {
+      if (typeof RNIap.syncIOS === "function") {
+        await RNIap.syncIOS();
+      }
+
+      const receipt = await getIosReceipt(RNIap);
+      if (!receipt) {
+        return { success: false, error: "No App Store receipt is available yet." };
+      }
+
+      await apiClient.syncAppleSubscriptions(receipt);
+      return { success: true };
+    } catch (syncError: any) {
+      return { success: false, error: syncError?.message || "Could not sync Apple subscriptions." };
+    }
+  }, [platform, isAvailable, error]);
 
   const restorePurchases = useCallback(async () => {
     if (platform === "web") return;
@@ -285,7 +427,7 @@ export function useIAP() {
       const purchases = await RNIap.getAvailablePurchases();
       const purchaseList = Array.isArray(purchases) ? purchases : [];
 
-      if (purchaseList.length === 0) {
+      if (purchaseList.length === 0 && platform !== "ios") {
         Alert.alert("No Purchases Found", "There are no previous purchases to restore.");
         return;
       }
@@ -294,24 +436,19 @@ export function useIAP() {
       let failedCount = 0;
 
       for (const purchase of purchaseList) {
-        const productId = String(purchase?.productId || purchase?.productIdentifier || "");
+        const productId = String(purchase?.productId || purchase?.productIdentifier || "").trim();
         if (!productId) {
           failedCount += 1;
           continue;
         }
 
+        const isSubscription = isSubscriptionProductId(productId, platform);
         let receipt = "";
+
         if (platform === "ios") {
-          receipt = String(purchase?.transactionReceipt || "");
-          if (!receipt && iapModuleRef.current?.getReceiptIOS) {
-            try {
-              receipt = String(await iapModuleRef.current.getReceiptIOS());
-            } catch {
-              receipt = "";
-            }
-          }
+          receipt = await getIosReceipt(RNIap, purchase);
         } else {
-          receipt = String(purchase?.purchaseToken || "");
+          receipt = String(purchase?.purchaseToken || "").trim();
         }
 
         if (!receipt) {
@@ -332,11 +469,20 @@ export function useIAP() {
 
           restoredCount += 1;
           try {
-            await RNIap.finishTransaction({ purchase, isConsumable: true });
+            await RNIap.finishTransaction({ purchase, isConsumable: !isSubscription });
           } catch {
             // no-op
           }
         } catch {
+          failedCount += 1;
+        }
+      }
+
+      if (platform === "ios") {
+        const syncResult = await syncAppleSubscriptions();
+        if (syncResult.success) {
+          restoredCount += 1;
+        } else if (purchaseList.length === 0) {
           failedCount += 1;
         }
       }
@@ -352,7 +498,22 @@ export function useIAP() {
     } catch (restoreError: any) {
       Alert.alert("Restore Failed", restoreError?.message || "Could not restore purchases.");
     }
-  }, [platform, isAvailable]);
+  }, [platform, isAvailable, syncAppleSubscriptions]);
+
+  const openSubscriptionManagement = useCallback(async (): Promise<SyncResult> => {
+    if (platform === "web") {
+      return { success: false, error: "Subscription management is only available on mobile here." };
+    }
+
+    try {
+      const opened = await openNativeSubscriptionManagement();
+      return opened
+        ? { success: true }
+        : { success: false, error: "Could not open subscription management." };
+    } catch (manageError: any) {
+      return { success: false, error: manageError?.message || "Could not open subscription management." };
+    }
+  }, [platform]);
 
   return {
     platform,
@@ -360,8 +521,12 @@ export function useIAP() {
     isAvailable,
     isPurchasing,
     products,
+    subscriptions,
     error,
     purchaseProduct,
+    purchaseSubscription,
     restorePurchases,
+    syncAppleSubscriptions,
+    openSubscriptionManagement,
   };
 }

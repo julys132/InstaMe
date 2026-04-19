@@ -46,6 +46,7 @@ export const users = pgTable("users", {
   subscriptionRenewAt: timestamp("subscription_renew_at"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  appleOriginalTransactionId: text("apple_original_transaction_id"),
   styleGender: text("style_gender"),
   stylePreferences: jsonb("style_preferences").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   favoriteLooks: jsonb("favorite_looks").$type<string[]>().notNull().default(sql`'[]'::jsonb`),

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import ChicooBackground from "@/components/ChicooBackground";
-import { resolveIapProductId, useIAP } from "@/hooks/useIAP";
+import { resolveIapProductId, resolveIapSubscriptionProductId, useIAP } from "@/hooks/useIAP";
 import {
   useCredits,
   CREDIT_PACKAGES,
@@ -71,6 +71,10 @@ function PackageCard({
 function SubPlanCard({
   plan,
   active,
+  priceLabel,
+  activeHint,
+  manageLabel,
+  cancelLabel,
   onSubscribe,
   onTopUp,
   onCancel,
@@ -78,6 +82,10 @@ function SubPlanCard({
 }: {
   plan: SubscriptionPlan;
   active: boolean;
+  priceLabel: string;
+  activeHint?: string | null;
+  manageLabel: string;
+  cancelLabel: string;
   onSubscribe: () => void;
   onTopUp: () => void;
   onCancel: () => void;
@@ -95,7 +103,7 @@ function SubPlanCard({
       )}
       <Text style={styles.subName}>{plan.name}</Text>
       <View style={styles.subPriceRow}>
-        <Text style={styles.subPrice}>${plan.price.toFixed(2)}</Text>
+        <Text style={styles.subPrice}>{priceLabel}</Text>
         <Text style={styles.subPricePeriod}>/month</Text>
       </View>
       <Text style={styles.subCredits}>{plan.creditsPerMonth} credits/month</Text>
@@ -130,7 +138,7 @@ function SubPlanCard({
 
       {active ? (
         <>
-          <Text style={styles.subManageHint}>Cancel anytime from Manage Billing.</Text>
+          <Text style={styles.subManageHint}>{activeHint || "Manage or cancel anytime from your subscription settings."}</Text>
 
           <View style={styles.subActionsRow}>
             <Pressable
@@ -152,9 +160,19 @@ function SubPlanCard({
               ]}
             >
               <Ionicons name="close-circle-outline" size={16} color={Colors.white} />
-              <Text style={styles.subCancelButtonText}>Cancel Subscription</Text>
+              <Text style={styles.subCancelButtonText}>{cancelLabel}</Text>
             </Pressable>
           </View>
+          <Pressable
+            onPress={() => { Haptics.selectionAsync(); onCancel(); }}
+            style={({ pressed }) => [
+              styles.subManageButton,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <Ionicons name="settings-outline" size={16} color={Colors.white} />
+            <Text style={styles.subManageButtonText}>{manageLabel}</Text>
+          </Pressable>
         </>
       ) : null}
     </Animated.View>
@@ -166,6 +184,8 @@ export default function CreditsScreen() {
   const {
     credits,
     subscription,
+    subscriptionProvider,
+    subscriptionRenewAt,
     purchasePackage,
     subscribeToPlan,
     createBillingPortalSession,
@@ -179,15 +199,29 @@ export default function CreditsScreen() {
   const [devGrantLoading, setDevGrantLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
+  const [subscriptionSyncing, setSubscriptionSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<"credits" | "subscription">("credits");
+  const didInitialAppleSync = useRef(false);
   const showDevCreditTools = __DEV__ || process.env.EXPO_PUBLIC_ENABLE_DEV_CREDITS === "true";
   const hasActiveSubscription = Boolean(subscription);
   const nativePlatform = Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : null;
-  const subscriptionsAvailable = Platform.OS === "web";
+  const subscriptionsAvailable = Platform.OS === "web" || nativePlatform === "ios";
   const iapPriceLookup = useMemo(
     () => new Map(iap.products.map((product) => [product.productId, product])),
     [iap.products],
   );
+  const iapSubscriptionLookup = useMemo(
+    () => new Map(iap.subscriptions.map((product) => [product.productId, product])),
+    [iap.subscriptions],
+  );
+  const isAppleManagedSubscription = nativePlatform === "ios" && subscriptionProvider === "apple";
+  const manageSubscriptionLabel = isAppleManagedSubscription ? "Manage on Apple" : "Manage Billing";
+  const cancelSubscriptionLabel = isAppleManagedSubscription ? "Cancel on Apple" : "Cancel Subscription";
+  const subscriptionManageHint = subscriptionRenewAt
+    ? `Renews on ${new Date(subscriptionRenewAt).toLocaleDateString()}. ${isAppleManagedSubscription ? "Manage or cancel anytime on Apple." : "Manage or cancel anytime from billing."}`
+    : isAppleManagedSubscription
+      ? "Manage or cancel anytime on Apple."
+      : "Manage or cancel anytime from billing.";
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
@@ -216,6 +250,22 @@ export default function CreditsScreen() {
     }
     return undefined;
   }
+
+  useEffect(() => {
+    if (nativePlatform !== "ios" || iap.isLoading || didInitialAppleSync.current) {
+      return;
+    }
+
+    didInitialAppleSync.current = true;
+    setSubscriptionSyncing(true);
+    void iap.syncAppleSubscriptions()
+      .then(async (result) => {
+        if (result.success) {
+          await refreshCredits();
+        }
+      })
+      .finally(() => setSubscriptionSyncing(false));
+  }, [nativePlatform, iap, refreshCredits]);
 
   async function runCheckout(
     url: string,
@@ -314,8 +364,37 @@ export default function CreditsScreen() {
   async function handleSubscribe(plan: SubscriptionPlan) {
     setSubLoading(plan.id);
     try {
+      if (nativePlatform === "ios") {
+        const iapProductId = resolveIapSubscriptionProductId(plan.id, "ios");
+        if (!iapProductId) {
+          throw new Error("This Apple subscription product is not configured yet.");
+        }
+        if (!iap.isAvailable && iap.subscriptions.length === 0) {
+          throw new Error(iap.error || "Apple subscriptions are not available on this build yet.");
+        }
+
+        const result = await iap.purchaseSubscription(iapProductId);
+        if (result.cancelled) {
+          Alert.alert("Purchase canceled", "No subscription payment was processed.");
+          return;
+        }
+        if (!result.success) {
+          throw new Error(result.error || "Subscription failed.");
+        }
+
+        const syncResult = await iap.syncAppleSubscriptions();
+        if (!syncResult.success && syncResult.error) {
+          throw new Error(syncResult.error);
+        }
+
+        await refreshCredits();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert("Success", `Subscribed to ${plan.name} on Apple.`);
+        return;
+      }
+
       if (!subscriptionsAvailable) {
-        throw new Error("Subscriptions are currently available on web checkout only.");
+        throw new Error("Native subscriptions are enabled on iOS right now. On other platforms, use web checkout.");
       }
 
       const checkoutUrls = getCheckoutUrls();
@@ -375,6 +454,14 @@ export default function CreditsScreen() {
   async function handleManageBilling() {
     setBillingPortalLoading(true);
     try {
+      if (isAppleManagedSubscription || nativePlatform === "ios") {
+        const result = await iap.openSubscriptionManagement();
+        if (!result.success) {
+          throw new Error(result.error || "Could not open Apple subscription settings.");
+        }
+        return;
+      }
+
       const portal = await createBillingPortalSession(getBillingPortalReturnUrl());
       if (!portal.url) {
         throw new Error("Billing portal URL unavailable");
@@ -427,12 +514,18 @@ export default function CreditsScreen() {
             <Text style={styles.topUpInfoText}>
               Need more credits before your next renewal? Buy a top-up anytime and it stacks on top of your subscription balance.
             </Text>
-            <Text style={styles.topUpInfoHint}>Cancel anytime from Manage Billing.</Text>
+            <Text style={styles.topUpInfoHint}>{subscriptionManageHint}</Text>
             <Pressable
               onPress={() => setActiveTab("credits")}
               style={({ pressed }) => [styles.topUpInfoButton, pressed && { opacity: 0.85 }]}
             >
               <Text style={styles.topUpInfoButtonText}>Open Credit Packs</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleManageBilling}
+              style={({ pressed }) => [styles.topUpInfoSecondaryButton, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.topUpInfoSecondaryButtonText}>{manageSubscriptionLabel}</Text>
             </Pressable>
           </Animated.View>
         ) : null}
@@ -511,16 +604,31 @@ export default function CreditsScreen() {
           </Animated.View>
         ) : (
           <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.subsSection}>
+            {subscriptionSyncing ? (
+              <Text style={styles.subscriptionSyncText}>Syncing Apple subscription status...</Text>
+            ) : null}
             {SUBSCRIPTION_PLANS.map((plan) => (
+              (() => {
+                const productId = nativePlatform === "ios" ? resolveIapSubscriptionProductId(plan.id, "ios") : null;
+                const storeProduct = productId ? iapSubscriptionLookup.get(productId) : null;
+                const priceLabel = storeProduct?.localizedPrice || `$${plan.price.toFixed(2)}`;
+
+                return (
               <SubPlanCard
                 key={plan.id}
                 plan={plan}
                 active={subscription === plan.id}
+                priceLabel={priceLabel}
+                activeHint={subscriptionManageHint}
+                manageLabel={manageSubscriptionLabel}
+                cancelLabel={cancelSubscriptionLabel}
                 onSubscribe={() => handleSubscribe(plan)}
                 onTopUp={() => setActiveTab("credits")}
                 onCancel={handleManageBilling}
                 loading={subLoading === plan.id}
               />
+                );
+              })()
             ))}
           </Animated.View>
         )}
@@ -556,13 +664,15 @@ export default function CreditsScreen() {
             )}
           </View>
           <Text style={styles.paymentNote}>
-            {nativePlatform
-              ? "Credit packs use Apple or Google in-app purchase on mobile. Subscriptions are available on web checkout only, and top-up packs can still be bought separately."
+            {nativePlatform === "ios"
+              ? "Credit packs and subscriptions use Apple In-App Purchase on iPhone. Users can manage or cancel their subscription anytime from Apple subscription settings."
+              : nativePlatform
+                ? "Credit packs use Apple or Google in-app purchase on mobile. Native subscriptions are currently enabled on iPhone, and top-up packs can still be bought separately."
               : "Secure Stripe checkout for web credit packs and subscriptions. One-time top-ups can be bought even with an active plan."}
           </Text>
           {subscription ? (
             <>
-              <Text style={styles.manageBillingHint}>Cancel anytime from Manage Billing.</Text>
+              <Text style={styles.manageBillingHint}>{subscriptionManageHint}</Text>
               <View style={styles.manageBillingActions}>
                 <Pressable
                   onPress={handleManageBilling}
@@ -579,7 +689,7 @@ export default function CreditsScreen() {
                   ) : (
                     <>
                       <Ionicons name="settings-outline" size={16} color={Colors.white} />
-                      <Text style={styles.manageBillingButtonText}>Manage Billing</Text>
+                      <Text style={styles.manageBillingButtonText}>{manageSubscriptionLabel}</Text>
                     </>
                   )}
                 </Pressable>
@@ -599,7 +709,7 @@ export default function CreditsScreen() {
                   ) : (
                     <>
                       <Ionicons name="close-circle-outline" size={16} color={Colors.white} />
-                      <Text style={styles.manageBillingButtonText}>Cancel Subscription</Text>
+                      <Text style={styles.manageBillingButtonText}>{cancelSubscriptionLabel}</Text>
                     </>
                   )}
                 </Pressable>
@@ -726,6 +836,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
     color: Colors.black,
+  },
+  topUpInfoSecondaryButton: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  topUpInfoSecondaryButtonText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.white,
   },
   devToolsCard: {
     marginHorizontal: 20,
@@ -859,6 +985,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 16,
   },
+  subscriptionSyncText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
   subCard: {
     backgroundColor: Colors.card,
     borderRadius: 20,
@@ -974,6 +1106,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   subCancelButtonText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.white,
+  },
+  subManageButton: {
+    alignSelf: "flex-start",
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.surfaceLight,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  subManageButtonText: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     color: Colors.white,

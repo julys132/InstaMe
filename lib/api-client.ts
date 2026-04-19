@@ -55,6 +55,14 @@ export type SocialLoginPayload =
       name?: string;
     };
 
+export type SubscriptionProvider = "apple" | "stripe";
+
+export type SubscriptionStateResponse = {
+  subscription: string | null;
+  subscriptionProvider: SubscriptionProvider | null;
+  subscriptionRenewAt: string | null;
+};
+
 function withApiPortIfNeeded(hostOrDomain: string): string {
   const trimmed = hostOrDomain.trim();
   if (!trimmed) return trimmed;
@@ -408,7 +416,7 @@ class ApiClient {
   }
 
   async getCredits() {
-    return this.request<{ credits: number; subscription: string | null }>("/credits", {}, true);
+    return this.request<{ credits: number } & SubscriptionStateResponse>("/credits", {}, true);
   }
 
   async getCreditPackages() {
@@ -473,7 +481,7 @@ class ApiClient {
     if (!normalizedSessionId) {
       throw new Error("Missing payment session ID");
     }
-    return this.request<{ success: boolean; credits: number; subscription: string | null }>(
+    return this.request<{ success: boolean; credits: number } & SubscriptionStateResponse>(
       `/credits/verify-session/${encodeURIComponent(normalizedSessionId)}`,
       {},
       true,
@@ -481,11 +489,22 @@ class ApiClient {
   }
 
   async verifyApplePurchase(receiptData: string, productId: string) {
-    return this.request<{ success: boolean; credits: number; error?: string }>(
+    return this.request<{ success: boolean; credits: number; error?: string } & Partial<SubscriptionStateResponse>>(
       "/credits/apple-verify",
       {
         method: "POST",
         body: JSON.stringify({ receiptData, productId }),
+      },
+      true,
+    );
+  }
+
+  async syncAppleSubscriptions(receiptData: string) {
+    return this.request<{ success: boolean; credits: number } & SubscriptionStateResponse>(
+      "/credits/apple-sync",
+      {
+        method: "POST",
+        body: JSON.stringify({ receiptData }),
       },
       true,
     );

@@ -247,12 +247,12 @@ Use these exact actions for the visible sections in App Store Connect:
   - The app is not a medical device.
 
 - App Store Server Notifications:
-  - Leave both `Production Server URL` and `Sandbox Server URL` empty for now.
-  - Do not set URLs unless you have implemented Apple server notification endpoints on your backend.
+  - Set both `Production Server URL` and `Sandbox Server URL` to your backend notification endpoint.
+  - Recommended path: `https://YOUR_DOMAIN/api/apple/server-notifications`
 
 - App-Specific Shared Secret:
-  - Do not configure it right now unless you are actively shipping Apple auto-renewable subscriptions.
-  - For the current iOS review path focused on consumable credit packs, you can leave this untouched.
+  - Configure it before testing or submitting iOS auto-renewable subscriptions.
+  - Copy the shared secret into your backend environment as `APPLE_SHARED_SECRET`.
 
 - Additional Information:
   - No action needed there for submission.
@@ -276,10 +276,13 @@ Only configure this if you are actively using App Store server notifications for
 
 Current repo signals:
 - iOS credit packs are handled via IAP verification
-- iOS auto-renewable subscriptions are not clearly active in the shipped mobile flow
+- iOS auto-renewable subscriptions are active in the shipped mobile flow
+- Apple renew, cancel, expire, and revoke events can now be synchronized from backend notifications
 
 Recommended now:
-- leave blank unless you have implemented notification handling on your backend
+- configure both Production and Sandbox URLs to `https://YOUR_DOMAIN/api/apple/server-notifications`
+- keep `APPLE_SHARED_SECRET` configured for receipt verification
+- optional: leave `APPLE_SERVER_NOTIFICATION_ROOT_CERT_URL` at the default Apple Root CA G3 URL unless you need to override it
 
 ## App Review
 
@@ -443,8 +446,8 @@ Recommended:
 ### For The Screen You Attached
 
 Your current draft IAP is:
-- `Quick Start 5 Credits`
-- Product ID: `com.instame.app.credits.5`
+- `Quick Start 10 Credits`
+- Product ID: `com.instame.app.credits.quickstart10`
 - Type: `Consumable`
 
 If App Store Connect shows `Missing Metadata`, open that IAP and complete these fields:
@@ -452,16 +455,16 @@ If App Store Connect shows `Missing Metadata`, open that IAP and complete these 
 #### Required fields to fill
 
 - Reference Name:
-  `Quick Start 5 Credits`
+  `Quick Start 10 Credits`
 
 - Product ID:
-  `com.instame.app.credits.5`
+  `com.instame.app.credits.quickstart10`
 
 - Price:
   choose the tier matching `$2.99`
 
 - Localizations:
-  - Display Name: `5 Credits`
+  - Display Name: `Quick Start - 10 Credits`
   - Description: `Consumable credits used to generate and edit AI portrait images in Chicoo.`
 
 - Review Screenshot:
@@ -471,7 +474,7 @@ If App Store Connect shows `Missing Metadata`, open that IAP and complete these 
 
 - Save the IAP.
 - Go back to the app version page.
-- In `In-App Purchases and Subscriptions`, attach `Quick Start 5 Credits` to the version.
+- In `In-App Purchases and Subscriptions`, attach `Quick Start 10 Credits` to the version.
 - Submit the app version and that first IAP together.
 
 Important:
@@ -480,41 +483,41 @@ Important:
 
 #### Recommended metadata for the other packs
 
-- `com.instame.app.credits.15`
-  - Reference Name: `Creator Pack 15 Credits`
-  - Display Name: `15 Credits`
+- `com.instame.app.credits.creator30`
+  - Reference Name: `Creator Pack 30 Credits`
+  - Display Name: `Creator Pack - 30 Credits`
   - Description: `Consumable credits used to generate and edit AI portrait images in Chicoo.`
 
-- `com.instame.app.credits.30`
-  - Reference Name: `Studio Pack 30 Credits`
-  - Display Name: `30 Credits`
+- `com.instame.app.credits.studio60`
+  - Reference Name: `Studio Pack 60 Credits`
+  - Display Name: `Studio Pack - 60 Credits`
   - Description: `Consumable credits used to generate and edit AI portrait images in Chicoo.`
 
-- `com.instame.app.credits.100`
-  - Reference Name: `Best Value 100 Credits`
-  - Display Name: `100 Credits`
+- `com.instame.app.credits.bestvalue200`
+  - Reference Name: `Best Value 200 Credits`
+  - Display Name: `Best Value - 200 Credits`
   - Description: `Consumable credits used to generate and edit AI portrait images in Chicoo.`
 
 For iOS, create these as consumable credit packs if not already fully configured:
 
-- `com.instame.app.credits.5`
-  - Reference Name: `Quick Start 5 Credits`
-  - Display Name: `5 Credits`
+- `com.instame.app.credits.quickstart10`
+  - Reference Name: `Quick Start 10 Credits`
+  - Display Name: `Quick Start - 10 Credits`
   - Price: `$2.99`
 
-- `com.instame.app.credits.15`
-  - Reference Name: `Creator Pack 15 Credits`
-  - Display Name: `15 Credits`
+- `com.instame.app.credits.creator30`
+  - Reference Name: `Creator Pack 30 Credits`
+  - Display Name: `Creator Pack - 30 Credits`
   - Price: `$7.99`
 
-- `com.instame.app.credits.30`
-  - Reference Name: `Studio Pack 30 Credits`
-  - Display Name: `30 Credits`
+- `com.instame.app.credits.studio60`
+  - Reference Name: `Studio Pack 60 Credits`
+  - Display Name: `Studio Pack - 60 Credits`
   - Price: `$14.99`
 
-- `com.instame.app.credits.100`
-  - Reference Name: `Best Value 100 Credits`
-  - Display Name: `100 Credits`
+- `com.instame.app.credits.bestvalue200`
+  - Reference Name: `Best Value 200 Credits`
+  - Display Name: `Best Value - 200 Credits`
   - Price: `$44.99`
 
 IAP review screenshot guidance:
@@ -527,10 +530,48 @@ IAP review notes:
 
 ### Subscriptions
 
-Current recommendation for iOS submission:
+Current iOS subscription setup:
 
-- If subscriptions are not fully implemented through Apple IAP in the mobile app, do not configure or market iOS subscriptions yet.
-- If subscriptions are web-only today, do not make them part of the iOS review story.
+- iOS subscriptions should be created as `Auto-Renewable Subscriptions` in App Store Connect.
+- Put all three plans in one subscription group so users can upgrade or downgrade cleanly.
+- The app expects these product IDs by default:
+  - `com.instame.app.sub.lite.monthly`
+  - `com.instame.app.sub.plus.monthly`
+  - `com.instame.app.sub.studio.monthly`
+
+Recommended metadata:
+
+- `com.instame.app.sub.lite.monthly`
+  - Group: `Chicoo Pro`
+  - Reference Name: `Lite Monthly`
+  - Display Name: `Lite`
+  - Duration: `1 month`
+  - Price: `$4.99`
+  - Description: `20 credits every month for AI portrait styling and edits in Chicoo.`
+
+- `com.instame.app.sub.plus.monthly`
+  - Group: `Chicoo Pro`
+  - Reference Name: `Plus Monthly`
+  - Display Name: `Plus`
+  - Duration: `1 month`
+  - Price: `$9.99`
+  - Description: `50 credits every month for AI portrait styling and edits in Chicoo.`
+
+- `com.instame.app.sub.studio.monthly`
+  - Group: `Chicoo Pro`
+  - Reference Name: `Studio Monthly`
+  - Display Name: `Studio`
+  - Duration: `1 month`
+  - Price: `$19.99`
+  - Description: `100 credits every month for AI portrait styling and edits in Chicoo.`
+
+Review notes suggestion:
+
+`iOS subscriptions are auto-renewable subscriptions managed through Apple In-App Purchase. Users can purchase, restore, upgrade, downgrade, and cancel from Apple subscription management. Credits are granted monthly based on the active plan.`
+
+Server notification note:
+
+`The backend listens for App Store Server Notifications at /api/apple/server-notifications so Apple subscription renewals, cancellations, expirations, and revocations can update subscription state automatically.`
 
 ## Screenshots and Creative
 

@@ -48,7 +48,7 @@ export default function PrivacyScreen() {
           bullets: [
             "You can delete your account from the app profile screen.",
             "You can contact us to request account deletion, data export, or privacy support.",
-            "You can manage Stripe billing through the in-app Manage Billing flow when applicable.",
+            "You can manage subscriptions through Apple subscription settings on iOS or through the in-app billing flow where applicable.",
           ],
         },
         {

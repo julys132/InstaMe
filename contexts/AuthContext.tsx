@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiClient, type SocialLoginPayload } from "@/lib/api-client";
+import { apiClient, type SocialLoginPayload, type SubscriptionProvider } from "@/lib/api-client";
 
 export interface User {
   id: string;
@@ -9,6 +9,8 @@ export interface User {
   provider?: "email" | "apple" | "google";
   credits?: number;
   subscription?: string | null;
+  subscriptionProvider?: SubscriptionProvider | null;
+  subscriptionRenewAt?: string | null;
   styleGender?: "female" | "male" | "non_binary" | null;
   stylePreferences?: string[];
   favoriteLooks?: string[];

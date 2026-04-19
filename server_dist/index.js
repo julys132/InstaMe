@@ -64,6 +64,7 @@ var users = (0, import_pg_core.pgTable)("users", {
   subscriptionRenewAt: (0, import_pg_core.timestamp)("subscription_renew_at"),
   stripeCustomerId: (0, import_pg_core.text)("stripe_customer_id"),
   stripeSubscriptionId: (0, import_pg_core.text)("stripe_subscription_id"),
+  appleOriginalTransactionId: (0, import_pg_core.text)("apple_original_transaction_id"),
   styleGender: (0, import_pg_core.text)("style_gender"),
   stylePreferences: (0, import_pg_core.jsonb)("style_preferences").$type().notNull().default(import_drizzle_orm.sql`'[]'::jsonb`),
   favoriteLooks: (0, import_pg_core.jsonb)("favorite_looks").$type().notNull().default(import_drizzle_orm.sql`'[]'::jsonb`),
@@ -1276,6 +1277,8 @@ function parseJwt(token) {
 }
 var appleKeysCache = null;
 var APPLE_KEYS_TTL_MS = 60 * 60 * 1e3;
+var appleNotificationRootCertCache = null;
+var APPLE_NOTIFICATION_ROOT_CERT_TTL_MS = 24 * 60 * 60 * 1e3;
 async function getAppleSigningKeys() {
   if (appleKeysCache && Date.now() - appleKeysCache.fetchedAt < APPLE_KEYS_TTL_MS) {
     return appleKeysCache.keys;
@@ -1291,6 +1294,71 @@ async function getAppleSigningKeys() {
   }
   appleKeysCache = { keys, fetchedAt: Date.now() };
   return keys;
+}
+function getAppleNotificationRootCertUrl() {
+  return normalizeStringValue(process.env.APPLE_SERVER_NOTIFICATION_ROOT_CERT_URL) || "https://www.apple.com/certificateauthority/AppleRootCA-G3.cer";
+}
+async function getTrustedAppleNotificationRootCertificate() {
+  if (appleNotificationRootCertCache && Date.now() - appleNotificationRootCertCache.fetchedAt < APPLE_NOTIFICATION_ROOT_CERT_TTL_MS) {
+    return appleNotificationRootCertCache.cert;
+  }
+  const response = await fetch(getAppleNotificationRootCertUrl());
+  if (!response.ok) {
+    throw new Error("Could not load Apple notification root certificate");
+  }
+  const cert = new import_node_crypto2.X509Certificate(Buffer.from(await response.arrayBuffer()));
+  appleNotificationRootCertCache = { cert, fetchedAt: Date.now() };
+  return cert;
+}
+function assertCertificateIsValidNow(cert, label) {
+  const now = Date.now();
+  const validFrom = Date.parse(cert.validFrom);
+  const validTo = Date.parse(cert.validTo);
+  if (!Number.isFinite(validFrom) || !Number.isFinite(validTo) || now < validFrom || now > validTo) {
+    throw new Error(`${label} certificate is outside its validity window`);
+  }
+}
+async function verifyAppleServerSignedPayload(signedPayload) {
+  const parsed = parseJwt(signedPayload);
+  const x5c = Array.isArray(parsed.header.x5c) ? parsed.header.x5c : [];
+  if (parsed.header.alg !== "ES256" || x5c.length === 0) {
+    throw new Error("Apple signed payload header is invalid");
+  }
+  const certificateChain = x5c.map((entry, index) => {
+    if (typeof entry !== "string" || !entry.trim()) {
+      throw new Error(`Apple certificate ${index + 1} is invalid`);
+    }
+    return new import_node_crypto2.X509Certificate(Buffer.from(entry, "base64"));
+  });
+  certificateChain.forEach((cert, index) => {
+    assertCertificateIsValidNow(cert, `Apple chain ${index + 1}`);
+  });
+  const trustedRoot = await getTrustedAppleNotificationRootCertificate();
+  assertCertificateIsValidNow(trustedRoot, "Trusted Apple root");
+  for (let index = 0; index < certificateChain.length - 1; index += 1) {
+    if (!certificateChain[index].verify(certificateChain[index + 1].publicKey)) {
+      throw new Error("Apple notification certificate chain is invalid");
+    }
+  }
+  if (!certificateChain[certificateChain.length - 1].verify(trustedRoot.publicKey)) {
+    throw new Error("Apple notification root trust validation failed");
+  }
+  const verifier = (0, import_node_crypto2.createVerify)("SHA256");
+  verifier.update(parsed.signedPart);
+  verifier.end();
+  if (!verifier.verify(certificateChain[0].publicKey, parsed.signature)) {
+    throw new Error("Apple notification signature is invalid");
+  }
+  return parsed.payload;
+}
+function decodeAppleSignedSubPayload(input) {
+  const signedPayload = normalizeStringValue(input);
+  if (!signedPayload) return null;
+  try {
+    return parseJwt(signedPayload).payload;
+  } catch {
+    return null;
+  }
 }
 function getAppleAudienceSet() {
   return new Set(
@@ -1399,16 +1467,24 @@ async function verifyAppleIdentityToken(identityToken) {
   return { sub, email };
 }
 var CREDIT_PACKAGES = [
-  { id: "pack_5", name: "Quick Start", credits: 5, priceCents: 299 },
-  { id: "pack_15", name: "Creator Pack", credits: 15, priceCents: 799, popular: true },
-  { id: "pack_30", name: "Studio Pack", credits: 30, priceCents: 1499 },
-  { id: "pack_100", name: "Best Value", credits: 100, priceCents: 4499 }
+  { id: "pack_5", name: "Quick Start - 10 Credits", credits: 10, priceCents: 299 },
+  { id: "pack_15", name: "Creator Pack - 30 Credits", credits: 30, priceCents: 799, popular: true },
+  { id: "pack_30", name: "Studio Pack - 60 Credits", credits: 60, priceCents: 1499 },
+  { id: "pack_100", name: "Best Value - 200 Credits", credits: 200, priceCents: 4499 }
 ];
 var SUBSCRIPTION_PLANS = [
-  { id: "sub_basic", name: "Lite", creditsPerMonth: 8, priceCents: 499 },
-  { id: "sub_premium", name: "Plus", creditsPerMonth: 20, priceCents: 999, popular: true },
-  { id: "sub_unlimited", name: "Studio", creditsPerMonth: 45, priceCents: 1999 }
+  { id: "sub_basic", name: "Lite", creditsPerMonth: 20, priceCents: 499 },
+  { id: "sub_premium", name: "Plus", creditsPerMonth: 50, priceCents: 999, popular: true },
+  { id: "sub_unlimited", name: "Studio", creditsPerMonth: 100, priceCents: 1999 }
 ];
+var DEFAULT_APPLE_SUBSCRIPTION_PRODUCT_TO_PLAN = {
+  "com.instame.app.sub.lite.monthly": "sub_basic",
+  "com.instame.app.sub.plus.monthly": "sub_premium",
+  "com.instame.app.sub.studio.monthly": "sub_unlimited"
+};
+function getSubscriptionPlanById(planId) {
+  return SUBSCRIPTION_PLANS.find((plan) => plan.id === planId);
+}
 var STYLE_COSTS = {
   text: 2,
   image: 5
@@ -1458,14 +1534,14 @@ var MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8e3;
 var STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 var INSTAME_HIGH_RES_OUTPUT_DIMENSION = 1024;
 var DEFAULT_IAP_PRODUCT_CREDITS = {
-  "com.instame.app.credits.5": 5,
-  "com.instame.app.credits.15": 15,
-  "com.instame.app.credits.30": 30,
-  "com.instame.app.credits.100": 100,
-  "com.iulia.muse.credits.5": 5,
-  "com.iulia.muse.credits.15": 15,
-  "com.iulia.muse.credits.30": 30,
-  "com.iulia.muse.credits.100": 100
+  "com.instame.app.credits.quickstart10": 10,
+  "com.instame.app.credits.creator30": 30,
+  "com.instame.app.credits.studio60": 60,
+  "com.instame.app.credits.bestvalue200": 200,
+  "com.iulia.muse.credits.quickstart10": 10,
+  "com.iulia.muse.credits.creator30": 30,
+  "com.iulia.muse.credits.studio60": 60,
+  "com.iulia.muse.credits.bestvalue200": 200
 };
 function parseProductCreditsMap(raw) {
   if (!raw || !raw.trim()) return {};
@@ -1492,6 +1568,28 @@ function parseProductCreditsMap(raw) {
     }, {});
   }
 }
+function parseProductMap(raw) {
+  if (!raw || !raw.trim()) return {};
+  const trimmed = raw.trim();
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return Object.entries(parsed).reduce((acc, [key, value]) => {
+      if (typeof key === "string" && typeof value === "string" && key.trim() && value.trim()) {
+        acc[key.trim()] = value.trim();
+      }
+      return acc;
+    }, {});
+  } catch {
+    return trimmed.split(",").map((entry) => entry.trim()).filter(Boolean).reduce((acc, entry) => {
+      const [keyRaw, valueRaw] = entry.split(":").map((part) => part.trim());
+      if (keyRaw && valueRaw) {
+        acc[keyRaw] = valueRaw;
+      }
+      return acc;
+    }, {});
+  }
+}
 var SHARED_IAP_PRODUCT_CREDITS = parseProductCreditsMap(process.env.IAP_PRODUCT_CREDITS);
 var APPLE_IAP_PRODUCT_CREDITS = {
   ...DEFAULT_IAP_PRODUCT_CREDITS,
@@ -1502,6 +1600,11 @@ var GOOGLE_IAP_PRODUCT_CREDITS = {
   ...DEFAULT_IAP_PRODUCT_CREDITS,
   ...SHARED_IAP_PRODUCT_CREDITS,
   ...parseProductCreditsMap(process.env.GOOGLE_IAP_PRODUCT_CREDITS)
+};
+var APPLE_IAP_SUBSCRIPTION_PRODUCTS = {
+  ...DEFAULT_APPLE_SUBSCRIPTION_PRODUCT_TO_PLAN,
+  ...parseProductMap(process.env.IAP_SUBSCRIPTION_PRODUCT_MAP),
+  ...parseProductMap(process.env.APPLE_IAP_SUBSCRIPTION_PRODUCT_MAP)
 };
 var STYLE_REFERENCE_LIBRARY_PATH = path2.resolve(
   process.cwd(),
@@ -1680,17 +1783,31 @@ function isValidEmail(email) {
 }
 function sanitizeUser(user) {
   const normalizedStyleGender = normalizeStyleGender(user.styleGender);
+  const subscriptionState = serializeSubscriptionState(user);
   return {
     id: user.id,
     email: user.email,
     name: user.name,
     provider: user.authProvider || "email",
     credits: user.credits,
-    subscription: user.subscriptionPlan,
+    ...subscriptionState,
     styleGender: normalizedStyleGender || null,
     stylePreferences: Array.isArray(user.stylePreferences) ? user.stylePreferences : [],
     favoriteLooks: Array.isArray(user.favoriteLooks) ? user.favoriteLooks : [],
     notificationsEnabled: user.notificationsEnabled
+  };
+}
+function resolveSubscriptionProvider(input) {
+  if (!normalizeStringValue(input.subscriptionPlan)) {
+    return null;
+  }
+  return normalizeStringValue(input.stripeSubscriptionId) ? "stripe" : "apple";
+}
+function serializeSubscriptionState(input) {
+  return {
+    subscription: normalizeStringValue(input.subscriptionPlan) || null,
+    subscriptionProvider: resolveSubscriptionProvider(input),
+    subscriptionRenewAt: input.subscriptionRenewAt ? input.subscriptionRenewAt.toISOString() : null
   };
 }
 function normalizeOutputMode(input) {
@@ -1729,6 +1846,23 @@ function normalizeStringValue(input) {
     return first ? first.trim() : "";
   }
   return "";
+}
+function parseAppleMilliseconds(input) {
+  const value = normalizeStringValue(input);
+  if (!value) return 0;
+  const numericValue = Number.parseInt(value, 10);
+  if (Number.isFinite(numericValue) && numericValue > 0) {
+    return numericValue;
+  }
+  const parsedDate = Date.parse(value);
+  return Number.isFinite(parsedDate) ? parsedDate : 0;
+}
+function parseAppleBooleanFlag(input) {
+  const value = normalizeStringValue(input).toLowerCase();
+  if (!value) return null;
+  if (value === "1" || value === "true") return true;
+  if (value === "0" || value === "false") return false;
+  return null;
 }
 function normalizeUsageMap(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -3445,6 +3579,246 @@ async function grantVerifiedInAppCredits(params) {
     };
   });
 }
+async function grantVerifiedAppleSubscriptionCredits(params) {
+  return db.transaction(async (tx) => {
+    const [user] = await tx.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+    if (!user) {
+      return { status: "missing_user", credits: 0 };
+    }
+    const inserted = await tx.insert(creditTransactions).values({
+      userId: params.userId,
+      type: "subscription",
+      amountCredits: params.credits,
+      amountUsdCents: params.amountUsdCents,
+      source: "app",
+      description: params.description,
+      stripePaymentIntentId: params.transactionId
+    }).onConflictDoNothing().returning({ id: creditTransactions.id });
+    if (inserted.length === 0) {
+      const [existingTransaction] = await tx.select({ userId: creditTransactions.userId }).from(creditTransactions).where((0, import_drizzle_orm3.eq)(creditTransactions.stripePaymentIntentId, params.transactionId));
+      const [existingUser] = await tx.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+      return {
+        status: "duplicate",
+        credits: existingUser?.credits ?? user.credits,
+        existingOwnerId: existingTransaction?.userId ?? null
+      };
+    }
+    await tx.update(users).set({
+      credits: import_drizzle_orm3.sql`${users.credits} + ${params.credits}`,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+    const [updatedUser] = await tx.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+    return {
+      status: "granted",
+      credits: updatedUser?.credits ?? user.credits + params.credits
+    };
+  });
+}
+async function verifyAppleReceiptData(receiptData) {
+  const verifyReceipt = async (url) => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        "receipt-data": receiptData,
+        password: process.env.APPLE_SHARED_SECRET || "",
+        "exclude-old-transactions": false
+      })
+    });
+    return response.json();
+  };
+  let appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+  if (appleResult?.status === 21007) {
+    appleResult = await verifyReceipt("https://sandbox.itunes.apple.com/verifyReceipt");
+  } else if (appleResult?.status === 21008) {
+    appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+  }
+  if (appleResult?.status !== 0) {
+    throw new Error("Apple receipt verification failed");
+  }
+  const expectedBundleId = normalizeStringValue(
+    process.env.APPLE_BUNDLE_ID || process.env.EXPO_PUBLIC_APPLE_BUNDLE_ID
+  );
+  const receiptBundleId = normalizeStringValue(appleResult?.receipt?.bundle_id);
+  if (expectedBundleId && receiptBundleId !== expectedBundleId) {
+    throw new Error("Apple receipt bundle ID mismatch");
+  }
+  return appleResult;
+}
+function getAppleReceiptTransactions(appleResult) {
+  if (Array.isArray(appleResult?.latest_receipt_info)) {
+    return appleResult.latest_receipt_info;
+  }
+  if (Array.isArray(appleResult?.receipt?.in_app)) {
+    return appleResult.receipt.in_app;
+  }
+  return [];
+}
+async function getUserCreditsSubscriptionState(userId) {
+  const [user] = await db.select({
+    credits: users.credits,
+    appleOriginalTransactionId: users.appleOriginalTransactionId,
+    subscriptionPlan: users.subscriptionPlan,
+    subscriptionRenewAt: users.subscriptionRenewAt,
+    stripeSubscriptionId: users.stripeSubscriptionId
+  }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
+  return {
+    credits: user?.credits ?? 0,
+    ...user ? serializeSubscriptionState(user) : { subscription: null, subscriptionProvider: null, subscriptionRenewAt: null }
+  };
+}
+async function linkAppleOriginalTransactionId(userId, originalTransactionId) {
+  const normalizedOriginalTransactionId = normalizeStringValue(originalTransactionId);
+  if (!normalizedOriginalTransactionId) return;
+  await db.update(users).set({
+    appleOriginalTransactionId: normalizedOriginalTransactionId,
+    updatedAt: /* @__PURE__ */ new Date()
+  }).where((0, import_drizzle_orm3.eq)(users.id, userId));
+}
+async function applyAppleSubscriptionNotificationUpdate(params) {
+  const normalizedOriginalTransactionId = normalizeStringValue(params.originalTransactionId);
+  const normalizedProductId = normalizeStringValue(params.productId);
+  const normalizedTransactionId = normalizeStringValue(params.transactionId);
+  const planId = APPLE_IAP_SUBSCRIPTION_PRODUCTS[normalizedProductId];
+  const plan = planId ? getSubscriptionPlanById(planId) : void 0;
+  const isActive = Boolean(plan) && params.revocationMs <= 0 && params.expiresMs > Date.now();
+  if (normalizedOriginalTransactionId) {
+    await linkAppleOriginalTransactionId(params.userId, normalizedOriginalTransactionId);
+  }
+  if (plan && normalizedTransactionId && params.revocationMs <= 0) {
+    await grantVerifiedAppleSubscriptionCredits({
+      userId: params.userId,
+      transactionId: normalizedTransactionId,
+      credits: plan.creditsPerMonth,
+      amountUsdCents: plan.priceCents,
+      description: `${plan.name} Apple subscription`
+    });
+  }
+  if (isActive && plan) {
+    await db.update(users).set({
+      appleOriginalTransactionId: normalizedOriginalTransactionId || null,
+      subscriptionPlan: plan.id,
+      subscriptionRenewAt: new Date(params.expiresMs),
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+    return;
+  }
+  const [currentUser] = await db.select({
+    appleOriginalTransactionId: users.appleOriginalTransactionId,
+    stripeSubscriptionId: users.stripeSubscriptionId,
+    subscriptionPlan: users.subscriptionPlan
+  }).from(users).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+  if (currentUser?.subscriptionPlan && resolveSubscriptionProvider(currentUser) === "apple" && (!normalizedOriginalTransactionId || currentUser.appleOriginalTransactionId === normalizedOriginalTransactionId)) {
+    await db.update(users).set({
+      subscriptionPlan: null,
+      subscriptionRenewAt: null,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+  }
+}
+async function findUserForAppleNotification(params) {
+  const accountToken = normalizeStringValue(params.appAccountToken);
+  if (accountToken) {
+    const [userById] = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm3.eq)(users.id, accountToken));
+    if (userById) {
+      return userById;
+    }
+  }
+  const originalTransactionId = normalizeStringValue(params.originalTransactionId);
+  if (!originalTransactionId) {
+    return null;
+  }
+  const [userByOriginalTransaction] = await db.select({ id: users.id }).from(users).where((0, import_drizzle_orm3.eq)(users.appleOriginalTransactionId, originalTransactionId));
+  return userByOriginalTransaction || null;
+}
+async function syncAppleSubscriptionReceiptState(params) {
+  const appleResult = await verifyAppleReceiptData(params.receiptData);
+  const knownSubscriptionProductIds = new Set(Object.keys(APPLE_IAP_SUBSCRIPTION_PRODUCTS));
+  const receiptTransactions = getAppleReceiptTransactions(appleResult).filter((transaction) => knownSubscriptionProductIds.has(normalizeStringValue(transaction?.product_id))).filter((transaction) => {
+    if (!params.productId) return true;
+    return normalizeStringValue(transaction?.product_id) === params.productId;
+  }).sort((a, b) => {
+    const aMs = Number.parseInt(String(a?.purchase_date_ms || "0"), 10);
+    const bMs = Number.parseInt(String(b?.purchase_date_ms || "0"), 10);
+    return aMs - bMs;
+  });
+  if (params.productId && !APPLE_IAP_SUBSCRIPTION_PRODUCTS[params.productId]) {
+    throw new Error("Unknown Apple subscription product ID");
+  }
+  let lastGrantCredits = 0;
+  for (const transaction of receiptTransactions) {
+    const transactionId = normalizeStringValue(transaction?.transaction_id);
+    const originalTransactionId = normalizeStringValue(transaction?.original_transaction_id);
+    const receiptProductId = normalizeStringValue(transaction?.product_id);
+    const planId = APPLE_IAP_SUBSCRIPTION_PRODUCTS[receiptProductId];
+    const plan = planId ? getSubscriptionPlanById(planId) : void 0;
+    const cancellationDateMs = Number.parseInt(String(transaction?.cancellation_date_ms || "0"), 10);
+    if (!transactionId || !plan || cancellationDateMs > 0) {
+      continue;
+    }
+    if (originalTransactionId) {
+      await linkAppleOriginalTransactionId(params.userId, originalTransactionId);
+    }
+    const grantResult = await grantVerifiedAppleSubscriptionCredits({
+      userId: params.userId,
+      transactionId,
+      credits: plan.creditsPerMonth,
+      amountUsdCents: plan.priceCents,
+      description: `${plan.name} Apple subscription`
+    });
+    if (grantResult.status === "missing_user") {
+      throw new Error("User not found");
+    }
+    if (grantResult.status === "duplicate" && grantResult.existingOwnerId && grantResult.existingOwnerId !== params.userId) {
+      return { status: "claimed_by_other_user" };
+    }
+    if (grantResult.status === "granted") {
+      lastGrantCredits = grantResult.credits;
+    }
+  }
+  const nowMs = Date.now();
+  const activeTransaction = receiptTransactions.filter((transaction) => Number.parseInt(String(transaction?.cancellation_date_ms || "0"), 10) <= 0).sort((a, b) => {
+    const aMs = Number.parseInt(String(a?.expires_date_ms || a?.purchase_date_ms || "0"), 10);
+    const bMs = Number.parseInt(String(b?.expires_date_ms || b?.purchase_date_ms || "0"), 10);
+    return bMs - aMs;
+  }).find((transaction) => {
+    const expiresMs = Number.parseInt(String(transaction?.expires_date_ms || "0"), 10);
+    return expiresMs > nowMs;
+  });
+  const [currentUser] = await db.select({
+    subscriptionPlan: users.subscriptionPlan,
+    stripeSubscriptionId: users.stripeSubscriptionId
+  }).from(users).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+  if (activeTransaction) {
+    const activeProductId = normalizeStringValue(activeTransaction?.product_id);
+    const activeOriginalTransactionId = normalizeStringValue(activeTransaction?.original_transaction_id);
+    const activePlanId = APPLE_IAP_SUBSCRIPTION_PRODUCTS[activeProductId];
+    const activePlan = activePlanId ? getSubscriptionPlanById(activePlanId) : void 0;
+    const expiresMs = Number.parseInt(String(activeTransaction?.expires_date_ms || "0"), 10);
+    if (activePlan && expiresMs > nowMs) {
+      await db.update(users).set({
+        appleOriginalTransactionId: activeOriginalTransactionId || null,
+        subscriptionPlan: activePlan.id,
+        subscriptionRenewAt: new Date(expiresMs),
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+    }
+  } else if (currentUser?.subscriptionPlan && resolveSubscriptionProvider(currentUser) === "apple") {
+    await db.update(users).set({
+      subscriptionPlan: null,
+      subscriptionRenewAt: null,
+      updatedAt: /* @__PURE__ */ new Date()
+    }).where((0, import_drizzle_orm3.eq)(users.id, params.userId));
+  }
+  return {
+    status: "ok",
+    credits: lastGrantCredits
+  };
+}
 async function createGoogleJwt(serviceAccount) {
   const header = { alg: "RS256", typ: "JWT" };
   const now = Math.floor(Date.now() / 1e3);
@@ -3920,13 +4294,89 @@ async function registerRoutes(app2) {
       return res.status(500).json({ error: "Failed to process Stripe webhook" });
     }
   });
+  app2.post("/api/apple/server-notifications", async (req, res) => {
+    try {
+      const signedPayload = normalizeStringValue(req.body?.signedPayload);
+      if (!signedPayload) {
+        return res.status(400).json({ error: "Missing signedPayload" });
+      }
+      const payload = await verifyAppleServerSignedPayload(signedPayload);
+      const data = payload.data || {};
+      const transactionPayload = decodeAppleSignedSubPayload(data.signedTransactionInfo);
+      const renewalPayload = decodeAppleSignedSubPayload(data.signedRenewalInfo);
+      const expectedBundleId = normalizeStringValue(
+        process.env.APPLE_BUNDLE_ID || process.env.EXPO_PUBLIC_APPLE_BUNDLE_ID
+      );
+      const bundleId = normalizeStringValue(transactionPayload?.bundleId || data.bundleId);
+      if (expectedBundleId && bundleId && bundleId !== expectedBundleId) {
+        return res.status(400).json({ error: "Apple notification bundle ID mismatch" });
+      }
+      const user = await findUserForAppleNotification({
+        appAccountToken: transactionPayload?.appAccountToken,
+        originalTransactionId: transactionPayload?.originalTransactionId || renewalPayload?.originalTransactionId
+      });
+      if (!user) {
+        return res.status(200).json({ received: true, ignored: true, reason: "user_not_found" });
+      }
+      const productId = normalizeStringValue(
+        transactionPayload?.productId || renewalPayload?.autoRenewProductId || renewalPayload?.productId
+      );
+      const originalTransactionId = normalizeStringValue(
+        transactionPayload?.originalTransactionId || renewalPayload?.originalTransactionId
+      );
+      const transactionId = normalizeStringValue(transactionPayload?.transactionId) || null;
+      const expiresMs = parseAppleMilliseconds(transactionPayload?.expiresDate);
+      const revocationMs = parseAppleMilliseconds(transactionPayload?.revocationDate);
+      if (productId || originalTransactionId) {
+        await applyAppleSubscriptionNotificationUpdate({
+          userId: user.id,
+          transactionId,
+          originalTransactionId: originalTransactionId || null,
+          productId: productId || null,
+          expiresMs,
+          revocationMs
+        });
+      }
+      const autoRenewStatus = parseAppleBooleanFlag(renewalPayload?.autoRenewStatus);
+      if (autoRenewStatus === false && expiresMs <= Date.now()) {
+        const [currentUser] = await db.select({
+          appleOriginalTransactionId: users.appleOriginalTransactionId,
+          stripeSubscriptionId: users.stripeSubscriptionId,
+          subscriptionPlan: users.subscriptionPlan
+        }).from(users).where((0, import_drizzle_orm3.eq)(users.id, user.id));
+        if (currentUser?.subscriptionPlan && resolveSubscriptionProvider(currentUser) === "apple" && (!originalTransactionId || currentUser.appleOriginalTransactionId === originalTransactionId)) {
+          await db.update(users).set({
+            subscriptionPlan: null,
+            subscriptionRenewAt: null,
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where((0, import_drizzle_orm3.eq)(users.id, user.id));
+        }
+      }
+      return res.status(200).json({
+        received: true,
+        notificationType: normalizeStringValue(payload.notificationType),
+        subtype: normalizeStringValue(payload.subtype) || null
+      });
+    } catch (error) {
+      console.error("Apple server notification error:", error);
+      return res.status(400).json({ error: toErrorMessage(error, "Invalid Apple server notification") });
+    }
+  });
   app2.get("/api/credits", authMiddleware, async (req, res) => {
     try {
-      const [user] = await db.select({ credits: users.credits, subscription: users.subscriptionPlan }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+      const [user] = await db.select({
+        credits: users.credits,
+        subscriptionPlan: users.subscriptionPlan,
+        subscriptionRenewAt: users.subscriptionRenewAt,
+        stripeSubscriptionId: users.stripeSubscriptionId
+      }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      res.json(user);
+      res.json({
+        credits: user.credits,
+        ...serializeSubscriptionState(user)
+      });
     } catch (error) {
       console.error("Get credits error:", error);
       res.status(500).json({ error: "Failed to load credits" });
@@ -4129,11 +4579,10 @@ async function registerRoutes(app2) {
         return res.status(403).json({ error: "Session does not belong to this user" });
       }
       await processPaidStripeSession(session);
-      const [updatedUser] = await db.select({ credits: users.credits, subscription: users.subscriptionPlan }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+      const state = await getUserCreditsSubscriptionState(req.user.id);
       res.json({
         success: true,
-        credits: updatedUser?.credits || 0,
-        subscription: updatedUser?.subscription || null
+        ...state
       });
     } catch (error) {
       console.error("Verify session error:", error);
@@ -4149,41 +4598,28 @@ async function registerRoutes(app2) {
         return res.status(400).json({ success: false, error: "Missing receipt data or product ID" });
       }
       const expectedCredits = APPLE_IAP_PRODUCT_CREDITS[productId];
-      if (!expectedCredits) {
+      const subscriptionPlanId = APPLE_IAP_SUBSCRIPTION_PRODUCTS[productId];
+      const subscriptionPlan = subscriptionPlanId ? getSubscriptionPlanById(subscriptionPlanId) : void 0;
+      if (!expectedCredits && !subscriptionPlan) {
         return res.status(400).json({ success: false, error: "Unknown Apple product ID" });
       }
-      const verifyReceipt = async (url) => {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            "receipt-data": receiptData,
-            password: process.env.APPLE_SHARED_SECRET || "",
-            "exclude-old-transactions": true
-          })
+      if (subscriptionPlan) {
+        const syncResult = await syncAppleSubscriptionReceiptState({
+          userId,
+          receiptData,
+          productId
         });
-        return response.json();
-      };
-      let appleResult = await verifyReceipt(
-        process.env.NODE_ENV === "production" ? "https://buy.itunes.apple.com/verifyReceipt" : "https://sandbox.itunes.apple.com/verifyReceipt"
-      );
-      if (appleResult?.status === 21007) {
-        appleResult = await verifyReceipt("https://sandbox.itunes.apple.com/verifyReceipt");
-      } else if (appleResult?.status === 21008) {
-        appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+        if (syncResult.status === "claimed_by_other_user") {
+          return res.status(409).json({ success: false, error: "This Apple subscription is already linked to another account." });
+        }
+        const state = await getUserCreditsSubscriptionState(userId);
+        return res.json({
+          success: true,
+          ...state
+        });
       }
-      if (appleResult?.status !== 0) {
-        return res.status(400).json({ success: false, error: "Apple receipt verification failed" });
-      }
-      const expectedBundleId = normalizeStringValue(
-        process.env.APPLE_BUNDLE_ID || process.env.EXPO_PUBLIC_APPLE_BUNDLE_ID
-      );
-      const receiptBundleId = normalizeStringValue(appleResult?.receipt?.bundle_id);
-      if (expectedBundleId && receiptBundleId !== expectedBundleId) {
-        return res.status(400).json({ success: false, error: "Apple receipt bundle ID mismatch" });
-      }
-      const inAppItems = Array.isArray(appleResult?.latest_receipt_info) ? appleResult.latest_receipt_info : Array.isArray(appleResult?.receipt?.in_app) ? appleResult.receipt.in_app : [];
-      const matchingTransactions = inAppItems.filter((item) => item?.product_id === productId).sort((a, b) => {
+      const appleResult = await verifyAppleReceiptData(receiptData);
+      const matchingTransactions = getAppleReceiptTransactions(appleResult).filter((item) => item?.product_id === productId).sort((a, b) => {
         const aMs = Number.parseInt(String(a?.purchase_date_ms || "0"), 10);
         const bMs = Number.parseInt(String(b?.purchase_date_ms || "0"), 10);
         return bMs - aMs;
@@ -4219,6 +4655,29 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Apple verify error:", error);
       return res.status(500).json({ success: false, error: "Failed to verify Apple purchase" });
+    }
+  });
+  app2.post("/api/credits/apple-sync", authMiddleware, async (req, res) => {
+    try {
+      const receiptData = normalizeStringValue(req.body?.receiptData);
+      if (!receiptData) {
+        return res.status(400).json({ success: false, error: "Missing receipt data" });
+      }
+      const syncResult = await syncAppleSubscriptionReceiptState({
+        userId: req.user.id,
+        receiptData
+      });
+      if (syncResult.status === "claimed_by_other_user") {
+        return res.status(409).json({ success: false, error: "This Apple subscription is already linked to another account." });
+      }
+      const state = await getUserCreditsSubscriptionState(req.user.id);
+      return res.json({
+        success: true,
+        ...state
+      });
+    } catch (error) {
+      console.error("Apple subscription sync error:", error);
+      return res.status(500).json({ success: false, error: "Failed to sync Apple subscription" });
     }
   });
   app2.post("/api/credits/google-verify", authMiddleware, async (req, res) => {

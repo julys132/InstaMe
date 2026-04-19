@@ -10,6 +10,7 @@ import ChicooBackground from "@/components/ChicooBackground";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useCredits, SUBSCRIPTION_PLANS } from "@/contexts/CreditsContext";
+import { openNativeSubscriptionManagement } from "@/hooks/useIAP";
 
 const DEV_TEST_EMAIL = "iuliastarcean@gmail.com";
 
@@ -40,12 +41,14 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout, deleteAccount } = useAuth();
   const { items, outfits } = useWardrobe();
-  const { credits, subscription, grantDevCredits } = useCredits();
+  const { credits, subscription, subscriptionProvider, subscriptionRenewAt, grantDevCredits } = useCredits();
   const [devCreditLoading, setDevCreditLoading] = useState(false);
+  const [manageSubscriptionLoading, setManageSubscriptionLoading] = useState(false);
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
   const activeSub = SUBSCRIPTION_PLANS.find(p => p.id === subscription);
+  const isAppleManagedSubscription = Platform.OS === "ios" && subscriptionProvider === "apple";
   const isDeveloperAccount = user?.email?.toLowerCase() === DEV_TEST_EMAIL;
   const styleGenderLabel =
     user?.styleGender === "female"
@@ -130,6 +133,30 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleManageSubscription = async () => {
+    if (!activeSub) {
+      router.push("/(tabs)/credits" as any);
+      return;
+    }
+
+    if (!isAppleManagedSubscription) {
+      router.push("/(tabs)/credits" as any);
+      return;
+    }
+
+    setManageSubscriptionLoading(true);
+    try {
+      const opened = await openNativeSubscriptionManagement();
+      if (!opened) {
+        throw new Error("Could not open Apple subscription settings.");
+      }
+    } catch (error: any) {
+      Alert.alert("Manage Subscription", error?.message || "Could not open Apple subscription settings.");
+    } finally {
+      setManageSubscriptionLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ChicooBackground />
@@ -188,12 +215,25 @@ export default function ProfileScreen() {
                 <Text style={styles.subBadgeText}>{activeSub.name} Plan Active</Text>
               </View>
               <Pressable
-                onPress={() => router.push("/(tabs)/credits" as any)}
+                onPress={handleManageSubscription}
                 style={({ pressed }) => [styles.manageBillingButton, pressed && { opacity: 0.85 }]}
               >
-                <Ionicons name="settings-outline" size={16} color={Colors.white} />
-                <Text style={styles.manageBillingButtonText}>Manage Billing</Text>
+                {manageSubscriptionLoading ? (
+                  <ActivityIndicator color={Colors.white} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="settings-outline" size={16} color={Colors.white} />
+                    <Text style={styles.manageBillingButtonText}>
+                      {isAppleManagedSubscription ? "Manage on Apple" : "Manage Billing"}
+                    </Text>
+                  </>
+                )}
               </Pressable>
+              {subscriptionRenewAt ? (
+                <Text style={styles.subscriptionRenewText}>
+                  Renews on {new Date(subscriptionRenewAt).toLocaleDateString()}
+                </Text>
+              ) : null}
             </>
           )}
           {isDeveloperAccount ? (
@@ -390,6 +430,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.white,
   },
+  subscriptionRenewText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
   devCreditsButton: {
     marginTop: 4,
     alignSelf: "flex-start",
@@ -494,4 +539,3 @@ const styles = StyleSheet.create({
     color: "#FF6666",
   },
 });
-
