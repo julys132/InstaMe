@@ -226,7 +226,6 @@ export default function ProfileScreen() {
 
         <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.menuSection}>
           <MenuItem icon="diamond-outline" label="Credits & Subscription" onPress={() => router.push("/(tabs)/credits" as any)} />
-          <MenuItem icon="color-palette-outline" label="Style Preferences" onPress={() => router.push("/(tabs)/style-preferences" as any)} />
           <MenuItem icon="heart-outline" label="Favorites" onPress={() => router.push("/(tabs)/favorites" as any)} />
           <MenuItem icon="notifications-outline" label="Notifications" onPress={() => router.push("/(tabs)/notifications" as any)} />
           {user?.provider === "email" ? (
