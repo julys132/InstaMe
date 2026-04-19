@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -14,6 +15,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { INSTAME_WELCOME_CARD_SOURCES } from "@/constants/instameArtStyles";
+import { useAuth } from "@/contexts/AuthContext";
 
 const FRAME_LAYOUT = [
   { x: -76, y: 12, rotate: "-9deg", scale: 0.9, tint: "rgba(8,8,10,0.68)", border: "rgba(255,255,255,0.06)", z: 1 },
@@ -25,6 +27,15 @@ const FRAME_LAYOUT = [
 const SIGNAL_WORDS = ["Editorials", "Authentic", "Swift"] as const;
 
 export default function WelcomeScreen() {
+  const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (user) {
+      router.replace("/launch");
+    }
+  }, [isLoading, user]);
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
