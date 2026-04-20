@@ -2215,60 +2215,6 @@ export default function InstaMeScreen() {
                 ) : null}
               </View>
 
-              {savedOwnStyles.length > 0 ? (
-                <View style={styles.ownStylesLibrarySection}>
-                  <View style={styles.ownStylesLibraryHeader}>
-                    <Text style={styles.ownStylesLibraryTitle}>Saved</Text>
-                    <Text style={styles.ownStylesLibraryCount}>{savedOwnStyles.length}</Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
-                    {savedOwnStyles.map((style, index) => {
-                      const active = selectedOwnStyleId === style.id;
-                      const isFirst = index === 0;
-                      const isLast = index === savedOwnStyles.length - 1;
-                      const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
-                      return (
-                        <Pressable
-                          key={style.id}
-                          onPress={() => handleSelectSavedOwnStyle(style)}
-                          style={[
-                            styles.savedOwnStyleCardOuter,
-                            isFirst && styles.styleCardOuterFirst,
-                            isLast && styles.styleCardOuterLast,
-                            { backgroundColor: theme.ambient, shadowColor: theme.glow },
-                            active && styles.styleCardOuterActive,
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.savedOwnStyleCard,
-                              { borderColor: active ? theme.glow : theme.border, backgroundColor: theme.footerBottom },
-                            ]}
-                          >
-                            <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
-                            <LinearGradient
-                              colors={active
-                                ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.66)"]
-                                : [theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]}
-                              locations={[0, 0.22, 1]}
-                              style={styles.styleCardAtmosphere}
-                            />
-                            <LinearGradient
-                              colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]}
-                              locations={[0, 0.4, 1]}
-                              style={styles.styleCardFooter}
-                            />
-                            <View style={styles.styleCardTextWrap}>
-                              <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
-                            </View>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              ) : null}
-
               <View style={styles.customChangesPanel}>
                 <View style={styles.customChangesHeader}>
                   <Text style={styles.customChangesTitle}>Custom Changes</Text>
@@ -2288,36 +2234,6 @@ export default function InstaMeScreen() {
                   Your notes guide the final result on top of the selected own style.
                 </Text>
               </View>
-
-              {favoriteOwnStyleCards.length > 0 ? (
-                <View style={styles.favoriteStylesSection}>
-                  <View style={styles.ownStylesLibraryHeader}>
-                    <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
-                    <Text style={styles.ownStylesLibraryCount}>{favoriteOwnStyleCards.length}</Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
-                    {favoriteOwnStyleCards.map((style) => {
-                      const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
-                      return (
-                        <Pressable
-                          key={`favorite-own-${style.id}`}
-                          onPress={() => handleSelectSavedOwnStyle(style)}
-                          style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
-                        >
-                          <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
-                            <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
-                            <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
-                            <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
-                            <View style={styles.styleCardTextWrap}>
-                              <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
-                            </View>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              ) : null}
             </View>
           ) : null}
 
@@ -2598,6 +2514,90 @@ export default function InstaMeScreen() {
                   </View>
                 </View>
               ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {styleSectionTab === "own" && savedOwnStyles.length > 0 ? (
+          <View style={styles.card}>
+            <View style={styles.ownStylesLibraryHeader}>
+              <Text style={styles.ownStylesLibraryTitle}>Saved</Text>
+              <Text style={styles.ownStylesLibraryCount}>{savedOwnStyles.length}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+              {savedOwnStyles.map((style, index) => {
+                const active = selectedOwnStyleId === style.id;
+                const isFirst = index === 0;
+                const isLast = index === savedOwnStyles.length - 1;
+                const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
+                return (
+                  <Pressable
+                    key={style.id}
+                    onPress={() => handleSelectSavedOwnStyle(style)}
+                    style={[
+                      styles.savedOwnStyleCardOuter,
+                      isFirst && styles.styleCardOuterFirst,
+                      isLast && styles.styleCardOuterLast,
+                      { backgroundColor: theme.ambient, shadowColor: theme.glow },
+                      active && styles.styleCardOuterActive,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.savedOwnStyleCard,
+                        { borderColor: active ? theme.glow : theme.border, backgroundColor: theme.footerBottom },
+                      ]}
+                    >
+                      <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
+                      <LinearGradient
+                        colors={active
+                          ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.66)"]
+                          : [theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]}
+                        locations={[0, 0.22, 1]}
+                        style={styles.styleCardAtmosphere}
+                      />
+                      <LinearGradient
+                        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]}
+                        locations={[0, 0.4, 1]}
+                        style={styles.styleCardFooter}
+                      />
+                      <View style={styles.styleCardTextWrap}>
+                        <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {styleSectionTab === "own" && favoriteOwnStyleCards.length > 0 ? (
+          <View style={styles.card}>
+            <View style={styles.ownStylesLibraryHeader}>
+              <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
+              <Text style={styles.ownStylesLibraryCount}>{favoriteOwnStyleCards.length}</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+              {favoriteOwnStyleCards.map((style) => {
+                const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
+                return (
+                  <Pressable
+                    key={`favorite-own-${style.id}`}
+                    onPress={() => handleSelectSavedOwnStyle(style)}
+                    style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
+                  >
+                    <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}> 
+                      <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
+                      <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
+                      <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
+                      <View style={styles.styleCardTextWrap}>
+                        <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
           </View>
         ) : null}
