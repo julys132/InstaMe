@@ -29,6 +29,7 @@ import { useCredits } from "@/contexts/CreditsContext";
 import {
   apiClient,
   type InstaMeOwnStyle,
+  type InstaMeUploadedImage,
   type InstaMeUploadedImageAsset,
 } from "@/lib/api-client";
 import {
@@ -96,14 +97,14 @@ const DEFAULT_TRANSFORM_COST = getInstaMeCreditsForQualityTier("premium");
 const GENERATION_WAIT_MESSAGE = "This can take around 1 to 2 minutes when providers are busy.";
 const MAX_INSTAME_HISTORY_ITEMS = 10;
 const ENHANCE_PREVIEW_CARD_ID = "__enhance_portrait__";
-const STYLE_CARD_GLOW_IDLE = "#53F3E2";
-const STYLE_CARD_GLOW_ACTIVE = "#FF6F7D";
-const STYLE_CATEGORY_OPTIONS: Array<{ key: InstaMeStyleCategory; label: string }> = [
+const ART_STYLE_NONE_ID = "__art_style_none__";
+const STYLE_CATEGORY_OPTIONS: { key: InstaMeStyleCategory; label: string }[] = [
   { key: "women", label: "Women" },
   { key: "men", label: "Men" },
   { key: "couple", label: "Couples" },
 ];
 const ART_TILE_HEIGHTS = [220, 292, 248];
+const ART_TILE_HEIGHTS_COMPACT = [168, 196, 178];
 
 function resolveDisplayedGenerationQualityTier(options: {
   preset: InstaMeStylePreset | null | undefined;
@@ -417,8 +418,76 @@ const DEFAULT_STYLE_CARD_THEME: StyleCardTheme = {
   ambient: "rgba(255,107,198,0.12)",
 };
 
+const ART_STYLE_CARD_THEME_MAP: Record<string, StyleCardTheme> = {
+  [ART_STYLE_NONE_ID]: {
+    glow: "#F0D2AA",
+    glowSoft: "rgba(240,210,170,0.34)",
+    border: "rgba(255,229,197,0.46)",
+    text: "#FFF0DB",
+    footerTop: "#251A11",
+    footerBottom: "#090605",
+    ambient: "rgba(240,210,170,0.12)",
+  },
+  colored_hand_drawn_sketch: {
+    glow: "#FF977B",
+    glowSoft: "rgba(255,151,123,0.36)",
+    border: "rgba(255,200,182,0.48)",
+    text: "#FFE2D7",
+    footerTop: "#2A120E",
+    footerBottom: "#0B0505",
+    ambient: "rgba(255,151,123,0.13)",
+  },
+  black_and_white_sketch: {
+    glow: "#9BE7FF",
+    glowSoft: "rgba(155,231,255,0.34)",
+    border: "rgba(202,244,255,0.46)",
+    text: "#E6FBFF",
+    footerTop: "#102026",
+    footerBottom: "#04080A",
+    ambient: "rgba(155,231,255,0.11)",
+  },
+  simple_watercolor: {
+    glow: "#FFD66F",
+    glowSoft: "rgba(255,214,111,0.34)",
+    border: "rgba(255,236,173,0.48)",
+    text: "#FFF1CB",
+    footerTop: "#2A220A",
+    footerBottom: "#0C0904",
+    ambient: "rgba(255,214,111,0.11)",
+  },
+};
+
 function getStyleCardTheme(styleId: string): StyleCardTheme {
   return STYLE_CARD_THEME_MAP[styleId] || DEFAULT_STYLE_CARD_THEME;
+}
+
+function getArtStyleCardTheme(styleId: string): StyleCardTheme {
+  return ART_STYLE_CARD_THEME_MAP[styleId] || DEFAULT_STYLE_CARD_THEME;
+}
+
+function getImageCandidates(...values: (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+
+  return values
+    .flatMap((value) => (typeof value === "string" ? [value.trim()] : []))
+    .filter((value) => {
+      if (!value || seen.has(value)) {
+        return false;
+      }
+
+      seen.add(value);
+      return true;
+    });
+}
+
+function getPresetImageCandidates(
+  preset: Pick<InstaMeStylePreset, "cover" | "representativeImage" | "examples"> | null | undefined,
+): string[] {
+  if (!preset) {
+    return [];
+  }
+
+  return getImageCandidates(preset.cover, preset.representativeImage, ...(preset.examples || []));
 }
 
 
@@ -474,6 +543,9 @@ export default function InstaMeScreen() {
   const [editLoading, setEditLoading] = useState(false);
   const [collageTileAspectRatios, setCollageTileAspectRatios] = useState<Record<string, number>>({});
   const [collageTileImageOverrides, setCollageTileImageOverrides] = useState<Record<string, string>>({});
+  const [inlineGalleryType, setInlineGalleryType] = useState<"uploaded" | "enhanced" | null>(null);
+  const [inlineGalleryImages, setInlineGalleryImages] = useState<InstaMeUploadedImage[]>([]);
+  const [inlineGalleryLoading, setInlineGalleryLoading] = useState(false);
 
   const selectedSavedOwnStyle = useMemo(
     () => savedOwnStyles.find((style) => style.id === selectedOwnStyleId) || null,
@@ -513,29 +585,66 @@ export default function InstaMeScreen() {
     setEditInstruction("");
   }, []);
 
-  const ownStylePreset = useMemo<InstaMeStylePreset>(() => ({
-    id: INSTAME_OWN_STYLE_ID,
-    label: "OWN STYLE",
-    subtitle: "Upload a reference image with the style you want",
-    qualityTier: "premium",
-    promptHint: "user uploaded style reference",
-    representativeImage:
-      ownStylePhoto?.uri ||
-      selectedSavedOwnStyle?.previewUri ||
-      stylePresets[0]?.representativeImage ||
-      "",
-    cover:
-      ownStylePhoto?.uri ||
-      selectedSavedOwnStyle?.previewUri ||
-      stylePresets[0]?.cover ||
-      stylePresets[0]?.representativeImage ||
-      "",
-    examples: ownStylePhoto?.uri
-      ? [ownStylePhoto.uri]
-      : selectedSavedOwnStyle?.previewUri
-        ? [selectedSavedOwnStyle.previewUri]
-        : [],
-  }), [ownStylePhoto, selectedSavedOwnStyle, stylePresets]);
+  const openInlineGallery = useCallback(async (kind: "uploaded" | "enhanced") => {
+    if (inlineGalleryType === kind) {
+      setInlineGalleryType(null);
+      return;
+    }
+    setInlineGalleryType(kind);
+    setInlineGalleryLoading(true);
+    try {
+      const result = await apiClient.getInstaMeUploadedImages(kind);
+      setInlineGalleryImages(Array.isArray(result.images) ? result.images : []);
+    } catch {
+      setInlineGalleryImages([]);
+    } finally {
+      setInlineGalleryLoading(false);
+    }
+  }, [inlineGalleryType]);
+
+  const selectInlineGalleryImage = useCallback(async (imageId: string) => {
+    try {
+      const result = await apiClient.getInstaMeUploadedImage(imageId);
+      const image = result.image;
+      applyBasePhoto({
+        uri: image.dataUri,
+        base64: image.base64,
+        previewBase64: image.base64,
+        mimeType: image.mimeType,
+        kind: image.kind === "enhanced" ? "enhanced" : "uploaded",
+        width: image.width,
+        height: image.height,
+        fileSizeBytes: image.fileSizeBytes,
+        sourceImageId: image.id,
+        name: image.name,
+      });
+      setInlineGalleryType(null);
+      await Haptics.selectionAsync();
+    } catch (error: any) {
+      Alert.alert("Failed to load image", error?.message || "Could not load this portrait.");
+    }
+  }, [applyBasePhoto]);
+
+  const fallbackPresetImageCandidates = useMemo(() => getPresetImageCandidates(stylePresets[0]), [stylePresets]);
+
+  const ownStylePreset = useMemo<InstaMeStylePreset>(() => {
+    const ownStyleReferenceCandidates = getImageCandidates(
+      ownStylePhoto?.uri,
+      selectedSavedOwnStyle?.previewUri,
+      ...fallbackPresetImageCandidates,
+    );
+
+    return {
+      id: INSTAME_OWN_STYLE_ID,
+      label: "OWN STYLE",
+      subtitle: "Upload a reference image with the style you want",
+      qualityTier: "premium",
+      promptHint: "user uploaded style reference",
+      representativeImage: ownStyleReferenceCandidates[0] || "",
+      cover: ownStyleReferenceCandidates[0] || "",
+      examples: getImageCandidates(ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri),
+    };
+  }, [fallbackPresetImageCandidates, ownStylePhoto, selectedSavedOwnStyle]);
 
   const visibleStylePresets = useMemo(
     () => [ownStylePreset, ...stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID)],
@@ -562,24 +671,37 @@ export default function InstaMeScreen() {
     [previewStyleId, visibleStylePresets],
   );
 
-  const collageColumnCount = viewportWidth >= 1180 ? 3 : 2;
-  const collageColumnOffsets = collageColumnCount === 3 ? [0, 18, 10] : [0, 18];
+  const isPhoneViewport = viewportWidth <= 430;
+  const collageColumnCount = viewportWidth >= 1360 ? 4 : 3;
+  const collageColumnOffsets = collageColumnCount === 4 ? [0, 18, 10, 22] : isPhoneViewport ? [0, 10, 4] : [0, 18, 10];
+  const collageColumnGap = isPhoneViewport ? 6 : 8;
+  const libraryCardWidth = isPhoneViewport ? "31.8%" : "48.2%";
+  const libraryCardHeight = isPhoneViewport ? 168 : 208;
+  const artTileWidth = isPhoneViewport ? "31.8%" : "48.2%";
+  const artTileHeights = isPhoneViewport ? ART_TILE_HEIGHTS_COMPACT : ART_TILE_HEIGHTS;
 
   const isEnhancePreviewActive = previewStyleId === ENHANCE_PREVIEW_CARD_ID;
 
   const previewPanelImageUri = useMemo(() => {
     if (isEnhancePreviewActive) {
-      return (
-        portraitEnhanceCandidate?.uri ||
-        photo?.uri ||
-        stylePresets[0]?.cover ||
-        stylePresets[0]?.representativeImage ||
-        ""
-      );
+      return getImageCandidates(portraitEnhanceCandidate?.uri, photo?.uri, ...fallbackPresetImageCandidates)[0] || "";
     }
 
-    return previewStyle?.cover || previewStyle?.representativeImage || stylePresets[0]?.cover || "";
-  }, [isEnhancePreviewActive, photo?.uri, portraitEnhanceCandidate?.uri, previewStyle?.cover, previewStyle?.representativeImage, stylePresets]);
+    return (
+      getImageCandidates(
+        ...getPresetImageCandidates(previewStyle || selectedStylePreset || defaultStylePreset),
+        ...fallbackPresetImageCandidates,
+      )[0] || ""
+    );
+  }, [
+    defaultStylePreset,
+    fallbackPresetImageCandidates,
+    isEnhancePreviewActive,
+    photo?.uri,
+    portraitEnhanceCandidate?.uri,
+    previewStyle,
+    selectedStylePreset,
+  ]);
 
   const previewPanelTitle = isEnhancePreviewActive
     ? "Enhance your portrait"
@@ -591,12 +713,8 @@ export default function InstaMeScreen() {
 
   const ownStyleHeroUri = useMemo(
     () =>
-      ownStylePhoto?.uri ||
-      selectedSavedOwnStyle?.previewUri ||
-      stylePresets[0]?.cover ||
-      stylePresets[0]?.representativeImage ||
-      "",
-    [ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri, stylePresets],
+      getImageCandidates(ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri, ...fallbackPresetImageCandidates)[0] || "",
+    [fallbackPresetImageCandidates, ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri],
   );
 
   const selectedArtStyle = useMemo(
@@ -1219,13 +1337,7 @@ export default function InstaMeScreen() {
     const enhanceCard = {
       id: ENHANCE_PREVIEW_CARD_ID,
       label: "Enhance your portrait",
-      imageCandidates: [
-        portraitEnhanceCandidate?.uri ||
-        photo?.uri ||
-        stylePresets[0]?.cover ||
-        stylePresets[0]?.representativeImage ||
-          "",
-      ].filter(Boolean),
+      imageCandidates: getImageCandidates(portraitEnhanceCandidate?.uri, photo?.uri, ...fallbackPresetImageCandidates),
       theme: getStyleCardTheme(INSTAME_OWN_STYLE_ID),
       active: isEnhancePreviewActive,
       onPress: handleEnhancePreviewPress,
@@ -1237,9 +1349,7 @@ export default function InstaMeScreen() {
     const presetCards = mainOnlyStylePresets.map((preset) => ({
       id: preset.id,
       label: preset.label,
-      imageCandidates: [preset.cover, preset.representativeImage, preset.examples?.[0]].filter(
-        (value): value is string => Boolean(value && value.trim()),
-      ),
+      imageCandidates: getPresetImageCandidates(preset),
       theme: getStyleCardTheme(preset.id),
       active: selectedStyleId === preset.id,
       onPress: () => handleStylePresetPress(preset),
@@ -1258,7 +1368,7 @@ export default function InstaMeScreen() {
     photo?.width,
     portraitEnhanceCandidate?.uri,
     selectedStyleId,
-    stylePresets,
+    fallbackPresetImageCandidates,
   ]);
 
   const mainCollageColumns = useMemo(() => {
@@ -1876,54 +1986,87 @@ export default function InstaMeScreen() {
                 <Text style={styles.categoryEmptySubtext}>Stay tuned — new styles are on the way!</Text>
               </View>
             ) : (
-              <View style={styles.collageColumnsWrap}>
+              <View style={[styles.collageColumnsWrap, { gap: collageColumnGap }]}> 
                 {mainCollageColumns.map((column, columnIndex) => (
                   <View
                     key={`collage-column-${columnIndex}`}
                     style={[
                       styles.collageColumn,
                       {
+                        gap: collageColumnGap,
                         marginTop: collageColumnOffsets[columnIndex] || 0,
                       },
                     ]}
                   >
-                    {column.map((item) => (
-                      <Pressable
-                        key={item.id}
-                        onPress={item.onPress}
-                        style={[
-                          styles.collageTile,
-                          {
-                            shadowColor: item.active ? STYLE_CARD_GLOW_ACTIVE : STYLE_CARD_GLOW_IDLE,
-                          },
-                          item.active && styles.collageTileActive,
-                        ]}
-                      >
-                        <View style={styles.collageTileInner}>
-                          <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
-                            <LinearGradient
-                              colors={["rgba(255,255,255,0.03)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.10)"]}
-                              locations={[0, 0.42, 1]}
-                              style={styles.collageTileOverlay}
-                            />
-                            <View
-                              style={[
-                                styles.collageTileGlow,
-                                item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
-                                { borderColor: item.active ? STYLE_CARD_GLOW_ACTIVE : STYLE_CARD_GLOW_IDLE },
-                              ]}
-                            />
-                            <Image
-                              source={{ uri: collageTileImageOverrides[item.id] || item.imageCandidates[0] || "" }}
-                              style={styles.collageTileImageContained}
-                              contentFit="contain"
-                              onLoad={(event) => handleCollageTileLoad(item.id, event)}
-                              onError={() => handleCollageTileError(item.id)}
-                            />
+                    {column.map((item) => {
+                      const collageImageUri = collageTileImageOverrides[item.id] || item.imageCandidates[0] || "";
+
+                      return (
+                        <Pressable
+                          key={item.id}
+                          onPress={item.onPress}
+                          style={[
+                            styles.collageTile,
+                            item.active && styles.collageTileActive,
+                            {
+                              shadowColor: item.theme.glow,
+                              shadowOpacity: item.active ? 1.0 : 0.88,
+                              shadowRadius: item.active ? 52 : 34,
+                              shadowOffset: { width: 0, height: 0 },
+                              elevation: item.active ? 36 : 24,
+                            },
+                          ]}
+                        >
+                          <View
+                            style={[
+                              styles.collageTileInner,
+                              {
+                                borderColor: item.active ? item.theme.glow : item.theme.border,
+                                backgroundColor: item.theme.footerBottom,
+                              },
+                            ]}
+                          >
+                            <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
+                              {collageImageUri ? (
+                                <Image
+                                  source={{ uri: collageImageUri }}
+                                  style={styles.collageTileImageContained}
+                                  contentFit="cover"
+                                  onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                                  onError={() => handleCollageTileError(item.id)}
+                                />
+                              ) : (
+                                <View style={styles.collageTileFallback}>
+                                  <Ionicons name="image-outline" size={22} color={item.theme.text} />
+                                  <Text style={[styles.collageTileFallbackText, { color: item.theme.text }]} numberOfLines={2}>
+                                    {item.label}
+                                  </Text>
+                                </View>
+                              )}
+                              <LinearGradient
+                                colors={[item.theme.glowSoft, "rgba(255,255,255,0.02)", "rgba(0,0,0,0.32)"]}
+                                locations={[0, 0.32, 1]}
+                                style={styles.collageTileOverlay}
+                              />
+                              <View
+                                style={[
+                                  styles.collageTileGlow,
+                                  item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
+                                  {
+                                    backgroundColor: item.active ? item.theme.glowSoft : "transparent",
+                                    borderColor: item.active ? item.theme.glow : item.theme.border,
+                                    shadowColor: item.theme.glow,
+                                    shadowOpacity: item.active ? 1 : 0.92,
+                                    shadowRadius: item.active ? 40 : 28,
+                                    elevation: item.active ? 30 : 18,
+                                  },
+                                ]}
+                              />
+                            </View>
                           </View>
-                        </View>
-                      </Pressable>
-                    ))}
+                        </Pressable>
+                      );
+                    })}
                   </View>
                 ))}
               </View>
@@ -1932,63 +2075,90 @@ export default function InstaMeScreen() {
         ) : (
           <View style={styles.studioSection}>
             <View style={styles.studioPortraitStrip}>
-              <Pressable style={styles.studioPortraitThumb} onPress={pickImage}>
-                {photo ? (
-                  <Image source={{ uri: photo.uri }} style={styles.uploadThumbImage} contentFit="cover" />
-                ) : (
-                  <View style={styles.editorUploadPlaceholder}>
-                    <Ionicons name="add" size={28} color={Colors.accentPale} />
-                    <Text style={styles.editorUploadPlaceholderText}>Add portrait</Text>
-                  </View>
-                )}
-              </Pressable>
-              <View style={styles.studioPortraitActions}>
-                <Pressable onPress={pickImage} style={styles.studioQuickButton}>
+              <Text style={styles.studioPortraitLabel}>Add your portrait</Text>
+              <View style={styles.portraitButtonRow}>
+                <Pressable onPress={pickImage} style={styles.portraitButtonItem}>
                   <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
-                  <Text style={styles.studioQuickButtonText}>Upload</Text>
+                  <Text style={styles.editorUploadButtonText}>Upload</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() =>
-                    router.push({
-                      pathname: "/uploaded-images",
-                      params: { selectedImageId: photo?.sourceImageId || "" },
-                    })
-                  }
-                  style={[styles.studioQuickButton, styles.studioQuickButtonAccent]}
+                  onPress={() => void openInlineGallery("uploaded")}
+                  style={[styles.portraitButtonItem, inlineGalleryType === "uploaded" && styles.portraitButtonItemActive]}
                 >
-                  <Ionicons name="images-outline" size={16} color={Colors.accentLight} />
-                  <Text style={[styles.studioQuickButtonText, styles.studioQuickButtonTextAccent]}>Uploaded</Text>
+                  <Ionicons name="images-outline" size={16} color={inlineGalleryType === "uploaded" ? Colors.accentLight : Colors.accentPale} />
+                  <Text style={[styles.editorUploadButtonText, inlineGalleryType === "uploaded" && { color: Colors.accentLight }]}>Uploaded</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() =>
-                    router.push({
-                      pathname: "/enhanced-portraits",
-                      params: { selectedImageId: photo?.kind === "enhanced" ? photo.sourceImageId || "" : "" },
-                    })
-                  }
-                  style={styles.studioQuickButton}
+                  onPress={() => void openInlineGallery("enhanced")}
+                  style={[styles.portraitButtonItem, inlineGalleryType === "enhanced" && styles.portraitButtonItemActive]}
                 >
-                  <Ionicons name="sparkles-outline" size={16} color={Colors.accentPale} />
-                  <Text style={styles.studioQuickButtonText}>Enhanced</Text>
+                  <Ionicons name="sparkles-outline" size={16} color={inlineGalleryType === "enhanced" ? Colors.accentLight : Colors.accentPale} />
+                  <Text style={[styles.editorUploadButtonText, inlineGalleryType === "enhanced" && { color: Colors.accentLight }]}>Enhanced</Text>
                 </Pressable>
                 <Pressable
                   onPress={handleEnhancePortrait}
                   disabled={!photo || portraitEnhanceLoading}
-                  style={[styles.studioQuickButton, styles.studioQuickButtonAccent, (!photo || portraitEnhanceLoading) && styles.secondaryActionButtonDisabled]}
+                  style={[styles.portraitButtonItem, styles.portraitButtonItemAccent, (!photo || portraitEnhanceLoading) && styles.secondaryActionButtonDisabled]}
                 >
                   {portraitEnhanceLoading ? (
                     <ActivityIndicator color={Colors.accentLight} size="small" />
                   ) : (
                     <>
                       <Ionicons name="sparkles" size={16} color={Colors.accentLight} />
-                      <Text style={[styles.studioQuickButtonText, styles.studioQuickButtonTextAccent]}>Enhance</Text>
+                      <Text style={[styles.editorUploadButtonText, { color: Colors.accentLight }]}>Enhance</Text>
                     </>
                   )}
                 </Pressable>
               </View>
+              {inlineGalleryType ? (
+                <View style={styles.inlineGalleryPanel}>
+                  <View style={styles.inlineGalleryHeader}>
+                    <Text style={styles.inlineGalleryTitle}>
+                      {inlineGalleryType === "uploaded" ? "Uploaded Portraits" : "Enhanced Portraits"}
+                    </Text>
+                    <Pressable onPress={() => setInlineGalleryType(null)} style={styles.inlineGalleryCloseBtn}>
+                      <Ionicons name="close" size={18} color="#FFF" />
+                    </Pressable>
+                  </View>
+                  {inlineGalleryLoading ? (
+                    <ActivityIndicator color={Colors.accent} style={{ alignSelf: "center", marginVertical: 16 }} />
+                  ) : inlineGalleryImages.length === 0 ? (
+                    <Text style={styles.inlineGalleryEmpty}>No {inlineGalleryType} portraits yet.</Text>
+                  ) : (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingBottom: 2 }}
+                    >
+                      {inlineGalleryImages.map((img) => (
+                        <Pressable
+                          key={img.id}
+                          onPress={() => void selectInlineGalleryImage(img.id)}
+                          style={[
+                            styles.inlineGalleryThumb,
+                            photo?.sourceImageId === img.id && styles.inlineGalleryThumbActive,
+                          ]}
+                        >
+                          <Image source={{ uri: img.previewUri }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                          <LinearGradient
+                            colors={["transparent", "rgba(0,0,0,0.72)"]}
+                            style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
+                          >
+                            <Text style={styles.inlineGalleryThumbName} numberOfLines={1}>{img.name}</Text>
+                          </LinearGradient>
+                          {photo?.sourceImageId === img.id ? (
+                            <View style={styles.inlineGalleryThumbCheck}>
+                              <Ionicons name="checkmark" size={12} color="#FFF" />
+                            </View>
+                          ) : null}
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+              ) : null}
+              {usingEnhancedPortrait ? <Text style={styles.enhanceSelectedText}>Enhanced portrait active.</Text> : null}
             </View>
-
-            {usingEnhancedPortrait ? <Text style={styles.enhanceSelectedText}>Enhanced portrait active.</Text> : null}
             {portraitEnhanceCandidate ? (
               <View style={styles.enhancePreviewCard}>
                 <Text style={styles.enhancePreviewTitle}>Enhanced preview</Text>
@@ -2189,20 +2359,80 @@ export default function InstaMeScreen() {
                 </View>
 
                 <View style={styles.studioPanel}>
-                  <View style={styles.artMasonryGrid}>
+                  <View style={[styles.artMasonryGrid, { gap: isPhoneViewport ? 8 : 12 }]}> 
                     <Pressable
                       onPress={() => setSelectedArtStyleId("")}
-                      style={[styles.artMasonryTile, styles.artMasonryTileWide, styles.artMasonryNoneTile, !selectedArtStyleId && styles.artMasonryTileActive]}
+                      style={[
+                        styles.artMasonryTile,
+                        !isPhoneViewport && styles.artMasonryTileWide,
+                        styles.artMasonryNoneTile,
+                        {
+                          width: isPhoneViewport ? artTileWidth : "100%",
+                          height: isPhoneViewport ? artTileHeights[0] : 128,
+                          backgroundColor: getArtStyleCardTheme(ART_STYLE_NONE_ID).footerBottom,
+                          borderColor: !selectedArtStyleId
+                            ? getArtStyleCardTheme(ART_STYLE_NONE_ID).glow
+                            : getArtStyleCardTheme(ART_STYLE_NONE_ID).border,
+                          shadowColor: getArtStyleCardTheme(ART_STYLE_NONE_ID).glow,
+                          shadowOpacity: !selectedArtStyleId ? 0.82 : 0.42,
+                          shadowRadius: !selectedArtStyleId ? 22 : 14,
+                          shadowOffset: { width: 0, height: !selectedArtStyleId ? 0 : 8 },
+                          elevation: !selectedArtStyleId ? 14 : 8,
+                        },
+                      ]}
                     >
-                      <LinearGradient colors={["#25292F", "#13161B", "#090B10"]} style={StyleSheet.absoluteFill} />
+                      <LinearGradient
+                        colors={[
+                          getArtStyleCardTheme(ART_STYLE_NONE_ID).footerTop,
+                          getArtStyleCardTheme(ART_STYLE_NONE_ID).footerBottom,
+                        ]}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <LinearGradient
+                        colors={[
+                          getArtStyleCardTheme(ART_STYLE_NONE_ID).glowSoft,
+                          "rgba(0,0,0,0.10)",
+                          "rgba(0,0,0,0.88)",
+                        ]}
+                        style={StyleSheet.absoluteFill}
+                      />
+                      <View
+                        style={[
+                          styles.artMasonryGlow,
+                          {
+                            borderColor: !selectedArtStyleId
+                              ? getArtStyleCardTheme(ART_STYLE_NONE_ID).glow
+                              : getArtStyleCardTheme(ART_STYLE_NONE_ID).border,
+                            shadowColor: getArtStyleCardTheme(ART_STYLE_NONE_ID).glow,
+                            shadowOpacity: !selectedArtStyleId ? 0.94 : 0.54,
+                            shadowRadius: !selectedArtStyleId ? 20 : 12,
+                            elevation: !selectedArtStyleId ? 14 : 8,
+                          },
+                        ]}
+                      />
                       <View style={styles.artMasonryTextWrap}>
-                        <Text style={[styles.artMasonryTitle, !selectedArtStyleId && styles.artMasonryTitleActive]}>None</Text>
-                        <Text style={[styles.artMasonrySubtitle, !selectedArtStyleId && styles.artMasonrySubtitleActive]}>Photographic output</Text>
+                        <Text
+                          style={[
+                            styles.artMasonryTitle,
+                            { color: !selectedArtStyleId ? getArtStyleCardTheme(ART_STYLE_NONE_ID).text : "#FFF" },
+                          ]}
+                        >
+                          None
+                        </Text>
+                        <Text
+                          style={[
+                            styles.artMasonrySubtitle,
+                            { color: !selectedArtStyleId ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.72)" },
+                          ]}
+                        >
+                          Photographic output
+                        </Text>
                       </View>
                     </Pressable>
                     {INSTAME_ART_STYLES.map((style, index) => {
                       const active = selectedArtStyleId === style.id;
-                      const isWide = index === 1;
+                      const theme = getArtStyleCardTheme(style.id);
+                      const isWide = !isPhoneViewport && index === 1;
                       return (
                         <Pressable
                           key={style.id}
@@ -2210,18 +2440,41 @@ export default function InstaMeScreen() {
                           style={[
                             styles.artMasonryTile,
                             isWide && styles.artMasonryTileWide,
-                            { height: isWide ? 236 : ART_TILE_HEIGHTS[index % ART_TILE_HEIGHTS.length] },
-                            active && styles.artMasonryTileActive,
+                            {
+                              width: isWide ? "100%" : artTileWidth,
+                              height: isWide ? 236 : artTileHeights[index % artTileHeights.length],
+                              backgroundColor: theme.footerBottom,
+                              borderColor: active ? theme.glow : theme.border,
+                              shadowColor: theme.glow,
+                              shadowOpacity: active ? 1.0 : 0.88,
+                              shadowRadius: active ? 48 : 32,
+                              shadowOffset: { width: 0, height: 0 },
+                              elevation: active ? 30 : 18,
+                            },
                           ]}
                         >
+                          <View
+                            style={[
+                              styles.artMasonryGlow,
+                              {
+                                borderColor: active ? theme.glow : theme.border,
+                                shadowColor: theme.glow,
+                                shadowOpacity: active ? 1 : 0.92,
+                                shadowRadius: active ? 38 : 24,
+                                elevation: active ? 26 : 16,
+                              },
+                            ]}
+                          />
                           <Image source={style.preview} style={styles.artStyleOptionImage} contentFit="cover" />
                           <LinearGradient
-                            colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.12)", "rgba(0,0,0,0.88)"]}
+                            colors={[theme.glowSoft, "rgba(0,0,0,0.12)", "rgba(0,0,0,0.88)"]}
                             style={styles.artStyleOptionOverlay}
                           />
                           <View style={styles.artMasonryTextWrap}>
-                            <Text style={[styles.artMasonryTitle, active && styles.artMasonryTitleActive]}>{style.label}</Text>
-                            <Text style={[styles.artMasonrySubtitle, active && styles.artMasonrySubtitleActive]}>{style.subtitle}</Text>
+                            <Text style={[styles.artMasonryTitle, { color: active ? theme.text : "#FFF" }]}>{style.label}</Text>
+                            <Text style={[styles.artMasonrySubtitle, { color: active ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.72)" }]}>
+                              {style.subtitle}
+                            </Text>
                           </View>
                         </Pressable>
                       );
@@ -2421,18 +2674,27 @@ export default function InstaMeScreen() {
               <Text style={styles.ownStylesLibraryTitle}>Saved</Text>
               <Text style={styles.ownStylesLibraryCount}>{savedOwnStyles.length}</Text>
             </View>
-            <View style={styles.libraryGrid}>
+            <View style={[styles.libraryGrid, { gap: isPhoneViewport ? 8 : 12 }]}> 
               {savedOwnStyles.map((style, index) => {
                 const active = selectedOwnStyleId === style.id;
                 const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
+                const previewUri = style.previewUri?.trim();
                 return (
                   <Pressable
                     key={style.id}
                     onPress={() => handleSelectSavedOwnStyle(style)}
                     style={[
                       styles.libraryGridCard,
-                      { backgroundColor: theme.ambient, shadowColor: theme.glow },
-                      active && styles.styleCardOuterActive,
+                      {
+                        width: libraryCardWidth,
+                        height: libraryCardHeight,
+                        backgroundColor: theme.ambient,
+                        shadowColor: theme.glow,
+                        shadowOpacity: active ? 1.0 : 0.88,
+                        shadowRadius: active ? 48 : 32,
+                        shadowOffset: { width: 0, height: 0 },
+                        elevation: active ? 30 : 18,
+                      },
                     ]}
                   >
                     <View
@@ -2441,7 +2703,14 @@ export default function InstaMeScreen() {
                         { borderColor: active ? theme.glow : theme.border, backgroundColor: theme.footerBottom },
                       ]}
                     >
-                      <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
+                      {previewUri ? (
+                        <Image source={{ uri: previewUri }} contentFit="cover" style={styles.styleCardImage} />
+                      ) : (
+                        <View style={[styles.ownStyleCardPlaceholder, { backgroundColor: theme.ambient }]}> 
+                          <Ionicons name="image-outline" size={20} color={theme.text} />
+                          <Text style={[styles.ownStyleCardPlaceholderText, { color: theme.text }]}>Preview unavailable</Text>
+                        </View>
+                      )}
                       <LinearGradient
                         colors={active
                           ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.66)"]
@@ -2453,6 +2722,18 @@ export default function InstaMeScreen() {
                         colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]}
                         locations={[0, 0.4, 1]}
                         style={styles.styleCardFooter}
+                      />
+                      <View
+                        style={[
+                          styles.styleCardInnerRing,
+                          {
+                            borderColor: active ? theme.glow : theme.border,
+                            shadowColor: theme.glow,
+                            shadowOpacity: active ? 1 : 0.88,
+                            shadowRadius: active ? 36 : 22,
+                            elevation: active ? 24 : 14,
+                          },
+                        ]}
                       />
                       <View style={styles.styleCardTextWrap}>
                         <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
@@ -2471,19 +2752,56 @@ export default function InstaMeScreen() {
               <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
               <Text style={styles.ownStylesLibraryCount}>{favoriteOwnStyleCards.length}</Text>
             </View>
-            <View style={styles.libraryGrid}>
+            <View style={[styles.libraryGrid, { gap: isPhoneViewport ? 8 : 12 }]}> 
               {favoriteOwnStyleCards.map((style) => {
                 const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
+                const active = selectedOwnStyleId === style.id;
+                const previewUri = style.previewUri?.trim();
                 return (
                   <Pressable
                     key={`favorite-own-${style.id}`}
                     onPress={() => handleSelectSavedOwnStyle(style)}
-                    style={[styles.libraryGridCard, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
+                    style={[
+                      styles.libraryGridCard,
+                      {
+                        width: libraryCardWidth,
+                        height: libraryCardHeight,
+                        backgroundColor: theme.ambient,
+                        shadowColor: theme.glow,
+                        shadowOpacity: active ? 1.0 : 0.88,
+                        shadowRadius: active ? 48 : 32,
+                        shadowOffset: { width: 0, height: 0 },
+                        elevation: active ? 30 : 18,
+                      },
+                    ]}
                   >
-                    <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}> 
-                      <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
-                      <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
+                    <View style={[styles.savedOwnStyleCard, { borderColor: active ? theme.glow : theme.border, backgroundColor: theme.footerBottom }]}> 
+                      {previewUri ? (
+                        <Image source={{ uri: previewUri }} contentFit="cover" style={styles.styleCardImage} />
+                      ) : (
+                        <View style={[styles.ownStyleCardPlaceholder, { backgroundColor: theme.ambient }]}> 
+                          <Ionicons name="image-outline" size={20} color={theme.text} />
+                          <Text style={[styles.ownStyleCardPlaceholderText, { color: theme.text }]}>Preview unavailable</Text>
+                        </View>
+                      )}
+                      <LinearGradient
+                        colors={active ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.66)"] : [theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]}
+                        locations={[0, 0.22, 1]}
+                        style={styles.styleCardAtmosphere}
+                      />
                       <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
+                      <View
+                        style={[
+                          styles.styleCardInnerRing,
+                          {
+                            borderColor: active ? theme.glow : theme.border,
+                            shadowColor: theme.glow,
+                            shadowOpacity: active ? 1 : 0.88,
+                            shadowRadius: active ? 36 : 22,
+                            elevation: active ? 24 : 14,
+                          },
+                        ]}
+                      />
                       <View style={styles.styleCardTextWrap}>
                         <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
                       </View>
@@ -2528,50 +2846,90 @@ export default function InstaMeScreen() {
                 ) : null}
               </View>
 
+              {!isEnhancePreviewActive ? (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Retouch template</Text>
+                  <TextInput
+                    value={customPrompt}
+                    onChangeText={setCustomPrompt}
+                    placeholder="Example: cleaner makeup, softer smile, warmer neutrals, brighter skin, white blazer."
+                    placeholderTextColor="rgba(255,255,255,0.34)"
+                    multiline
+                    style={styles.modalPromptInput}
+                  />
+                  <Text style={styles.editorInlineHint}>These notes are layered over the selected style.</Text>
+                </View>
+              ) : null}
+
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>Add your portrait</Text>
-                <View style={styles.editorUploadRow}>
-                  <Pressable style={styles.editorUploadThumb} onPress={pickImage}>
-                    {photo ? (
-                      <Image source={{ uri: photo.uri }} style={styles.uploadThumbImage} contentFit="cover" />
-                    ) : (
-                      <View style={styles.editorUploadPlaceholder}>
-                        <Ionicons name="add" size={28} color={Colors.accentPale} />
-                        <Text style={styles.editorUploadPlaceholderText}>Tap to add</Text>
-                      </View>
-                    )}
+                <View style={styles.portraitButtonRow}>
+                  <Pressable onPress={pickImage} style={styles.portraitButtonItem}>
+                    <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
+                    <Text style={styles.editorUploadButtonText}>Upload</Text>
                   </Pressable>
-                  <View style={styles.editorUploadActions}>
-                    <Pressable onPress={pickImage} style={styles.editorUploadButton}>
-                      <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
-                      <Text style={styles.editorUploadButtonText}>Upload</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: "/uploaded-images",
-                          params: { selectedImageId: photo?.sourceImageId || "" },
-                        })
-                      }
-                      style={styles.editorUploadButton}
-                    >
-                      <Ionicons name="images-outline" size={16} color={Colors.accentPale} />
-                      <Text style={styles.editorUploadButtonText}>Uploaded</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() =>
-                        router.push({
-                          pathname: "/enhanced-portraits",
-                          params: { selectedImageId: photo?.kind === "enhanced" ? photo.sourceImageId || "" : "" },
-                        })
-                      }
-                      style={styles.editorUploadButton}
-                    >
-                      <Ionicons name="sparkles-outline" size={16} color={Colors.accentPale} />
-                      <Text style={styles.editorUploadButtonText}>Enhanced</Text>
-                    </Pressable>
-                  </View>
+                  <Pressable
+                    onPress={() => void openInlineGallery("uploaded")}
+                    style={[styles.portraitButtonItem, inlineGalleryType === "uploaded" && styles.portraitButtonItemActive]}
+                  >
+                    <Ionicons name="images-outline" size={16} color={inlineGalleryType === "uploaded" ? Colors.accentLight : Colors.accentPale} />
+                    <Text style={[styles.editorUploadButtonText, inlineGalleryType === "uploaded" && { color: Colors.accentLight }]}>Uploaded</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void openInlineGallery("enhanced")}
+                    style={[styles.portraitButtonItem, inlineGalleryType === "enhanced" && styles.portraitButtonItemActive]}
+                  >
+                    <Ionicons name="sparkles-outline" size={16} color={inlineGalleryType === "enhanced" ? Colors.accentLight : Colors.accentPale} />
+                    <Text style={[styles.editorUploadButtonText, inlineGalleryType === "enhanced" && { color: Colors.accentLight }]}>Enhanced</Text>
+                  </Pressable>
                 </View>
+                {inlineGalleryType ? (
+                  <View style={styles.inlineGalleryPanel}>
+                    <View style={styles.inlineGalleryHeader}>
+                      <Text style={styles.inlineGalleryTitle}>
+                        {inlineGalleryType === "uploaded" ? "Uploaded Portraits" : "Enhanced Portraits"}
+                      </Text>
+                      <Pressable onPress={() => setInlineGalleryType(null)} style={styles.inlineGalleryCloseBtn}>
+                        <Ionicons name="close" size={18} color="#FFF" />
+                      </Pressable>
+                    </View>
+                    {inlineGalleryLoading ? (
+                      <ActivityIndicator color={Colors.accent} style={{ alignSelf: "center", marginVertical: 16 }} />
+                    ) : inlineGalleryImages.length === 0 ? (
+                      <Text style={styles.inlineGalleryEmpty}>No {inlineGalleryType} portraits yet.</Text>
+                    ) : (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingBottom: 2 }}
+                      >
+                        {inlineGalleryImages.map((img) => (
+                          <Pressable
+                            key={img.id}
+                            onPress={() => void selectInlineGalleryImage(img.id)}
+                            style={[
+                              styles.inlineGalleryThumb,
+                              photo?.sourceImageId === img.id && styles.inlineGalleryThumbActive,
+                            ]}
+                          >
+                            <Image source={{ uri: img.previewUri }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                            <LinearGradient
+                              colors={["transparent", "rgba(0,0,0,0.72)"]}
+                              style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
+                            >
+                              <Text style={styles.inlineGalleryThumbName} numberOfLines={1}>{img.name}</Text>
+                            </LinearGradient>
+                            {photo?.sourceImageId === img.id ? (
+                              <View style={styles.inlineGalleryThumbCheck}>
+                                <Ionicons name="checkmark" size={12} color="#FFF" />
+                              </View>
+                            ) : null}
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    )}
+                  </View>
+                ) : null}
                 {usingEnhancedPortrait ? <Text style={styles.editorInlineHint}>Enhanced portrait active.</Text> : null}
               </View>
 
@@ -2639,19 +2997,6 @@ export default function InstaMeScreen() {
                 </View>
               ) : (
                 <>
-                  <View style={styles.modalSection}>
-                    <Text style={styles.modalSectionTitle}>Retouch template</Text>
-                    <TextInput
-                      value={customPrompt}
-                      onChangeText={setCustomPrompt}
-                      placeholder="Example: cleaner makeup, softer smile, warmer neutrals, brighter skin, white blazer."
-                      placeholderTextColor="rgba(255,255,255,0.34)"
-                      multiline
-                      style={styles.modalPromptInput}
-                    />
-                    <Text style={styles.editorInlineHint}>These notes are layered over the selected style.</Text>
-                  </View>
-
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>Choose quality</Text>
                     <View style={styles.modalQualityRow}>
@@ -3030,22 +3375,22 @@ const styles = StyleSheet.create({
   collageTile: {
     borderRadius: 24,
     backgroundColor: "transparent",
-    shadowOpacity: 0.52,
-    shadowRadius: 14,
+    shadowOpacity: 0.82,
+    shadowRadius: 30,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
+    elevation: 22,
   },
   collageTileActive: {
-    shadowOpacity: 0.9,
-    shadowRadius: 18,
+    shadowOpacity: 1.0,
+    shadowRadius: 48,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 16,
+    elevation: 36,
   },
   collageTileInner: {
     borderRadius: 24,
     overflow: "hidden",
-    borderWidth: 0.4,
-    borderColor: "#050505",
+    borderWidth: 0.85,
+    borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "#060606",
   },
   collageTileMedia: {
@@ -3058,22 +3403,32 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
   collageTileGlowIdle: {
-    borderWidth: 1,
-    shadowColor: STYLE_CARD_GLOW_IDLE,
-    shadowOpacity: 0.68,
-    shadowRadius: 11,
+    borderWidth: 1.5,
+    shadowOpacity: 0.92,
+    shadowRadius: 26,
     shadowOffset: { width: 0, height: 0 },
   },
   collageTileGlowActive: {
-    borderWidth: 1.2,
-    shadowColor: STYLE_CARD_GLOW_ACTIVE,
-    shadowOpacity: 0.98,
-    shadowRadius: 14,
+    borderWidth: 2,
+    shadowOpacity: 1,
+    shadowRadius: 40,
     shadowOffset: { width: 0, height: 0 },
   },
   collageTileImageContained: {
-    width: "100%",
-    height: "100%",
+    ...StyleSheet.absoluteFillObject,
+  },
+  collageTileFallback: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  collageTileFallbackText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: "center",
   },
   studioSection: {
     marginHorizontal: 16,
@@ -3086,16 +3441,105 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(18,18,24,0.94)",
     padding: 14,
-    gap: 12,
+    gap: 10,
   },
-  studioPortraitThumb: {
-    width: "100%",
-    height: 188,
-    borderRadius: 22,
-    overflow: "hidden",
+  studioPortraitLabel: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  portraitButtonRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  portraitButtonItem: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    backgroundColor: "rgba(0,0,0,0.28)",
+    paddingHorizontal: 6,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+  },
+  portraitButtonItemActive: {
+    borderColor: "rgba(255,79,125,0.52)",
+    backgroundColor: "rgba(255,79,125,0.12)",
+  },
+  portraitButtonItemAccent: {
+    borderColor: "rgba(255,79,125,0.28)",
+    backgroundColor: "rgba(255,79,125,0.08)",
+  },
+  inlineGalleryPanel: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(12,12,18,0.96)",
+    padding: 12,
+    gap: 10,
+  },
+  inlineGalleryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  inlineGalleryTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  inlineGalleryCloseBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlineGalleryEmpty: {
+    color: "rgba(255,255,255,0.46)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    textAlign: "center",
+    paddingVertical: 12,
+  },
+  inlineGalleryThumb: {
+    width: 86,
+    height: 110,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#0A0A0A",
+  },
+  inlineGalleryThumbActive: {
+    borderColor: "rgba(255,79,125,0.82)",
+    shadowColor: "#FF5CB8",
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  inlineGalleryThumbName: {
+    color: "#FFF",
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    lineHeight: 13,
+  },
+  inlineGalleryThumbCheck: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,79,125,0.92)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   studioPortraitActions: {
     flexDirection: "row",
@@ -4009,12 +4453,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   artMasonryTile: {
-    width: "48.2%",
     borderRadius: 24,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "#09090C",
+    shadowOpacity: 0.42,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
   artMasonryTileWide: {
     width: "100%",
@@ -4037,6 +4484,11 @@ const styles = StyleSheet.create({
     right: 14,
     bottom: 14,
     gap: 4,
+  },
+  artMasonryGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+    borderWidth: 1,
   },
   artMasonryTitle: {
     color: "#FFF",
@@ -4329,9 +4781,9 @@ const styles = StyleSheet.create({
     minHeight: 22,
     maxHeight: 60,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1.5,
+    borderColor: "rgba(82,182,255,0.72)",
+    backgroundColor: "rgba(10,30,55,0.58)",
     paddingHorizontal: 12,
     paddingVertical: 8,
     color: "#FFF",
@@ -4339,6 +4791,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     textAlignVertical: "top",
+    shadowColor: "#52B6FF",
+    shadowOpacity: 0.72,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
   },
   customChangesFootnote: {
     color: "rgba(255,255,255,0.46)",
@@ -4804,18 +5261,23 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   modalPromptInput: {
-    minHeight: 92,
+    minHeight: 48,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(0,0,0,0.24)",
+    borderWidth: 1.5,
+    borderColor: "rgba(82,182,255,0.72)",
+    backgroundColor: "rgba(10,30,55,0.58)",
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 10,
     color: "#FFF",
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     lineHeight: 20,
     textAlignVertical: "top",
+    shadowColor: "#52B6FF",
+    shadowOpacity: 0.72,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 14,
   },
   modalQualityRow: {
     flexDirection: "row",
