@@ -2014,10 +2014,10 @@ export default function InstaMeScreen() {
                             item.active && styles.collageTileActive,
                             {
                               shadowColor: "#00E5CC",
-                              shadowOpacity: item.active ? 0.72 : 0.22,
-                              shadowRadius: item.active ? 18 : 5,
+                              shadowOpacity: item.active ? 0.72 : 0.36,
+                              shadowRadius: item.active ? 18 : 9,
                               shadowOffset: { width: 0, height: 0 },
-                              elevation: item.active ? 14 : 4,
+                              elevation: item.active ? 14 : 7,
                             },
                           ]}
                         >
@@ -2060,9 +2060,9 @@ export default function InstaMeScreen() {
                                     backgroundColor: "transparent",
                                     borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
                                     shadowColor: "#00E5CC",
-                                    shadowOpacity: item.active ? 0.80 : 0.24,
-                                    shadowRadius: item.active ? 14 : 4,
-                                    elevation: item.active ? 12 : 3,
+                                    shadowOpacity: item.active ? 0.80 : 0.40,
+                                    shadowRadius: item.active ? 14 : 7,
+                                    elevation: item.active ? 12 : 6,
                                   },
                                 ]}
                               />
@@ -2450,10 +2450,10 @@ export default function InstaMeScreen() {
                               backgroundColor: theme.footerBottom,
                               borderColor: active ? "#00E5CC" : theme.border,
                               shadowColor: "#00E5CC",
-                              shadowOpacity: active ? 0.72 : 0.22,
-                              shadowRadius: active ? 18 : 5,
+                              shadowOpacity: active ? 0.72 : 0.36,
+                              shadowRadius: active ? 18 : 9,
                               shadowOffset: { width: 0, height: 0 },
-                              elevation: active ? 14 : 4,
+                              elevation: active ? 14 : 7,
                             },
                           ]}>
                           <View
@@ -2462,9 +2462,9 @@ export default function InstaMeScreen() {
                               {
                                 borderColor: active ? "#00E5CC" : "rgba(0,229,204,0.20)",
                                 shadowColor: "#00E5CC",
-                                shadowOpacity: active ? 0.80 : 0.24,
-                                shadowRadius: active ? 12 : 4,
-                                elevation: active ? 10 : 3,
+                                shadowOpacity: active ? 0.80 : 0.40,
+                                shadowRadius: active ? 12 : 6,
+                                elevation: active ? 10 : 5,
                               },
                             ]}
                           />
@@ -2693,10 +2693,10 @@ export default function InstaMeScreen() {
                         height: libraryCardHeight,
                         backgroundColor: theme.ambient,
                         shadowColor: "#00E5CC",
-                        shadowOpacity: active ? 0.72 : 0.22,
-                        shadowRadius: active ? 18 : 5,
+                        shadowOpacity: active ? 0.72 : 0.36,
+                        shadowRadius: active ? 18 : 9,
                         shadowOffset: { width: 0, height: 0 },
-                        elevation: active ? 14 : 4,
+                        elevation: active ? 14 : 7,
                       },
                     ]}
                   >
@@ -2771,10 +2771,10 @@ export default function InstaMeScreen() {
                         height: libraryCardHeight,
                         backgroundColor: theme.ambient,
                         shadowColor: "#00E5CC",
-                        shadowOpacity: active ? 0.72 : 0.22,
-                        shadowRadius: active ? 18 : 5,
+                        shadowOpacity: active ? 0.72 : 0.36,
+                        shadowRadius: active ? 18 : 9,
                         shadowOffset: { width: 0, height: 0 },
-                        elevation: active ? 14 : 4,
+                        elevation: active ? 14 : 7,
                       },
                     ]}
                   >
@@ -3378,10 +3378,10 @@ const styles = StyleSheet.create({
   collageTile: {
     borderRadius: 24,
     backgroundColor: "transparent",
-    shadowOpacity: 0.22,
-    shadowRadius: 5,
+    shadowOpacity: 0.36,
+    shadowRadius: 9,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
+    elevation: 7,
   },
   collageTileActive: {
     shadowOpacity: 0.72,
@@ -3406,9 +3406,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
   collageTileGlowIdle: {
-    borderWidth: 0.5,
-    shadowOpacity: 0.24,
-    shadowRadius: 4,
+    borderWidth: 1,
+    shadowOpacity: 0.40,
+    shadowRadius: 7,
     shadowOffset: { width: 0, height: 0 },
   },
   collageTileGlowActive: {
@@ -4785,7 +4785,7 @@ const styles = StyleSheet.create({
     maxHeight: 60,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: "rgba(0,229,204,0.72)",
+    borderColor: "rgba(0,229,204,0.50)",
     backgroundColor: "rgba(10,30,55,0.58)",
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -4795,10 +4795,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlignVertical: "top",
     shadowColor: "#00E5CC",
-    shadowOpacity: 0.72,
-    shadowRadius: 14,
+    shadowOpacity: 0.40,
+    shadowRadius: 8,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
+    elevation: 6,
   },
   customChangesFootnote: {
     color: "rgba(255,255,255,0.46)",
@@ -5267,7 +5267,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: "rgba(0,229,204,0.72)",
+    borderColor: "rgba(0,229,204,0.50)",
     backgroundColor: "rgba(10,30,55,0.58)",
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -5277,10 +5277,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlignVertical: "top",
     shadowColor: "#00E5CC",
-    shadowOpacity: 0.72,
-    shadowRadius: 18,
+    shadowOpacity: 0.40,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 14,
+    elevation: 8,
   },
   modalQualityRow: {
     flexDirection: "row",
