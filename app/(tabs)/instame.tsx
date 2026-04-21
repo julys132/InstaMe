@@ -2014,10 +2014,10 @@ export default function InstaMeScreen() {
                             item.active && styles.collageTileActive,
                             {
                               shadowColor: "#00E5CC",
-                              shadowOpacity: item.active ? 0.72 : 0.38,
-                              shadowRadius: item.active ? 18 : 10,
+                              shadowOpacity: item.active ? 0.72 : 0.22,
+                              shadowRadius: item.active ? 18 : 5,
                               shadowOffset: { width: 0, height: 0 },
-                              elevation: item.active ? 14 : 8,
+                              elevation: item.active ? 14 : 4,
                             },
                           ]}
                         >
@@ -2058,11 +2058,11 @@ export default function InstaMeScreen() {
                                   item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
                                   {
                                     backgroundColor: "transparent",
-                                    borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.38)",
+                                    borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
                                     shadowColor: "#00E5CC",
-                                    shadowOpacity: item.active ? 0.80 : 0.42,
-                                    shadowRadius: item.active ? 14 : 8,
-                                    elevation: item.active ? 12 : 6,
+                                    shadowOpacity: item.active ? 0.80 : 0.24,
+                                    shadowRadius: item.active ? 14 : 4,
+                                    elevation: item.active ? 12 : 3,
                                   },
                                 ]}
                               />
@@ -2450,22 +2450,21 @@ export default function InstaMeScreen() {
                               backgroundColor: theme.footerBottom,
                               borderColor: active ? "#00E5CC" : theme.border,
                               shadowColor: "#00E5CC",
-                              shadowOpacity: active ? 0.72 : 0.38,
-                              shadowRadius: active ? 18 : 10,
+                              shadowOpacity: active ? 0.72 : 0.22,
+                              shadowRadius: active ? 18 : 5,
                               shadowOffset: { width: 0, height: 0 },
-                              elevation: active ? 14 : 8,
+                              elevation: active ? 14 : 4,
                             },
-                          ]}
-                        >
+                          ]}>
                           <View
                             style={[
                               styles.artMasonryGlow,
                               {
-                                borderColor: active ? "#00E5CC" : theme.border,
+                                borderColor: active ? "#00E5CC" : "rgba(0,229,204,0.20)",
                                 shadowColor: "#00E5CC",
-                                shadowOpacity: active ? 0.80 : 0.42,
-                                shadowRadius: active ? 12 : 6,
-                                elevation: active ? 10 : 5,
+                                shadowOpacity: active ? 0.80 : 0.24,
+                                shadowRadius: active ? 12 : 4,
+                                elevation: active ? 10 : 3,
                               },
                             ]}
                           />
@@ -2694,10 +2693,10 @@ export default function InstaMeScreen() {
                         height: libraryCardHeight,
                         backgroundColor: theme.ambient,
                         shadowColor: "#00E5CC",
-                        shadowOpacity: active ? 0.72 : 0.38,
-                        shadowRadius: active ? 18 : 10,
+                        shadowOpacity: active ? 0.72 : 0.22,
+                        shadowRadius: active ? 18 : 5,
                         shadowOffset: { width: 0, height: 0 },
-                        elevation: active ? 14 : 8,
+                        elevation: active ? 14 : 4,
                       },
                     ]}
                   >
@@ -2772,10 +2771,10 @@ export default function InstaMeScreen() {
                         height: libraryCardHeight,
                         backgroundColor: theme.ambient,
                         shadowColor: "#00E5CC",
-                        shadowOpacity: active ? 0.72 : 0.38,
-                        shadowRadius: active ? 18 : 10,
+                        shadowOpacity: active ? 0.72 : 0.22,
+                        shadowRadius: active ? 18 : 5,
                         shadowOffset: { width: 0, height: 0 },
-                        elevation: active ? 14 : 8,
+                        elevation: active ? 14 : 4,
                       },
                     ]}
                   >
@@ -3379,10 +3378,10 @@ const styles = StyleSheet.create({
   collageTile: {
     borderRadius: 24,
     backgroundColor: "transparent",
-    shadowOpacity: 0.36,
-    shadowRadius: 10,
+    shadowOpacity: 0.22,
+    shadowRadius: 5,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    elevation: 4,
   },
   collageTileActive: {
     shadowOpacity: 0.72,
@@ -3407,9 +3406,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
   collageTileGlowIdle: {
-    borderWidth: 1,
-    shadowOpacity: 0.42,
-    shadowRadius: 8,
+    borderWidth: 0.5,
+    shadowOpacity: 0.24,
+    shadowRadius: 4,
     shadowOffset: { width: 0, height: 0 },
   },
   collageTileGlowActive: {
