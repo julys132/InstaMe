@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -100,7 +101,6 @@ const STYLE_CATEGORY_OPTIONS: Array<{ key: InstaMeStyleCategory; label: string }
   { key: "men", label: "Men" },
   { key: "couple", label: "Couples" },
 ];
-const COLLAGE_TILE_HEIGHTS = [244, 196, 292, 228, 268, 210];
 const ART_TILE_HEIGHTS = [220, 292, 248];
 
 function resolveDisplayedGenerationQualityTier(options: {
@@ -423,6 +423,7 @@ function getStyleCardTheme(styleId: string): StyleCardTheme {
 export default function InstaMeScreen() {
   const params = useLocalSearchParams<{ uploadedImageId?: string | string[]; uploadedImageNonce?: string | string[] }>();
   const insets = useSafeAreaInsets();
+  const { width: viewportWidth } = useWindowDimensions();
   const { user } = useAuth();
   const { credits, refreshCredits } = useCredits();
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
@@ -469,6 +470,7 @@ export default function InstaMeScreen() {
   const [showEditComposer, setShowEditComposer] = useState(false);
   const [editInstruction, setEditInstruction] = useState("");
   const [editLoading, setEditLoading] = useState(false);
+  const [collageTileAspectRatios, setCollageTileAspectRatios] = useState<Record<string, number>>({});
 
   const selectedSavedOwnStyle = useMemo(
     () => savedOwnStyles.find((style) => style.id === selectedOwnStyleId) || null,
@@ -556,6 +558,9 @@ export default function InstaMeScreen() {
     () => visibleStylePresets.find((preset) => preset.id === previewStyleId) || null,
     [previewStyleId, visibleStylePresets],
   );
+
+  const collageColumnCount = viewportWidth >= 1180 ? 3 : 2;
+  const collageCardWidth = collageColumnCount === 3 ? "31.4%" : "48.2%";
 
   const isEnhancePreviewActive = previewStyleId === ENHANCE_PREVIEW_CARD_ID;
 
@@ -990,6 +995,27 @@ export default function InstaMeScreen() {
     ),
     [photo, loading, ownStyleNeedsActivation, credits, transformCost, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId],
   );
+
+  const handleCollageTileLoad = useCallback((styleId: string, event: any) => {
+    const width = event?.source?.width;
+    const height = event?.source?.height;
+
+    if (typeof width !== "number" || typeof height !== "number" || width <= 0 || height <= 0) {
+      return;
+    }
+
+    const nextAspectRatio = width / height;
+    setCollageTileAspectRatios((current) => {
+      if (current[styleId] && Math.abs(current[styleId] - nextAspectRatio) < 0.01) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [styleId]: nextAspectRatio,
+      };
+    });
+  }, []);
 
   const persistFavoriteKeys = useCallback(async (nextKeys: FavoriteStyleKey[]) => {
     setFavoriteStyleKeys(nextKeys);
@@ -1783,10 +1809,10 @@ export default function InstaMeScreen() {
               </View>
             ) : (
               <View style={styles.collageGrid}>
-                {mainOnlyStylePresets.map((preset, index) => {
+                {mainOnlyStylePresets.map((preset) => {
                   const active = selectedStyleId === preset.id;
                   const theme = getStyleCardTheme(preset.id);
-                  const isWide = index % 5 === 2;
+                  const cardAspectRatio = collageTileAspectRatios[preset.id] || 0.72;
                   return (
                     <Pressable
                       key={preset.id}
@@ -1794,22 +1820,30 @@ export default function InstaMeScreen() {
                       style={[
                         styles.collageTile,
                         {
-                          width: isWide ? "100%" : "48.3%",
-                          height: isWide ? 258 : COLLAGE_TILE_HEIGHTS[index % COLLAGE_TILE_HEIGHTS.length],
+                          width: collageCardWidth,
+                          shadowColor: theme.glow,
                         },
                         active && styles.collageTileActive,
                       ]}
                     >
-                      <Image source={{ uri: preset.cover || preset.representativeImage }} style={styles.collageTileImage} contentFit="cover" />
-                      <LinearGradient
-                        colors={[theme.ambient, "rgba(0,0,0,0.18)", "rgba(0,0,0,0.9)"]}
-                        locations={[0, 0.28, 1]}
-                        style={styles.collageTileOverlay}
-                      />
-                      <View style={[styles.collageTileGlow, active && { borderColor: theme.glow }]} />
-                      <View style={styles.collageTileTextWrap}>
-                        <Text style={styles.collageTileTitle}>{preset.label}</Text>
-                        <Text style={styles.collageTileSubtitle}>{preset.subtitle}</Text>
+                      <View style={[styles.collageTileInner, { borderColor: active ? theme.glow : theme.border }]}> 
+                        <View style={[styles.collageTileMedia, { aspectRatio: cardAspectRatio, backgroundColor: theme.ambient }]}> 
+                          <LinearGradient
+                            colors={["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)", "rgba(0,0,0,0.16)"]}
+                            locations={[0, 0.38, 1]}
+                            style={styles.collageTileOverlay}
+                          />
+                          <View style={[styles.collageTileGlow, active && styles.collageTileGlowActive, { borderColor: active ? theme.glow : "rgba(255,255,255,0.08)" }]} />
+                          <Image
+                            source={{ uri: preset.cover || preset.representativeImage }}
+                            style={styles.collageTileImageContained}
+                            contentFit="contain"
+                            onLoad={(event) => handleCollageTileLoad(preset.id, event)}
+                          />
+                        </View>
+                        <View style={styles.collageTileLabelRow}>
+                          <Text style={[styles.collageTileTitle, active && styles.collageTileTitleActive]}>{preset.label}</Text>
+                        </View>
                       </View>
                     </Pressable>
                   );
@@ -2904,25 +2938,32 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 14,
+    alignItems: "flex-start",
   },
   collageTile: {
-    width: "48.3%",
     borderRadius: 28,
-    overflow: "hidden",
-    backgroundColor: "#0D0D11",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-  },
-  collageTileActive: {
-    borderColor: "rgba(255,122,176,0.72)",
-    shadowColor: "#FF5CB8",
-    shadowOpacity: 0.28,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    shadowOpacity: 0.22,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
   },
-  collageTileImage: {
-    ...StyleSheet.absoluteFillObject,
+  collageTileActive: {
+    shadowOpacity: 0.48,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 14,
+  },
+  collageTileInner: {
+    borderRadius: 28,
+    overflow: "hidden",
+    borderWidth: 1,
+    backgroundColor: "#0D0D11",
+  },
+  collageTileMedia: {
+    position: "relative",
+    width: "100%",
+    padding: 10,
   },
   collageTileGlow: {
     ...StyleSheet.absoluteFillObject,
@@ -2930,24 +2971,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
   },
-  collageTileTextWrap: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 16,
-    gap: 6,
+  collageTileGlowActive: {
+    borderWidth: 1.5,
+    shadowColor: "#FF78C3",
+    shadowOpacity: 0.85,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  collageTileImageContained: {
+    width: "100%",
+    height: "100%",
+  },
+  collageTileLabelRow: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
   collageTileTitle: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 18,
+    fontSize: 16,
     lineHeight: 22,
+    textAlign: "center",
   },
-  collageTileSubtitle: {
-    color: "rgba(255,255,255,0.72)",
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    lineHeight: 17,
+  collageTileTitleActive: {
+    color: Colors.accentPale,
   },
   studioSection: {
     marginHorizontal: 16,
