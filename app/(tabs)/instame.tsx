@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   InteractionManager,
-  PanResponder,
-  useWindowDimensions,
   Modal,
   Platform,
   Pressable,
@@ -53,7 +51,6 @@ import {
   INSTAME_PORTRAIT_ENHANCE_TIER,
   getInstaMeCreditsForQualityTier,
   getInstaMeQualityTierLabel,
-  getInstaMeQualityTierSubtitle,
   type InstaMeQualityTier,
   type PublicInstaMeEditTier,
   type PublicInstaMeGenerationTier,
@@ -97,6 +94,14 @@ type StyleCardTheme = {
 const DEFAULT_TRANSFORM_COST = getInstaMeCreditsForQualityTier("premium");
 const GENERATION_WAIT_MESSAGE = "This can take around 1 to 2 minutes when providers are busy.";
 const MAX_INSTAME_HISTORY_ITEMS = 10;
+const ENHANCE_PREVIEW_CARD_ID = "__enhance_portrait__";
+const STYLE_CATEGORY_OPTIONS: Array<{ key: InstaMeStyleCategory; label: string }> = [
+  { key: "women", label: "Women" },
+  { key: "men", label: "Men" },
+  { key: "couple", label: "Couples" },
+];
+const COLLAGE_TILE_HEIGHTS = [244, 196, 292, 228, 268, 210];
+const ART_TILE_HEIGHTS = [220, 292, 248];
 
 function resolveDisplayedGenerationQualityTier(options: {
   preset: InstaMeStylePreset | null | undefined;
@@ -418,7 +423,6 @@ function getStyleCardTheme(styleId: string): StyleCardTheme {
 export default function InstaMeScreen() {
   const params = useLocalSearchParams<{ uploadedImageId?: string | string[]; uploadedImageNonce?: string | string[] }>();
   const insets = useSafeAreaInsets();
-  useWindowDimensions();
   const { user } = useAuth();
   const { credits, refreshCredits } = useCredits();
   const [photo, setPhoto] = useState<UploadedPhoto | null>(null);
@@ -452,21 +456,15 @@ export default function InstaMeScreen() {
   const [generationHistory, setGenerationHistory] = useState<InstaMeHistoryEntry[]>([]);
   const [ownStyleNameDraft, setOwnStyleNameDraft] = useState("");
   const [renamingOwnStyle, setRenamingOwnStyle] = useState(false);
-  const [savingResultAsStyle, setSavingResultAsStyle] = useState(false);
-  const [compareWidth, setCompareWidth] = useState(0);
-  const [compareRatio, setCompareRatio] = useState(0.5);
-  const [comparisonImageUri, setComparisonImageUri] = useState<string | null>(null);
+  const [, setComparisonImageUri] = useState<string | null>(null);
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
-  const [lastUsedStyleRefs, setLastUsedStyleRefs] = useState<string[]>([]);
   const [portraitEnhanceCandidate, setPortraitEnhanceCandidate] = useState<UploadedPhoto | null>(null);
   const [portraitEnhanceLoading, setPortraitEnhanceLoading] = useState(false);
   const [usingEnhancedPortrait, setUsingEnhancedPortrait] = useState(false);
-  const styleListRef = useRef<ScrollView | null>(null);
   const mainScrollRef = useRef<ScrollView | null>(null);
   const resultCardRef = useRef<View | null>(null);
-  const [canScrollMoreRight, setCanScrollMoreRight] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showEditComposer, setShowEditComposer] = useState(false);
   const [editInstruction, setEditInstruction] = useState("");
@@ -494,31 +492,9 @@ export default function InstaMeScreen() {
     ? favoriteStyleKeys.includes(currentFavoriteStyleKey)
     : false;
 
-  const favoritePresetCards = useMemo(
-    () => stylePresets.filter((preset) => favoriteStyleKeys.includes(toPresetFavoriteKey(preset.id))),
-    [favoriteStyleKeys, stylePresets],
-  );
-
   const favoriteOwnStyleCards = useMemo(
     () => savedOwnStyles.filter((style) => favoriteStyleKeys.includes(toOwnStyleFavoriteKey(style.id))),
     [favoriteStyleKeys, savedOwnStyles],
-  );
-
-  const comparePanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (event) => {
-          if (!compareWidth) return;
-          setCompareRatio(Math.min(1, Math.max(0, event.nativeEvent.locationX / compareWidth)));
-        },
-        onPanResponderMove: (event) => {
-          if (!compareWidth) return;
-          setCompareRatio(Math.min(1, Math.max(0, event.nativeEvent.locationX / compareWidth)));
-        },
-      }),
-    [compareWidth],
   );
 
   const applyBasePhoto = useCallback((nextPhoto: UploadedPhoto) => {
@@ -581,6 +557,45 @@ export default function InstaMeScreen() {
     [previewStyleId, visibleStylePresets],
   );
 
+  const isEnhancePreviewActive = previewStyleId === ENHANCE_PREVIEW_CARD_ID;
+
+  const previewPanelImageUri = useMemo(() => {
+    if (isEnhancePreviewActive) {
+      return (
+        portraitEnhanceCandidate?.uri ||
+        photo?.uri ||
+        stylePresets[0]?.cover ||
+        stylePresets[0]?.representativeImage ||
+        ""
+      );
+    }
+
+    return previewStyle?.cover || previewStyle?.representativeImage || stylePresets[0]?.cover || "";
+  }, [isEnhancePreviewActive, photo?.uri, portraitEnhanceCandidate?.uri, previewStyle?.cover, previewStyle?.representativeImage, stylePresets]);
+
+  const previewPanelTitle = isEnhancePreviewActive
+    ? "Enhance your portrait"
+    : previewStyle?.label || selectedStylePreset?.label || "Portrait style";
+
+  const previewPanelSubtitle = isEnhancePreviewActive
+    ? "Clean up and strengthen your base portrait before applying any style."
+    : previewStyle?.subtitle || "Choose your portrait, adjust the retouch template and generate.";
+
+  const ownStyleHeroUri = useMemo(
+    () =>
+      ownStylePhoto?.uri ||
+      selectedSavedOwnStyle?.previewUri ||
+      stylePresets[0]?.cover ||
+      stylePresets[0]?.representativeImage ||
+      "",
+    [ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri, stylePresets],
+  );
+
+  const activeArtPreviewSource = useMemo(
+    () => selectedArtStyle?.preview || INSTAME_ART_STYLES[0]?.preview,
+    [selectedArtStyle],
+  );
+
   const selectedArtStyle = useMemo(
     () => INSTAME_ART_STYLES.find((style) => style.id === selectedArtStyleId) || null,
     [selectedArtStyleId],
@@ -589,14 +604,6 @@ export default function InstaMeScreen() {
   const liveGenerationTier = useMemo(
     () => generationTiers.find((tier) => tier.id === selectedGenerationTierId) || generationTiers[0],
     [generationTiers, selectedGenerationTierId],
-  );
-
-  const highResGenerationTier = useMemo(
-    () =>
-      generationTiers.find((tier) => tier.id === "excellent") ||
-      generationTiers[generationTiers.length - 1] ||
-      INSTAME_GENERATION_TIERS[INSTAME_GENERATION_TIERS.length - 1],
-    [generationTiers],
   );
 
   const activeGenerationTier = liveGenerationTier;
@@ -618,10 +625,6 @@ export default function InstaMeScreen() {
     [activeGenerationQualityTier],
   );
 
-  const activeGenerationQualitySubtitle = useMemo(
-    () => getInstaMeQualityTierSubtitle(activeGenerationQualityTier, "generate"),
-    [activeGenerationQualityTier],
-  );
   const isFirstOwnStyleGeneration = isOwnStyleSelected && !selectedOwnStyleId;
   const transformBaseCost = activeGenerationTier?.credits ?? getInstaMeCreditsForQualityTier(activeGenerationQualityTier);
   const transformCost =
@@ -988,16 +991,6 @@ export default function InstaMeScreen() {
     [photo, loading, ownStyleNeedsActivation, credits, transformCost, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId],
   );
 
-  const handleStyleRowScroll = useCallback((event: any) => {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    const remainingRight = contentSize.width - (contentOffset.x + layoutMeasurement.width);
-    setCanScrollMoreRight(remainingRight > 16);
-  }, []);
-
-  const scrollStylesRight = useCallback(() => {
-    (styleListRef.current as ScrollView | null)?.scrollTo({ x: 220, animated: true });
-  }, []);
-
   const persistFavoriteKeys = useCallback(async (nextKeys: FavoriteStyleKey[]) => {
     setFavoriteStyleKeys(nextKeys);
     await AsyncStorage.setItem(getInstaMeFavoritesStorageKey(user?.id), JSON.stringify(nextKeys));
@@ -1189,6 +1182,10 @@ export default function InstaMeScreen() {
     setPreviewStyleId(preset.id);
   }, [ownStylePhoto, pickOwnStyleImage, selectedOwnStyleId]);
 
+  const handleEnhancePreviewPress = useCallback(() => {
+    setPreviewStyleId(ENHANCE_PREVIEW_CARD_ID);
+  }, []);
+
   const handleUseCurrentOwnStyle = useCallback(async () => {
     if (!ownStylePhoto && !selectedOwnStyleId) {
       Alert.alert("Missing style image", "Upload or select one Own Style before activating it.");
@@ -1308,44 +1305,6 @@ export default function InstaMeScreen() {
     }
     await Haptics.selectionAsync();
   }, [resultMeta?.qualityLabel, resultMeta?.qualityTier, savedOwnStyles]);
-
-  const handleSaveResultAsOwnStyle = useCallback(async () => {
-    if (!resultBase64) {
-      Alert.alert("Missing image", "Generate an image before saving it as a style.");
-      return;
-    }
-
-    setSavingResultAsStyle(true);
-    try {
-      const prepared = await optimizeGeneratedBase64Image({
-        base64: resultBase64,
-        mimeType: "image/png",
-      });
-      const result = await apiClient.saveInstaMeOwnStyle({
-        image: {
-          name: `${selectedStylePreset?.label || "Chicoo"} Style`,
-          base64: prepared.base64,
-          previewBase64: prepared.previewBase64,
-          mimeType: prepared.mimeType,
-          width: prepared.width,
-          height: prepared.height,
-          fileSizeBytes: prepared.fileSizeBytes,
-        },
-      });
-      setSavedOwnStyles((current) => {
-        const rest = current.filter((style) => style.id !== result.ownStyle.id);
-        return [result.ownStyle, ...rest];
-      });
-      setSelectedStyleId(INSTAME_OWN_STYLE_ID);
-      setSelectedOwnStyleId(result.ownStyle.id);
-      setOwnStylePhoto(null);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
-      Alert.alert("Save failed", error?.message || "Could not save this result as an Own Style.");
-    } finally {
-      setSavingResultAsStyle(false);
-    }
-  }, [resultBase64, selectedStylePreset?.label]);
 
   const persistHistoryResult = useCallback(async (options: {
     imageBase64: string;
@@ -1564,9 +1523,9 @@ export default function InstaMeScreen() {
         setSelectedOwnStyleId(result.savedOwnStyle.id);
         setOwnStylePhoto(null);
       }
-      setLastUsedStyleRefs(Array.isArray(result.styleReferenceIds) ? result.styleReferenceIds : []);
       setShowEditComposer(false);
       setEditInstruction("");
+      setPreviewStyleId(null);
       await persistHistoryResult({
         imageBase64: result.imageBase64,
         mimeType: "image/png",
@@ -1738,13 +1697,29 @@ export default function InstaMeScreen() {
           <View style={styles.headerTopRow}>
             <View style={styles.headerCopySolo}>
               <Text style={styles.headerBrand}>Chicoo</Text>
-              <Text style={styles.headerTitle}>Portrait Studio</Text>
+              <Text style={styles.headerTitle}>Style collage</Text>
             </View>
             <View style={styles.headerCreditsLine}>
               <Text style={styles.headerCreditsCount}>{credits}</Text>
               <Text style={styles.headerCreditsLabel}>Credits</Text>
             </View>
           </View>
+          {styleSectionTab === "main" ? (
+            <View style={styles.categoryPillRowTop}>
+              {STYLE_CATEGORY_OPTIONS.map((cat) => {
+                const active = styleCategory === cat.key;
+                return (
+                  <Pressable
+                    key={cat.key}
+                    onPress={() => setStyleCategory(cat.key)}
+                    style={[styles.categoryPill, active && styles.categoryPillActive]}
+                  >
+                    <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>{cat.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.sectionTabBarOuter}>
@@ -1777,609 +1752,427 @@ export default function InstaMeScreen() {
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Upload your photo</Text>
-          <View style={styles.uploadCompactRow}>
-            <Pressable style={styles.uploadThumbBox} onPress={pickImage}>
-              {photo ? (
-                <Image source={{ uri: photo.uri }} style={styles.uploadThumbImage} contentFit="contain" />
-              ) : (
-                <View style={styles.uploadThumbPlaceholder}>
-                  <Ionicons name="add" size={32} color={Colors.accent} />
-                </View>
-              )}
-            </Pressable>
-            <View style={styles.uploadButtonsColumn}>
-              <Pressable
-                onPress={pickImage}
-                style={({ pressed }) => [styles.uploadCompactButton, pressed && { opacity: 0.88 }]}
-              >
-                <Ionicons name="cloud-upload-outline" size={15} color={Colors.accentPale} />
-                <Text style={styles.uploadCompactButtonText}>Upload from device</Text>
-              </Pressable>
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: "/uploaded-images",
-                    params: { selectedImageId: photo?.sourceImageId || "" },
-                  })
-                }
-                style={({ pressed }) => [styles.uploadCompactButton, styles.uploadCompactButtonAccent, pressed && { opacity: 0.88 }]}
-              >
-                <Ionicons name="images-outline" size={15} color={Colors.accentLight} />
-                <Text style={[styles.uploadCompactButtonText, styles.uploadCompactButtonTextAccent]}>Uploaded Images</Text>
-              </Pressable>
-              <Pressable
-                onPress={() =>
-                  router.push({
-                    pathname: "/enhanced-portraits",
-                    params: { selectedImageId: photo?.kind === "enhanced" ? photo.sourceImageId || "" : "" },
-                  })
-                }
-                style={({ pressed }) => [styles.uploadCompactButton, pressed && { opacity: 0.88 }]}
-              >
-                <Ionicons name="sparkles-outline" size={15} color={Colors.accentPale} />
-                <Text style={styles.uploadCompactButtonText}>Enhanced Portraits</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <Pressable
-            onPress={handleEnhancePortrait}
-            disabled={!photo || portraitEnhanceLoading}
-            style={({ pressed }) => [
-              styles.enhanceButton,
-              (!photo || portraitEnhanceLoading) && styles.enhanceButtonDisabled,
-              pressed && photo && !portraitEnhanceLoading ? { opacity: 0.85, transform: [{ scale: 0.97 }] } : undefined,
-            ]}
-          >
-            {portraitEnhanceLoading ? (
-              <ActivityIndicator color="#FFF" size="small" />
-            ) : (
-              <>
-                <View style={styles.enhanceButtonIconWrap}>
-                  <LinearGradient
-                    colors={["#FF7BAF", "#FF5D90", "#FF4F7D"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.enhanceButtonIconFill}
-                  >
-                    <Ionicons name="sparkles" size={14} color="#FFF" />
-                  </LinearGradient>
-                </View>
-                <Text style={styles.enhanceButtonText}>Enhance Portrait</Text>
-              </>
-            )}
-          </Pressable>
-          {portraitEnhanceLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
-
-          {usingEnhancedPortrait ? (
-            <Text style={styles.enhanceSelectedText}>Enhanced portrait active.</Text>
-          ) : null}
-
-          {portraitEnhanceCandidate ? (
-            <View style={styles.enhancePreviewCard}>
-              <Text style={styles.enhancePreviewTitle}>Enhanced preview</Text>
+        {styleSectionTab === "main" ? (
+          <View style={styles.collageSection}>
+            <Pressable onPress={handleEnhancePreviewPress} style={styles.collageHeroTile}>
               <Image
-                source={{ uri: portraitEnhanceCandidate.uri }}
-                style={styles.enhancePreviewImage}
-                contentFit="contain"
+                source={{ uri: portraitEnhanceCandidate?.uri || photo?.uri || stylePresets[0]?.cover || stylePresets[0]?.representativeImage }}
+                style={styles.collageHeroImage}
+                contentFit="cover"
               />
-              <View style={styles.enhanceDecisionRow}>
-                <Pressable
-                  onPress={handleEnhancePortrait}
-                  disabled={portraitEnhanceLoading}
-                  style={({ pressed }) => [
-                    styles.enhanceDecisionButton,
-                    styles.enhanceRetryButton,
-                    pressed && !portraitEnhanceLoading ? { opacity: 0.88 } : undefined,
-                  ]}
-                >
-                  <Text style={styles.enhanceRetryButtonText}>Try again</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleKeepEnhancedPortrait}
-                  style={({ pressed }) => [
-                    styles.enhanceDecisionButton,
-                    styles.enhanceKeepButton,
-                    pressed ? { opacity: 0.9 } : undefined,
-                  ]}
-                >
-                  <Text style={styles.enhanceKeepButtonText}>Keep this one</Text>
-                </Pressable>
+              <LinearGradient
+                colors={["rgba(11,14,18,0.06)", "rgba(11,14,18,0.24)", "rgba(11,14,18,0.92)"]}
+                locations={[0, 0.34, 1]}
+                style={styles.collageTileOverlay}
+              />
+              <View style={styles.collageHeroBadge}>
+                <Ionicons name="sparkles" size={14} color="#081012" />
+                <Text style={styles.collageHeroBadgeText}>Always first</Text>
               </View>
-            </View>
-          ) : null}
+              <View style={styles.collageHeroTextWrap}>
+                <Text style={styles.collageHeroTitle}>Enhance your portrait</Text>
+                <Text style={styles.collageHeroSubtitle}>Prepare the base image before styling and keep the best version.</Text>
+              </View>
+            </Pressable>
 
-        </View>
-
-        <View style={styles.card}>
-
-          {/* ── Sub-tabs: Signature Match / Creative Freedom (Own Styles only) ── */}
-          {styleSectionTab === "own" ? (
-            <View style={styles.subTabBar}>
-              {OWN_STYLE_MODE_OPTIONS.map((option) => {
-                const active = ownStyleMode === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setOwnStyleMode(option.value)}
-                    style={[styles.subTab, active && styles.subTabActive]}
-                  >
-                    <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{option.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
-
-          {/* ════════════  MAIN STYLES TAB  ════════════ */}
-          {styleSectionTab === "main" ? (
-            <>
-              {/* ── Category pills ── */}
-              <View style={styles.categoryPillRow}>
-                {([
-                  { key: "women" as const, label: "Women" },
-                  { key: "men" as const, label: "Men" },
-                  { key: "couple" as const, label: "Couples" },
-                ] as const).map((cat) => {
-                  const active = styleCategory === cat.key;
+            {mainOnlyStylePresets.length === 0 ? (
+              <View style={styles.categoryEmptyState}>
+                <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.25)" />
+                <Text style={styles.categoryEmptyText}>Coming soon</Text>
+                <Text style={styles.categoryEmptySubtext}>Stay tuned — new styles are on the way!</Text>
+              </View>
+            ) : (
+              <View style={styles.collageGrid}>
+                {mainOnlyStylePresets.map((preset, index) => {
+                  const active = selectedStyleId === preset.id;
+                  const theme = getStyleCardTheme(preset.id);
+                  const isWide = index % 5 === 2;
                   return (
                     <Pressable
-                      key={cat.key}
-                      onPress={() => setStyleCategory(cat.key)}
-                      style={[styles.categoryPill, active && styles.categoryPillActive]}
-                    >
-                      <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>
-                        {cat.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
-              {mainOnlyStylePresets.length === 0 ? (
-                <View style={styles.categoryEmptyState}>
-                  <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.25)" />
-                  <Text style={styles.categoryEmptyText}>Coming soon</Text>
-                  <Text style={styles.categoryEmptySubtext}>Stay tuned — new styles are on the way!</Text>
-                </View>
-              ) : (
-              <View style={styles.styleCarouselWrap}>
-                <ScrollView
-                  ref={styleListRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.styleRow}
-                  onScroll={handleStyleRowScroll}
-                  scrollEventThrottle={16}
-                >
-                  {mainOnlyStylePresets.map((preset, index) => {
-                    const active = selectedStyleId === preset.id;
-                    const isFirst = index === 0;
-                    const isLast = index === mainOnlyStylePresets.length - 1;
-                    const theme = getStyleCardTheme(preset.id);
-
-                    return (
-                      <Pressable
-                        key={preset.id}
-                        onPress={() => handleStylePresetPress(preset)}
-                        style={[
-                          styles.styleCardOuter,
-                          isFirst && styles.styleCardOuterFirst,
-                          isLast && styles.styleCardOuterLast,
-                          { backgroundColor: theme.ambient, shadowColor: theme.glow },
-                          active && styles.styleCardOuterActive,
-                          active && { shadowColor: theme.glow },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.styleCard,
-                            { borderColor: theme.border, backgroundColor: theme.footerBottom },
-                            active && styles.styleCardActive,
-                            active && { borderColor: theme.glow },
-                          ]}
-                        >
-                          <Image
-                            source={{ uri: preset.cover || preset.representativeImage }}
-                            contentFit="cover"
-                            style={styles.styleCardImage}
-                          />
-                          <LinearGradient
-                            colors={active
-                              ? [theme.glowSoft, "rgba(0,0,0,0.10)", "rgba(0,0,0,0.58)"]
-                              : [theme.ambient, "rgba(0,0,0,0.10)", "rgba(0,0,0,0.62)"]}
-                            locations={[0, 0.22, 1]}
-                            style={styles.styleCardAtmosphere}
-                          />
-                          <LinearGradient
-                            colors={["rgba(255,255,255,0.10)", "rgba(0,0,0,0.06)", "rgba(0,0,0,0.18)"]}
-                            locations={[0, 0.14, 1]}
-                            style={styles.styleCardImageWash}
-                          />
-                          <View
-                            style={[
-                              styles.styleCardInnerRing,
-                              { borderColor: active ? theme.border : "rgba(255,255,255,0.12)" },
-                              active && styles.styleCardInnerRingActive,
-                            ]}
-                          />
-                          <LinearGradient
-                            colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.74)", "rgba(0,0,0,0.92)"]}
-                            locations={[0, 0.4, 1]}
-                            style={styles.styleCardFooter}
-                          />
-                          <View style={styles.styleCardTextWrap}>
-                            <Text
-                              style={[
-                                styles.styleCardTitle,
-                                { color: theme.text },
-                                active && styles.styleCardTitleActive,
-                                active && { color: theme.text },
-                              ]}
-                            >
-                              {preset.label}
-                            </Text>
-                          </View>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-
-                {canScrollMoreRight ? (
-                  <View pointerEvents="box-none" style={styles.styleScrollHintWrap}>
-                    <LinearGradient
-                      colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.94)"]}
-                      locations={[0, 0.45, 1]}
-                      style={styles.styleScrollFade}
-                    />
-                    <Pressable
-                      onPress={scrollStylesRight}
-                      style={({ pressed }) => [styles.styleScrollArrow, pressed && { transform: [{ scale: 0.96 }] }]}
-                    >
-                      <Ionicons name="chevron-forward" size={18} color={Colors.accentSoft} />
-                    </Pressable>
-                  </View>
-                ) : null}
-              </View>
-              )}
-
-              <View style={styles.selectedStyleRow}>
-                <Text style={styles.selectedStyleText}>
-                  Selected: <Text style={styles.selectedStyleAccent}>{selectedStylePreset?.label || "None"}</Text>
-                </Text>
-                {currentFavoriteStyleKey ? (
-                  <Pressable onPress={() => void toggleCurrentStyleFavorite()} style={styles.favoriteStyleButton}>
-                    <Ionicons name={isCurrentStyleFavorite ? "heart" : "heart-outline"} size={18} color={isCurrentStyleFavorite ? Colors.accentPink : Colors.accentSoft} />
-                    <Text style={styles.favoriteStyleButtonText}>{isCurrentStyleFavorite ? "Favorited" : "Favorite"}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-
-              <View style={styles.customChangesPanel}>
-                <View style={styles.customChangesHeader}>
-                  <Text style={styles.customChangesTitle}>Custom Changes</Text>
-                  <Text style={styles.customChangesSubtitle}>
-                    Write any extra changes you want over the preset.
-                  </Text>
-                </View>
-                <View style={styles.customChangesHintRow}>
-                  <View style={styles.customChangesHintChip}>
-                    <Text style={styles.customChangesHintChipText}>colors</Text>
-                  </View>
-                  <View style={styles.customChangesHintChip}>
-                    <Text style={styles.customChangesHintChipText}>clothes</Text>
-                  </View>
-                  <View style={styles.customChangesHintChip}>
-                    <Text style={styles.customChangesHintChipText}>expression</Text>
-                  </View>
-                  <View style={styles.customChangesHintChip}>
-                    <Text style={styles.customChangesHintChipText}>hair</Text>
-                  </View>
-                </View>
-                <TextInput
-                  value={customPrompt}
-                  onChangeText={setCustomPrompt}
-                  placeholder="Example: make the outfit white, softer makeup, stronger smile, warmer pink tones, gold earrings."
-                  placeholderTextColor="rgba(255,255,255,0.34)"
-                  multiline
-                  style={styles.customChangesInput}
-                />
-                <Text style={styles.customChangesFootnote}>
-                  These notes are added over the generic preset styling.
-                </Text>
-              </View>
-
-              {favoritePresetCards.length > 0 ? (
-                <View style={styles.favoriteStylesSection}>
-                  <View style={styles.ownStylesLibraryHeader}>
-                    <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
-                    <Text style={styles.ownStylesLibraryCount}>{favoritePresetCards.length}</Text>
-                  </View>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
-                    {favoritePresetCards.map((preset) => {
-                      const theme = getStyleCardTheme(preset.id);
-                      return (
-                        <Pressable
-                          key={`favorite-preset-${preset.id}`}
-                          onPress={() => handleStylePresetPress(preset)}
-                          style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
-                        >
-                          <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}>
-                            <Image source={{ uri: preset.cover || preset.representativeImage }} contentFit="cover" style={styles.styleCardImage} />
-                            <LinearGradient colors={[theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]} locations={[0, 0.22, 1]} style={styles.styleCardAtmosphere} />
-                            <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
-                            <View style={styles.styleCardTextWrap}>
-                              <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{preset.label}</Text>
-                            </View>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              ) : null}
-            </>
-          ) : null}
-
-          {/* ════════════  OWN STYLES TAB  ════════════ */}
-          {styleSectionTab === "own" ? (
-            <View style={styles.ownStylePanel}>
-              <Text style={styles.processingHintText}>
-                First use: {transformCost} cr. Saved styles: {activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST} cr.
-              </Text>
-              <Pressable onPress={pickOwnStyleImage} style={styles.ownStyleUploadBox}>
-                {ownStylePhoto ? (
-                  <Image source={{ uri: ownStylePhoto.uri }} style={styles.ownStyleUploadImage} contentFit="contain" />
-                ) : selectedSavedOwnStyle ? (
-                  <Image source={{ uri: selectedSavedOwnStyle.previewUri }} style={styles.ownStyleUploadImage} contentFit="contain" />
-                ) : (
-                  <View style={styles.ownStyleUploadPlaceholder}>
-                    <Ionicons name="images-outline" size={28} color={Colors.accent} />
-                    <Text style={styles.ownStyleUploadPlaceholderTitle}>Choose style image</Text>
-                  </View>
-                )}
-              </Pressable>
-              {hasOwnStyleInput ? (
-                <>
-                  <Pressable
-                    onPress={() => void handleUseCurrentOwnStyle()}
-                    disabled={!ownStyleNeedsActivation}
-                    style={({ pressed }) => [
-                      styles.secondaryActionButton,
-                      styles.secondaryActionButtonAccent,
-                      !ownStyleNeedsActivation && styles.secondaryActionButtonDisabled,
-                      pressed && ownStyleNeedsActivation ? { opacity: 0.9 } : undefined,
-                    ]}
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={16} color={Colors.accentLight} />
-                    <Text style={[styles.secondaryActionButtonText, styles.secondaryActionButtonTextAccent]}>
-                      {ownStyleNeedsActivation ? "Use this style" : "Using this style"}
-                    </Text>
-                  </Pressable>
-                </>
-              ) : null}
-              {selectedSavedOwnStyle ? (
-                <View style={styles.ownStyleSavedMeta}>
-                  <Text style={styles.ownStyleSavedMetaTitle}>Using: {selectedSavedOwnStyle.name}</Text>
-                  <View style={styles.renameOwnStyleRow}>
-                    <TextInput
-                      value={ownStyleNameDraft}
-                      onChangeText={setOwnStyleNameDraft}
-                      placeholder="Rename this style"
-                      placeholderTextColor="#7EA1A7"
-                      style={styles.renameOwnStyleInput}
-                    />
-                    <Pressable
-                      onPress={() => void handleRenameSavedOwnStyle()}
-                      disabled={renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name}
-                      style={({ pressed }) => [
-                        styles.renameOwnStyleButton,
-                        (renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name) && styles.secondaryActionButtonDisabled,
-                        pressed && !(renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name) ? { opacity: 0.88 } : undefined,
+                      key={preset.id}
+                      onPress={() => handleStylePresetPress(preset)}
+                      style={[
+                        styles.collageTile,
+                        {
+                          width: isWide ? "100%" : "48.3%",
+                          height: isWide ? 258 : COLLAGE_TILE_HEIGHTS[index % COLLAGE_TILE_HEIGHTS.length],
+                        },
+                        active && styles.collageTileActive,
                       ]}
                     >
-                      <Text style={styles.renameOwnStyleButtonText}>{renamingOwnStyle ? "Saving..." : "Rename"}</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : null}
-              <View style={styles.uploadActionRow}>
-                <Pressable
-                  onPress={pickOwnStyleImage}
-                  style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
-                >
-                  <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
-                  <Text style={styles.secondaryActionButtonText}>
-                    {ownStylePhoto || selectedSavedOwnStyle ? "Change image" : "Upload"}
-                  </Text>
-                </Pressable>
-                {ownStylePhoto ? (
-                  <Pressable
-                    onPress={() => setOwnStylePhoto(null)}
-                    style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
-                  >
-                    <Ionicons name="trash-outline" size={16} color={Colors.accentPale} />
-                    <Text style={styles.secondaryActionButtonText}>Remove</Text>
-                  </Pressable>
-                ) : selectedSavedOwnStyle ? (
-                  <Pressable
-                    onPress={() => handleDeleteSavedOwnStyle(selectedSavedOwnStyle)}
-                    style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}
-                  >
-                    <Ionicons name="trash-outline" size={16} color={Colors.accentPale} />
-                    <Text style={styles.secondaryActionButtonText}>Delete</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-
-              <View style={styles.customChangesPanel}>
-                <View style={styles.customChangesHeader}>
-                  <Text style={styles.customChangesTitle}>Custom Changes</Text>
-                  <Text style={styles.customChangesSubtitle}>
-                    Add any clothing, color or expression notes for this own style.
-                  </Text>
-                </View>
-                <TextInput
-                  value={customPrompt}
-                  onChangeText={setCustomPrompt}
-                  placeholder="Example: keep the same pose, white blazer, cleaner background, softer smile."
-                  placeholderTextColor="rgba(255,255,255,0.34)"
-                  multiline
-                  style={styles.customChangesInput}
-                />
-                <Text style={styles.customChangesFootnote}>
-                  Your notes guide the final result on top of the selected own style.
-                </Text>
-              </View>
-            </View>
-          ) : null}
-
-          {/* ════════════  ART STYLES TAB  ════════════ */}
-          {styleSectionTab === "art" ? (
-            <View style={styles.artStylesPanel}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.artStylesRow}
-              >
-                <Pressable
-                  onPress={() => setSelectedArtStyleId("")}
-                  style={[styles.artStyleOption, styles.artStyleOptionEmpty, !selectedArtStyleId && styles.artStyleOptionActive]}
-                >
-                  <View style={styles.artStyleOptionTextWrap}>
-                    <Text style={[styles.artStyleOptionTitle, !selectedArtStyleId && styles.artStyleOptionTitleActive]}>None</Text>
-                    <Text style={[styles.artStyleOptionSubtitle, !selectedArtStyleId && styles.artStyleOptionSubtitleActive]}>Photographic</Text>
-                  </View>
-                </Pressable>
-
-                {INSTAME_ART_STYLES.map((style) => {
-                  const active = selectedArtStyleId === style.id;
-                  return (
-                    <Pressable
-                      key={style.id}
-                      onPress={() => setSelectedArtStyleId(style.id)}
-                      style={[styles.artStyleOption, active && styles.artStyleOptionActive]}
-                    >
-                      <Image source={style.preview} style={styles.artStyleOptionImage} contentFit="cover" />
+                      <Image source={{ uri: preset.cover || preset.representativeImage }} style={styles.collageTileImage} contentFit="cover" />
                       <LinearGradient
-                        colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.88)"]}
-                        style={styles.artStyleOptionOverlay}
+                        colors={[theme.ambient, "rgba(0,0,0,0.18)", "rgba(0,0,0,0.9)"]}
+                        locations={[0, 0.28, 1]}
+                        style={styles.collageTileOverlay}
                       />
-                      <View style={styles.artStyleOptionTextWrap}>
-                        <Text style={[styles.artStyleOptionTitle, active && styles.artStyleOptionTitleActive]}>{style.label}</Text>
+                      <View style={[styles.collageTileGlow, active && { borderColor: theme.glow }]} />
+                      <View style={styles.collageTileTextWrap}>
+                        <Text style={styles.collageTileTitle}>{preset.label}</Text>
+                        <Text style={styles.collageTileSubtitle}>{preset.subtitle}</Text>
                       </View>
                     </Pressable>
                   );
                 })}
-              </ScrollView>
-
-              <Text style={styles.selectedStyleText}>
-                Art finish: <Text style={styles.selectedStyleAccent}>{selectedArtStyle?.label || "None"}</Text>
-              </Text>
-
-              <View style={styles.customChangesPanel}>
-                <View style={styles.customChangesHeader}>
-                  <Text style={styles.customChangesTitle}>Custom Changes</Text>
-                  <Text style={styles.customChangesSubtitle}>
-                    Add optional notes if you want this art finish to lean a certain way.
-                  </Text>
-                </View>
-                <TextInput
-                  value={customPrompt}
-                  onChangeText={setCustomPrompt}
-                  placeholder="Example: more pastel colors, brighter skin, softer facial expression, longer hair."
-                  placeholderTextColor="rgba(255,255,255,0.34)"
-                  multiline
-                  style={styles.customChangesInput}
-                />
-                <Text style={styles.customChangesFootnote}>
-                  Leave it empty if you want only the default preset + art style behavior.
-                </Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.studioSection}>
+            <View style={styles.studioPortraitStrip}>
+              <Pressable style={styles.studioPortraitThumb} onPress={pickImage}>
+                {photo ? (
+                  <Image source={{ uri: photo.uri }} style={styles.uploadThumbImage} contentFit="cover" />
+                ) : (
+                  <View style={styles.editorUploadPlaceholder}>
+                    <Ionicons name="add" size={28} color={Colors.accentPale} />
+                    <Text style={styles.editorUploadPlaceholderText}>Add portrait</Text>
+                  </View>
+                )}
+              </Pressable>
+              <View style={styles.studioPortraitActions}>
+                <Pressable onPress={pickImage} style={styles.studioQuickButton}>
+                  <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
+                  <Text style={styles.studioQuickButtonText}>Upload</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/uploaded-images",
+                      params: { selectedImageId: photo?.sourceImageId || "" },
+                    })
+                  }
+                  style={[styles.studioQuickButton, styles.studioQuickButtonAccent]}
+                >
+                  <Ionicons name="images-outline" size={16} color={Colors.accentLight} />
+                  <Text style={[styles.studioQuickButtonText, styles.studioQuickButtonTextAccent]}>Uploaded</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() =>
+                    router.push({
+                      pathname: "/enhanced-portraits",
+                      params: { selectedImageId: photo?.kind === "enhanced" ? photo.sourceImageId || "" : "" },
+                    })
+                  }
+                  style={styles.studioQuickButton}
+                >
+                  <Ionicons name="sparkles-outline" size={16} color={Colors.accentPale} />
+                  <Text style={styles.studioQuickButtonText}>Enhanced</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleEnhancePortrait}
+                  disabled={!photo || portraitEnhanceLoading}
+                  style={[styles.studioQuickButton, styles.studioQuickButtonAccent, (!photo || portraitEnhanceLoading) && styles.secondaryActionButtonDisabled]}
+                >
+                  {portraitEnhanceLoading ? (
+                    <ActivityIndicator color={Colors.accentLight} size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="sparkles" size={16} color={Colors.accentLight} />
+                      <Text style={[styles.studioQuickButtonText, styles.studioQuickButtonTextAccent]}>Enhance</Text>
+                    </>
+                  )}
+                </Pressable>
               </View>
             </View>
-          ) : null}
-        </View>
 
-        <View style={styles.card}>
-          <View style={styles.pricingSection}>
-            <Text style={styles.pricingSectionTitle}>Generate</Text>
-            <View style={styles.pricingCardsRow}>
-              {generationTiers.map((tier) => {
-                const isSelected = tier.id === (activeGenerationTier?.id || selectedGenerationTierId);
-                const tierCost = tier.credits + (isFirstOwnStyleGeneration ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0);
-                return (
+            {usingEnhancedPortrait ? <Text style={styles.enhanceSelectedText}>Enhanced portrait active.</Text> : null}
+            {portraitEnhanceCandidate ? (
+              <View style={styles.enhancePreviewCard}>
+                <Text style={styles.enhancePreviewTitle}>Enhanced preview</Text>
+                <Image source={{ uri: portraitEnhanceCandidate.uri }} style={styles.enhancePreviewImage} contentFit="cover" />
+                <View style={styles.enhanceDecisionRow}>
                   <Pressable
-                    key={tier.id}
-                    onPress={() => setSelectedGenerationTierId(tier.id)}
-                    style={[styles.pricingCard, isSelected && styles.pricingCardActive]}
+                    onPress={handleEnhancePortrait}
+                    disabled={portraitEnhanceLoading}
+                    style={({ pressed }) => [
+                      styles.enhanceDecisionButton,
+                      styles.enhanceRetryButton,
+                      pressed && !portraitEnhanceLoading ? { opacity: 0.88 } : undefined,
+                    ]}
                   >
-                    <Text style={styles.pricingLabel}>{tier.label}</Text>
-                    <Text style={styles.pricingSubtitle}>{tier.output}</Text>
-                    <Text style={styles.pricingCredits}>{tierCost} credits</Text>
+                    <Text style={styles.enhanceRetryButtonText}>Try again</Text>
                   </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <Pressable
-            onPress={handleTransform}
-            disabled={!canGenerate}
-            style={({ pressed }) => [
-              styles.generateButton,
-              !canGenerate && styles.generateButtonDisabled,
-              pressed && canGenerate ? { opacity: 0.9 } : undefined,
-            ]}
-          >
-            <View style={styles.generateButtonInner}>
-              {loading ? (
-                <ActivityIndicator color="#FF7FB1" />
-              ) : (
-                <Text style={styles.generateButtonText}>Transform now</Text>
-              )}
-            </View>
-          </Pressable>
-          <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
-          {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
-        </View>
-
-        {resultBase64 ? (
-          <View ref={resultCardRef} style={styles.card}>
-            <Text style={styles.cardTitle}>Your Chicoo result</Text>
-            {comparisonImageUri ? (
-              <View style={styles.compareSection}>
-                <View style={styles.compareHeader}>
-                  <Text style={styles.compareTitle}>Before / After</Text>
-                  <Text style={styles.compareSubtitle}>Drag the divider to compare your original photo with the generated result.</Text>
-                </View>
-                <View
-                  style={styles.compareFrame}
-                  onLayout={(event) => setCompareWidth(event.nativeEvent.layout.width)}
-                  {...comparePanResponder.panHandlers}
-                >
-                  <Image source={{ uri: `data:image/png;base64,${resultBase64}` }} style={styles.compareImage} contentFit="cover" />
-                  <View style={[styles.compareOverlay, { width: Math.max(0, compareWidth * compareRatio) }]}>
-                    <Image
-                      source={{ uri: comparisonImageUri }}
-                      style={[styles.compareImage, compareWidth ? { width: compareWidth } : null]}
-                      contentFit="cover"
-                    />
-                  </View>
-                  <View style={[styles.compareDivider, { left: `${compareRatio * 100}%` }]}>
-                    <View style={styles.compareHandle}>
-                      <Ionicons name="swap-horizontal" size={16} color="#091114" />
-                    </View>
-                  </View>
-                  <View style={styles.compareLabelRow}>
-                    <Text style={styles.compareLabel}>Before</Text>
-                    <Text style={styles.compareLabel}>After</Text>
-                  </View>
+                  <Pressable
+                    onPress={handleKeepEnhancedPortrait}
+                    style={({ pressed }) => [
+                      styles.enhanceDecisionButton,
+                      styles.enhanceKeepButton,
+                      pressed ? { opacity: 0.9 } : undefined,
+                    ]}
+                  >
+                    <Text style={styles.enhanceKeepButtonText}>Keep this one</Text>
+                  </Pressable>
                 </View>
               </View>
             ) : null}
+
+            {styleSectionTab === "own" ? (
+              <>
+                <Pressable onPress={pickOwnStyleImage} style={styles.studioHero}>
+                  <Image source={{ uri: ownStyleHeroUri }} style={styles.studioHeroImage} contentFit="cover" />
+                  <LinearGradient
+                    colors={["rgba(134,244,255,0.10)", "rgba(0,0,0,0.28)", "rgba(0,0,0,0.90)"]}
+                    locations={[0, 0.28, 1]}
+                    style={styles.studioHeroOverlay}
+                  />
+                  <View style={styles.studioHeroBadge}>
+                    <Text style={styles.studioHeroBadgeText}>Own Style</Text>
+                  </View>
+                  <View style={styles.studioHeroTextWrap}>
+                    <Text style={styles.studioHeroTitle}>{selectedSavedOwnStyle?.name || "Create your own style"}</Text>
+                    <Text style={styles.studioHeroSubtitle}>Upload one reference and build a persistent full-screen styling direction.</Text>
+                  </View>
+                </Pressable>
+
+                <View style={styles.studioPanel}>
+                  <View style={styles.subTabBar}>
+                    {OWN_STYLE_MODE_OPTIONS.map((option) => {
+                      const active = ownStyleMode === option.value;
+                      return (
+                        <Pressable
+                          key={option.value}
+                          onPress={() => setOwnStyleMode(option.value)}
+                          style={[styles.subTab, active && styles.subTabActive]}
+                        >
+                          <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{option.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <Text style={styles.processingHintText}>
+                    First use: {transformCost} cr. Saved styles: {activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST} cr.
+                  </Text>
+
+                  {selectedSavedOwnStyle ? (
+                    <View style={styles.ownStyleSavedMeta}>
+                      <Text style={styles.ownStyleSavedMetaTitle}>Using: {selectedSavedOwnStyle.name}</Text>
+                      <View style={styles.renameOwnStyleRow}>
+                        <TextInput
+                          value={ownStyleNameDraft}
+                          onChangeText={setOwnStyleNameDraft}
+                          placeholder="Rename this style"
+                          placeholderTextColor="#7EA1A7"
+                          style={styles.renameOwnStyleInput}
+                        />
+                        <Pressable
+                          onPress={() => void handleRenameSavedOwnStyle()}
+                          disabled={renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name}
+                          style={({ pressed }) => [
+                            styles.renameOwnStyleButton,
+                            (renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name) && styles.secondaryActionButtonDisabled,
+                            pressed && !(renamingOwnStyle || ownStyleNameDraft.trim() === selectedSavedOwnStyle.name) ? { opacity: 0.88 } : undefined,
+                          ]}
+                        >
+                          <Text style={styles.renameOwnStyleButtonText}>{renamingOwnStyle ? "Saving..." : "Rename"}</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.uploadActionRow}>
+                    <Pressable onPress={pickOwnStyleImage} style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }] }>
+                      <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
+                      <Text style={styles.secondaryActionButtonText}>{ownStylePhoto || selectedSavedOwnStyle ? "Change image" : "Upload"}</Text>
+                    </Pressable>
+                    {hasOwnStyleInput ? (
+                      <Pressable
+                        onPress={() => void handleUseCurrentOwnStyle()}
+                        disabled={!ownStyleNeedsActivation}
+                        style={({ pressed }) => [
+                          styles.secondaryActionButton,
+                          styles.secondaryActionButtonAccent,
+                          !ownStyleNeedsActivation && styles.secondaryActionButtonDisabled,
+                          pressed && ownStyleNeedsActivation ? { opacity: 0.9 } : undefined,
+                        ]}
+                      >
+                        <Ionicons name="checkmark-circle-outline" size={16} color={Colors.accentLight} />
+                        <Text style={[styles.secondaryActionButtonText, styles.secondaryActionButtonTextAccent]}>
+                          {ownStyleNeedsActivation ? "Use this style" : "Using this style"}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+
+                  {ownStylePhoto ? (
+                    <Pressable onPress={() => setOwnStylePhoto(null)} style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}>
+                      <Ionicons name="trash-outline" size={16} color={Colors.accentPale} />
+                      <Text style={styles.secondaryActionButtonText}>Remove uploaded reference</Text>
+                    </Pressable>
+                  ) : selectedSavedOwnStyle ? (
+                    <Pressable onPress={() => handleDeleteSavedOwnStyle(selectedSavedOwnStyle)} style={({ pressed }) => [styles.secondaryActionButton, pressed && { opacity: 0.88 }]}>
+                      <Ionicons name="trash-outline" size={16} color={Colors.accentPale} />
+                      <Text style={styles.secondaryActionButtonText}>Delete saved style</Text>
+                    </Pressable>
+                  ) : null}
+
+                  <View style={styles.customChangesPanel}>
+                    <View style={styles.customChangesHeader}>
+                      <Text style={styles.customChangesTitle}>Retouch Template</Text>
+                      <Text style={styles.customChangesSubtitle}>Add clothing, expression, lighting or color notes for this own style.</Text>
+                    </View>
+                    <TextInput
+                      value={customPrompt}
+                      onChangeText={setCustomPrompt}
+                      placeholder="Example: keep the same pose, white blazer, cleaner background, softer smile."
+                      placeholderTextColor="rgba(255,255,255,0.34)"
+                      multiline
+                      style={styles.customChangesInput}
+                    />
+                    <Text style={styles.customChangesFootnote}>Your notes guide the final result on top of the selected own style.</Text>
+                  </View>
+
+                  <View style={styles.modalQualityRow}>
+                    {generationTiers.map((tier) => {
+                      const selected = tier.id === (activeGenerationTier?.id || selectedGenerationTierId);
+                      const tierCost = tier.credits + (isFirstOwnStyleGeneration ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0);
+                      return (
+                        <Pressable
+                          key={tier.id}
+                          onPress={() => setSelectedGenerationTierId(tier.id)}
+                          style={[styles.modalQualityButton, selected && styles.modalQualityButtonActive]}
+                        >
+                          <Text style={[styles.modalQualityButtonLabel, selected && styles.modalQualityButtonLabelActive]}>{tier.label}</Text>
+                          <Text style={[styles.modalQualityButtonMeta, selected && styles.modalQualityButtonMetaActive]}>{tier.output}</Text>
+                          <Text style={[styles.modalQualityButtonMeta, selected && styles.modalQualityButtonMetaActive]}>{tierCost} credits</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <Pressable
+                    onPress={handleTransform}
+                    disabled={!canGenerate}
+                    style={({ pressed }) => [
+                      styles.generateButton,
+                      !canGenerate && styles.generateButtonDisabled,
+                      pressed && canGenerate ? { opacity: 0.9 } : undefined,
+                    ]}
+                  >
+                    <View style={styles.generateButtonInner}>
+                      {loading ? <ActivityIndicator color="#FF7FB1" /> : <Text style={styles.generateButtonText}>Create own style result</Text>}
+                    </View>
+                  </Pressable>
+                  <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
+                  {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.studioHero}>
+                  <Image source={activeArtPreviewSource} style={styles.studioHeroImage} contentFit="cover" />
+                  <LinearGradient
+                    colors={["rgba(255,240,180,0.10)", "rgba(0,0,0,0.24)", "rgba(0,0,0,0.90)"]}
+                    locations={[0, 0.28, 1]}
+                    style={styles.studioHeroOverlay}
+                  />
+                  <View style={styles.studioHeroBadge}>
+                    <Text style={styles.studioHeroBadgeText}>Art Finish</Text>
+                  </View>
+                  <View style={styles.studioHeroTextWrap}>
+                    <Text style={styles.studioHeroTitle}>{selectedArtStyle?.label || "Photographic base"}</Text>
+                    <Text style={styles.studioHeroSubtitle}>{selectedArtStyle?.subtitle || "Keep the result photographic, or apply an illustrative finish full-screen."}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.studioPanel}>
+                  <View style={styles.artMasonryGrid}>
+                    <Pressable
+                      onPress={() => setSelectedArtStyleId("")}
+                      style={[styles.artMasonryTile, styles.artMasonryTileWide, styles.artMasonryNoneTile, !selectedArtStyleId && styles.artMasonryTileActive]}
+                    >
+                      <LinearGradient colors={["#25292F", "#13161B", "#090B10"]} style={StyleSheet.absoluteFill} />
+                      <View style={styles.artMasonryTextWrap}>
+                        <Text style={[styles.artMasonryTitle, !selectedArtStyleId && styles.artMasonryTitleActive]}>None</Text>
+                        <Text style={[styles.artMasonrySubtitle, !selectedArtStyleId && styles.artMasonrySubtitleActive]}>Photographic output</Text>
+                      </View>
+                    </Pressable>
+                    {INSTAME_ART_STYLES.map((style, index) => {
+                      const active = selectedArtStyleId === style.id;
+                      const isWide = index === 1;
+                      return (
+                        <Pressable
+                          key={style.id}
+                          onPress={() => setSelectedArtStyleId(style.id)}
+                          style={[
+                            styles.artMasonryTile,
+                            isWide && styles.artMasonryTileWide,
+                            { height: isWide ? 236 : ART_TILE_HEIGHTS[index % ART_TILE_HEIGHTS.length] },
+                            active && styles.artMasonryTileActive,
+                          ]}
+                        >
+                          <Image source={style.preview} style={styles.artStyleOptionImage} contentFit="cover" />
+                          <LinearGradient
+                            colors={["rgba(255,255,255,0.05)", "rgba(0,0,0,0.12)", "rgba(0,0,0,0.88)"]}
+                            style={styles.artStyleOptionOverlay}
+                          />
+                          <View style={styles.artMasonryTextWrap}>
+                            <Text style={[styles.artMasonryTitle, active && styles.artMasonryTitleActive]}>{style.label}</Text>
+                            <Text style={[styles.artMasonrySubtitle, active && styles.artMasonrySubtitleActive]}>{style.subtitle}</Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.customChangesPanel}>
+                    <View style={styles.customChangesHeader}>
+                      <Text style={styles.customChangesTitle}>Retouch Template</Text>
+                      <Text style={styles.customChangesSubtitle}>Add optional notes if you want this art finish to lean in a specific direction.</Text>
+                    </View>
+                    <TextInput
+                      value={customPrompt}
+                      onChangeText={setCustomPrompt}
+                      placeholder="Example: more pastel colors, brighter skin, softer facial expression, longer hair."
+                      placeholderTextColor="rgba(255,255,255,0.34)"
+                      multiline
+                      style={styles.customChangesInput}
+                    />
+                    <Text style={styles.customChangesFootnote}>Leave it empty if you want only the default preset + art style behavior.</Text>
+                  </View>
+
+                  <View style={styles.modalQualityRow}>
+                    {generationTiers.map((tier) => {
+                      const selected = tier.id === (activeGenerationTier?.id || selectedGenerationTierId);
+                      return (
+                        <Pressable
+                          key={tier.id}
+                          onPress={() => setSelectedGenerationTierId(tier.id)}
+                          style={[styles.modalQualityButton, selected && styles.modalQualityButtonActive]}
+                        >
+                          <Text style={[styles.modalQualityButtonLabel, selected && styles.modalQualityButtonLabelActive]}>{tier.label}</Text>
+                          <Text style={[styles.modalQualityButtonMeta, selected && styles.modalQualityButtonMetaActive]}>{tier.output}</Text>
+                          <Text style={[styles.modalQualityButtonMeta, selected && styles.modalQualityButtonMetaActive]}>{tier.credits} credits</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <Pressable
+                    onPress={handleTransform}
+                    disabled={!canGenerate}
+                    style={({ pressed }) => [
+                      styles.generateButton,
+                      !canGenerate && styles.generateButtonDisabled,
+                      pressed && canGenerate ? { opacity: 0.9 } : undefined,
+                    ]}
+                  >
+                    <View style={styles.generateButtonInner}>
+                      {loading ? <ActivityIndicator color="#FF7FB1" /> : <Text style={styles.generateButtonText}>Create art result</Text>}
+                    </View>
+                  </Pressable>
+                  <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
+                  {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
+                </View>
+              </>
+            )}
+          </View>
+        )}
+
+        {resultBase64 ? (
+          <View ref={resultCardRef} style={styles.card}>
+            <Text style={styles.cardTitle}>Your result</Text>
             <Image
               source={{ uri: `data:image/png;base64,${resultBase64}` }}
               style={styles.resultImage}
@@ -2427,14 +2220,6 @@ export default function InstaMeScreen() {
               >
                 <Ionicons name="create-outline" size={18} color={Colors.accentSoft} />
                 <Text numberOfLines={1} style={styles.editButtonText}>Edit</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.resultActionButton, styles.resultActionButtonSecondary, styles.resultActionButtonWide]}
-                onPress={() => void handleSaveResultAsOwnStyle()}
-                disabled={savingResultAsStyle}
-              >
-                <Ionicons name="bookmark-outline" size={18} color={Colors.accentSoft} />
-                <Text numberOfLines={1} style={styles.editButtonText}>{savingResultAsStyle ? "Saving..." : "Save as style"}</Text>
               </Pressable>
             </View>
             {showEditComposer ? (
@@ -2486,7 +2271,7 @@ export default function InstaMeScreen() {
               </View>
             ) : null}
             <Text style={styles.resultFootnote}>
-              Download is free. Every edit is charged separately.
+              Download is free. Edit creates a fresh variation from this result.
             </Text>
           </View>
         ) : null}
@@ -2524,20 +2309,16 @@ export default function InstaMeScreen() {
               <Text style={styles.ownStylesLibraryTitle}>Saved</Text>
               <Text style={styles.ownStylesLibraryCount}>{savedOwnStyles.length}</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+            <View style={styles.libraryGrid}>
               {savedOwnStyles.map((style, index) => {
                 const active = selectedOwnStyleId === style.id;
-                const isFirst = index === 0;
-                const isLast = index === savedOwnStyles.length - 1;
                 const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
                 return (
                   <Pressable
                     key={style.id}
                     onPress={() => handleSelectSavedOwnStyle(style)}
                     style={[
-                      styles.savedOwnStyleCardOuter,
-                      isFirst && styles.styleCardOuterFirst,
-                      isLast && styles.styleCardOuterLast,
+                      styles.libraryGridCard,
                       { backgroundColor: theme.ambient, shadowColor: theme.glow },
                       active && styles.styleCardOuterActive,
                     ]}
@@ -2568,7 +2349,7 @@ export default function InstaMeScreen() {
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
           </View>
         ) : null}
 
@@ -2578,14 +2359,14 @@ export default function InstaMeScreen() {
               <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
               <Text style={styles.ownStylesLibraryCount}>{favoriteOwnStyleCards.length}</Text>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ownStylesRow}>
+            <View style={styles.libraryGrid}>
               {favoriteOwnStyleCards.map((style) => {
                 const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
                 return (
                   <Pressable
                     key={`favorite-own-${style.id}`}
                     onPress={() => handleSelectSavedOwnStyle(style)}
-                    style={[styles.savedOwnStyleCardOuter, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
+                    style={[styles.libraryGridCard, { backgroundColor: theme.ambient, shadowColor: theme.glow }]}
                   >
                     <View style={[styles.savedOwnStyleCard, { borderColor: theme.border, backgroundColor: theme.footerBottom }]}> 
                       <Image source={{ uri: style.previewUri }} contentFit="cover" style={styles.styleCardImage} />
@@ -2598,7 +2379,7 @@ export default function InstaMeScreen() {
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
           </View>
         ) : null}
       </ScrollView>
@@ -2606,7 +2387,7 @@ export default function InstaMeScreen() {
       <Modal
         animationType="fade"
         transparent
-        visible={Boolean(previewStyle)}
+        visible={Boolean(previewStyleId)}
         onRequestClose={() => setPreviewStyleId(null)}
       >
         <View style={styles.modalBackdrop}>
@@ -2614,19 +2395,196 @@ export default function InstaMeScreen() {
             <Pressable style={styles.modalCloseButton} onPress={() => setPreviewStyleId(null)}>
               <Ionicons name="close" size={20} color="#FFF" />
             </Pressable>
-            <Text style={styles.modalTitle}>{previewStyle?.label}</Text>
-            <Text style={styles.modalSubtitle}>{previewStyle?.subtitle}</Text>
-            <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-              {(previewStyle?.examples || []).map((imageUri, index) => (
-                <View key={`${previewStyle?.id || "style"}-${index}`} style={styles.modalImageWrap}>
-                  <Image source={{ uri: imageUri }} style={styles.modalImage} contentFit="cover" />
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+              <View style={styles.modalHero}>
+                <Image source={{ uri: previewPanelImageUri }} style={styles.modalHeroImage} contentFit="cover" />
+                <LinearGradient
+                  colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.22)", "rgba(0,0,0,0.86)"]}
+                  locations={[0, 0.36, 1]}
+                  style={styles.modalHeroOverlay}
+                />
+                <View style={styles.modalHeroTextWrap}>
+                  <Text style={styles.modalHeroEyebrow}>{isEnhancePreviewActive ? "Base portrait" : "Selected style"}</Text>
+                  <Text style={styles.modalTitle}>{previewPanelTitle}</Text>
+                  <Text style={styles.modalSubtitle}>{previewPanelSubtitle}</Text>
                 </View>
-              ))}
+                {!isEnhancePreviewActive && currentFavoriteStyleKey ? (
+                  <Pressable onPress={() => void toggleCurrentStyleFavorite()} style={styles.modalFavoriteButton}>
+                    <Ionicons name={isCurrentStyleFavorite ? "heart" : "heart-outline"} size={16} color={isCurrentStyleFavorite ? Colors.accentPink : Colors.accentSoft} />
+                    <Text style={styles.modalFavoriteButtonText}>{isCurrentStyleFavorite ? "Favorited" : "Favorite"}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Add your portrait</Text>
+                <View style={styles.editorUploadRow}>
+                  <Pressable style={styles.editorUploadThumb} onPress={pickImage}>
+                    {photo ? (
+                      <Image source={{ uri: photo.uri }} style={styles.uploadThumbImage} contentFit="cover" />
+                    ) : (
+                      <View style={styles.editorUploadPlaceholder}>
+                        <Ionicons name="add" size={28} color={Colors.accentPale} />
+                        <Text style={styles.editorUploadPlaceholderText}>Tap to add</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                  <View style={styles.editorUploadActions}>
+                    <Pressable onPress={pickImage} style={styles.editorUploadButton}>
+                      <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
+                      <Text style={styles.editorUploadButtonText}>Upload</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: "/uploaded-images",
+                          params: { selectedImageId: photo?.sourceImageId || "" },
+                        })
+                      }
+                      style={styles.editorUploadButton}
+                    >
+                      <Ionicons name="images-outline" size={16} color={Colors.accentPale} />
+                      <Text style={styles.editorUploadButtonText}>Uploaded</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: "/enhanced-portraits",
+                          params: { selectedImageId: photo?.kind === "enhanced" ? photo.sourceImageId || "" : "" },
+                        })
+                      }
+                      style={styles.editorUploadButton}
+                    >
+                      <Ionicons name="sparkles-outline" size={16} color={Colors.accentPale} />
+                      <Text style={styles.editorUploadButtonText}>Enhanced</Text>
+                    </Pressable>
+                  </View>
+                </View>
+                {usingEnhancedPortrait ? <Text style={styles.editorInlineHint}>Enhanced portrait active.</Text> : null}
+              </View>
+
+              {isEnhancePreviewActive ? (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Portrait upgrade</Text>
+                  <Pressable
+                    onPress={handleEnhancePortrait}
+                    disabled={!photo || portraitEnhanceLoading}
+                    style={({ pressed }) => [
+                      styles.enhanceButton,
+                      (!photo || portraitEnhanceLoading) && styles.enhanceButtonDisabled,
+                      pressed && photo && !portraitEnhanceLoading ? { opacity: 0.85, transform: [{ scale: 0.97 }] } : undefined,
+                    ]}
+                  >
+                    {portraitEnhanceLoading ? (
+                      <ActivityIndicator color="#FFF" size="small" />
+                    ) : (
+                      <>
+                        <View style={styles.enhanceButtonIconWrap}>
+                          <LinearGradient
+                            colors={["#FF7BAF", "#FF5D90", "#FF4F7D"]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.enhanceButtonIconFill}
+                          >
+                            <Ionicons name="sparkles" size={14} color="#FFF" />
+                          </LinearGradient>
+                        </View>
+                        <Text style={styles.enhanceButtonText}>Enhance portrait</Text>
+                      </>
+                    )}
+                  </Pressable>
+                  {portraitEnhanceLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
+
+                  {portraitEnhanceCandidate ? (
+                    <View style={styles.enhancePreviewCard}>
+                      <Text style={styles.enhancePreviewTitle}>Enhanced preview</Text>
+                      <Image source={{ uri: portraitEnhanceCandidate.uri }} style={styles.enhancePreviewImage} contentFit="cover" />
+                      <View style={styles.enhanceDecisionRow}>
+                        <Pressable
+                          onPress={handleEnhancePortrait}
+                          disabled={portraitEnhanceLoading}
+                          style={({ pressed }) => [
+                            styles.enhanceDecisionButton,
+                            styles.enhanceRetryButton,
+                            pressed && !portraitEnhanceLoading ? { opacity: 0.88 } : undefined,
+                          ]}
+                        >
+                          <Text style={styles.enhanceRetryButtonText}>Try again</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={handleKeepEnhancedPortrait}
+                          style={({ pressed }) => [
+                            styles.enhanceDecisionButton,
+                            styles.enhanceKeepButton,
+                            pressed ? { opacity: 0.9 } : undefined,
+                          ]}
+                        >
+                          <Text style={styles.enhanceKeepButtonText}>Keep this one</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              ) : (
+                <>
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Retouch template</Text>
+                    <TextInput
+                      value={customPrompt}
+                      onChangeText={setCustomPrompt}
+                      placeholder="Example: cleaner makeup, softer smile, warmer neutrals, brighter skin, white blazer."
+                      placeholderTextColor="rgba(255,255,255,0.34)"
+                      multiline
+                      style={styles.modalPromptInput}
+                    />
+                    <Text style={styles.editorInlineHint}>These notes are layered over the selected style.</Text>
+                  </View>
+
+                  <View style={styles.modalSection}>
+                    <Text style={styles.modalSectionTitle}>Choose quality</Text>
+                    <View style={styles.modalQualityRow}>
+                      {generationTiers.map((tier) => {
+                        const selected = tier.id === (activeGenerationTier?.id || selectedGenerationTierId);
+                        const tierCost = tier.credits + (isFirstOwnStyleGeneration ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0);
+                        return (
+                          <Pressable
+                            key={tier.id}
+                            onPress={() => setSelectedGenerationTierId(tier.id)}
+                            style={[styles.modalQualityButton, selected && styles.modalQualityButtonActive]}
+                          >
+                            <Text style={[styles.modalQualityButtonLabel, selected && styles.modalQualityButtonLabelActive]}>{tier.label}</Text>
+                            <Text style={[styles.modalQualityButtonMeta, selected && styles.modalQualityButtonMetaActive]}>{tier.output}</Text>
+                            <Text style={[styles.modalQualityButtonMeta, selected && styles.modalQualityButtonMetaActive]}>{tierCost} credits</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  <View style={styles.modalSection}>
+                    <Pressable
+                      onPress={handleTransform}
+                      disabled={!canGenerate}
+                      style={({ pressed }) => [
+                        styles.generateButton,
+                        !canGenerate && styles.generateButtonDisabled,
+                        pressed && canGenerate ? { opacity: 0.9 } : undefined,
+                      ]}
+                    >
+                      <View style={styles.generateButtonInner}>
+                        {loading ? (
+                          <ActivityIndicator color="#FF7FB1" />
+                        ) : (
+                          <Text style={styles.generateButtonText}>Create {previewPanelTitle}</Text>
+                        )}
+                      </View>
+                    </Pressable>
+                    <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
+                    {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
+                  </View>
+                </>
+              )}
             </ScrollView>
-            <Text style={styles.modalFootnote}>Swipe to view more examples.</Text>
-            <Pressable style={styles.modalApplyButton} onPress={() => setPreviewStyleId(null)}>
-              <Text style={styles.modalApplyButtonText}>Use this style</Text>
-            </Pressable>
           </View>
         </View>
       </Modal>
@@ -2708,6 +2666,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     lineHeight: 18,
+  },
+  categoryPillRowTop: {
+    flexDirection: "row",
+    gap: 8,
+    paddingTop: 6,
   },
   libraryHint: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
   libraryHintMuted: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 11 },
@@ -2874,9 +2837,239 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 12,
   },
+  collageSection: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    gap: 16,
+  },
+  collageHeroTile: {
+    height: 356,
+    borderRadius: 34,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#0C0F13",
+    shadowColor: "#000",
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 12,
+  },
+  collageHeroImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  collageTileOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  collageHeroBadge: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(223,255,250,0.88)",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  collageHeroBadgeText: {
+    color: "#081012",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    textTransform: "uppercase",
+  },
+  collageHeroTextWrap: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: 22,
+    gap: 8,
+  },
+  collageHeroTitle: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 31,
+    lineHeight: 35,
+  },
+  collageHeroSubtitle: {
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 20,
+    maxWidth: "78%",
+  },
+  collageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 14,
+  },
+  collageTile: {
+    width: "48.3%",
+    borderRadius: 28,
+    overflow: "hidden",
+    backgroundColor: "#0D0D11",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  collageTileActive: {
+    borderColor: "rgba(255,122,176,0.72)",
+    shadowColor: "#FF5CB8",
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  collageTileImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  collageTileGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  collageTileTextWrap: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 16,
+    gap: 6,
+  },
+  collageTileTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  collageTileSubtitle: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 17,
+  },
+  studioSection: {
+    marginHorizontal: 16,
+    marginTop: 14,
+    gap: 14,
+  },
+  studioPortraitStrip: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(18,18,24,0.94)",
+    padding: 14,
+    gap: 12,
+  },
+  studioPortraitThumb: {
+    width: "100%",
+    height: 188,
+    borderRadius: 22,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  studioPortraitActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  studioQuickButton: {
+    minHeight: 44,
+    flexGrow: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  studioQuickButtonAccent: {
+    borderColor: "rgba(255,79,125,0.28)",
+    backgroundColor: "rgba(255,79,125,0.08)",
+  },
+  studioQuickButtonText: {
+    color: Colors.accentPale,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  studioQuickButtonTextAccent: {
+    color: Colors.accentLight,
+  },
+  studioHero: {
+    height: 392,
+    borderRadius: 32,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#090B10",
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  studioHeroImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  studioHeroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  studioHeroBadge: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  studioHeroBadgeText: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  studioHeroTextWrap: {
+    position: "absolute",
+    left: 18,
+    right: 18,
+    bottom: 20,
+    gap: 6,
+  },
+  studioHeroTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 29,
+    lineHeight: 33,
+  },
+  studioHeroSubtitle: {
+    color: "rgba(255,255,255,0.76)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+    maxWidth: "82%",
+  },
+  studioPanel: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(18,18,24,0.94)",
+    padding: 14,
+    gap: 14,
+  },
   enhanceButton: {
     marginTop: 12,
-    alignSelf: "center",
+    alignSelf: "stretch",
     minHeight: 46,
     paddingHorizontal: 20,
     paddingVertical: 10,
@@ -3218,6 +3411,23 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingLeft: 2,
     paddingRight: 12,
+  },
+  libraryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  libraryGridCard: {
+    width: "48.2%",
+    height: 208,
+    borderRadius: Colors.radiusLg,
+    backgroundColor: "rgba(134,244,255,0.06)",
+    padding: 1,
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
   },
   savedOwnStyleCardOuter: {
     width: 156,
@@ -3665,6 +3875,60 @@ const styles = StyleSheet.create({
   artStylesPanel: {
     marginTop: 12,
     gap: 12,
+  },
+  artMasonryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  artMasonryTile: {
+    width: "48.2%",
+    borderRadius: 24,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "#09090C",
+  },
+  artMasonryTileWide: {
+    width: "100%",
+  },
+  artMasonryTileActive: {
+    borderColor: "rgba(255,122,176,0.82)",
+    shadowColor: "#FF5CB8",
+    shadowOpacity: 0.34,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  artMasonryNoneTile: {
+    height: 128,
+    justifyContent: "flex-end",
+  },
+  artMasonryTextWrap: {
+    position: "absolute",
+    left: 14,
+    right: 14,
+    bottom: 14,
+    gap: 4,
+  },
+  artMasonryTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    lineHeight: 20,
+  },
+  artMasonryTitleActive: {
+    color: Colors.accentPale,
+  },
+  artMasonrySubtitle: {
+    color: "rgba(255,255,255,0.70)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  artMasonrySubtitleActive: {
+    color: "rgba(255,255,255,0.90)",
   },
   artStylesPanelHeader: {
     gap: 4,
@@ -4253,46 +4517,214 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.75)",
+    backgroundColor: "rgba(0,0,0,0.82)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 14,
+    paddingVertical: 18,
   },
   modalCard: {
     width: "100%",
     maxWidth: 520,
-    backgroundColor: "#111111",
-    borderRadius: Colors.radiusLg,
+    maxHeight: "100%",
+    backgroundColor: "#0E1014",
+    borderRadius: 32,
     borderWidth: 1,
-    borderColor: Colors.borderLight,
-    padding: 16,
-    gap: 12,
+    borderColor: "rgba(255,255,255,0.08)",
+    overflow: "hidden",
   },
   modalCloseButton: {
     position: "absolute",
-    top: 12,
-    right: 12,
+    top: 16,
+    right: 16,
     zIndex: 5,
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    backgroundColor: "rgba(0,0,0,0.58)",
     alignItems: "center",
     justifyContent: "center",
   },
+  modalScrollContent: {
+    padding: 16,
+    gap: 14,
+  },
+  modalHero: {
+    height: 470,
+    borderRadius: 26,
+    overflow: "hidden",
+    backgroundColor: "#090B10",
+  },
+  modalHeroImage: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalHeroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalHeroTextWrap: {
+    position: "absolute",
+    left: 18,
+    right: 18,
+    bottom: 20,
+    gap: 6,
+  },
+  modalHeroEyebrow: {
+    color: "rgba(227,255,252,0.84)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+  },
   modalTitle: {
     color: "#FFF",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    fontSize: 28,
+    lineHeight: 32,
     paddingRight: 36,
   },
   modalSubtitle: {
-    color: Colors.textSecondary,
+    color: "rgba(255,255,255,0.76)",
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: -2,
     marginBottom: 4,
     paddingRight: 24,
+  },
+  modalFavoriteButton: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+  modalFavoriteButtonText: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  modalSection: {
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    padding: 14,
+    gap: 12,
+  },
+  modalSectionTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  editorUploadRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "stretch",
+  },
+  editorUploadThumb: {
+    width: 120,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    minHeight: 160,
+  },
+  editorUploadPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  editorUploadPlaceholderText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  editorUploadActions: {
+    flex: 1,
+    gap: 8,
+  },
+  editorUploadButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(0,0,0,0.28)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  editorUploadButtonText: {
+    color: Colors.accentPale,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  editorInlineHint: {
+    color: "rgba(255,255,255,0.54)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  modalPromptInput: {
+    minHeight: 92,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(0,0,0,0.24)",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#FFF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlignVertical: "top",
+  },
+  modalQualityRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  modalQualityButton: {
+    flex: 1,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(0,0,0,0.26)",
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  modalQualityButtonActive: {
+    borderColor: "rgba(255,122,176,0.72)",
+    backgroundColor: "rgba(255,79,125,0.14)",
+  },
+  modalQualityButtonLabel: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  modalQualityButtonLabelActive: {
+    color: Colors.accentPale,
+  },
+  modalQualityButtonMeta: {
+    color: "rgba(255,255,255,0.64)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  modalQualityButtonMetaActive: {
+    color: "rgba(255,255,255,0.86)",
   },
   modalImageWrap: {
     width: 290,
