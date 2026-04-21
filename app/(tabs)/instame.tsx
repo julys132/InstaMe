@@ -96,6 +96,8 @@ const DEFAULT_TRANSFORM_COST = getInstaMeCreditsForQualityTier("premium");
 const GENERATION_WAIT_MESSAGE = "This can take around 1 to 2 minutes when providers are busy.";
 const MAX_INSTAME_HISTORY_ITEMS = 10;
 const ENHANCE_PREVIEW_CARD_ID = "__enhance_portrait__";
+const STYLE_CARD_GLOW_IDLE = "#53F3E2";
+const STYLE_CARD_GLOW_ACTIVE = "#FF6F7D";
 const STYLE_CATEGORY_OPTIONS: Array<{ key: InstaMeStyleCategory; label: string }> = [
   { key: "women", label: "Women" },
   { key: "men", label: "Men" },
@@ -471,6 +473,7 @@ export default function InstaMeScreen() {
   const [editInstruction, setEditInstruction] = useState("");
   const [editLoading, setEditLoading] = useState(false);
   const [collageTileAspectRatios, setCollageTileAspectRatios] = useState<Record<string, number>>({});
+  const [collageTileImageOverrides, setCollageTileImageOverrides] = useState<Record<string, string>>({});
 
   const selectedSavedOwnStyle = useMemo(
     () => savedOwnStyles.find((style) => style.id === selectedOwnStyleId) || null,
@@ -560,7 +563,7 @@ export default function InstaMeScreen() {
   );
 
   const collageColumnCount = viewportWidth >= 1180 ? 3 : 2;
-  const collageCardWidth = collageColumnCount === 3 ? "31.4%" : "48.2%";
+  const collageColumnOffsets = collageColumnCount === 3 ? [0, 18, 10] : [0, 18];
 
   const isEnhancePreviewActive = previewStyleId === ENHANCE_PREVIEW_CARD_ID;
 
@@ -1212,6 +1215,92 @@ export default function InstaMeScreen() {
     setPreviewStyleId(ENHANCE_PREVIEW_CARD_ID);
   }, []);
 
+  const mainCollageItems = useMemo(() => {
+    const enhanceCard = {
+      id: ENHANCE_PREVIEW_CARD_ID,
+      label: "Enhance your portrait",
+      imageCandidates: [
+        portraitEnhanceCandidate?.uri ||
+        photo?.uri ||
+        stylePresets[0]?.cover ||
+        stylePresets[0]?.representativeImage ||
+          "",
+      ].filter(Boolean),
+      theme: getStyleCardTheme(INSTAME_OWN_STYLE_ID),
+      active: isEnhancePreviewActive,
+      onPress: handleEnhancePreviewPress,
+      aspectRatio:
+        collageTileAspectRatios[ENHANCE_PREVIEW_CARD_ID] ||
+        (photo?.width && photo?.height ? photo.width / photo.height : 0.72),
+    };
+
+    const presetCards = mainOnlyStylePresets.map((preset) => ({
+      id: preset.id,
+      label: preset.label,
+      imageCandidates: [preset.cover, preset.representativeImage, preset.examples?.[0]].filter(
+        (value): value is string => Boolean(value && value.trim()),
+      ),
+      theme: getStyleCardTheme(preset.id),
+      active: selectedStyleId === preset.id,
+      onPress: () => handleStylePresetPress(preset),
+      aspectRatio: collageTileAspectRatios[preset.id] || 0.72,
+    }));
+
+    return [enhanceCard, ...presetCards];
+  }, [
+    collageTileAspectRatios,
+    handleEnhancePreviewPress,
+    handleStylePresetPress,
+    isEnhancePreviewActive,
+    mainOnlyStylePresets,
+    photo?.height,
+    photo?.uri,
+    photo?.width,
+    portraitEnhanceCandidate?.uri,
+    selectedStyleId,
+    stylePresets,
+  ]);
+
+  const mainCollageColumns = useMemo(() => {
+    const columns = Array.from({ length: collageColumnCount }, () => [] as typeof mainCollageItems);
+
+    mainCollageItems.forEach((item, index) => {
+      columns[index % collageColumnCount].push(item);
+    });
+
+    return columns;
+  }, [collageColumnCount, mainCollageItems]);
+
+  const collageTileCandidateMap = useMemo(
+    () =>
+      Object.fromEntries(
+        mainCollageItems.map((item) => [item.id, item.imageCandidates]),
+      ) as Record<string, string[]>,
+    [mainCollageItems],
+  );
+
+  const handleCollageTileError = useCallback((styleId: string) => {
+    const candidates = collageTileCandidateMap[styleId] || [];
+    if (candidates.length <= 1) {
+      return;
+    }
+
+    setCollageTileImageOverrides((current) => {
+      const currentUri = current[styleId] || candidates[0];
+      const currentIndex = candidates.indexOf(currentUri);
+      const nextCandidate = candidates[currentIndex + 1];
+
+      if (!nextCandidate) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [styleId]: nextCandidate,
+      };
+    });
+  }, [collageTileCandidateMap]);
+
   const handleUseCurrentOwnStyle = useCallback(async () => {
     if (!ownStylePhoto && !selectedOwnStyleId) {
       Alert.alert("Missing style image", "Upload or select one Own Style before activating it.");
@@ -1780,27 +1869,6 @@ export default function InstaMeScreen() {
 
         {styleSectionTab === "main" ? (
           <View style={styles.collageSection}>
-            <Pressable onPress={handleEnhancePreviewPress} style={styles.collageHeroTile}>
-              <Image
-                source={{ uri: portraitEnhanceCandidate?.uri || photo?.uri || stylePresets[0]?.cover || stylePresets[0]?.representativeImage }}
-                style={styles.collageHeroImage}
-                contentFit="cover"
-              />
-              <LinearGradient
-                colors={["rgba(11,14,18,0.06)", "rgba(11,14,18,0.24)", "rgba(11,14,18,0.92)"]}
-                locations={[0, 0.34, 1]}
-                style={styles.collageTileOverlay}
-              />
-              <View style={styles.collageHeroBadge}>
-                <Ionicons name="sparkles" size={14} color="#081012" />
-                <Text style={styles.collageHeroBadgeText}>Always first</Text>
-              </View>
-              <View style={styles.collageHeroTextWrap}>
-                <Text style={styles.collageHeroTitle}>Enhance your portrait</Text>
-                <Text style={styles.collageHeroSubtitle}>Prepare the base image before styling and keep the best version.</Text>
-              </View>
-            </Pressable>
-
             {mainOnlyStylePresets.length === 0 ? (
               <View style={styles.categoryEmptyState}>
                 <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.25)" />
@@ -1808,46 +1876,56 @@ export default function InstaMeScreen() {
                 <Text style={styles.categoryEmptySubtext}>Stay tuned — new styles are on the way!</Text>
               </View>
             ) : (
-              <View style={styles.collageGrid}>
-                {mainOnlyStylePresets.map((preset) => {
-                  const active = selectedStyleId === preset.id;
-                  const theme = getStyleCardTheme(preset.id);
-                  const cardAspectRatio = collageTileAspectRatios[preset.id] || 0.72;
-                  return (
-                    <Pressable
-                      key={preset.id}
-                      onPress={() => handleStylePresetPress(preset)}
-                      style={[
-                        styles.collageTile,
-                        {
-                          width: collageCardWidth,
-                          shadowColor: theme.glow,
-                        },
-                        active && styles.collageTileActive,
-                      ]}
-                    >
-                      <View style={[styles.collageTileInner, { borderColor: active ? theme.glow : theme.border }]}> 
-                        <View style={[styles.collageTileMedia, { aspectRatio: cardAspectRatio, backgroundColor: theme.ambient }]}> 
-                          <LinearGradient
-                            colors={["rgba(255,255,255,0.05)", "rgba(255,255,255,0.02)", "rgba(0,0,0,0.16)"]}
-                            locations={[0, 0.38, 1]}
-                            style={styles.collageTileOverlay}
-                          />
-                          <View style={[styles.collageTileGlow, active && styles.collageTileGlowActive, { borderColor: active ? theme.glow : "rgba(255,255,255,0.08)" }]} />
-                          <Image
-                            source={{ uri: preset.cover || preset.representativeImage }}
-                            style={styles.collageTileImageContained}
-                            contentFit="contain"
-                            onLoad={(event) => handleCollageTileLoad(preset.id, event)}
-                          />
+              <View style={styles.collageColumnsWrap}>
+                {mainCollageColumns.map((column, columnIndex) => (
+                  <View
+                    key={`collage-column-${columnIndex}`}
+                    style={[
+                      styles.collageColumn,
+                      {
+                        marginTop: collageColumnOffsets[columnIndex] || 0,
+                      },
+                    ]}
+                  >
+                    {column.map((item) => (
+                      <Pressable
+                        key={item.id}
+                        onPress={item.onPress}
+                        style={[
+                          styles.collageTile,
+                          {
+                            shadowColor: item.active ? STYLE_CARD_GLOW_ACTIVE : STYLE_CARD_GLOW_IDLE,
+                          },
+                          item.active && styles.collageTileActive,
+                        ]}
+                      >
+                        <View style={styles.collageTileInner}>
+                          <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
+                            <LinearGradient
+                              colors={["rgba(255,255,255,0.03)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.10)"]}
+                              locations={[0, 0.42, 1]}
+                              style={styles.collageTileOverlay}
+                            />
+                            <View
+                              style={[
+                                styles.collageTileGlow,
+                                item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
+                                { borderColor: item.active ? STYLE_CARD_GLOW_ACTIVE : STYLE_CARD_GLOW_IDLE },
+                              ]}
+                            />
+                            <Image
+                              source={{ uri: collageTileImageOverrides[item.id] || item.imageCandidates[0] || "" }}
+                              style={styles.collageTileImageContained}
+                              contentFit="contain"
+                              onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                              onError={() => handleCollageTileError(item.id)}
+                            />
+                          </View>
                         </View>
-                        <View style={styles.collageTileLabelRow}>
-                          <Text style={[styles.collageTileTitle, active && styles.collageTileTitleActive]}>{preset.label}</Text>
-                        </View>
-                      </View>
-                    </Pressable>
-                  );
-                })}
+                      </Pressable>
+                    ))}
+                  </View>
+                ))}
               </View>
             )}
           </View>
@@ -2874,7 +2952,16 @@ const styles = StyleSheet.create({
   collageSection: {
     marginHorizontal: 16,
     marginTop: 16,
-    gap: 16,
+    gap: 8,
+  },
+  collageColumnsWrap: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  collageColumn: {
+    flex: 1,
+    gap: 8,
   },
   collageHeroTile: {
     height: 356,
@@ -2941,62 +3028,52 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   collageTile: {
-    borderRadius: 28,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
+    borderRadius: 24,
+    backgroundColor: "transparent",
+    shadowOpacity: 0.52,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
   },
   collageTileActive: {
-    shadowOpacity: 0.48,
-    shadowRadius: 28,
+    shadowOpacity: 0.9,
+    shadowRadius: 18,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 14,
+    elevation: 16,
   },
   collageTileInner: {
-    borderRadius: 28,
+    borderRadius: 24,
     overflow: "hidden",
-    borderWidth: 1,
-    backgroundColor: "#0D0D11",
+    borderWidth: 0.4,
+    borderColor: "#050505",
+    backgroundColor: "#060606",
   },
   collageTileMedia: {
     position: "relative",
     width: "100%",
-    padding: 10,
+    padding: 2,
   },
   collageTileGlow: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 28,
+    borderRadius: 22,
+  },
+  collageTileGlowIdle: {
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    shadowColor: STYLE_CARD_GLOW_IDLE,
+    shadowOpacity: 0.68,
+    shadowRadius: 11,
+    shadowOffset: { width: 0, height: 0 },
   },
   collageTileGlowActive: {
-    borderWidth: 1.5,
-    shadowColor: "#FF78C3",
-    shadowOpacity: 0.85,
-    shadowRadius: 24,
+    borderWidth: 1.2,
+    shadowColor: STYLE_CARD_GLOW_ACTIVE,
+    shadowOpacity: 0.98,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
   },
   collageTileImageContained: {
     width: "100%",
     height: "100%",
-  },
-  collageTileLabelRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  collageTileTitle: {
-    color: "#FFF",
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-    lineHeight: 22,
-    textAlign: "center",
-  },
-  collageTileTitleActive: {
-    color: Colors.accentPale,
   },
   studioSection: {
     marginHorizontal: 16,
