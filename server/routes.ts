@@ -5001,7 +5001,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const absolutePath = getCatalogAssetAbsolutePath(styleId, filename);
 
     if (!absolutePath) {
-      return res.status(404).json({ error: "Style asset not found." });
+      const cwd = process.cwd();
+      const expectedPath = `${cwd}/assets/instame-style-presets/styles/${styleId}/${filename}`;
+      console.warn(`[style-asset] 404 styleId=${styleId} filename=${filename} cwd=${cwd} expectedPath=${expectedPath}`);
+      return res.status(404).json({ error: "Style asset not found.", debug: { cwd, expectedPath } });
     }
 
     return res.sendFile(absolutePath);
