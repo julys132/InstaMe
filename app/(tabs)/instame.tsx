@@ -591,14 +591,14 @@ export default function InstaMeScreen() {
     [ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri, stylePresets],
   );
 
-  const activeArtPreviewSource = useMemo(
-    () => selectedArtStyle?.preview || INSTAME_ART_STYLES[0]?.preview,
-    [selectedArtStyle],
-  );
-
   const selectedArtStyle = useMemo(
     () => INSTAME_ART_STYLES.find((style) => style.id === selectedArtStyleId) || null,
     [selectedArtStyleId],
+  );
+
+  const activeArtPreviewSource = useMemo(
+    () => selectedArtStyle?.preview || INSTAME_ART_STYLES[0]?.preview,
+    [selectedArtStyle],
   );
 
   const liveGenerationTier = useMemo(
