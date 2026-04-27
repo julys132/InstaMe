@@ -2080,40 +2080,58 @@ export default function InstaMeScreen() {
           <View style={styles.studioSection}>
             <View style={styles.studioPortraitStrip}>
               <Text style={styles.studioPortraitLabel}>Add your portrait</Text>
-              <View style={styles.portraitButtonRow}>
-                <Pressable onPress={pickImage} style={styles.portraitButtonItem}>
+              <View style={styles.portraitButtonGrid}>
+                <Pressable onPress={pickImage} style={styles.portraitSourceCard}>
                   <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
-                  <Text style={styles.editorUploadButtonText}>Upload</Text>
+                  <Text numberOfLines={2} style={styles.portraitSourceCardText}>Upload</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => void openInlineGallery("uploaded")}
-                  style={[styles.portraitButtonItem, inlineGalleryType === "uploaded" && styles.portraitButtonItemActive]}
+                  style={[styles.portraitSourceCard, inlineGalleryType === "uploaded" && styles.portraitSourceCardActive]}
                 >
                   <Ionicons name="images-outline" size={16} color={inlineGalleryType === "uploaded" ? Colors.accentLight : Colors.accentPale} />
-                  <Text style={[styles.editorUploadButtonText, inlineGalleryType === "uploaded" && { color: Colors.accentLight }]}>Uploaded</Text>
+                  <Text numberOfLines={2} style={[styles.portraitSourceCardText, inlineGalleryType === "uploaded" && styles.portraitSourceCardTextActive]}>Uploaded</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => void openInlineGallery("enhanced")}
-                  style={[styles.portraitButtonItem, inlineGalleryType === "enhanced" && styles.portraitButtonItemActive]}
+                  style={[styles.portraitSourceCard, inlineGalleryType === "enhanced" && styles.portraitSourceCardActive]}
                 >
                   <Ionicons name="sparkles-outline" size={16} color={inlineGalleryType === "enhanced" ? Colors.accentLight : Colors.accentPale} />
-                  <Text style={[styles.editorUploadButtonText, inlineGalleryType === "enhanced" && { color: Colors.accentLight }]}>Enhanced</Text>
-                </Pressable>
-                <Pressable
-                  onPress={handleEnhancePortrait}
-                  disabled={!photo || portraitEnhanceLoading}
-                  style={[styles.portraitButtonItem, styles.portraitButtonItemAccent, (!photo || portraitEnhanceLoading) && styles.secondaryActionButtonDisabled]}
-                >
-                  {portraitEnhanceLoading ? (
-                    <ActivityIndicator color={Colors.accentLight} size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="sparkles" size={16} color={Colors.accentLight} />
-                      <Text style={[styles.editorUploadButtonText, { color: Colors.accentLight }]}>Enhance</Text>
-                    </>
-                  )}
+                  <Text numberOfLines={2} style={[styles.portraitSourceCardText, inlineGalleryType === "enhanced" && styles.portraitSourceCardTextActive]}>Enhanced</Text>
                 </Pressable>
               </View>
+              <Pressable
+                onPress={handleEnhancePortrait}
+                disabled={!photo || portraitEnhanceLoading}
+                style={[
+                  styles.portraitEnhanceCard,
+                  (!photo || portraitEnhanceLoading) && styles.secondaryActionButtonDisabled,
+                ]}
+              >
+                {portraitEnhanceLoading ? (
+                  <ActivityIndicator color="#7EF3FF" size="small" />
+                ) : (
+                  <>
+                    <View style={styles.portraitEnhanceCardIconWrap}>
+                      <LinearGradient
+                        colors={["rgba(126,243,255,0.22)", "rgba(66,214,235,0.08)"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.portraitEnhanceCardIconFill}
+                      >
+                        <Ionicons name="sparkles" size={18} color="#7EF3FF" />
+                      </LinearGradient>
+                    </View>
+                    <View style={styles.portraitEnhanceCardCopy}>
+                      <Text style={styles.portraitEnhanceCardTitle}>Enhance portrait</Text>
+                      <Text style={styles.portraitEnhanceCardSubtitle}>Create a cleaner portrait base before styling</Text>
+                    </View>
+                    <View style={styles.portraitEnhanceCardBadge}>
+                      <Text style={styles.portraitEnhanceCardBadgeText}>Glow</Text>
+                    </View>
+                  </>
+                )}
+              </Pressable>
               {inlineGalleryType ? (
                 <View style={styles.inlineGalleryPanel}>
                   <View style={styles.inlineGalleryHeader}>
@@ -2129,11 +2147,7 @@ export default function InstaMeScreen() {
                   ) : inlineGalleryImages.length === 0 ? (
                     <Text style={styles.inlineGalleryEmpty}>No {inlineGalleryType} portraits yet.</Text>
                   ) : (
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingBottom: 2 }}
-                    >
+                    <View style={styles.inlineGalleryGrid}>
                       {inlineGalleryImages.map((img) => (
                         <Pressable
                           key={img.id}
@@ -2148,7 +2162,7 @@ export default function InstaMeScreen() {
                             colors={["transparent", "rgba(0,0,0,0.72)"]}
                             style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
                           >
-                            <Text style={styles.inlineGalleryThumbName} numberOfLines={1}>{img.name}</Text>
+                            <Text style={styles.inlineGalleryThumbName} numberOfLines={2}>{img.name}</Text>
                           </LinearGradient>
                           {photo?.sourceImageId === img.id ? (
                             <View style={styles.inlineGalleryThumbCheck}>
@@ -2157,7 +2171,7 @@ export default function InstaMeScreen() {
                           ) : null}
                         </Pressable>
                       ))}
-                    </ScrollView>
+                    </View>
                   )}
                 </View>
               ) : null}
@@ -2866,26 +2880,58 @@ export default function InstaMeScreen() {
 
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>Add your portrait</Text>
-                <View style={styles.portraitButtonRow}>
-                  <Pressable onPress={pickImage} style={styles.portraitButtonItem}>
+                <View style={styles.portraitButtonGrid}>
+                  <Pressable onPress={pickImage} style={styles.portraitSourceCard}>
                     <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
-                    <Text style={styles.editorUploadButtonText}>Upload</Text>
+                    <Text numberOfLines={2} style={styles.portraitSourceCardText}>Upload</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => void openInlineGallery("uploaded")}
-                    style={[styles.portraitButtonItem, inlineGalleryType === "uploaded" && styles.portraitButtonItemActive]}
+                    style={[styles.portraitSourceCard, inlineGalleryType === "uploaded" && styles.portraitSourceCardActive]}
                   >
                     <Ionicons name="images-outline" size={16} color={inlineGalleryType === "uploaded" ? Colors.accentLight : Colors.accentPale} />
-                    <Text style={[styles.editorUploadButtonText, inlineGalleryType === "uploaded" && { color: Colors.accentLight }]}>Uploaded</Text>
+                    <Text numberOfLines={2} style={[styles.portraitSourceCardText, inlineGalleryType === "uploaded" && styles.portraitSourceCardTextActive]}>Uploaded</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => void openInlineGallery("enhanced")}
-                    style={[styles.portraitButtonItem, inlineGalleryType === "enhanced" && styles.portraitButtonItemActive]}
+                    style={[styles.portraitSourceCard, inlineGalleryType === "enhanced" && styles.portraitSourceCardActive]}
                   >
                     <Ionicons name="sparkles-outline" size={16} color={inlineGalleryType === "enhanced" ? Colors.accentLight : Colors.accentPale} />
-                    <Text style={[styles.editorUploadButtonText, inlineGalleryType === "enhanced" && { color: Colors.accentLight }]}>Enhanced</Text>
+                    <Text numberOfLines={2} style={[styles.portraitSourceCardText, inlineGalleryType === "enhanced" && styles.portraitSourceCardTextActive]}>Enhanced</Text>
                   </Pressable>
                 </View>
+                <Pressable
+                  onPress={handleEnhancePortrait}
+                  disabled={!photo || portraitEnhanceLoading}
+                  style={[
+                    styles.portraitEnhanceCard,
+                    (!photo || portraitEnhanceLoading) && styles.secondaryActionButtonDisabled,
+                  ]}
+                >
+                  {portraitEnhanceLoading ? (
+                    <ActivityIndicator color="#7EF3FF" size="small" />
+                  ) : (
+                    <>
+                      <View style={styles.portraitEnhanceCardIconWrap}>
+                        <LinearGradient
+                          colors={["rgba(126,243,255,0.22)", "rgba(66,214,235,0.08)"]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.portraitEnhanceCardIconFill}
+                        >
+                          <Ionicons name="sparkles" size={18} color="#7EF3FF" />
+                        </LinearGradient>
+                      </View>
+                      <View style={styles.portraitEnhanceCardCopy}>
+                        <Text style={styles.portraitEnhanceCardTitle}>Enhance portrait</Text>
+                        <Text style={styles.portraitEnhanceCardSubtitle}>Use a polished base before your Own Style render</Text>
+                      </View>
+                      <View style={styles.portraitEnhanceCardBadge}>
+                        <Text style={styles.portraitEnhanceCardBadgeText}>Boost</Text>
+                      </View>
+                    </>
+                  )}
+                </Pressable>
                 {inlineGalleryType ? (
                   <View style={styles.inlineGalleryPanel}>
                     <View style={styles.inlineGalleryHeader}>
@@ -2901,11 +2947,7 @@ export default function InstaMeScreen() {
                     ) : inlineGalleryImages.length === 0 ? (
                       <Text style={styles.inlineGalleryEmpty}>No {inlineGalleryType} portraits yet.</Text>
                     ) : (
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ gap: 8, paddingHorizontal: 2, paddingBottom: 2 }}
-                      >
+                      <View style={styles.inlineGalleryGrid}>
                         {inlineGalleryImages.map((img) => (
                           <Pressable
                             key={img.id}
@@ -2920,7 +2962,7 @@ export default function InstaMeScreen() {
                               colors={["transparent", "rgba(0,0,0,0.72)"]}
                               style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
                             >
-                              <Text style={styles.inlineGalleryThumbName} numberOfLines={1}>{img.name}</Text>
+                              <Text style={styles.inlineGalleryThumbName} numberOfLines={2}>{img.name}</Text>
                             </LinearGradient>
                             {photo?.sourceImageId === img.id ? (
                               <View style={styles.inlineGalleryThumbCheck}>
@@ -2929,7 +2971,7 @@ export default function InstaMeScreen() {
                             ) : null}
                           </Pressable>
                         ))}
-                      </ScrollView>
+                      </View>
                     )}
                   </View>
                 ) : null}
@@ -3441,47 +3483,123 @@ const styles = StyleSheet.create({
   studioPortraitStrip: {
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(126,243,255,0.24)",
     backgroundColor: "rgba(18,18,24,0.94)",
     padding: 14,
     gap: 10,
+    shadowColor: "#53ECFF",
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
   },
   studioPortraitLabel: {
-    color: "rgba(255,255,255,0.72)",
+    color: "rgba(235,255,255,0.88)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 14,
   },
-  portraitButtonRow: {
+  portraitButtonGrid: {
     flexDirection: "row",
-    gap: 6,
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
   },
-  portraitButtonItem: {
-    flex: 1,
-    minHeight: 44,
-    borderRadius: 16,
+  portraitSourceCard: {
+    width: "31.5%",
+    minHeight: 82,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(0,0,0,0.28)",
-    paddingHorizontal: 6,
-    paddingVertical: 10,
-    flexDirection: "row",
+    backgroundColor: "rgba(8,12,16,0.82)",
+    paddingHorizontal: 8,
+    paddingVertical: 12,
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
+    gap: 8,
   },
-  portraitButtonItemActive: {
-    borderColor: "rgba(255,79,125,0.52)",
-    backgroundColor: "rgba(255,79,125,0.12)",
+  portraitSourceCardActive: {
+    borderColor: "rgba(126,243,255,0.52)",
+    backgroundColor: "rgba(126,243,255,0.12)",
+    shadowColor: "#58F0FF",
+    shadowOpacity: 0.36,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
   },
-  portraitButtonItemAccent: {
-    borderColor: "rgba(255,79,125,0.28)",
-    backgroundColor: "rgba(255,79,125,0.08)",
+  portraitSourceCardText: {
+    color: Colors.accentPale,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 15,
+    textAlign: "center",
+  },
+  portraitSourceCardTextActive: {
+    color: "#DFFFFF",
+  },
+  portraitEnhanceCard: {
+    minHeight: 74,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.34)",
+    backgroundColor: "rgba(16,28,34,0.92)",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: "#53ECFF",
+    shadowOpacity: 0.46,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 10,
+  },
+  portraitEnhanceCardIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    overflow: "hidden",
+  },
+  portraitEnhanceCardIconFill: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  portraitEnhanceCardCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  portraitEnhanceCardTitle: {
+    color: "#E8FFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  portraitEnhanceCardSubtitle: {
+    color: "rgba(235,255,255,0.68)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  portraitEnhanceCardBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.24)",
+    backgroundColor: "rgba(126,243,255,0.14)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: "flex-start",
+  },
+  portraitEnhanceCardBadgeText: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   inlineGalleryPanel: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(12,12,18,0.96)",
+    borderColor: "rgba(126,243,255,0.16)",
+    backgroundColor: "rgba(10,14,18,0.98)",
     padding: 12,
     gap: 10,
   },
@@ -3510,18 +3628,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 12,
   },
+  inlineGalleryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   inlineGalleryThumb: {
-    width: 86,
-    height: 110,
-    borderRadius: 14,
+    width: "31.5%",
+    aspectRatio: 0.78,
+    borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
     backgroundColor: "#0A0A0A",
   },
   inlineGalleryThumbActive: {
-    borderColor: "rgba(255,79,125,0.82)",
-    shadowColor: "#FF5CB8",
+    borderColor: "rgba(126,243,255,0.82)",
+    shadowColor: "#58F0FF",
     shadowOpacity: 0.5,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
@@ -3540,7 +3664,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "rgba(255,79,125,0.92)",
+    backgroundColor: "rgba(126,243,255,0.92)",
     alignItems: "center",
     justifyContent: "center",
   },

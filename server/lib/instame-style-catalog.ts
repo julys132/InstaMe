@@ -131,19 +131,19 @@ export function findCatalogStylePresetById(id: string): InstaMeStylePreset | und
   return getInstaMeStylePresetsFromCatalog().find((preset) => preset.id === id);
 }
 
-export function getCatalogAssetAbsolutePath(styleId: string, filename: string): string | null {
+export function getCatalogAssetRelativePath(styleId: string, filename: string): string | null {
   const slug = styleId.trim();
   const safeFilename = path.basename(filename);
   if (!slug || !safeFilename) return null;
 
-  const absolutePath = path.resolve(
-    process.cwd(),
-    "assets",
-    "instame-style-presets",
-    "styles",
-    slug,
-    safeFilename,
-  );
+  return `assets/instame-style-presets/styles/${slug}/${safeFilename}`;
+}
+
+export function getCatalogAssetAbsolutePath(styleId: string, filename: string): string | null {
+  const relativePath = getCatalogAssetRelativePath(styleId, filename);
+  if (!relativePath) return null;
+
+  const absolutePath = path.resolve(process.cwd(), relativePath);
 
   const stylesRoot = path.resolve(process.cwd(), "assets", "instame-style-presets", "styles");
   if (!absolutePath.startsWith(stylesRoot)) {

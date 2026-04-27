@@ -774,18 +774,16 @@ function getInstaMeStylePresetsFromCatalog() {
 function findCatalogStylePresetById(id) {
   return getInstaMeStylePresetsFromCatalog().find((preset) => preset.id === id);
 }
-function getCatalogAssetAbsolutePath(styleId, filename) {
+function getCatalogAssetRelativePath(styleId, filename) {
   const slug = styleId.trim();
   const safeFilename = path.basename(filename);
   if (!slug || !safeFilename) return null;
-  const absolutePath = path.resolve(
-    process.cwd(),
-    "assets",
-    "instame-style-presets",
-    "styles",
-    slug,
-    safeFilename
-  );
+  return `assets/instame-style-presets/styles/${slug}/${safeFilename}`;
+}
+function getCatalogAssetAbsolutePath(styleId, filename) {
+  const relativePath = getCatalogAssetRelativePath(styleId, filename);
+  if (!relativePath) return null;
+  const absolutePath = path.resolve(process.cwd(), relativePath);
   const stylesRoot = path.resolve(process.cwd(), "assets", "instame-style-presets", "styles");
   if (!absolutePath.startsWith(stylesRoot)) {
     return null;
@@ -1188,6 +1186,108 @@ async function generateReveImage(options) {
   return base64;
 }
 
+// server/lib/railway-bucket.ts
+var import_client_s3 = require("@aws-sdk/client-s3");
+var bucketConfigCache;
+var bucketClientCache;
+function normalizeEnvValue(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function parseBooleanEnv(value, fallback) {
+  const normalized = normalizeEnvValue(value).toLowerCase();
+  if (!normalized) return fallback;
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+function loadBucketConfig() {
+  if (bucketConfigCache !== void 0) {
+    return bucketConfigCache;
+  }
+  const bucketName = normalizeEnvValue(process.env.INSTAME_STYLE_ASSETS_BUCKET_NAME || process.env.BUCKET);
+  const endpoint = normalizeEnvValue(process.env.INSTAME_STYLE_ASSETS_BUCKET_ENDPOINT || process.env.ENDPOINT);
+  const region = normalizeEnvValue(process.env.INSTAME_STYLE_ASSETS_BUCKET_REGION || process.env.REGION || "auto");
+  const accessKeyId = normalizeEnvValue(
+    process.env.INSTAME_STYLE_ASSETS_BUCKET_ACCESS_KEY_ID || process.env.ACCESS_KEY_ID
+  );
+  const secretAccessKey = normalizeEnvValue(
+    process.env.INSTAME_STYLE_ASSETS_BUCKET_SECRET_ACCESS_KEY || process.env.SECRET_ACCESS_KEY
+  );
+  if (!bucketName || !endpoint || !accessKeyId || !secretAccessKey) {
+    bucketConfigCache = null;
+    return bucketConfigCache;
+  }
+  bucketConfigCache = {
+    bucketName,
+    endpoint,
+    region,
+    accessKeyId,
+    secretAccessKey,
+    forcePathStyle: parseBooleanEnv(process.env.INSTAME_STYLE_ASSETS_BUCKET_FORCE_PATH_STYLE, false)
+  };
+  return bucketConfigCache;
+}
+function getBucketClient() {
+  if (bucketClientCache !== void 0) {
+    return bucketClientCache;
+  }
+  const config = loadBucketConfig();
+  if (!config) {
+    bucketClientCache = null;
+    return bucketClientCache;
+  }
+  bucketClientCache = new import_client_s3.S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    forcePathStyle: config.forcePathStyle,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey
+    }
+  });
+  return bucketClientCache;
+}
+function getBucketName() {
+  return loadBucketConfig()?.bucketName || null;
+}
+function toBucketKey(relativePath) {
+  return relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
+}
+function toMissingObject(error) {
+  if (!error || typeof error !== "object") return false;
+  const statusCode = typeof error.$metadata?.httpStatusCode === "number" ? Number(error.$metadata?.httpStatusCode) : null;
+  const name = typeof error.name === "string" ? error.name : "";
+  return statusCode === 404 || name === "NoSuchKey" || name === "NotFound";
+}
+async function getStyleAssetObject(relativePath) {
+  const client = getBucketClient();
+  const bucketName = getBucketName();
+  if (!client || !bucketName) {
+    return null;
+  }
+  try {
+    const response = await client.send(
+      new import_client_s3.GetObjectCommand({
+        Bucket: bucketName,
+        Key: toBucketKey(relativePath)
+      })
+    );
+    const body = response.Body;
+    if (!body || typeof body.transformToByteArray !== "function") {
+      return null;
+    }
+    const bytes = await body.transformToByteArray();
+    return {
+      body: Buffer.from(bytes),
+      contentType: typeof response.ContentType === "string" && response.ContentType.trim() ? response.ContentType : "application/octet-stream",
+      cacheControl: typeof response.CacheControl === "string" ? response.CacheControl : void 0
+    };
+  } catch (error) {
+    if (toMissingObject(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 // server/routes.ts
 function getGeminiApiKey() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -1245,6 +1345,30 @@ function toUserFacingTemporaryImageServiceMessage(errorMessage) {
     /capacity/i
   ];
   return providerCapacityPatterns.some((pattern) => pattern.test(normalized)) ? TEMPORARY_IMAGE_SERVICE_MESSAGE : null;
+}
+function shouldFallbackTogetherToGemini(error) {
+  const normalized = normalizeStringValue(toErrorMessage(error, "")).toLowerCase();
+  if (!normalized) return false;
+  const fallbackPatterns = [
+    /together api error/i,
+    /\(402\)/i,
+    /\(408\)/i,
+    /\(409\)/i,
+    /\(429\)/i,
+    /\(5\d\d\)/i,
+    /insufficient credits?/i,
+    /insufficient balance/i,
+    /credit balance/i,
+    /billing/i,
+    /payment required/i,
+    /quota/i,
+    /rate limit/i,
+    /temporarily unavailable/i,
+    /overloaded/i,
+    /timeout/i,
+    /service unavailable/i
+  ];
+  return fallbackPatterns.some((pattern) => pattern.test(normalized));
 }
 function getEnvValues(keys) {
   const values = [];
@@ -2601,6 +2725,24 @@ async function generateGeminiContent(options) {
   }
   return parsed;
 }
+async function generateGeminiImageFromParts(options) {
+  const model = normalizeStringValue(options.model) || DEFAULT_STYLE_IMAGE_MODEL;
+  const response = await generateGeminiContent({
+    model,
+    parts: options.parts,
+    responseModalities: ["IMAGE", "TEXT"],
+    maxOutputTokens: options.maxOutputTokens ?? 1200
+  });
+  const imageBase64 = extractGeminiImageBase64(response);
+  if (!imageBase64) {
+    throw new Error("Gemini image generation returned no image data.");
+  }
+  return {
+    imageBase64,
+    model,
+    provider: "Google"
+  };
+}
 function resolveGenerationTierById(input) {
   const generationTierId = normalizeStringValue(input);
   return INSTAME_GENERATION_TIERS.find((tier) => tier.id === generationTierId) || getLiveInstaMeGenerationTier();
@@ -2732,22 +2874,34 @@ async function generatePromptOnlyPresetImage(options) {
     generationTierId: options.generationTierId
   });
   if (selectedModel?.provider === "together") {
-    const { width, height } = resolveGenerationResolution(options.generationTierId);
-    const referenceImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
-    const imageBase642 = await generateTogetherImage({
-      model: selectedModel.model,
-      prompt,
-      referenceImages: [referenceImageUrl],
-      width,
-      height,
-      sourceWidth: options.uploadedImages[0]?.width,
-      sourceHeight: options.uploadedImages[0]?.height
-    });
-    return {
-      imageBase64: imageBase642,
-      model: selectedModel.displayName,
-      provider: "Together"
-    };
+    try {
+      const { width, height } = resolveGenerationResolution(options.generationTierId);
+      const referenceImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
+      const imageBase642 = await generateTogetherImage({
+        model: selectedModel.model,
+        prompt,
+        referenceImages: [referenceImageUrl],
+        width,
+        height,
+        sourceWidth: options.uploadedImages[0]?.width,
+        sourceHeight: options.uploadedImages[0]?.height
+      });
+      return {
+        imageBase64: imageBase642,
+        model: selectedModel.displayName,
+        provider: "Together"
+      };
+    } catch (error) {
+      if (!shouldFallbackTogetherToGemini(error)) {
+        throw error;
+      }
+      console.warn("Prompt-only preset generation fell back from Together to Gemini:", error);
+      return generateGeminiImageFromParts({
+        model: DEFAULT_STYLE_IMAGE_MODEL,
+        parts: [{ text: prompt }, ...toGeminiInlineImageParts(options.uploadedImages)],
+        maxOutputTokens: options.generationMode === "high_res" ? 1200 : 900
+      });
+    }
   }
   if (selectedModel?.provider === "reve") {
     const imageBase642 = await generateReveImage({
@@ -2928,18 +3082,34 @@ async function generateReferenceGuidedHighResImage(options) {
     stylePresetPromptHint: options.stylePresetPromptHint,
     sizeLabel
   });
-  const imageBase64 = await generateTogetherImage({
-    model: "black-forest-labs/FLUX.2-pro",
-    prompt,
-    referenceImages: [...referenceImageUrls, userImageUrl],
-    width,
-    height
-  });
-  return {
-    imageBase64,
-    model: "FLUX.2 Pro",
-    provider: "Together"
-  };
+  try {
+    const imageBase64 = await generateTogetherImage({
+      model: "black-forest-labs/FLUX.2-pro",
+      prompt,
+      referenceImages: [...referenceImageUrls, userImageUrl],
+      width,
+      height
+    });
+    return {
+      imageBase64,
+      model: "FLUX.2 Pro",
+      provider: "Together"
+    };
+  } catch (error) {
+    if (!shouldFallbackTogetherToGemini(error)) {
+      throw error;
+    }
+    console.warn("Reference-guided high-res generation fell back from Together to Gemini:", error);
+    return generateGeminiImageFromParts({
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      parts: [
+        { text: prompt },
+        ...toStyleReferenceImageParts(options.selectedStyleReferences),
+        ...toGeminiInlineImageParts(options.uploadedImages)
+      ],
+      maxOutputTokens: 1200
+    });
+  }
 }
 async function generateReferenceGuidedPreviewImage(options) {
   const imageResponse = await generateGeminiContent({
@@ -2982,36 +3152,72 @@ async function generateInstaMeEditImage(options) {
     toRuntimeAssetUrl(options.req, options.currentImage),
     options.originalPhoto ? toRuntimeAssetUrl(options.req, options.originalPhoto) : null
   ].filter((image) => Boolean(image));
-  const imageBase64 = await generateTogetherImage({
-    model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
-    prompt,
-    referenceImages,
-    width: 1024,
-    height: 1024,
-    sourceWidth: options.originalPhoto?.width || options.currentImage.width,
-    sourceHeight: options.originalPhoto?.height || options.currentImage.height
-  });
-  return {
-    imageBase64,
-    model: tier.model,
-    provider: "Together"
-  };
+  try {
+    const imageBase64 = await generateTogetherImage({
+      model: DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      referenceImages,
+      width: 1024,
+      height: 1024,
+      sourceWidth: options.originalPhoto?.width || options.currentImage.width,
+      sourceHeight: options.originalPhoto?.height || options.currentImage.height
+    });
+    return {
+      imageBase64,
+      model: tier.model,
+      provider: "Together"
+    };
+  } catch (error) {
+    if (!shouldFallbackTogetherToGemini(error)) {
+      throw error;
+    }
+    console.warn("InstaMe edit fell back from Together to Gemini:", error);
+    const parts = [
+      { text: prompt },
+      {
+        text: "Primary generated portrait to edit. Keep this person and composition consistent unless the user explicitly requested a change:"
+      },
+      ...toGeminiInlineImageParts([options.currentImage]),
+      ...options.originalPhoto ? [
+        { text: "Original base portrait for identity anchoring:" },
+        ...toGeminiInlineImageParts([options.originalPhoto])
+      ] : []
+    ];
+    return generateGeminiImageFromParts({
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      parts,
+      maxOutputTokens: 1e3
+    });
+  }
 }
 async function generateInstaMePortraitEnhance(options) {
-  const imageBase64 = await generateTogetherImage({
-    model: INSTAME_PORTRAIT_ENHANCE_MODEL,
-    prompt: buildPortraitEnhancePrompt(),
-    referenceImages: [toRuntimeAssetUrl(options.req, options.photo)],
-    width: 1024,
-    height: 1024,
-    sourceWidth: options.photo.width,
-    sourceHeight: options.photo.height
-  });
-  return {
-    imageBase64,
-    model: INSTAME_PORTRAIT_ENHANCE_MODEL,
-    provider: "Together"
-  };
+  const prompt = buildPortraitEnhancePrompt();
+  try {
+    const imageBase64 = await generateTogetherImage({
+      model: INSTAME_PORTRAIT_ENHANCE_MODEL,
+      prompt,
+      referenceImages: [toRuntimeAssetUrl(options.req, options.photo)],
+      width: 1024,
+      height: 1024,
+      sourceWidth: options.photo.width,
+      sourceHeight: options.photo.height
+    });
+    return {
+      imageBase64,
+      model: INSTAME_PORTRAIT_ENHANCE_MODEL,
+      provider: "Together"
+    };
+  } catch (error) {
+    if (!shouldFallbackTogetherToGemini(error)) {
+      throw error;
+    }
+    console.warn("Portrait enhance fell back from Together to Gemini:", error);
+    return generateGeminiImageFromParts({
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      parts: [{ text: prompt }, ...toGeminiInlineImageParts([options.photo])],
+      maxOutputTokens: 1e3
+    });
+  }
 }
 async function createStylingPlan({
   prompt,
@@ -4678,11 +4884,28 @@ async function registerRoutes(app2) {
   app2.get("/api/instame/style-asset/:styleId/:filename", async (req, res) => {
     const styleId = normalizeStringValue(req.params.styleId);
     const filename = normalizeStringValue(req.params.filename);
+    const relativePath = getCatalogAssetRelativePath(styleId, filename);
     const absolutePath = getCatalogAssetAbsolutePath(styleId, filename);
-    if (!absolutePath) {
-      return res.status(404).json({ error: "Style asset not found." });
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    if (absolutePath) {
+      return res.sendFile(absolutePath);
     }
-    return res.sendFile(absolutePath);
+    if (relativePath) {
+      const bucketObject = await getStyleAssetObject(relativePath);
+      if (bucketObject) {
+        res.setHeader("Content-Type", bucketObject.contentType);
+        if (bucketObject.cacheControl) {
+          res.setHeader("Cache-Control", bucketObject.cacheControl);
+        }
+        return res.send(bucketObject.body);
+      }
+    }
+    if (!absolutePath) {
+      const cwd = process.cwd();
+      const expectedPath = `${cwd}/assets/instame-style-presets/styles/${styleId}/${filename}`;
+      console.warn(`[style-asset] 404 styleId=${styleId} filename=${filename} cwd=${cwd} expectedPath=${expectedPath}`);
+      return res.status(404).json({ error: "Style asset not found.", debug: { cwd, expectedPath } });
+    }
   });
   app2.get("/api/instame/runtime-image/:token", async (req, res) => {
     const token = normalizeStringValue(req.params.token);

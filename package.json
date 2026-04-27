@@ -13,6 +13,7 @@
     "server:prod": "NODE_ENV=production node server_dist/index.js",
     "build": "npm run expo:static:build && npm run server:build",
     "build:railway": "npm run web:build && npm run server:build",
+    "bucket:upload:instame-style-assets": "tsx scripts/upload-instame-style-assets-to-bucket.ts",
     "db:prepare": "node scripts/prepare-db.js",
     "db:push": "drizzle-kit push",
     "start": "npx expo start",
@@ -21,6 +22,7 @@
     "lint:fix": "npx expo lint --fix"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1037.0",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "@expo/vector-icons": "^15.0.3",

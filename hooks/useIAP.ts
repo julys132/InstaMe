@@ -132,7 +132,11 @@ function isSubscriptionProductId(productId: string, platform: NativePlatform): b
   return Object.values(getSubscriptionMapForPlatform(platform)).includes(productId);
 }
 
-async function getIosReceipt(RNIap: any, purchase?: any): Promise<string> {
+async function getIosReceipt(
+  RNIap: any,
+  purchase?: any,
+  options?: { allowRefresh?: boolean },
+): Promise<string> {
   const purchaseReceipt = String(purchase?.transactionReceipt || "").trim();
   if (purchaseReceipt) return purchaseReceipt;
 
@@ -145,7 +149,7 @@ async function getIosReceipt(RNIap: any, purchase?: any): Promise<string> {
     }
   }
 
-  if (typeof RNIap?.requestReceiptRefreshIOS === "function") {
+  if (options?.allowRefresh && typeof RNIap?.requestReceiptRefreshIOS === "function") {
     try {
       const refreshedReceipt = String(await RNIap.requestReceiptRefreshIOS()).trim();
       if (refreshedReceipt) return refreshedReceipt;
@@ -245,13 +249,21 @@ export function useIAP() {
           let receipt = "";
 
           if (platform === "ios") {
-            receipt = await getIosReceipt(RNIap, purchase);
+            receipt = await getIosReceipt(RNIap, purchase, { allowRefresh: false });
           } else {
             receipt = String(purchase?.purchaseToken || "").trim();
           }
 
-          if (!productId || !receipt) {
-            resolvePending({ success: false, error: "Missing receipt or product ID." });
+          if (!productId) {
+            resolvePending({ success: false, error: "Missing App Store product ID." });
+            return;
+          }
+
+          if (!receipt) {
+            resolvePending({
+              success: false,
+              error: "App Store receipt is unavailable right now. Try Restore Purchases once, then retry.",
+            });
             return;
           }
 
@@ -388,7 +400,7 @@ export function useIAP() {
     [startPurchase],
   );
 
-  const syncAppleSubscriptions = useCallback(async (): Promise<SyncResult> => {
+  const syncAppleSubscriptions = useCallback(async (options?: { allowRefresh?: boolean }): Promise<SyncResult> => {
     if (platform !== "ios") {
       return { success: false, error: "Apple subscription sync is only available on iOS." };
     }
@@ -403,7 +415,9 @@ export function useIAP() {
         await RNIap.syncIOS();
       }
 
-      const receipt = await getIosReceipt(RNIap);
+      const receipt = await getIosReceipt(RNIap, undefined, {
+        allowRefresh: options?.allowRefresh === true,
+      });
       if (!receipt) {
         return { success: false, error: "No App Store receipt is available yet." };
       }
@@ -435,6 +449,8 @@ export function useIAP() {
       let restoredCount = 0;
       let failedCount = 0;
 
+      let cachedIosReceipt = "";
+
       for (const purchase of purchaseList) {
         const productId = String(purchase?.productId || purchase?.productIdentifier || "").trim();
         if (!productId) {
@@ -446,7 +462,13 @@ export function useIAP() {
         let receipt = "";
 
         if (platform === "ios") {
-          receipt = await getIosReceipt(RNIap, purchase);
+          receipt = String(purchase?.transactionReceipt || "").trim();
+          if (!receipt) {
+            if (!cachedIosReceipt) {
+              cachedIosReceipt = await getIosReceipt(RNIap, purchase, { allowRefresh: false });
+            }
+            receipt = cachedIosReceipt;
+          }
         } else {
           receipt = String(purchase?.purchaseToken || "").trim();
         }
@@ -479,7 +501,7 @@ export function useIAP() {
       }
 
       if (platform === "ios") {
-        const syncResult = await syncAppleSubscriptions();
+        const syncResult = await syncAppleSubscriptions({ allowRefresh: true });
         if (syncResult.success) {
           restoredCount += 1;
         } else if (purchaseList.length === 0) {

@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Platform } from "react-native";
 import { apiClient, type SubscriptionProvider } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -125,54 +124,6 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
         console.error("Failed to load credits:", error);
       })
       .finally(() => setIsLoading(false));
-  }, [authLoading, refreshCredits, user]);
-
-  useEffect(() => {
-    if (authLoading || !user || Platform.OS !== "ios") {
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const RNIap = await import("react-native-iap");
-        await RNIap.initConnection();
-        if (typeof RNIap.syncIOS === "function") {
-          await RNIap.syncIOS();
-        }
-
-        let receipt = "";
-        if (typeof RNIap.getReceiptIOS === "function") {
-          try {
-            receipt = String(await RNIap.getReceiptIOS()).trim();
-          } catch {
-            receipt = "";
-          }
-        }
-        if (!receipt && typeof RNIap.requestReceiptRefreshIOS === "function") {
-          try {
-            receipt = String(await RNIap.requestReceiptRefreshIOS()).trim();
-          } catch {
-            receipt = "";
-          }
-        }
-        if (!receipt || cancelled) {
-          return;
-        }
-
-        await apiClient.syncAppleSubscriptions(receipt);
-        if (!cancelled) {
-          await refreshCredits();
-        }
-      } catch {
-        // Silent by default: a missing receipt is normal before the first Apple purchase.
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [authLoading, refreshCredits, user]);
 
   async function useCredit(feature: string = "style_generation"): Promise<boolean> {

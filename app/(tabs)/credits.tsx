@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -199,9 +199,7 @@ export default function CreditsScreen() {
   const [devGrantLoading, setDevGrantLoading] = useState(false);
   const [restoreLoading, setRestoreLoading] = useState(false);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
-  const [subscriptionSyncing, setSubscriptionSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<"credits" | "subscription">("credits");
-  const didInitialAppleSync = useRef(false);
   const showDevCreditTools = __DEV__ || process.env.EXPO_PUBLIC_ENABLE_DEV_CREDITS === "true";
   const hasActiveSubscription = Boolean(subscription);
   const nativePlatform = Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : null;
@@ -250,22 +248,6 @@ export default function CreditsScreen() {
     }
     return undefined;
   }
-
-  useEffect(() => {
-    if (nativePlatform !== "ios" || iap.isLoading || didInitialAppleSync.current) {
-      return;
-    }
-
-    didInitialAppleSync.current = true;
-    setSubscriptionSyncing(true);
-    void iap.syncAppleSubscriptions()
-      .then(async (result) => {
-        if (result.success) {
-          await refreshCredits();
-        }
-      })
-      .finally(() => setSubscriptionSyncing(false));
-  }, [nativePlatform, iap, refreshCredits]);
 
   async function runCheckout(
     url: string,
@@ -382,7 +364,7 @@ export default function CreditsScreen() {
           throw new Error(result.error || "Subscription failed.");
         }
 
-        const syncResult = await iap.syncAppleSubscriptions();
+        const syncResult = await iap.syncAppleSubscriptions({ allowRefresh: true });
         if (!syncResult.success && syncResult.error) {
           throw new Error(syncResult.error);
         }
@@ -604,9 +586,6 @@ export default function CreditsScreen() {
           </Animated.View>
         ) : (
           <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.subsSection}>
-            {subscriptionSyncing ? (
-              <Text style={styles.subscriptionSyncText}>Syncing Apple subscription status...</Text>
-            ) : null}
             {SUBSCRIPTION_PLANS.map((plan) => (
               (() => {
                 const productId = nativePlatform === "ios" ? resolveIapSubscriptionProductId(plan.id, "ios") : null;
