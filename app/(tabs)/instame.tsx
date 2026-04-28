@@ -2083,21 +2083,21 @@ export default function InstaMeScreen() {
               <View style={styles.portraitButtonGrid}>
                 <Pressable onPress={pickImage} style={styles.portraitSourceCard}>
                   <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
-                  <Text numberOfLines={2} style={styles.portraitSourceCardText}>Upload</Text>
+                  <Text numberOfLines={1} style={styles.portraitSourceCardText}>Upload</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => void openInlineGallery("uploaded")}
                   style={[styles.portraitSourceCard, inlineGalleryType === "uploaded" && styles.portraitSourceCardActive]}
                 >
                   <Ionicons name="images-outline" size={16} color={inlineGalleryType === "uploaded" ? Colors.accentLight : Colors.accentPale} />
-                  <Text numberOfLines={2} style={[styles.portraitSourceCardText, inlineGalleryType === "uploaded" && styles.portraitSourceCardTextActive]}>Uploaded</Text>
+                  <Text numberOfLines={1} style={[styles.portraitSourceCardText, inlineGalleryType === "uploaded" && styles.portraitSourceCardTextActive]}>Uploaded</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => void openInlineGallery("enhanced")}
                   style={[styles.portraitSourceCard, inlineGalleryType === "enhanced" && styles.portraitSourceCardActive]}
                 >
                   <Ionicons name="sparkles-outline" size={16} color={inlineGalleryType === "enhanced" ? Colors.accentLight : Colors.accentPale} />
-                  <Text numberOfLines={2} style={[styles.portraitSourceCardText, inlineGalleryType === "enhanced" && styles.portraitSourceCardTextActive]}>Enhanced</Text>
+                  <Text numberOfLines={1} style={[styles.portraitSourceCardText, inlineGalleryType === "enhanced" && styles.portraitSourceCardTextActive]}>Enhanced</Text>
                 </Pressable>
               </View>
               <Pressable
@@ -2883,21 +2883,21 @@ export default function InstaMeScreen() {
                 <View style={styles.portraitButtonGrid}>
                   <Pressable onPress={pickImage} style={styles.portraitSourceCard}>
                     <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
-                    <Text numberOfLines={2} style={styles.portraitSourceCardText}>Upload</Text>
+                    <Text numberOfLines={1} style={styles.portraitSourceCardText}>Upload</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => void openInlineGallery("uploaded")}
                     style={[styles.portraitSourceCard, inlineGalleryType === "uploaded" && styles.portraitSourceCardActive]}
                   >
                     <Ionicons name="images-outline" size={16} color={inlineGalleryType === "uploaded" ? Colors.accentLight : Colors.accentPale} />
-                    <Text numberOfLines={2} style={[styles.portraitSourceCardText, inlineGalleryType === "uploaded" && styles.portraitSourceCardTextActive]}>Uploaded</Text>
+                    <Text numberOfLines={1} style={[styles.portraitSourceCardText, inlineGalleryType === "uploaded" && styles.portraitSourceCardTextActive]}>Uploaded</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => void openInlineGallery("enhanced")}
                     style={[styles.portraitSourceCard, inlineGalleryType === "enhanced" && styles.portraitSourceCardActive]}
                   >
                     <Ionicons name="sparkles-outline" size={16} color={inlineGalleryType === "enhanced" ? Colors.accentLight : Colors.accentPale} />
-                    <Text numberOfLines={2} style={[styles.portraitSourceCardText, inlineGalleryType === "enhanced" && styles.portraitSourceCardTextActive]}>Enhanced</Text>
+                    <Text numberOfLines={1} style={[styles.portraitSourceCardText, inlineGalleryType === "enhanced" && styles.portraitSourceCardTextActive]}>Enhanced</Text>
                   </Pressable>
                 </View>
                 <Pressable
@@ -3500,13 +3500,14 @@ const styles = StyleSheet.create({
   },
   portraitButtonGrid: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    flexWrap: "nowrap",
     justifyContent: "space-between",
     gap: 10,
   },
   portraitSourceCard: {
-    width: "31.5%",
-    minHeight: 82,
+    flex: 1,
+    minWidth: 0,
+    minHeight: 78,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
@@ -3530,7 +3531,7 @@ const styles = StyleSheet.create({
     color: Colors.accentPale,
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
-    lineHeight: 15,
+    lineHeight: 14,
     textAlign: "center",
   },
   portraitSourceCardTextActive: {
@@ -3631,11 +3632,11 @@ const styles = StyleSheet.create({
   inlineGalleryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     gap: 10,
   },
   inlineGalleryThumb: {
-    width: "31.5%",
+    width: "31%",
     aspectRatio: 0.78,
     borderRadius: 18,
     overflow: "hidden",

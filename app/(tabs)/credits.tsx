@@ -29,6 +29,10 @@ import {
 
 WebBrowser.maybeCompleteAuthSession();
 
+const WEB_STRIPE_CHECKOUT_ENABLED =
+  Platform.OS !== "web" ||
+  process.env.EXPO_PUBLIC_ENABLE_WEB_STRIPE_CHECKOUT === "true";
+
 function PackageCard({
   pkg,
   priceLabel,
@@ -290,6 +294,12 @@ export default function CreditsScreen() {
   async function handlePurchase(pkg: CreditPackage) {
     setPurchaseLoading(pkg.id);
     try {
+      if (Platform.OS === "web" && !WEB_STRIPE_CHECKOUT_ENABLED) {
+        throw new Error(
+          "Web checkout is disabled for now. Payments will be enabled later after Stripe is configured.",
+        );
+      }
+
       if (nativePlatform) {
         const iapProductId = resolveIapProductId(pkg.id, nativePlatform);
         if (iap.isAvailable && iapProductId) {
@@ -346,6 +356,12 @@ export default function CreditsScreen() {
   async function handleSubscribe(plan: SubscriptionPlan) {
     setSubLoading(plan.id);
     try {
+      if (Platform.OS === "web" && !WEB_STRIPE_CHECKOUT_ENABLED) {
+        throw new Error(
+          "Web subscriptions are disabled for now. Payments will be enabled later after Stripe is configured.",
+        );
+      }
+
       if (nativePlatform === "ios") {
         const iapProductId = resolveIapSubscriptionProductId(plan.id, "ios");
         if (!iapProductId) {
@@ -578,7 +594,7 @@ export default function CreditsScreen() {
                 priceLabel={priceLabel}
                 priceSubLabel={priceSubLabel}
                 onPurchase={() => handlePurchase(pkg)}
-                loading={purchaseLoading === pkg.id || iap.isPurchasing}
+                loading={purchaseLoading === pkg.id || iap.isPurchasing || (Platform.OS === "web" && !WEB_STRIPE_CHECKOUT_ENABLED)}
               />
                 );
               })()
@@ -647,8 +663,13 @@ export default function CreditsScreen() {
               ? "Credit packs and subscriptions use Apple In-App Purchase on iPhone. Users can manage or cancel their subscription anytime from Apple subscription settings."
               : nativePlatform
                 ? "Credit packs use Apple or Google in-app purchase on mobile. Native subscriptions are currently enabled on iPhone, and top-up packs can still be bought separately."
-              : "Secure Stripe checkout for web credit packs and subscriptions. One-time top-ups can be bought even with an active plan."}
+                : "Secure Stripe checkout for web credit packs and subscriptions. One-time top-ups can be bought even with an active plan."}
           </Text>
+          {Platform.OS === "web" && !WEB_STRIPE_CHECKOUT_ENABLED ? (
+            <Text style={styles.paymentWarning}>
+              Web checkout is disabled for now while Stripe is being configured. iPhone payments remain available through Apple IAP.
+            </Text>
+          ) : null}
           {subscription ? (
             <>
               <Text style={styles.manageBillingHint}>{subscriptionManageHint}</Text>

@@ -1,9 +1,27 @@
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 
+function isStripePlaceholderKey(key: string): boolean {
+  const normalized = key.trim().toLowerCase();
+  if (!normalized) return true;
+
+  const placeholderPatterns = [
+    /^sk_live_or_test_key$/,
+    /^sk_live_\*+/,
+    /^sk_test_\*+/,
+    /your[_-]?stripe[_-]?key/,
+    /placeholder/,
+    /\*{3,}/,
+  ];
+
+  return placeholderPatterns.some((pattern) => pattern.test(normalized));
+}
+
 function getStripeSecretKey(): string {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new Error("STRIPE_SECRET_KEY is not configured");
+  const key = process.env.STRIPE_SECRET_KEY?.trim() || "";
+  if (!key || isStripePlaceholderKey(key)) {
+    throw new Error(
+      "Stripe web checkout is not configured yet. Set a valid STRIPE_SECRET_KEY in Railway before enabling web payments.",
+    );
   }
   return key;
 }
@@ -30,6 +48,11 @@ async function stripeRequest<T>({
   const data = (await response.json()) as any;
   if (!response.ok) {
     const message = data?.error?.message || "Stripe request failed";
+    if (typeof message === "string" && /invalid api key provided/i.test(message)) {
+      throw new Error(
+        "Stripe web checkout is not configured correctly. Update STRIPE_SECRET_KEY in Railway before using web payments.",
+      );
+    }
     throw new Error(message);
   }
 

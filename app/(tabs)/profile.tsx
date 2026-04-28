@@ -8,21 +8,10 @@ import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import ChicooBackground from "@/components/ChicooBackground";
 import { useAuth } from "@/contexts/AuthContext";
-import { useWardrobe } from "@/contexts/WardrobeContext";
 import { useCredits, SUBSCRIPTION_PLANS } from "@/contexts/CreditsContext";
 import { openNativeSubscriptionManagement } from "@/hooks/useIAP";
 
 const DEV_TEST_EMAIL = "iuliastarcean@gmail.com";
-
-function StatCard({ label, value, icon }: { label: string; value: string; icon: string }) {
-  return (
-    <View style={styles.statCard}>
-      <Ionicons name={icon as any} size={22} color={Colors.accent} />
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
 
 function MenuItem({ icon, label, onPress, color }: { icon: string; label: string; onPress: () => void; color?: string }) {
   return (
@@ -40,7 +29,6 @@ function MenuItem({ icon, label, onPress, color }: { icon: string; label: string
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout, deleteAccount } = useAuth();
-  const { items, outfits } = useWardrobe();
   const { credits, subscription, subscriptionProvider, subscriptionRenewAt, grantDevCredits } = useCredits();
   const [devCreditLoading, setDevCreditLoading] = useState(false);
   const [manageSubscriptionLoading, setManageSubscriptionLoading] = useState(false);
@@ -258,12 +246,6 @@ export default function ProfileScreen() {
           ) : null}
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.statsRow}>
-          <StatCard label="Items" value={items.length.toString()} icon="shirt-outline" />
-          <StatCard label="Outfits" value={outfits.length.toString()} icon="layers-outline" />
-          <StatCard label="Credits" value={credits.toString()} icon="sparkles-outline" />
-        </Animated.View>
-
         <Animated.View entering={FadeInDown.delay(300).duration(500)} style={styles.menuSection}>
           <MenuItem icon="diamond-outline" label="Credits & Subscription" onPress={() => router.push("/(tabs)/credits" as any)} />
           <MenuItem icon="heart-outline" label="Favorites" onPress={() => router.push("/(tabs)/favorites" as any)} />
@@ -451,32 +433,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     color: "#0A0A0A",
-  },
-  statsRow: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 10,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  statValue: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 20,
-    color: Colors.white,
-  },
-  statLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
   },
   menuSection: {
     marginHorizontal: 20,
