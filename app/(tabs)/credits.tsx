@@ -302,7 +302,8 @@ export default function CreditsScreen() {
 
       if (nativePlatform) {
         const iapProductId = resolveIapProductId(pkg.id, nativePlatform);
-        if (iap.isAvailable && iapProductId) {
+        const storeProduct = iapProductId ? iapPriceLookup.get(iapProductId) : null;
+        if (iap.isAvailable && iapProductId && storeProduct) {
           const iapResult = await iap.purchaseProduct(iapProductId);
           if (iapResult.cancelled) {
             Alert.alert("Purchase canceled", "No payment was processed.");
@@ -320,7 +321,7 @@ export default function CreditsScreen() {
 
         throw new Error(
           nativePlatform === "ios"
-            ? "Apple in-app purchases are not available on this build yet."
+            ? "Apple credit packs are not available yet on this build. Open Restore Purchases once, then try again after App Store Connect finishes syncing the consumables."
             : "Google Play billing is not available on this build yet.",
         );
       }

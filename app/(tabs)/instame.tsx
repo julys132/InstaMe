@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image as NativeImage,
   InteractionManager,
   Modal,
   Platform,
@@ -36,6 +37,7 @@ import {
   buildDataUri,
   optimizeImageAsset,
   optimizeGeneratedBase64Image,
+  stripDataUriPrefix,
   type PreparedUploadImage,
 } from "@/lib/instame-uploaded-images";
 import Colors from "@/constants/colors";
@@ -1881,29 +1883,44 @@ export default function InstaMeScreen() {
     selectedOwnStyleId,
   ]);
 
-  const handleDownload = useCallback(async () => {
-    if (!resultBase64) return;
+  const exportBase64Image = useCallback(async (
+    base64: string,
+    options?: {
+      mimeType?: string;
+      fileNamePrefix?: string;
+      dialogTitle?: string;
+    },
+  ) => {
+    const normalizedBase64 = stripDataUriPrefix(base64);
+    if (!normalizedBase64) {
+      return;
+    }
+
+    const mimeType = options?.mimeType || "image/png";
+    const fileNamePrefix = options?.fileNamePrefix || "instame-style";
+    const dialogTitle = options?.dialogTitle || "Save Chicoo Result";
+    const fileExtension = mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
 
     try {
       if (Platform.OS === "web" && typeof document !== "undefined") {
         const link = document.createElement("a");
-        link.href = `data:image/png;base64,${resultBase64}`;
-        link.download = `instame-style-${Date.now()}.png`;
+        link.href = buildDataUri(normalizedBase64, mimeType);
+        link.download = `${fileNamePrefix}-${Date.now()}.${fileExtension}`;
         document.body.appendChild(link);
         link.click();
         link.remove();
         return;
       }
 
-      const filePath = `${FileSystem.cacheDirectory}instame-style-${Date.now()}.png`;
-      await FileSystem.writeAsStringAsync(filePath, resultBase64, {
+      const filePath = `${FileSystem.cacheDirectory}${fileNamePrefix}-${Date.now()}.${fileExtension}`;
+      await FileSystem.writeAsStringAsync(filePath, normalizedBase64, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(filePath, {
-          mimeType: "image/png",
-          dialogTitle: "Save Chicoo Result",
+          mimeType,
+          dialogTitle,
         });
       } else {
         Alert.alert("Info", "Sharing is not available on this device.");
@@ -1911,7 +1928,29 @@ export default function InstaMeScreen() {
     } catch (error: any) {
       Alert.alert("Error", error?.message || "Could not export this image.");
     }
-  }, [resultBase64]);
+  }, []);
+
+  const handleDownload = useCallback(async () => {
+    if (!resultBase64) return;
+
+    await exportBase64Image(resultBase64, {
+      mimeType: "image/png",
+      fileNamePrefix: "instame-style",
+      dialogTitle: "Save Chicoo Result",
+    });
+  }, [exportBase64Image, resultBase64]);
+
+  const handleDownloadEnhancedPortrait = useCallback(async () => {
+    if (!portraitEnhanceCandidate?.base64) {
+      return;
+    }
+
+    await exportBase64Image(portraitEnhanceCandidate.base64, {
+      mimeType: portraitEnhanceCandidate.mimeType || "image/png",
+      fileNamePrefix: "instame-enhanced-portrait",
+      dialogTitle: "Save Enhanced Portrait",
+    });
+  }, [exportBase64Image, portraitEnhanceCandidate]);
 
   return (
     <View style={styles.container}>
@@ -2157,7 +2196,7 @@ export default function InstaMeScreen() {
                             photo?.sourceImageId === img.id && styles.inlineGalleryThumbActive,
                           ]}
                         >
-                          <Image source={img.previewUri} style={StyleSheet.absoluteFillObject} contentFit="cover" cachePolicy="none" recyclingKey={img.id} />
+                          <NativeImage source={{ uri: img.previewUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                           <LinearGradient
                             colors={["transparent", "rgba(0,0,0,0.72)"]}
                             style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
@@ -2192,6 +2231,16 @@ export default function InstaMeScreen() {
                     ]}
                   >
                     <Text style={styles.enhanceRetryButtonText}>Try again</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void handleDownloadEnhancedPortrait()}
+                    style={({ pressed }) => [
+                      styles.enhanceDecisionButton,
+                      styles.enhanceDownloadButton,
+                      pressed ? { opacity: 0.9 } : undefined,
+                    ]}
+                  >
+                    <Text style={styles.enhanceDownloadButtonText}>Download</Text>
                   </Pressable>
                   <Pressable
                     onPress={handleKeepEnhancedPortrait}
@@ -2957,7 +3006,7 @@ export default function InstaMeScreen() {
                               photo?.sourceImageId === img.id && styles.inlineGalleryThumbActive,
                             ]}
                           >
-                            <Image source={img.previewUri} style={StyleSheet.absoluteFillObject} contentFit="cover" cachePolicy="none" recyclingKey={img.id} />
+                            <NativeImage source={{ uri: img.previewUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                             <LinearGradient
                               colors={["transparent", "rgba(0,0,0,0.72)"]}
                               style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
@@ -3025,6 +3074,16 @@ export default function InstaMeScreen() {
                           ]}
                         >
                           <Text style={styles.enhanceRetryButtonText}>Try again</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => void handleDownloadEnhancedPortrait()}
+                          style={({ pressed }) => [
+                            styles.enhanceDecisionButton,
+                            styles.enhanceDownloadButton,
+                            pressed ? { opacity: 0.9 } : undefined,
+                          ]}
+                        >
+                          <Text style={styles.enhanceDownloadButtonText}>Download</Text>
                         </Pressable>
                         <Pressable
                           onPress={handleKeepEnhancedPortrait}
@@ -3871,9 +3930,11 @@ const styles = StyleSheet.create({
   enhanceDecisionRow: {
     flexDirection: "row",
     gap: 12,
+    flexWrap: "wrap",
   },
   enhanceDecisionButton: {
     flex: 1,
+    minWidth: 96,
     minHeight: 46,
     borderRadius: Colors.radiusMd,
     alignItems: "center",
@@ -3888,9 +3949,21 @@ const styles = StyleSheet.create({
   enhanceKeepButton: {
     backgroundColor: Colors.accent,
   },
+  enhanceDownloadButton: {
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.45)",
+    backgroundColor: "rgba(126,243,255,0.12)",
+  },
   enhanceRetryButtonText: {
     color: Colors.accentPale,
     fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    textAlign: "center",
+    lineHeight: 17,
+  },
+  enhanceDownloadButtonText: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_600SemiBold",
     fontSize: 12,
     textAlign: "center",
     lineHeight: 17,

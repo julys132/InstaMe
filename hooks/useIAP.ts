@@ -201,6 +201,26 @@ export function useIAP() {
     | NativePlatform
     | "web";
 
+  const clearStaleIosPurchase = useCallback(async (): Promise<boolean> => {
+    if (platform !== "ios") {
+      return false;
+    }
+
+    const RNIap = iapModuleRef.current;
+    if (!RNIap || typeof RNIap.clearTransactionIOS !== "function") {
+      return false;
+    }
+
+    try {
+      await RNIap.clearTransactionIOS();
+      pendingResolve.current = null;
+      setIsPurchasing(false);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [platform]);
+
   const resolvePending = useCallback((result: PurchaseResult) => {
     const resolver = pendingResolve.current;
     pendingResolve.current = null;
@@ -224,6 +244,14 @@ export function useIAP() {
         iapModuleRef.current = RNIap;
 
         await RNIap.initConnection();
+
+        if (platform === "ios" && typeof RNIap.clearTransactionIOS === "function") {
+          try {
+            await RNIap.clearTransactionIOS();
+          } catch {
+            // Best-effort cleanup for stale StoreKit transactions.
+          }
+        }
 
         const productIds = Array.from(new Set(Object.values(getProductMapForPlatform(platform)).filter(Boolean)));
         const subscriptionIds = Array.from(
@@ -354,6 +382,14 @@ export function useIAP() {
       }
 
       if (isPurchasing) {
+        const cleared = await clearStaleIosPurchase();
+        if (cleared) {
+          // Let React commit the cleared state before starting the next request.
+          await Promise.resolve();
+        }
+      }
+
+      if (isPurchasing) {
         return { success: false, error: "A purchase is already in progress." };
       }
 
@@ -387,7 +423,7 @@ export function useIAP() {
           });
       });
     },
-    [platform, isAvailable, error, isPurchasing, resolvePending, user?.id],
+    [clearStaleIosPurchase, platform, isAvailable, error, isPurchasing, resolvePending, user?.id],
   );
 
   const purchaseProduct = useCallback(
