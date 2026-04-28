@@ -2157,7 +2157,7 @@ export default function InstaMeScreen() {
                             photo?.sourceImageId === img.id && styles.inlineGalleryThumbActive,
                           ]}
                         >
-                          <Image source={{ uri: img.previewUri }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                          <Image source={img.previewUri} style={StyleSheet.absoluteFillObject} contentFit="cover" cachePolicy="none" recyclingKey={img.id} />
                           <LinearGradient
                             colors={["transparent", "rgba(0,0,0,0.72)"]}
                             style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
@@ -2957,7 +2957,7 @@ export default function InstaMeScreen() {
                               photo?.sourceImageId === img.id && styles.inlineGalleryThumbActive,
                             ]}
                           >
-                            <Image source={{ uri: img.previewUri }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                            <Image source={img.previewUri} style={StyleSheet.absoluteFillObject} contentFit="cover" cachePolicy="none" recyclingKey={img.id} />
                             <LinearGradient
                               colors={["transparent", "rgba(0,0,0,0.72)"]}
                               style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
