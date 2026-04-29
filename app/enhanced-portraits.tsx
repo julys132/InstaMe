@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +12,6 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { apiClient, type InstaMeUploadedImage } from "@/lib/api-client";
@@ -178,7 +178,7 @@ export default function EnhancedPortraitsScreen() {
                       onPress={() => handleUseImage(image.id)}
                       style={[styles.tile, isSelected && styles.tileActive]}
                     >
-                      <Image source={{ uri: image.previewUri }} style={styles.tileImage} contentFit="cover" />
+                      <Image source={{ uri: image.previewUri }} style={styles.tileImage} resizeMode="cover" />
                       <LinearGradient
                         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.22)", "rgba(0,0,0,0.86)"]}
                         locations={[0, 0.48, 1]}

@@ -321,7 +321,7 @@ export default function CreditsScreen() {
 
         throw new Error(
           nativePlatform === "ios"
-            ? "Apple credit packs are not available yet on this build. Open Restore Purchases once, then try again after App Store Connect finishes syncing the consumables."
+            ? "Apple credit packs are loading — tap Retry to check again, or use Restore Purchases once if this persists."
             : "Google Play billing is not available on this build yet.",
         );
       }
@@ -578,6 +578,36 @@ export default function CreditsScreen() {
 
         {activeTab === "credits" || !subscriptionsAvailable ? (
           <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.packagesGrid}>
+            {nativePlatform && iap.products.length === 0 && !iap.isLoading ? (
+              <View style={styles.retryRow}>
+                <Text style={styles.retryHint}>
+                  {nativePlatform === "ios"
+                    ? "Credit packs are still syncing from the App Store."
+                    : "Credit pack prices haven't loaded yet."}
+                </Text>
+                <Pressable
+                  onPress={async () => {
+                    const ok = await iap.retryFetchProducts();
+                    if (!ok) {
+                      Alert.alert(
+                        "Still loading",
+                        nativePlatform === "ios"
+                          ? "Packs are not available yet. Tap Restore Purchases once, then try again."
+                          : "Could not load products. Try again shortly.",
+                      );
+                    }
+                  }}
+                  disabled={iap.isRetryingProducts}
+                  style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.8 }]}
+                >
+                  {iap.isRetryingProducts ? (
+                    <ActivityIndicator size="small" color="#0A0A0A" />
+                  ) : (
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
             {CREDIT_PACKAGES.map((pkg) => (
               (() => {
                 const productId = nativePlatform ? resolveIapProductId(pkg.id, nativePlatform) : null;
@@ -926,6 +956,35 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     paddingHorizontal: 20,
     gap: 12,
+  },
+  retryRow: {
+    width: "100%",
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  retryHint: {
+    flex: 1,
+    color: "#BEBEBE",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  retryButton: {
+    minWidth: 72,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  retryButtonText: {
+    color: "#0A0A0A",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
   },
   packageCard: {
     width: "47%",

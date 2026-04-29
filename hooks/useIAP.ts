@@ -573,11 +573,45 @@ export function useIAP() {
     }
   }, [platform]);
 
+  const [isRetryingProducts, setIsRetryingProducts] = useState(false);
+
+  const retryFetchProducts = useCallback(async (): Promise<boolean> => {
+    if (platform === "web") return false;
+    const RNIap = iapModuleRef.current;
+    if (!RNIap) return false;
+
+    setIsRetryingProducts(true);
+    try {
+      const productIds = Array.from(
+        new Set(Object.values(getProductMapForPlatform(platform as NativePlatform)).filter(Boolean)),
+      );
+      if (productIds.length === 0) return false;
+
+      const fetched = await RNIap.fetchProducts({ skus: productIds, type: "in-app" });
+      const normalized = (Array.isArray(fetched) ? fetched : [])
+        .map((entry: any) => normalizeProduct(entry, "in-app"))
+        .filter((entry: IapProduct | null): entry is IapProduct => Boolean(entry));
+
+      if (normalized.length > 0) {
+        setProducts(normalized);
+        setIsAvailable(true);
+        setError(null);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      setIsRetryingProducts(false);
+    }
+  }, [platform]);
+
   return {
     platform,
     isLoading,
     isAvailable,
     isPurchasing,
+    isRetryingProducts,
     products,
     subscriptions,
     error,
@@ -586,5 +620,6 @@ export function useIAP() {
     restorePurchases,
     syncAppleSubscriptions,
     openSubscriptionManagement,
+    retryFetchProducts,
   };
 }
