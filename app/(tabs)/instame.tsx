@@ -2127,6 +2127,21 @@ export default function InstaMeScreen() {
                               {
                                 borderColor: item.active ? "#00E5CC" : item.theme.border,
                                 backgroundColor: item.theme.footerBottom,
+                              },
+                            ]}
+                          >
+                            <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
+                              {collageImageUri ? (
+                                <Image
+                                  source={{ uri: collageImageUri }}
+                                  style={styles.collageTileImageContained}
+                                  contentFit="cover"
+                                  onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                                  onError={() => handleCollageTileError(item.id, collageImageUri)}
+                                />
+                              ) : (
+                                <View style={styles.collageTileFallback}>
+                                  <Ionicons name="image-outline" size={22} color={item.theme.text} />
                             {item.id === OWN_UPLOAD_CARD_ID ? (
                               <View style={styles.ownUploadInlineActions}>
                                 <Pressable
@@ -2179,21 +2194,6 @@ export default function InstaMeScreen() {
                                 </Pressable>
                               </View>
                             ) : null}
-                              },
-                            ]}
-                          >
-                            <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
-                              {collageImageUri ? (
-                                <Image
-                                  source={{ uri: collageImageUri }}
-                                  style={styles.collageTileImageContained}
-                                  contentFit="cover"
-                                  onLoad={(event) => handleCollageTileLoad(item.id, event)}
-                                  onError={() => handleCollageTileError(item.id, collageImageUri)}
-                                />
-                              ) : (
-                                <View style={styles.collageTileFallback}>
-                                  <Ionicons name="image-outline" size={22} color={item.theme.text} />
                                   <Text style={[styles.collageTileFallbackText, { color: item.theme.text }]} numberOfLines={2}>
                                     {item.label}
                                   </Text>
