@@ -1412,7 +1412,16 @@ export default function InstaMeScreen() {
         theme: getStyleCardTheme(INSTAME_OWN_STYLE_ID),
         active: selectedOwnStyleId === style.id,
         onPress: () => {
-          void handleSelectSavedOwnStyle(style);
+          setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+          setIntensity(null);
+          setSelectedOwnStyleId(style.id);
+          setOwnStylePhoto(null);
+          setResultBase64(null);
+          setResultMeta(null);
+          setShowEditComposer(false);
+          setEditInstruction("");
+          setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+          void Haptics.selectionAsync();
         },
         aspectRatio: collageTileAspectRatios[cardId] || 0.72,
       };
@@ -1421,7 +1430,6 @@ export default function InstaMeScreen() {
     return [uploadCard, ...savedCards];
   }, [
     collageTileAspectRatios,
-    handleSelectSavedOwnStyle,
     ownStyleHeroUri,
     ownStylePhoto,
     pickOwnStyleImage,
@@ -1486,20 +1494,6 @@ export default function InstaMeScreen() {
     setPreviewStyleId(null);
     await Haptics.selectionAsync();
   }, [ownStylePhoto, selectedOwnStyleId]);
-
-  const handleSelectSavedOwnStyle = useCallback(async (style: InstaMeOwnStyle) => {
-    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
-    setIntensity(null);
-    setPreviewStyleId(null);
-    setSelectedOwnStyleId(style.id);
-    setOwnStylePhoto(null);
-    setResultBase64(null);
-    setResultMeta(null);
-    setShowEditComposer(false);
-    setEditInstruction("");
-    setPreviewStyleId(INSTAME_OWN_STYLE_ID);
-    await Haptics.selectionAsync();
-  }, []);
 
   const handleDeleteSavedOwnStyle = useCallback((style: InstaMeOwnStyle) => {
     Alert.alert(
