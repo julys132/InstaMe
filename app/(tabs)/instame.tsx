@@ -99,6 +99,7 @@ const DEFAULT_TRANSFORM_COST = getInstaMeCreditsForQualityTier("premium");
 const GENERATION_WAIT_MESSAGE = "This can take around 1 to 2 minutes when providers are busy.";
 const MAX_INSTAME_HISTORY_ITEMS = 10;
 const ENHANCE_PREVIEW_CARD_ID = "__enhance_portrait__";
+const OWN_UPLOAD_CARD_ID = "__own_upload_card__";
 const ART_STYLE_NONE_ID = "__art_style_none__";
 const STYLE_CATEGORY_OPTIONS: { key: InstaMeStyleCategory; label: string }[] = [
   { key: "women", label: "Women" },
@@ -571,11 +572,6 @@ export default function InstaMeScreen() {
     ? favoriteStyleKeys.includes(currentFavoriteStyleKey)
     : false;
 
-  const favoriteOwnStyleCards = useMemo(
-    () => savedOwnStyles.filter((style) => favoriteStyleKeys.includes(toOwnStyleFavoriteKey(style.id))),
-    [favoriteStyleKeys, savedOwnStyles],
-  );
-
   const applyBasePhoto = useCallback((nextPhoto: UploadedPhoto) => {
     setPhoto(nextPhoto);
     setComparisonImageUri(buildDataUri(nextPhoto.previewBase64 || nextPhoto.base64, nextPhoto.mimeType));
@@ -677,8 +673,6 @@ export default function InstaMeScreen() {
   const collageColumnCount = viewportWidth >= 1360 ? 4 : 3;
   const collageColumnOffsets = collageColumnCount === 4 ? [0, 18, 10, 22] : isPhoneViewport ? [0, 10, 4] : [0, 18, 10];
   const collageColumnGap = isPhoneViewport ? 6 : 8;
-  const libraryCardWidth = isPhoneViewport ? "31.8%" : "48.2%";
-  const libraryCardHeight = isPhoneViewport ? 168 : 208;
   const artTileWidth = isPhoneViewport ? "31.8%" : "48.2%";
   const artTileHeights = isPhoneViewport ? ART_TILE_HEIGHTS_COMPACT : ART_TILE_HEIGHTS;
 
@@ -707,11 +701,15 @@ export default function InstaMeScreen() {
 
   const previewPanelTitle = isEnhancePreviewActive
     ? "Enhance your portrait"
-    : previewStyle?.label || selectedStylePreset?.label || "Portrait style";
+    : previewStyleId === INSTAME_OWN_STYLE_ID
+      ? selectedSavedOwnStyle?.name || "Own Style"
+      : previewStyle?.label || selectedStylePreset?.label || "Portrait style";
 
   const previewPanelSubtitle = isEnhancePreviewActive
     ? "Clean up and strengthen your base portrait before applying any style."
-    : previewStyle?.subtitle || "Choose your portrait, adjust the retouch template and generate.";
+    : previewStyleId === INSTAME_OWN_STYLE_ID
+      ? "Upload one reference and build a persistent styling direction, then generate on your portrait."
+      : previewStyle?.subtitle || "Choose your portrait, adjust the retouch template and generate.";
 
   const ownStyleHeroUri = useMemo(
     () =>
@@ -1318,7 +1316,7 @@ export default function InstaMeScreen() {
 
     if (preset.id === INSTAME_OWN_STYLE_ID) {
       setIntensity(null);
-      setPreviewStyleId(null);
+      setPreviewStyleId(INSTAME_OWN_STYLE_ID);
 
       if (!ownStylePhoto && !selectedOwnStyleId) {
         InteractionManager.runAfterInteractions(() => {
@@ -1383,12 +1381,72 @@ export default function InstaMeScreen() {
     return columns;
   }, [collageColumnCount, mainCollageItems]);
 
+  const ownCollageItems = useMemo(() => {
+    const uploadCard = {
+      id: OWN_UPLOAD_CARD_ID,
+      label: ownStylePhoto || selectedSavedOwnStyle ? "Edit own style" : "Upload own style",
+      imageCandidates: getImageCandidates(ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri, ownStyleHeroUri),
+      theme: getStyleCardTheme(INSTAME_OWN_STYLE_ID),
+      active: selectedStyleId === INSTAME_OWN_STYLE_ID && !selectedOwnStyleId,
+      onPress: () => {
+        setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+        setIntensity(null);
+        setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+        setSelectedOwnStyleId(null);
+
+        InteractionManager.runAfterInteractions(() => {
+          void pickOwnStyleImage();
+        });
+      },
+      aspectRatio:
+        collageTileAspectRatios[OWN_UPLOAD_CARD_ID] ||
+        (ownStylePhoto?.width && ownStylePhoto?.height ? ownStylePhoto.width / ownStylePhoto.height : 0.72),
+    };
+
+    const savedCards = savedOwnStyles.map((style) => {
+      const cardId = `__own_saved_${style.id}`;
+      return {
+        id: cardId,
+        label: style.name,
+        imageCandidates: getImageCandidates(style.previewUri, ownStyleHeroUri),
+        theme: getStyleCardTheme(INSTAME_OWN_STYLE_ID),
+        active: selectedOwnStyleId === style.id,
+        onPress: () => {
+          void handleSelectSavedOwnStyle(style);
+        },
+        aspectRatio: collageTileAspectRatios[cardId] || 0.72,
+      };
+    });
+
+    return [uploadCard, ...savedCards];
+  }, [
+    collageTileAspectRatios,
+    handleSelectSavedOwnStyle,
+    ownStyleHeroUri,
+    ownStylePhoto,
+    pickOwnStyleImage,
+    savedOwnStyles,
+    selectedOwnStyleId,
+    selectedSavedOwnStyle,
+    selectedStyleId,
+  ]);
+
+  const ownCollageColumns = useMemo(() => {
+    const columns = Array.from({ length: collageColumnCount }, () => [] as typeof ownCollageItems);
+
+    ownCollageItems.forEach((item, index) => {
+      columns[index % collageColumnCount].push(item);
+    });
+
+    return columns;
+  }, [collageColumnCount, ownCollageItems]);
+
   const collageTileCandidateMap = useMemo(
     () =>
       Object.fromEntries(
-        mainCollageItems.map((item) => [item.id, item.imageCandidates]),
+        [...mainCollageItems, ...ownCollageItems].map((item) => [item.id, item.imageCandidates]),
       ) as Record<string, string[]>,
-    [mainCollageItems],
+    [mainCollageItems, ownCollageItems],
   );
 
   const handleCollageTileError = useCallback((styleId: string, failedUri?: string) => {
@@ -1439,6 +1497,7 @@ export default function InstaMeScreen() {
     setResultMeta(null);
     setShowEditComposer(false);
     setEditInstruction("");
+    setPreviewStyleId(INSTAME_OWN_STYLE_ID);
     await Haptics.selectionAsync();
   }, []);
 
@@ -2003,8 +2062,10 @@ export default function InstaMeScreen() {
                   key={tab.key}
                   onPress={() => {
                     setStyleSectionTab(tab.key);
-                    if (tab.key === "own" && selectedStyleId !== INSTAME_OWN_STYLE_ID) {
-                      handleStylePresetPress(ownStylePreset);
+                    if (tab.key === "own") {
+                      setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+                      setIntensity(null);
+                      setPreviewStyleId(null);
                     }
                   }}
                   style={[styles.sectionTab, active && styles.sectionTabActive]}
@@ -2066,6 +2127,58 @@ export default function InstaMeScreen() {
                               {
                                 borderColor: item.active ? "#00E5CC" : item.theme.border,
                                 backgroundColor: item.theme.footerBottom,
+                            {item.id === OWN_UPLOAD_CARD_ID ? (
+                              <View style={styles.ownUploadInlineActions}>
+                                <Pressable
+                                  onPress={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+                                    setIntensity(null);
+                                    setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+                                    void openInlineGallery("uploaded");
+                                  }}
+                                  style={({ pressed }) => [styles.ownUploadInlineAction, pressed ? { opacity: 0.9 } : undefined]}
+                                >
+                                  <Text style={styles.ownUploadInlineActionText}>Uploaded</Text>
+                                </Pressable>
+                                <Pressable
+                                  onPress={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+                                    setIntensity(null);
+                                    setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+                                    void openInlineGallery("enhanced");
+                                  }}
+                                  style={({ pressed }) => [styles.ownUploadInlineAction, pressed ? { opacity: 0.9 } : undefined]}
+                                >
+                                  <Text style={styles.ownUploadInlineActionText}>Enhanced</Text>
+                                </Pressable>
+                                <Pressable
+                                  onPress={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+                                    setIntensity(null);
+                                    setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+                                    void handleEnhancePortrait();
+                                  }}
+                                  disabled={!photo || portraitEnhanceLoading}
+                                  style={({ pressed }) => [
+                                    styles.ownUploadInlineAction,
+                                    (!photo || portraitEnhanceLoading) && styles.ownUploadInlineActionDisabled,
+                                    pressed && photo && !portraitEnhanceLoading ? { opacity: 0.9 } : undefined,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.ownUploadInlineActionText,
+                                      (!photo || portraitEnhanceLoading) && styles.ownUploadInlineActionTextDisabled,
+                                    ]}
+                                  >
+                                    Enhance
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            ) : null}
                               },
                             ]}
                           >
@@ -2114,6 +2227,93 @@ export default function InstaMeScreen() {
                 ))}
               </View>
             )}
+          </View>
+        ) : styleSectionTab === "own" ? (
+          <View style={styles.collageSection}>
+            <View style={[styles.collageColumnsWrap, { gap: collageColumnGap }]}> 
+              {ownCollageColumns.map((column, columnIndex) => (
+                <View
+                  key={`own-collage-column-${columnIndex}`}
+                  style={[
+                    styles.collageColumn,
+                    {
+                      gap: collageColumnGap,
+                      marginTop: collageColumnOffsets[columnIndex] || 0,
+                    },
+                  ]}
+                >
+                  {column.map((item) => {
+                    const collageImageUri = collageTileImageOverrides[item.id] || item.imageCandidates[0] || "";
+
+                    return (
+                      <Pressable
+                        key={item.id}
+                        onPress={item.onPress}
+                        style={[
+                          styles.collageTile,
+                          item.active && styles.collageTileActive,
+                          {
+                            shadowColor: "#00E5CC",
+                            shadowOpacity: item.active ? 0.72 : 0.36,
+                            shadowRadius: item.active ? 18 : 9,
+                            shadowOffset: { width: 0, height: 0 },
+                            elevation: item.active ? 14 : 7,
+                          },
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.collageTileInner,
+                            {
+                              borderColor: item.active ? "#00E5CC" : item.theme.border,
+                              backgroundColor: item.theme.footerBottom,
+                            },
+                          ]}
+                        >
+                          <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
+                            {collageImageUri ? (
+                              <Image
+                                source={{ uri: collageImageUri }}
+                                style={styles.collageTileImageContained}
+                                contentFit="cover"
+                                onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                                onError={() => handleCollageTileError(item.id, collageImageUri)}
+                              />
+                            ) : (
+                              <View style={styles.collageTileFallback}>
+                                <Ionicons name="image-outline" size={22} color={item.theme.text} />
+                                <Text style={[styles.collageTileFallbackText, { color: item.theme.text }]} numberOfLines={2}>
+                                  {item.label}
+                                </Text>
+                              </View>
+                            )}
+                            <LinearGradient
+                              colors={["rgba(0,229,204,0.08)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.28)"]}
+                              locations={[0, 0.32, 1]}
+                              style={styles.collageTileOverlay}
+                            />
+                            <View
+                              style={[
+                                styles.collageTileGlow,
+                                item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
+                                {
+                                  backgroundColor: "transparent",
+                                  borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
+                                  shadowColor: "#00E5CC",
+                                  shadowOpacity: item.active ? 0.80 : 0.40,
+                                  shadowRadius: item.active ? 14 : 7,
+                                  elevation: item.active ? 12 : 6,
+                                },
+                              ]}
+                            />
+                          </View>
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
           </View>
         ) : (
           <View style={styles.studioSection}>
@@ -2477,24 +2677,6 @@ export default function InstaMeScreen() {
                           },
                         ]}
                       />
-                      <View style={styles.artMasonryTextWrap}>
-                        <Text
-                          style={[
-                            styles.artMasonryTitle,
-                            { color: !selectedArtStyleId ? getArtStyleCardTheme(ART_STYLE_NONE_ID).text : "#FFF" },
-                          ]}
-                        >
-                          None
-                        </Text>
-                        <Text
-                          style={[
-                            styles.artMasonrySubtitle,
-                            { color: !selectedArtStyleId ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.72)" },
-                          ]}
-                        >
-                          Photographic output
-                        </Text>
-                      </View>
                     </Pressable>
                     {INSTAME_ART_STYLES.map((style, index) => {
                       const active = selectedArtStyleId === style.id;
@@ -2536,12 +2718,6 @@ export default function InstaMeScreen() {
                             colors={[theme.glowSoft, "rgba(0,0,0,0.12)", "rgba(0,0,0,0.88)"]}
                             style={styles.artStyleOptionOverlay}
                           />
-                          <View style={styles.artMasonryTextWrap}>
-                            <Text style={[styles.artMasonryTitle, { color: active ? theme.text : "#FFF" }]}>{style.label}</Text>
-                            <Text style={[styles.artMasonrySubtitle, { color: active ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.72)" }]}>
-                              {style.subtitle}
-                            </Text>
-                          </View>
                         </Pressable>
                       );
                     })}
@@ -2734,150 +2910,6 @@ export default function InstaMeScreen() {
           </View>
         ) : null}
 
-        {styleSectionTab === "own" && savedOwnStyles.length > 0 ? (
-          <View style={styles.card}>
-            <View style={styles.ownStylesLibraryHeader}>
-              <Text style={styles.ownStylesLibraryTitle}>Saved</Text>
-              <Text style={styles.ownStylesLibraryCount}>{savedOwnStyles.length}</Text>
-            </View>
-            <View style={[styles.libraryGrid, { gap: isPhoneViewport ? 8 : 12 }]}> 
-              {savedOwnStyles.map((style, index) => {
-                const active = selectedOwnStyleId === style.id;
-                const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
-                const previewUri = style.previewUri?.trim();
-                return (
-                  <Pressable
-                    key={style.id}
-                    onPress={() => handleSelectSavedOwnStyle(style)}
-                    style={[
-                      styles.libraryGridCard,
-                      {
-                        width: libraryCardWidth,
-                        height: libraryCardHeight,
-                        backgroundColor: theme.ambient,
-                        shadowColor: "#00E5CC",
-                        shadowOpacity: active ? 0.72 : 0.36,
-                        shadowRadius: active ? 18 : 9,
-                        shadowOffset: { width: 0, height: 0 },
-                        elevation: active ? 14 : 7,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.savedOwnStyleCard,
-                        { borderColor: active ? "#00E5CC" : theme.border, backgroundColor: theme.footerBottom },
-                      ]}
-                    >
-                      {previewUri ? (
-                        <Image source={{ uri: previewUri }} contentFit="cover" style={styles.styleCardImage} />
-                      ) : (
-                        <View style={[styles.ownStyleCardPlaceholder, { backgroundColor: theme.ambient }]}> 
-                          <Ionicons name="image-outline" size={20} color={theme.text} />
-                          <Text style={[styles.ownStyleCardPlaceholderText, { color: theme.text }]}>Preview unavailable</Text>
-                        </View>
-                      )}
-                      <LinearGradient
-                        colors={active
-                          ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.66)"]
-                          : [theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]}
-                        locations={[0, 0.22, 1]}
-                        style={styles.styleCardAtmosphere}
-                      />
-                      <LinearGradient
-                        colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]}
-                        locations={[0, 0.4, 1]}
-                        style={styles.styleCardFooter}
-                      />
-                      <View
-                        style={[
-                          styles.styleCardInnerRing,
-                          {
-                            borderColor: active ? theme.glow : theme.border,
-                            shadowColor: theme.glow,
-                            shadowOpacity: active ? 1 : 0.88,
-                            shadowRadius: active ? 36 : 22,
-                            elevation: active ? 24 : 14,
-                          },
-                        ]}
-                      />
-                      <View style={styles.styleCardTextWrap}>
-                        <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
-                      </View>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
-
-        {styleSectionTab === "own" && favoriteOwnStyleCards.length > 0 ? (
-          <View style={styles.card}>
-            <View style={styles.ownStylesLibraryHeader}>
-              <Text style={styles.ownStylesLibraryTitle}>Favorites</Text>
-              <Text style={styles.ownStylesLibraryCount}>{favoriteOwnStyleCards.length}</Text>
-            </View>
-            <View style={[styles.libraryGrid, { gap: isPhoneViewport ? 8 : 12 }]}> 
-              {favoriteOwnStyleCards.map((style) => {
-                const theme = getStyleCardTheme(INSTAME_OWN_STYLE_ID);
-                const active = selectedOwnStyleId === style.id;
-                const previewUri = style.previewUri?.trim();
-                return (
-                  <Pressable
-                    key={`favorite-own-${style.id}`}
-                    onPress={() => handleSelectSavedOwnStyle(style)}
-                    style={[
-                      styles.libraryGridCard,
-                      {
-                        width: libraryCardWidth,
-                        height: libraryCardHeight,
-                        backgroundColor: theme.ambient,
-                        shadowColor: "#00E5CC",
-                        shadowOpacity: active ? 0.72 : 0.36,
-                        shadowRadius: active ? 18 : 9,
-                        shadowOffset: { width: 0, height: 0 },
-                        elevation: active ? 14 : 7,
-                      },
-                    ]}
-                  >
-                    <View style={[styles.savedOwnStyleCard, { borderColor: active ? "#00E5CC" : theme.border, backgroundColor: theme.footerBottom }]}> 
-                      {previewUri ? (
-                        <Image source={{ uri: previewUri }} contentFit="cover" style={styles.styleCardImage} />
-                      ) : (
-                        <View style={[styles.ownStyleCardPlaceholder, { backgroundColor: theme.ambient }]}> 
-                          <Ionicons name="image-outline" size={20} color={theme.text} />
-                          <Text style={[styles.ownStyleCardPlaceholderText, { color: theme.text }]}>Preview unavailable</Text>
-                        </View>
-                      )}
-                      <LinearGradient
-                        colors={active ? [theme.glowSoft, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.66)"] : [theme.ambient, "rgba(0,0,0,0.08)", "rgba(0,0,0,0.72)"]}
-                        locations={[0, 0.22, 1]}
-                        style={styles.styleCardAtmosphere}
-                      />
-                      <LinearGradient colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.72)", "rgba(0,0,0,0.92)"]} locations={[0, 0.4, 1]} style={styles.styleCardFooter} />
-                      <View
-                        style={[
-                          styles.styleCardInnerRing,
-                          {
-                            borderColor: active ? theme.glow : theme.border,
-                            shadowColor: theme.glow,
-                            shadowOpacity: active ? 1 : 0.88,
-                            shadowRadius: active ? 36 : 22,
-                            elevation: active ? 24 : 14,
-                          },
-                        ]}
-                      />
-                      <View style={styles.styleCardTextWrap}>
-                        <Text style={[styles.savedOwnStyleCardTitle, { color: theme.text }]}>{style.name}</Text>
-                      </View>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        ) : null}
       </ScrollView>
 
       <Modal
@@ -3533,6 +3565,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     textAlign: "center",
+  },
+  ownUploadInlineActions: {
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    paddingTop: 6,
+  },
+  ownUploadInlineAction: {
+    flex: 1,
+    minHeight: 30,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.30)",
+    backgroundColor: "rgba(10,18,22,0.72)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  ownUploadInlineActionDisabled: {
+    opacity: 0.45,
+  },
+  ownUploadInlineActionText: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    lineHeight: 13,
+    textAlign: "center",
+  },
+  ownUploadInlineActionTextDisabled: {
+    color: "rgba(223,255,255,0.58)",
   },
   studioSection: {
     marginHorizontal: 16,
