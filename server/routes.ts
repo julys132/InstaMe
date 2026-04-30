@@ -2444,11 +2444,18 @@ async function generatePromptOnlyPresetImage(options: {
         throw error;
       }
       console.warn("Prompt-only preset generation fell back from Together to Gemini:", error);
-      return generateGeminiImageFromParts({
-        model: DEFAULT_STYLE_IMAGE_MODEL,
-        parts: [{ text: prompt }, ...toGeminiInlineImageParts(options.uploadedImages)],
-        maxOutputTokens: options.generationMode === "high_res" ? 1200 : 900,
-      });
+      try {
+        return await generateGeminiImageFromParts({
+          model: DEFAULT_STYLE_IMAGE_MODEL,
+          parts: [{ text: prompt }, ...toGeminiInlineImageParts(options.uploadedImages)],
+          maxOutputTokens: options.generationMode === "high_res" ? 1200 : 900,
+        });
+      } catch (fallbackError: unknown) {
+        console.error("Prompt-only preset generation Gemini fallback failed:", fallbackError);
+        throw new Error(
+          `Prompt-only preset generation failed: ${toErrorMessage(error, "Together request failed")}. Gemini fallback failed: ${toErrorMessage(fallbackError, "Gemini request failed")}.`,
+        );
+      }
     }
   }
 

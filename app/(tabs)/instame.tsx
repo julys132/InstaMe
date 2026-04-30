@@ -2227,9 +2227,6 @@ export default function InstaMeScreen() {
                                 </Pressable>
                               </View>
                             ) : null}
-                                  <Text style={[styles.collageTileFallbackText, { color: item.theme.text }]} numberOfLines={2}>
-                                    {item.label}
-                                  </Text>
                                 </View>
                               )}
                               <LinearGradient
@@ -2315,9 +2312,6 @@ export default function InstaMeScreen() {
                             ) : (
                               <View style={styles.collageTileFallback}>
                                 <Ionicons name="image-outline" size={22} color={item.theme.text} />
-                                <Text style={[styles.collageTileFallbackText, { color: item.theme.text }]} numberOfLines={2}>
-                                  {item.label}
-                                </Text>
                               </View>
                             )}
                             <LinearGradient
@@ -2501,10 +2495,6 @@ export default function InstaMeScreen() {
                   <View style={styles.studioHeroBadge}>
                     <Text style={styles.studioHeroBadgeText}>Own Style</Text>
                   </View>
-                  <View style={styles.studioHeroTextWrap}>
-                    <Text style={styles.studioHeroTitle}>{selectedSavedOwnStyle?.name || "Create your own style"}</Text>
-                    <Text style={styles.studioHeroSubtitle}>Upload one reference and build a persistent full-screen styling direction.</Text>
-                  </View>
                 </Pressable>
 
                 <View style={styles.studioPanel}>
@@ -2651,10 +2641,6 @@ export default function InstaMeScreen() {
                   />
                   <View style={styles.studioHeroBadge}>
                     <Text style={styles.studioHeroBadgeText}>Art Finish</Text>
-                  </View>
-                  <View style={styles.studioHeroTextWrap}>
-                    <Text style={styles.studioHeroTitle}>{selectedArtStyle?.label || "Photographic base"}</Text>
-                    <Text style={styles.studioHeroSubtitle}>{selectedArtStyle?.subtitle || "Keep the result photographic, or apply an illustrative finish full-screen."}</Text>
                   </View>
                 </View>
 
@@ -2964,11 +2950,13 @@ export default function InstaMeScreen() {
                   locations={[0, 0.36, 1]}
                   style={styles.modalHeroOverlay}
                 />
-                <View style={styles.modalHeroTextWrap}>
-                  <Text style={styles.modalHeroEyebrow}>{isEnhancePreviewActive ? "Base portrait" : "Selected style"}</Text>
-                  <Text style={styles.modalTitle}>{previewPanelTitle}</Text>
-                  <Text style={styles.modalSubtitle}>{previewPanelSubtitle}</Text>
-                </View>
+                {isEnhancePreviewActive ? (
+                  <View style={styles.modalHeroTextWrap}>
+                    <Text style={styles.modalHeroEyebrow}>Base portrait</Text>
+                    <Text style={styles.modalTitle}>{previewPanelTitle}</Text>
+                    <Text style={styles.modalSubtitle}>{previewPanelSubtitle}</Text>
+                  </View>
+                ) : null}
                 {!isEnhancePreviewActive && currentFavoriteStyleKey ? (
                   <Pressable onPress={() => void toggleCurrentStyleFavorite()} style={styles.modalFavoriteButton}>
                     <Ionicons name={isCurrentStyleFavorite ? "heart" : "heart-outline"} size={16} color={isCurrentStyleFavorite ? Colors.accentPink : Colors.accentSoft} />

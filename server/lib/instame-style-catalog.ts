@@ -19,8 +19,62 @@ const STYLE_CATALOG_PATH = path.resolve(
   "instame-style-presets",
   "catalog.json",
 );
+const STYLE_PROMPTS_ROOT = path.resolve(
+  process.cwd(),
+  "assets",
+  "instame-style-presets",
+  "styles",
+);
 
 let catalogCache: StyleCatalogFile | null = null;
+const promptFileTextCache = new Map<string, string | null>();
+
+function isLikelyCorruptedPrompt(prompt: string): boolean {
+  const normalized = prompt.trim();
+  if (!normalized) return true;
+  if (normalized.includes("\uFFFD") || normalized.includes("ï¿½")) return true;
+
+  const questionMarkCount = (normalized.match(/\?/g) || []).length;
+  const cyrillicCount = (normalized.match(/[А-Яа-яЁё]/g) || []).length;
+
+  if (questionMarkCount >= 12 && cyrillicCount === 0) {
+    return true;
+  }
+
+  return questionMarkCount >= 24 && questionMarkCount / Math.max(normalized.length, 1) > 0.08;
+}
+
+function readPromptFileText(promptFile: string | undefined): string | null {
+  const normalizedPath = (promptFile || "").trim().replace(/\\/g, "/");
+  if (!normalizedPath) return null;
+
+  const cached = promptFileTextCache.get(normalizedPath);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  try {
+    const absolutePath = path.resolve(process.cwd(), normalizedPath);
+    const relativeToRoot = path.relative(STYLE_PROMPTS_ROOT, absolutePath);
+    if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
+      promptFileTextCache.set(normalizedPath, null);
+      return null;
+    }
+
+    if (!fs.existsSync(absolutePath)) {
+      promptFileTextCache.set(normalizedPath, null);
+      return null;
+    }
+
+    const promptText = fs.readFileSync(absolutePath, "utf-8").trim();
+    const resolved = promptText || null;
+    promptFileTextCache.set(normalizedPath, resolved);
+    return resolved;
+  } catch {
+    promptFileTextCache.set(normalizedPath, null);
+    return null;
+  }
+}
 
 function getObjectRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -67,6 +121,7 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
     typeof record?.representativeImage === "string" ? record.representativeImage : "";
   const cover = typeof record?.cover === "string" ? record.cover : undefined;
   const promptFile = typeof record?.promptFile === "string" ? record.promptFile : undefined;
+  const promptFileFallbackText = readPromptFileText(promptFile);
   const examples = Array.isArray(record?.examples)
     ? record.examples.filter((entry): entry is string => typeof entry === "string")
     : [];
@@ -74,6 +129,16 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
     ? record.promptVariants
         .map((entry) => normalizePromptVariant(entry))
         .filter((entry): entry is InstaMePromptVariant => Boolean(entry))
+        .map((entry) => {
+          if (!promptFileFallbackText || !isLikelyCorruptedPrompt(entry.prompt)) {
+            return entry;
+          }
+
+          return {
+            ...entry,
+            prompt: promptFileFallbackText,
+          };
+        })
     : [];
   const promptOnlyAfterFirstUse = record?.promptOnlyAfterFirstUse === true;
   const rawCategory = typeof record?.category === "string" ? record.category : "";

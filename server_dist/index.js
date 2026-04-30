@@ -596,10 +596,25 @@ async function sendTransactionalEmail(payload) {
 
 // server/lib/stripe.ts
 var STRIPE_API_BASE = "https://api.stripe.com/v1";
+function isStripePlaceholderKey(key) {
+  const normalized = key.trim().toLowerCase();
+  if (!normalized) return true;
+  const placeholderPatterns = [
+    /^sk_live_or_test_key$/,
+    /^sk_live_\*+/,
+    /^sk_test_\*+/,
+    /your[_-]?stripe[_-]?key/,
+    /placeholder/,
+    /\*{3,}/
+  ];
+  return placeholderPatterns.some((pattern) => pattern.test(normalized));
+}
 function getStripeSecretKey() {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new Error("STRIPE_SECRET_KEY is not configured");
+  const key = process.env.STRIPE_SECRET_KEY?.trim() || "";
+  if (!key || isStripePlaceholderKey(key)) {
+    throw new Error(
+      "Stripe web checkout is not configured yet. Set a valid STRIPE_SECRET_KEY in Railway before enabling web payments."
+    );
   }
   return key;
 }
@@ -620,6 +635,11 @@ async function stripeRequest({
   const data = await response.json();
   if (!response.ok) {
     const message = data?.error?.message || "Stripe request failed";
+    if (typeof message === "string" && /invalid api key provided/i.test(message)) {
+      throw new Error(
+        "Stripe web checkout is not configured correctly. Update STRIPE_SECRET_KEY in Railway before using web payments."
+      );
+    }
     throw new Error(message);
   }
   return data;
@@ -691,7 +711,52 @@ var STYLE_CATALOG_PATH = path.resolve(
   "instame-style-presets",
   "catalog.json"
 );
+var STYLE_PROMPTS_ROOT = path.resolve(
+  process.cwd(),
+  "assets",
+  "instame-style-presets",
+  "styles"
+);
 var catalogCache = null;
+var promptFileTextCache = /* @__PURE__ */ new Map();
+function isLikelyCorruptedPrompt(prompt) {
+  const normalized = prompt.trim();
+  if (!normalized) return true;
+  if (normalized.includes("\uFFFD") || normalized.includes("\xEF\xBF\xBD")) return true;
+  const questionMarkCount = (normalized.match(/\?/g) || []).length;
+  const cyrillicCount = (normalized.match(/[А-Яа-яЁё]/g) || []).length;
+  if (questionMarkCount >= 12 && cyrillicCount === 0) {
+    return true;
+  }
+  return questionMarkCount >= 24 && questionMarkCount / Math.max(normalized.length, 1) > 0.08;
+}
+function readPromptFileText(promptFile) {
+  const normalizedPath = (promptFile || "").trim().replace(/\\/g, "/");
+  if (!normalizedPath) return null;
+  const cached = promptFileTextCache.get(normalizedPath);
+  if (cached !== void 0) {
+    return cached;
+  }
+  try {
+    const absolutePath = path.resolve(process.cwd(), normalizedPath);
+    const relativeToRoot = path.relative(STYLE_PROMPTS_ROOT, absolutePath);
+    if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
+      promptFileTextCache.set(normalizedPath, null);
+      return null;
+    }
+    if (!fs.existsSync(absolutePath)) {
+      promptFileTextCache.set(normalizedPath, null);
+      return null;
+    }
+    const promptText = fs.readFileSync(absolutePath, "utf-8").trim();
+    const resolved = promptText || null;
+    promptFileTextCache.set(normalizedPath, resolved);
+    return resolved;
+  } catch {
+    promptFileTextCache.set(normalizedPath, null);
+    return null;
+  }
+}
 function getObjectRecord(value) {
   return value && typeof value === "object" ? value : null;
 }
@@ -728,8 +793,17 @@ function normalizePreset(input) {
   const representativeImage = typeof record?.representativeImage === "string" ? record.representativeImage : "";
   const cover = typeof record?.cover === "string" ? record.cover : void 0;
   const promptFile = typeof record?.promptFile === "string" ? record.promptFile : void 0;
+  const promptFileFallbackText = readPromptFileText(promptFile);
   const examples = Array.isArray(record?.examples) ? record.examples.filter((entry) => typeof entry === "string") : [];
-  const promptVariants = Array.isArray(record?.promptVariants) ? record.promptVariants.map((entry) => normalizePromptVariant(entry)).filter((entry) => Boolean(entry)) : [];
+  const promptVariants = Array.isArray(record?.promptVariants) ? record.promptVariants.map((entry) => normalizePromptVariant(entry)).filter((entry) => Boolean(entry)).map((entry) => {
+    if (!promptFileFallbackText || !isLikelyCorruptedPrompt(entry.prompt)) {
+      return entry;
+    }
+    return {
+      ...entry,
+      prompt: promptFileFallbackText
+    };
+  }) : [];
   const promptOnlyAfterFirstUse = record?.promptOnlyAfterFirstUse === true;
   const rawCategory = typeof record?.category === "string" ? record.category : "";
   const category = rawCategory === "men" ? "men" : rawCategory === "couple" ? "couple" : rawCategory === "women" ? "women" : void 0;
@@ -2237,8 +2311,10 @@ function normalizeStoredInstaMeUploadedImages(input) {
     const candidate = entry;
     const id = normalizeStringValue(candidate.id);
     const mimeType = typeof candidate.mimeType === "string" && candidate.mimeType.startsWith("image/") ? candidate.mimeType : "image/jpeg";
-    const base64 = normalizeStringValue(candidate.base64);
-    const previewBase64 = normalizeStringValue(candidate.previewBase64);
+    const base64 = stripDataUriPrefix(normalizeStringValue(candidate.base64)).replace(/\s+/g, "");
+    const previewBase64 = stripDataUriPrefix(
+      normalizeStringValue(candidate.previewBase64) || base64
+    ).replace(/\s+/g, "");
     const kind = candidate.kind === "enhanced" ? "enhanced" : candidate.kind === "own_style" ? "own_style" : "uploaded";
     const analyzedPrompt = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
     const analysisMode = candidate.analysisMode === "creative_prompt" || candidate.analysisMode === "reference_locked" ? candidate.analysisMode : void 0;
@@ -2258,8 +2334,8 @@ function normalizeStoredInstaMeUploadedImages(input) {
       name,
       kind,
       mimeType,
-      base64: stripDataUriPrefix(base64),
-      previewBase64: stripDataUriPrefix(previewBase64),
+      base64,
+      previewBase64,
       width: Math.min(Math.round(width), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
       height: Math.min(Math.round(height), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
       fileSizeBytes: Number.isFinite(fileSizeBytes) && fileSizeBytes > 0 ? Math.round(fileSizeBytes) : estimateBase64Bytes(base64),
@@ -2896,11 +2972,18 @@ async function generatePromptOnlyPresetImage(options) {
         throw error;
       }
       console.warn("Prompt-only preset generation fell back from Together to Gemini:", error);
-      return generateGeminiImageFromParts({
-        model: DEFAULT_STYLE_IMAGE_MODEL,
-        parts: [{ text: prompt }, ...toGeminiInlineImageParts(options.uploadedImages)],
-        maxOutputTokens: options.generationMode === "high_res" ? 1200 : 900
-      });
+      try {
+        return await generateGeminiImageFromParts({
+          model: DEFAULT_STYLE_IMAGE_MODEL,
+          parts: [{ text: prompt }, ...toGeminiInlineImageParts(options.uploadedImages)],
+          maxOutputTokens: options.generationMode === "high_res" ? 1200 : 900
+        });
+      } catch (fallbackError) {
+        console.error("Prompt-only preset generation Gemini fallback failed:", fallbackError);
+        throw new Error(
+          `Prompt-only preset generation failed: ${toErrorMessage(error, "Together request failed")}. Gemini fallback failed: ${toErrorMessage(fallbackError, "Gemini request failed")}.`
+        );
+      }
     }
   }
   if (selectedModel?.provider === "reve") {
@@ -5055,10 +5138,12 @@ async function registerRoutes(app2) {
     const name = normalizeStringValue(input.name) || "Portrait";
     const kind = normalizeStringValue(input.kind) === "enhanced" ? "enhanced" : "uploaded";
     const mimeType = typeof input.mimeType === "string" && String(input.mimeType).startsWith("image/") ? String(input.mimeType) : "image/jpeg";
-    const base64 = stripDataUriPrefix(normalizeStringValue(input.base64));
+    const base64 = stripDataUriPrefix(
+      normalizeStringValue(input.base64)
+    ).replace(/\s+/g, "");
     const previewBase64 = stripDataUriPrefix(
       normalizeStringValue(input.previewBase64)
-    );
+    ).replace(/\s+/g, "");
     const width = Number(input.width);
     const height = Number(input.height);
     const fileSizeBytes = Number(input.fileSizeBytes);
