@@ -583,6 +583,38 @@ export default function InstaMeScreen() {
     setEditInstruction("");
   }, []);
 
+  const renderInlineGalleryPreview = useCallback((img: InstaMeUploadedImage) => {
+    const sanitizedUri = (img.previewUri || "").replace(/\s+/g, "");
+
+    if (!sanitizedUri) {
+      return (
+        <View style={[StyleSheet.absoluteFillObject, styles.inlineGalleryThumbFallback]}>
+          <Ionicons name="image-outline" size={18} color="rgba(255,255,255,0.38)" />
+        </View>
+      );
+    }
+
+    if (Platform.OS === "ios") {
+      return (
+        <NativeImage
+          source={{ uri: sanitizedUri }}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+        />
+      );
+    }
+
+    return (
+      <Image
+        source={{ uri: sanitizedUri }}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+        cachePolicy="none"
+        recyclingKey={img.id}
+      />
+    );
+  }, []);
+
   const openInlineGallery = useCallback(async (kind: "uploaded" | "enhanced") => {
     if (inlineGalleryType === kind) {
       setInlineGalleryType(null);
@@ -592,7 +624,14 @@ export default function InstaMeScreen() {
     setInlineGalleryLoading(true);
     try {
       const result = await apiClient.getInstaMeUploadedImages(kind);
-      setInlineGalleryImages(Array.isArray(result.images) ? result.images : []);
+      setInlineGalleryImages(
+        Array.isArray(result.images)
+          ? result.images.map((image) => ({
+              ...image,
+              previewUri: (image.previewUri || "").replace(/\s+/g, ""),
+            }))
+          : [],
+      );
     } catch {
       setInlineGalleryImages([]);
     } finally {
@@ -2390,7 +2429,7 @@ export default function InstaMeScreen() {
                             photo?.sourceImageId === img.id && styles.inlineGalleryThumbActive,
                           ]}
                         >
-                          <NativeImage source={{ uri: img.previewUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                          {renderInlineGalleryPreview(img)}
                           <LinearGradient
                             colors={["transparent", "rgba(0,0,0,0.72)"]}
                             style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
@@ -3032,7 +3071,7 @@ export default function InstaMeScreen() {
                               photo?.sourceImageId === img.id && styles.inlineGalleryThumbActive,
                             ]}
                           >
-                            <NativeImage source={{ uri: img.previewUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+                            {renderInlineGalleryPreview(img)}
                             <LinearGradient
                               colors={["transparent", "rgba(0,0,0,0.72)"]}
                               style={[StyleSheet.absoluteFillObject, { justifyContent: "flex-end", padding: 6 }]}
@@ -3754,10 +3793,16 @@ const styles = StyleSheet.create({
   inlineGalleryThumb: {
     width: "31%",
     aspectRatio: 0.78,
+    minHeight: 96,
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "#0A0A0A",
+  },
+  inlineGalleryThumbFallback: {
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#0A0A0A",
   },
   inlineGalleryThumbActive: {

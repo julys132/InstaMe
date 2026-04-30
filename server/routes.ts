@@ -1483,8 +1483,10 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
         typeof candidate.mimeType === "string" && candidate.mimeType.startsWith("image/")
           ? candidate.mimeType
           : "image/jpeg";
-      const base64 = normalizeStringValue(candidate.base64);
-      const previewBase64 = normalizeStringValue(candidate.previewBase64);
+      const base64 = stripDataUriPrefix(normalizeStringValue(candidate.base64)).replace(/\s+/g, "");
+      const previewBase64 = stripDataUriPrefix(
+        normalizeStringValue(candidate.previewBase64) || base64,
+      ).replace(/\s+/g, "");
       const kind =
         candidate.kind === "enhanced"
           ? "enhanced"
@@ -1514,8 +1516,8 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
         name,
         kind,
         mimeType,
-        base64: stripDataUriPrefix(base64),
-        previewBase64: stripDataUriPrefix(previewBase64),
+        base64,
+        previewBase64,
         width: Math.min(Math.round(width), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
         height: Math.min(Math.round(height), MAX_INSTAME_LIBRARY_IMAGE_DIMENSION),
         fileSizeBytes:
@@ -5358,10 +5360,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       String((input as { mimeType?: unknown }).mimeType).startsWith("image/")
         ? String((input as { mimeType?: unknown }).mimeType)
         : "image/jpeg";
-    const base64 = stripDataUriPrefix(normalizeStringValue((input as { base64?: unknown }).base64));
+    const base64 = stripDataUriPrefix(
+      normalizeStringValue((input as { base64?: unknown }).base64),
+    ).replace(/\s+/g, "");
     const previewBase64 = stripDataUriPrefix(
       normalizeStringValue((input as { previewBase64?: unknown }).previewBase64),
-    );
+    ).replace(/\s+/g, "");
     const width = Number((input as { width?: unknown }).width);
     const height = Number((input as { height?: unknown }).height);
     const fileSizeBytes = Number((input as { fileSizeBytes?: unknown }).fileSizeBytes);

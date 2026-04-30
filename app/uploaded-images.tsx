@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
+  Image as NativeImage,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
+import { Image as ExpoImage } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -162,6 +164,28 @@ export default function UploadedImagesScreen() {
     [images.length],
   );
 
+  const renderPreviewImage = useCallback((previewUri: string) => {
+    const sanitizedUri = previewUri.replace(/\s+/g, "");
+
+    if (Platform.OS === "ios") {
+      return (
+        <NativeImage
+          source={{ uri: sanitizedUri }}
+          style={styles.tileImage}
+          resizeMode="cover"
+        />
+      );
+    }
+
+    return (
+      <ExpoImage
+        source={{ uri: sanitizedUri }}
+        style={styles.tileImage}
+        contentFit="cover"
+      />
+    );
+  }, []);
+
   return (
     <View style={styles.container}>
       <ChicooBackground />
@@ -273,7 +297,7 @@ export default function UploadedImagesScreen() {
                       onPress={() => handleUseImage(image.id)}
                       style={[styles.tile, isSelected && styles.tileActive]}
                     >
-                      <Image source={{ uri: image.previewUri }} style={styles.tileImage} resizeMode="cover" />
+                      {renderPreviewImage(image.previewUri)}
                       <LinearGradient
                         colors={["rgba(0,0,0,0.02)", "rgba(0,0,0,0.22)", "rgba(0,0,0,0.86)"]}
                         locations={[0, 0.48, 1]}
