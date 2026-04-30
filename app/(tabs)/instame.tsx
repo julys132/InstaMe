@@ -535,6 +535,7 @@ export default function InstaMeScreen() {
   const [preserveBackground, setPreserveBackground] = useState(true);
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
+  const [isRetouchDrawerOpen, setIsRetouchDrawerOpen] = useState(false);
   const [portraitEnhanceCandidate, setPortraitEnhanceCandidate] = useState<UploadedPhoto | null>(null);
   const [portraitEnhanceLoading, setPortraitEnhanceLoading] = useState(false);
   const [usingEnhancedPortrait, setUsingEnhancedPortrait] = useState(false);
@@ -716,6 +717,18 @@ export default function InstaMeScreen() {
   const artTileHeights = isPhoneViewport ? ART_TILE_HEIGHTS_COMPACT : ART_TILE_HEIGHTS;
 
   const isEnhancePreviewActive = previewStyleId === ENHANCE_PREVIEW_CARD_ID;
+
+  const modalStyleResultAvailable = useMemo(() => {
+    if (!resultBase64 || !previewStyleId || isEnhancePreviewActive) {
+      return false;
+    }
+
+    if (resultMeta?.stylePresetId) {
+      return resultMeta.stylePresetId === previewStyleId;
+    }
+
+    return selectedStyleId === previewStyleId;
+  }, [isEnhancePreviewActive, previewStyleId, resultBase64, resultMeta?.stylePresetId, selectedStyleId]);
 
   const previewPanelImageUri = useMemo(() => {
     if (isEnhancePreviewActive) {
@@ -1144,6 +1157,16 @@ export default function InstaMeScreen() {
       setIntensity(null);
     }
   }, [selectedArtStyleId]);
+
+  useEffect(() => {
+    if (!previewStyleId) {
+      setIsRetouchDrawerOpen(false);
+      setShowEditComposer(false);
+      return;
+    }
+
+    setIsRetouchDrawerOpen(false);
+  }, [previewStyleId]);
 
   const canGenerate = useMemo(
     () => Boolean(
@@ -1622,12 +1645,17 @@ export default function InstaMeScreen() {
       setSelectedOwnStyleId(null);
     }
 
+    if (styleSectionTab === "main" && entry.stylePresetId) {
+      setPreviewStyleId(entry.stylePresetId);
+      setIsRetouchDrawerOpen(false);
+    }
+
     setShowEditComposer(Boolean(openEditComposer));
     if (openEditComposer) {
       setEditInstruction("");
     }
     await Haptics.selectionAsync();
-  }, [resultMeta?.qualityLabel, resultMeta?.qualityTier, savedOwnStyles]);
+  }, [resultMeta?.qualityLabel, resultMeta?.qualityTier, savedOwnStyles, styleSectionTab]);
 
   const persistHistoryResult = useCallback(async (options: {
     imageBase64: string;
@@ -1848,7 +1876,7 @@ export default function InstaMeScreen() {
       }
       setShowEditComposer(false);
       setEditInstruction("");
-      setPreviewStyleId(null);
+      setIsRetouchDrawerOpen(false);
       await persistHistoryResult({
         imageBase64: result.imageBase64,
         mimeType: "image/png",
@@ -2796,7 +2824,7 @@ export default function InstaMeScreen() {
           </View>
         )}
 
-        {resultBase64 ? (
+        {resultBase64 && styleSectionTab !== "main" ? (
           <View ref={resultCardRef} style={styles.card}>
             <Text style={styles.cardTitle}>Your result</Text>
             <Image
@@ -2967,16 +2995,41 @@ export default function InstaMeScreen() {
 
               {!isEnhancePreviewActive ? (
                 <View style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>Retouch template</Text>
-                  <TextInput
-                    value={customPrompt}
-                    onChangeText={setCustomPrompt}
-                    placeholder="Example: cleaner makeup, softer smile, warmer neutrals, brighter skin, white blazer."
-                    placeholderTextColor="rgba(255,255,255,0.34)"
-                    multiline
-                    style={styles.modalPromptInput}
-                  />
-                  <Text style={styles.editorInlineHint}>These notes are layered over the selected style.</Text>
+                  <Pressable
+                    onPress={() => setIsRetouchDrawerOpen((prev) => !prev)}
+                    style={({ pressed }) => [
+                      styles.modalRetouchToggle,
+                      pressed ? { opacity: 0.9 } : undefined,
+                    ]}
+                  >
+                    <View style={styles.modalRetouchToggleCopy}>
+                      <Text style={styles.modalRetouchToggleTitle}>Retouch</Text>
+                      <Text style={styles.modalRetouchToggleSubtitle}>
+                        Open notes layered over the selected style.
+                      </Text>
+                    </View>
+                    <View style={styles.modalRetouchToggleIconWrap}>
+                      <Ionicons
+                        name={isRetouchDrawerOpen ? "chevron-up" : "chevron-down"}
+                        size={16}
+                        color={Colors.accentPale}
+                      />
+                    </View>
+                  </Pressable>
+
+                  {isRetouchDrawerOpen ? (
+                    <View style={styles.modalRetouchDrawer}>
+                      <TextInput
+                        value={customPrompt}
+                        onChangeText={setCustomPrompt}
+                        placeholder="Example: cleaner makeup, softer smile, warmer neutrals, brighter skin, white blazer."
+                        placeholderTextColor="rgba(255,255,255,0.34)"
+                        multiline
+                        style={styles.modalPromptInput}
+                      />
+                      <Text style={styles.editorInlineHint}>These notes are layered over the selected style.</Text>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
 
@@ -3189,13 +3242,119 @@ export default function InstaMeScreen() {
                         {loading ? (
                           <ActivityIndicator color="#FF7FB1" />
                         ) : (
-                          <Text style={styles.generateButtonText}>Create {previewPanelTitle}</Text>
+                          <Text style={styles.generateButtonText}>Restyle</Text>
                         )}
                       </View>
                     </Pressable>
                     <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
+                    <Text style={styles.generateActionHint}>Generates a new image</Text>
                     {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
                   </View>
+
+                  {modalStyleResultAvailable ? (
+                    <View style={styles.modalSection}>
+                      <Image
+                        source={{ uri: `data:image/png;base64,${resultBase64}` }}
+                        style={styles.resultImage}
+                        contentFit="cover"
+                      />
+                      <View style={styles.resultMetaCard}>
+                        <Text style={styles.resultMetaTitle}>Generation details</Text>
+                        <Text style={styles.resultMetaText}>
+                          Style: {selectedStylePreset?.label || "Chicoo"}
+                          {selectedArtStyle ? ` + ${selectedArtStyle.label}` : ""} - Quality: {resultMeta?.qualityLabel || activeGenerationQualityLabel}
+                        </Text>
+                        <Text style={styles.resultMetaText}>
+                          Mode: {resultMeta?.stylePresetId === INSTAME_OWN_STYLE_ID ? "Own Style" : resultMeta?.promptOnlyMode ? "Prompt preset" : "Reference guided"}
+                        </Text>
+                      </View>
+                      <View style={styles.postGenerationSection}>
+                        <Text style={styles.pricingSectionTitle}>Edit after generation</Text>
+                        <View style={[styles.pricingCard, styles.pricingCardActive]}>
+                          <View style={styles.pricingTopRow}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.pricingLabel}>{selectedEditTier?.label || "Edit"}</Text>
+                              <Text style={styles.pricingSubtitle}>
+                                {selectedEditTier?.subtitle || "Refine your generated result"}
+                              </Text>
+                            </View>
+                            <View style={[styles.pricingBadge, styles.pricingBadgeLive]}>
+                              <Text style={styles.pricingBadgeText}>{selectedEditTier?.badge || "Live"}</Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.pricingMetaRow}>
+                            <Text style={styles.pricingCredits}>{selectedEditTier?.credits ?? 0} credits</Text>
+                            <Text style={styles.pricingMetaText}>{selectedEditTier?.output || "1024 x 1024"}</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.resultActionRow}>
+                        <Pressable style={[styles.resultActionButton, styles.resultActionButtonPrimary]} onPress={handleDownload}>
+                          <Ionicons name="download-outline" size={18} color={Colors.accent} />
+                          <Text numberOfLines={1} style={styles.downloadText}>Download</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.resultActionButton, styles.resultActionButtonSecondary]}
+                          onPress={() => setShowEditComposer((prev) => !prev)}
+                        >
+                          <Ionicons name="create-outline" size={18} color={Colors.accentSoft} />
+                          <Text numberOfLines={1} style={styles.editButtonText}>Edit</Text>
+                        </Pressable>
+                      </View>
+                      {showEditComposer ? (
+                        <View style={styles.editComposer}>
+                          <Text style={styles.editComposerTitle}>Refine this result</Text>
+                          <Text style={styles.editComposerSubtitle}>
+                            This edit costs {selectedEditTier?.credits ?? 0} credits
+                          </Text>
+                          <TextInput
+                            value={editInstruction}
+                            onChangeText={setEditInstruction}
+                            placeholder="Example: soften makeup, keep outfit, make the background more cinematic..."
+                            placeholderTextColor="#7A7A7A"
+                            multiline
+                            style={styles.promptInput}
+                          />
+                          <Pressable
+                            onPress={handleEditResult}
+                            disabled={editLoading}
+                            style={({ pressed }) => [
+                              styles.generateButton,
+                              editLoading && styles.generateButtonDisabled,
+                              pressed && !editLoading ? { opacity: 0.9 } : undefined,
+                            ]}
+                          >
+                            {editLoading ? (
+                              <LinearGradient
+                                colors={["#FF7FB1", "#FF6698", "#FF4F7D"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.generateButtonInner}
+                              >
+                                <ActivityIndicator color="#FFF" />
+                              </LinearGradient>
+                            ) : (
+                              <LinearGradient
+                                colors={["#FF7FB1", "#FF6698", "#FF4F7D"]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.generateButtonInner}
+                              >
+                                <Ionicons name="create-outline" size={18} color="#FFF" />
+                                <Text style={styles.generateButtonText}>Apply Edit</Text>
+                                <Text style={styles.costText}>{selectedEditTier?.credits ?? 0} credits</Text>
+                              </LinearGradient>
+                            )}
+                          </Pressable>
+                          {editLoading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
+                        </View>
+                      ) : null}
+                      <Text style={styles.resultFootnote}>
+                        Download is free. Edit creates a fresh variation from this result.
+                      </Text>
+                    </View>
+                  ) : null}
                 </>
               )}
             </ScrollView>
@@ -5160,6 +5319,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 6,
   },
+  generateActionHint: {
+    textAlign: "center",
+    color: "rgba(255,255,255,0.48)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    marginTop: -2,
+  },
   costText: {
     marginLeft: 4,
     color: "rgba(255,255,255,0.95)",
@@ -5496,6 +5662,56 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontFamily: "Inter_700Bold",
     fontSize: 15,
+  },
+  modalRetouchToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  modalRetouchToggleCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  modalRetouchToggleTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  modalRetouchToggleSubtitle: {
+    color: "rgba(255,255,255,0.62)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  modalRetouchToggleIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalRetouchDrawer: {
+    gap: 12,
+  },
+  modalRetouchDrawerEmpty: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(0,0,0,0.26)",
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  modalRetouchDrawerEmptyText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
   },
   editorUploadRow: {
     flexDirection: "row",

@@ -1444,6 +1444,10 @@ function shouldFallbackTogetherToGemini(error) {
   ];
   return fallbackPatterns.some((pattern) => pattern.test(normalized));
 }
+function isGeminiNoImageDataError(error) {
+  const normalized = normalizeStringValue(toErrorMessage(error, "")).toLowerCase();
+  return normalized.includes("gemini image generation returned no image data");
+}
 function getEnvValues(keys) {
   const values = [];
   for (const key of keys) {
@@ -1699,6 +1703,7 @@ var GEMINI_API_BASE_URL = process.env.GEMINI_API_BASE_URL || "https://generative
 var DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-preview";
 var DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3-pro-image-preview";
 var DEFAULT_OWN_STYLE_IMAGE_MODEL = process.env.OWN_STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+var DEFAULT_STYLE_IMAGE_FALLBACK_MODEL = process.env.STYLE_IMAGE_FALLBACK_MODEL || DEFAULT_OWN_STYLE_IMAGE_MODEL;
 var DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
 var DEFAULT_CREATIVE_OWN_STYLE_ANALYSIS_MODEL = process.env.CREATIVE_OWN_STYLE_ANALYSIS_MODEL || "gemini-3.1-pro";
 var INSTAME_DEBUG_TRACE_ENABLED = ["1", "true", "yes", "on"].includes(
@@ -2803,21 +2808,43 @@ async function generateGeminiContent(options) {
 }
 async function generateGeminiImageFromParts(options) {
   const model = normalizeStringValue(options.model) || DEFAULT_STYLE_IMAGE_MODEL;
-  const response = await generateGeminiContent({
-    model,
-    parts: options.parts,
-    responseModalities: ["IMAGE", "TEXT"],
-    maxOutputTokens: options.maxOutputTokens ?? 1200
-  });
-  const imageBase64 = extractGeminiImageBase64(response);
-  if (!imageBase64) {
-    throw new Error("Gemini image generation returned no image data.");
-  }
-  return {
-    imageBase64,
-    model,
-    provider: "Google"
+  const fallbackModel = DEFAULT_STYLE_IMAGE_FALLBACK_MODEL;
+  const requestImage = async (requestModel) => {
+    const response = await generateGeminiContent({
+      model: requestModel,
+      parts: options.parts,
+      responseModalities: ["IMAGE", "TEXT"],
+      maxOutputTokens: options.maxOutputTokens ?? 1200
+    });
+    const imageBase64 = extractGeminiImageBase64(response);
+    if (!imageBase64) {
+      const responseText = extractGeminiText(response).trim();
+      const responseTextHint = responseText ? ` Response text: ${responseText.slice(0, 240)}` : "";
+      throw new Error(`Gemini image generation returned no image data.${responseTextHint}`);
+    }
+    return {
+      imageBase64,
+      model: requestModel,
+      provider: "Google"
+    };
   };
+  try {
+    return await requestImage(model);
+  } catch (error) {
+    if (!isGeminiNoImageDataError(error) || !fallbackModel || fallbackModel === model) {
+      throw error;
+    }
+    console.warn(
+      `Gemini image generation returned no image data with model ${model}. Retrying with ${fallbackModel}.`
+    );
+    try {
+      return await requestImage(fallbackModel);
+    } catch (fallbackError) {
+      throw new Error(
+        `Gemini image generation returned no image data with primary model ${model} and fallback model ${fallbackModel}: ${toErrorMessage(fallbackError, "Gemini fallback request failed")}`
+      );
+    }
+  }
 }
 function resolveGenerationTierById(input) {
   const generationTierId = normalizeStringValue(input);
