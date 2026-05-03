@@ -3242,6 +3242,22 @@ export default function InstaMeScreen() {
 
                   {isRetouchDrawerOpen ? (
                     <View style={styles.modalRetouchDrawer}>
+                      {isOwnStyleSelected ? (
+                        <View style={[styles.subTabBar, { marginBottom: 10 }]}>
+                          {OWN_STYLE_MODE_OPTIONS.map((option) => {
+                            const active = ownStyleMode === option.value;
+                            return (
+                              <Pressable
+                                key={option.value}
+                                onPress={() => setOwnStyleMode(option.value)}
+                                style={[styles.subTab, active && styles.subTabActive]}
+                              >
+                                <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{option.label}</Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      ) : null}
                       <TextInput
                         value={customPrompt}
                         onChangeText={setCustomPrompt}
