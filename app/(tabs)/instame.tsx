@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Alert,
+  Easing,
   Image as NativeImage,
   InteractionManager,
   Modal,
@@ -106,8 +108,6 @@ const STYLE_CATEGORY_OPTIONS: { key: InstaMeStyleCategory; label: string }[] = [
   { key: "men", label: "Men" },
   { key: "couple", label: "Couples" },
 ];
-const ART_TILE_HEIGHTS = [220, 292, 248];
-const ART_TILE_HEIGHTS_COMPACT = [168, 196, 178];
 
 function resolveDisplayedGenerationQualityTier(options: {
   preset: InstaMeStylePreset | null | undefined;
@@ -483,6 +483,11 @@ function getImageCandidates(...values: (string | null | undefined)[]): string[] 
     });
 }
 
+function resolveImageSourceUri(source: any): string {
+  const resolved = NativeImage.resolveAssetSource(source);
+  return typeof resolved?.uri === "string" ? resolved.uri : "";
+}
+
 function getPresetImageCandidates(
   preset: Pick<InstaMeStylePreset, "cover" | "representativeImage" | "examples"> | null | undefined,
 ): string[] {
@@ -550,6 +555,7 @@ export default function InstaMeScreen() {
   const [inlineGalleryType, setInlineGalleryType] = useState<"uploaded" | "enhanced" | null>(null);
   const [inlineGalleryImages, setInlineGalleryImages] = useState<InstaMeUploadedImage[]>([]);
   const [inlineGalleryLoading, setInlineGalleryLoading] = useState(false);
+  const collageRevealProgress = useRef(new Animated.Value(1)).current;
 
   const selectedSavedOwnStyle = useMemo(
     () => savedOwnStyles.find((style) => style.id === selectedOwnStyleId) || null,
@@ -669,7 +675,6 @@ export default function InstaMeScreen() {
     const ownStyleReferenceCandidates = getImageCandidates(
       ownStylePhoto?.uri,
       selectedSavedOwnStyle?.previewUri,
-      ...fallbackPresetImageCandidates,
     );
 
     return {
@@ -682,7 +687,7 @@ export default function InstaMeScreen() {
       cover: ownStyleReferenceCandidates[0] || "",
       examples: getImageCandidates(ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri),
     };
-  }, [fallbackPresetImageCandidates, ownStylePhoto, selectedSavedOwnStyle]);
+  }, [ownStylePhoto, selectedSavedOwnStyle]);
 
   const visibleStylePresets = useMemo(
     () => [ownStylePreset, ...stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID)],
@@ -713,8 +718,48 @@ export default function InstaMeScreen() {
   const collageColumnCount = viewportWidth >= 1360 ? 4 : 3;
   const collageColumnOffsets = collageColumnCount === 4 ? [0, 18, 10, 22] : isPhoneViewport ? [0, 10, 4] : [0, 18, 10];
   const collageColumnGap = isPhoneViewport ? 6 : 8;
-  const artTileWidth = isPhoneViewport ? "31.8%" : "48.2%";
-  const artTileHeights = isPhoneViewport ? ART_TILE_HEIGHTS_COMPACT : ART_TILE_HEIGHTS;
+  const collageRevealAnimatedStyle = useMemo(
+    () => ({
+      opacity: collageRevealProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.84, 1],
+      }),
+      transform: [
+        {
+          translateY: collageRevealProgress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [8, 0],
+          }),
+        },
+      ],
+    }),
+    [collageRevealProgress],
+  );
+
+  const getCollageColumnRevealStyle = useCallback((columnIndex: number) => {
+    const delayStart = Math.min(0.42, columnIndex * 0.14);
+    const delayEnd = Math.min(1, delayStart + 0.56);
+    const columnProgress = collageRevealProgress.interpolate({
+      inputRange: [0, delayStart, delayEnd, 1],
+      outputRange: [0, 0, 1, 1],
+      extrapolate: "clamp",
+    });
+
+    return {
+      opacity: columnProgress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.38, 1],
+      }),
+      transform: [
+        {
+          translateY: columnProgress.interpolate({
+            inputRange: [0, 1],
+            outputRange: [22, 0],
+          }),
+        },
+      ],
+    };
+  }, [collageRevealProgress]);
 
   const isEnhancePreviewActive = previewStyleId === ENHANCE_PREVIEW_CARD_ID;
 
@@ -735,6 +780,12 @@ export default function InstaMeScreen() {
       return getImageCandidates(portraitEnhanceCandidate?.uri, photo?.uri, ...fallbackPresetImageCandidates)[0] || "";
     }
 
+    if (previewStyleId === INSTAME_OWN_STYLE_ID) {
+      return getImageCandidates(
+        selectedOwnStyleId ? selectedSavedOwnStyle?.previewUri : ownStylePhoto?.uri,
+      )[0] || "";
+    }
+
     return (
       getImageCandidates(
         ...getPresetImageCandidates(previewStyle || selectedStylePreset || defaultStylePreset),
@@ -748,8 +799,19 @@ export default function InstaMeScreen() {
     photo?.uri,
     portraitEnhanceCandidate?.uri,
     previewStyle,
+    previewStyleId,
+    ownStylePhoto?.uri,
+    selectedOwnStyleId,
+    selectedSavedOwnStyle?.previewUri,
     selectedStylePreset,
   ]);
+
+  const closePreviewPanel = useCallback(() => {
+    if (previewStyleId === INSTAME_OWN_STYLE_ID && ownStylePhoto && !selectedOwnStyleId) {
+      setOwnStylePhoto(null);
+    }
+    setPreviewStyleId(null);
+  }, [ownStylePhoto, previewStyleId, selectedOwnStyleId]);
 
   const previewPanelTitle = isEnhancePreviewActive
     ? "Enhance your portrait"
@@ -1159,6 +1221,22 @@ export default function InstaMeScreen() {
   }, [selectedArtStyleId]);
 
   useEffect(() => {
+    collageRevealProgress.setValue(0);
+    const animation = Animated.timing(collageRevealProgress, {
+      toValue: 1,
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+
+    animation.start();
+
+    return () => {
+      animation.stop();
+    };
+  }, [collageRevealProgress, styleSectionTab]);
+
+  useEffect(() => {
     if (!previewStyleId) {
       setIsRetouchDrawerOpen(false);
       setShowEditComposer(false);
@@ -1297,6 +1375,70 @@ export default function InstaMeScreen() {
       Crypto.CryptoDigestAlgorithm.SHA256,
       prepared.previewBase64,
     );
+    const nextOwnStylePhoto: UploadedPhoto = {
+      uri: prepared.uri,
+      base64: prepared.base64,
+      previewBase64: prepared.previewBase64,
+      mimeType: prepared.mimeType,
+      width: prepared.width,
+      height: prepared.height,
+      fileSizeBytes: prepared.fileSizeBytes,
+      sourceImageId: undefined,
+      name: asset.fileName || "Style reference",
+      kind: "own_style",
+    };
+
+    const applyTemporaryOwnStylePhoto = () => {
+      setOwnStylePhoto(nextOwnStylePhoto);
+      setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+      setIntensity(null);
+      setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+      setSelectedOwnStyleId(null);
+      setResultBase64(null);
+      setResultMeta(null);
+      setShowEditComposer(false);
+      setEditInstruction("");
+    };
+
+    const saveOwnStyleImmediately = async () => {
+      const optimisticId = `__optimistic_own_style_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const optimisticStyle: InstaMeOwnStyle = {
+        id: optimisticId,
+        name: nextOwnStylePhoto.name || "Own Style",
+        mimeType: nextOwnStylePhoto.mimeType,
+        createdAt: new Date().toISOString(),
+        previewUri: buildDataUri(nextOwnStylePhoto.previewBase64 || nextOwnStylePhoto.base64, nextOwnStylePhoto.mimeType),
+        promptPreview: "Saving your style...",
+        imageHash: preparedHash,
+      };
+
+      setSavedOwnStyles((current) => [optimisticStyle, ...current.filter((style) => style.id !== optimisticId)]);
+
+      try {
+        const saved = await apiClient.saveInstaMeOwnStyle({
+          image: {
+            name: nextOwnStylePhoto.name,
+            mimeType: nextOwnStylePhoto.mimeType,
+            base64: nextOwnStylePhoto.base64,
+            previewBase64: nextOwnStylePhoto.previewBase64 || nextOwnStylePhoto.base64,
+            width: nextOwnStylePhoto.width,
+            height: nextOwnStylePhoto.height,
+            fileSizeBytes:
+              nextOwnStylePhoto.fileSizeBytes || Math.ceil((nextOwnStylePhoto.base64.length * 3) / 4),
+          },
+          ownStyleMode,
+        });
+
+        setSavedOwnStyles((current) => {
+          const next = current.filter((style) => style.id !== optimisticId && style.id !== saved.ownStyle.id);
+          return [saved.ownStyle, ...next];
+        });
+      } catch (error: any) {
+        setSavedOwnStyles((current) => current.filter((style) => style.id !== optimisticId));
+        console.warn("[InstaMe] Immediate Own Style save failed:", error?.message || "unknown error");
+      }
+    };
+
     const duplicateOwnStyle = savedOwnStyles.find(
       (style) => style.imageHash && style.imageHash === preparedHash,
     );
@@ -1307,28 +1449,11 @@ export default function InstaMeScreen() {
         `This looks like your saved style \"${duplicateOwnStyle.name}\". Reuse it instead of paying the first-time Own Style fee again?`,
         [
           {
-            text: "Keep new upload",
+            text: "Use this upload",
             style: "cancel",
             onPress: () => {
-              setSelectedStyleId(INSTAME_OWN_STYLE_ID);
-              setIntensity(null);
-              setPreviewStyleId(null);
-              setOwnStylePhoto({
-                uri: prepared.uri,
-                base64: prepared.base64,
-                previewBase64: prepared.previewBase64,
-                mimeType: prepared.mimeType,
-                width: prepared.width,
-                height: prepared.height,
-                fileSizeBytes: prepared.fileSizeBytes,
-                sourceImageId: undefined,
-                name: asset.fileName || "Style reference",
-              });
-              setSelectedOwnStyleId(null);
-              setResultBase64(null);
-              setResultMeta(null);
-              setShowEditComposer(false);
-              setEditInstruction("");
+              applyTemporaryOwnStylePhoto();
+              void saveOwnStyleImmediately();
             },
           },
           {
@@ -1336,7 +1461,7 @@ export default function InstaMeScreen() {
             onPress: () => {
               setSelectedStyleId(INSTAME_OWN_STYLE_ID);
               setIntensity(null);
-              setPreviewStyleId(null);
+              setPreviewStyleId(INSTAME_OWN_STYLE_ID);
               setSelectedOwnStyleId(duplicateOwnStyle.id);
               setOwnStylePhoto(null);
               setResultBase64(null);
@@ -1351,27 +1476,10 @@ export default function InstaMeScreen() {
       return;
     }
 
-    setOwnStylePhoto({
-      uri: prepared.uri,
-      base64: prepared.base64,
-      previewBase64: prepared.previewBase64,
-      mimeType: prepared.mimeType,
-      width: prepared.width,
-      height: prepared.height,
-      fileSizeBytes: prepared.fileSizeBytes,
-      sourceImageId: undefined,
-      name: asset.fileName || "Style reference",
-    });
-    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
-    setIntensity(null);
-    setPreviewStyleId(null);
-    setSelectedOwnStyleId(null);
-    setResultBase64(null);
-    setResultMeta(null);
-    setShowEditComposer(false);
-    setEditInstruction("");
+    applyTemporaryOwnStylePhoto();
+    void saveOwnStyleImmediately();
     await Haptics.selectionAsync();
-  }, [pickRawImage, savedOwnStyles]);
+  }, [ownStyleMode, pickRawImage, savedOwnStyles]);
 
   const handleStylePresetPress = useCallback((preset: InstaMeStylePreset) => {
     setSelectedStyleId(preset.id);
@@ -1379,17 +1487,11 @@ export default function InstaMeScreen() {
     if (preset.id === INSTAME_OWN_STYLE_ID) {
       setIntensity(null);
       setPreviewStyleId(INSTAME_OWN_STYLE_ID);
-
-      if (!ownStylePhoto && !selectedOwnStyleId) {
-        InteractionManager.runAfterInteractions(() => {
-          void pickOwnStyleImage();
-        });
-      }
       return;
     }
 
     setPreviewStyleId(preset.id);
-  }, [ownStylePhoto, pickOwnStyleImage, selectedOwnStyleId]);
+  }, []);
 
   const handleEnhancePreviewPress = useCallback(() => {
     setPreviewStyleId(ENHANCE_PREVIEW_CARD_ID);
@@ -1455,10 +1557,7 @@ export default function InstaMeScreen() {
         setIntensity(null);
         setPreviewStyleId(INSTAME_OWN_STYLE_ID);
         setSelectedOwnStyleId(null);
-
-        InteractionManager.runAfterInteractions(() => {
-          void pickOwnStyleImage();
-        });
+        setOwnStylePhoto(null);
       },
       aspectRatio: collageTileAspectRatios[OWN_UPLOAD_CARD_ID] || 0.72,
     };
@@ -1491,11 +1590,8 @@ export default function InstaMeScreen() {
   }, [
     collageTileAspectRatios,
     ownStyleHeroUri,
-    ownStylePhoto,
-    pickOwnStyleImage,
     savedOwnStyles,
     selectedOwnStyleId,
-    selectedSavedOwnStyle,
     selectedStyleId,
   ]);
 
@@ -1509,12 +1605,52 @@ export default function InstaMeScreen() {
     return columns;
   }, [collageColumnCount, ownCollageItems]);
 
+  const artCollageItems = useMemo(() => {
+    const noneTheme = getArtStyleCardTheme(ART_STYLE_NONE_ID);
+    const noneCard = {
+      id: ART_STYLE_NONE_ID,
+      label: "No art finish",
+      imageCandidates: getImageCandidates(...getPresetImageCandidates(selectedStylePreset || defaultStylePreset)),
+      theme: noneTheme,
+      active: !selectedArtStyleId,
+      onPress: () => setSelectedArtStyleId(""),
+      aspectRatio: collageTileAspectRatios[ART_STYLE_NONE_ID] || 0.72,
+    };
+
+    const styleCards = INSTAME_ART_STYLES.map((style) => ({
+      id: style.id,
+      label: style.label,
+      imageCandidates: getImageCandidates(resolveImageSourceUri(style.preview)),
+      theme: getArtStyleCardTheme(style.id),
+      active: selectedArtStyleId === style.id,
+      onPress: () => setSelectedArtStyleId(style.id),
+      aspectRatio: collageTileAspectRatios[style.id] || 0.72,
+    }));
+
+    return [noneCard, ...styleCards];
+  }, [
+    collageTileAspectRatios,
+    defaultStylePreset,
+    selectedArtStyleId,
+    selectedStylePreset,
+  ]);
+
+  const artCollageColumns = useMemo(() => {
+    const columns = Array.from({ length: collageColumnCount }, () => [] as typeof artCollageItems);
+
+    artCollageItems.forEach((item, index) => {
+      columns[index % collageColumnCount].push(item);
+    });
+
+    return columns;
+  }, [artCollageItems, collageColumnCount]);
+
   const collageTileCandidateMap = useMemo(
     () =>
       Object.fromEntries(
-        [...mainCollageItems, ...ownCollageItems].map((item) => [item.id, item.imageCandidates]),
+        [...mainCollageItems, ...ownCollageItems, ...artCollageItems].map((item) => [item.id, item.imageCandidates]),
       ) as Record<string, string[]>,
-    [mainCollageItems, ownCollageItems],
+    [artCollageItems, mainCollageItems, ownCollageItems],
   );
 
   const handleCollageTileError = useCallback((styleId: string, failedUri?: string) => {
@@ -2142,19 +2278,161 @@ export default function InstaMeScreen() {
 
         {styleSectionTab === "main" ? (
           <View style={styles.collageSection}>
-            {mainOnlyStylePresets.length === 0 ? (
-              <View style={styles.categoryEmptyState}>
-                <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.25)" />
-                <Text style={styles.categoryEmptyText}>Coming soon</Text>
-                <Text style={styles.categoryEmptySubtext}>Stay tuned — new styles are on the way!</Text>
-              </View>
-            ) : (
+            <Animated.View style={collageRevealAnimatedStyle}>
+              {mainOnlyStylePresets.length === 0 ? (
+                <View style={styles.categoryEmptyState}>
+                  <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.25)" />
+                  <Text style={styles.categoryEmptyText}>Coming soon</Text>
+                  <Text style={styles.categoryEmptySubtext}>Stay tuned — new styles are on the way!</Text>
+                </View>
+              ) : (
+                <View style={[styles.collageColumnsWrap, { gap: collageColumnGap }]}> 
+                  {mainCollageColumns.map((column, columnIndex) => (
+                    <Animated.View
+                      key={`collage-column-${columnIndex}`}
+                      style={[
+                        styles.collageColumn,
+                        getCollageColumnRevealStyle(columnIndex),
+                        {
+                          gap: collageColumnGap,
+                          marginTop: collageColumnOffsets[columnIndex] || 0,
+                        },
+                      ]}
+                    >
+                      {column.map((item) => {
+                        const collageImageUri = collageTileImageOverrides[item.id] || item.imageCandidates[0] || "";
+
+                        return (
+                          <Pressable
+                            key={item.id}
+                            onPress={item.onPress}
+                            style={[
+                              styles.collageTile,
+                              item.active && styles.collageTileActive,
+                              {
+                                shadowColor: "#00E5CC",
+                                shadowOpacity: item.active ? 0.72 : 0.36,
+                                shadowRadius: item.active ? 18 : 9,
+                                shadowOffset: { width: 0, height: 0 },
+                                elevation: item.active ? 14 : 7,
+                              },
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.collageTileInner,
+                                {
+                                  borderColor: item.active ? "#00E5CC" : item.theme.border,
+                                  backgroundColor: item.theme.footerBottom,
+                                },
+                              ]}
+                            >
+                              <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
+                                {collageImageUri ? (
+                                  <Image
+                                    source={{ uri: collageImageUri }}
+                                    style={styles.collageTileImageContained}
+                                    contentFit="cover"
+                                    onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                                    onError={() => handleCollageTileError(item.id, collageImageUri)}
+                                  />
+                                ) : (
+                                  <View style={styles.collageTileFallback}>
+                                    <Ionicons name="image-outline" size={22} color={item.theme.text} />
+                              {item.id === OWN_UPLOAD_CARD_ID ? (
+                                <View style={styles.ownUploadInlineActions}>
+                                  <Pressable
+                                    onPress={(event) => {
+                                      event.stopPropagation();
+                                      setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+                                      setIntensity(null);
+                                      setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+                                      void openInlineGallery("uploaded");
+                                    }}
+                                    style={({ pressed }) => [styles.ownUploadInlineAction, pressed ? { opacity: 0.9 } : undefined]}
+                                  >
+                                    <Text style={styles.ownUploadInlineActionText}>Uploaded</Text>
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={(event) => {
+                                      event.stopPropagation();
+                                      setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+                                      setIntensity(null);
+                                      setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+                                      void openInlineGallery("enhanced");
+                                    }}
+                                    style={({ pressed }) => [styles.ownUploadInlineAction, pressed ? { opacity: 0.9 } : undefined]}
+                                  >
+                                    <Text style={styles.ownUploadInlineActionText}>Enhanced</Text>
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={(event) => {
+                                      event.stopPropagation();
+                                      setSelectedStyleId(INSTAME_OWN_STYLE_ID);
+                                      setIntensity(null);
+                                      setPreviewStyleId(INSTAME_OWN_STYLE_ID);
+                                      void handleEnhancePortrait();
+                                    }}
+                                    disabled={!photo || portraitEnhanceLoading}
+                                    style={({ pressed }) => [
+                                      styles.ownUploadInlineAction,
+                                      (!photo || portraitEnhanceLoading) && styles.ownUploadInlineActionDisabled,
+                                      pressed && photo && !portraitEnhanceLoading ? { opacity: 0.9 } : undefined,
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.ownUploadInlineActionText,
+                                        (!photo || portraitEnhanceLoading) && styles.ownUploadInlineActionTextDisabled,
+                                      ]}
+                                    >
+                                      Enhance
+                                    </Text>
+                                  </Pressable>
+                                </View>
+                              ) : null}
+                                  </View>
+                                )}
+                                <LinearGradient
+                                  colors={["rgba(0,229,204,0.08)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.28)"]}
+                                  locations={[0, 0.32, 1]}
+                                  style={styles.collageTileOverlay}
+                                />
+                                <View
+                                  style={[
+                                    styles.collageTileGlow,
+                                    item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
+                                    {
+                                      backgroundColor: "transparent",
+                                      borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
+                                      shadowColor: "#00E5CC",
+                                      shadowOpacity: item.active ? 0.80 : 0.40,
+                                      shadowRadius: item.active ? 14 : 7,
+                                      elevation: item.active ? 12 : 6,
+                                    },
+                                  ]}
+                                />
+                              </View>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </Animated.View>
+                  ))}
+                </View>
+              )}
+            </Animated.View>
+          </View>
+        ) : styleSectionTab === "own" ? (
+          <View style={styles.collageSection}>
+            <Animated.View style={collageRevealAnimatedStyle}>
               <View style={[styles.collageColumnsWrap, { gap: collageColumnGap }]}> 
-                {mainCollageColumns.map((column, columnIndex) => (
-                  <View
-                    key={`collage-column-${columnIndex}`}
+                {ownCollageColumns.map((column, columnIndex) => (
+                  <Animated.View
+                    key={`own-collage-column-${columnIndex}`}
                     style={[
                       styles.collageColumn,
+                      getCollageColumnRevealStyle(columnIndex),
                       {
                         gap: collageColumnGap,
                         marginTop: collageColumnOffsets[columnIndex] || 0,
@@ -2190,199 +2468,63 @@ export default function InstaMeScreen() {
                             ]}
                           >
                             <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
-                              {collageImageUri ? (
-                                <Image
-                                  source={{ uri: collageImageUri }}
-                                  style={styles.collageTileImageContained}
-                                  contentFit="cover"
-                                  onLoad={(event) => handleCollageTileLoad(item.id, event)}
-                                  onError={() => handleCollageTileError(item.id, collageImageUri)}
-                                />
-                              ) : (
-                                <View style={styles.collageTileFallback}>
-                                  <Ionicons name="image-outline" size={22} color={item.theme.text} />
-                            {item.id === OWN_UPLOAD_CARD_ID ? (
-                              <View style={styles.ownUploadInlineActions}>
-                                <Pressable
-                                  onPress={(event) => {
-                                    event.stopPropagation();
-                                    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
-                                    setIntensity(null);
-                                    setPreviewStyleId(INSTAME_OWN_STYLE_ID);
-                                    void openInlineGallery("uploaded");
-                                  }}
-                                  style={({ pressed }) => [styles.ownUploadInlineAction, pressed ? { opacity: 0.9 } : undefined]}
-                                >
-                                  <Text style={styles.ownUploadInlineActionText}>Uploaded</Text>
-                                </Pressable>
-                                <Pressable
-                                  onPress={(event) => {
-                                    event.stopPropagation();
-                                    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
-                                    setIntensity(null);
-                                    setPreviewStyleId(INSTAME_OWN_STYLE_ID);
-                                    void openInlineGallery("enhanced");
-                                  }}
-                                  style={({ pressed }) => [styles.ownUploadInlineAction, pressed ? { opacity: 0.9 } : undefined]}
-                                >
-                                  <Text style={styles.ownUploadInlineActionText}>Enhanced</Text>
-                                </Pressable>
-                                <Pressable
-                                  onPress={(event) => {
-                                    event.stopPropagation();
-                                    setSelectedStyleId(INSTAME_OWN_STYLE_ID);
-                                    setIntensity(null);
-                                    setPreviewStyleId(INSTAME_OWN_STYLE_ID);
-                                    void handleEnhancePortrait();
-                                  }}
-                                  disabled={!photo || portraitEnhanceLoading}
-                                  style={({ pressed }) => [
-                                    styles.ownUploadInlineAction,
-                                    (!photo || portraitEnhanceLoading) && styles.ownUploadInlineActionDisabled,
-                                    pressed && photo && !portraitEnhanceLoading ? { opacity: 0.9 } : undefined,
-                                  ]}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.ownUploadInlineActionText,
-                                      (!photo || portraitEnhanceLoading) && styles.ownUploadInlineActionTextDisabled,
-                                    ]}
-                                  >
-                                    Enhance
-                                  </Text>
-                                </Pressable>
-                              </View>
-                            ) : null}
+                              {item.id === OWN_UPLOAD_CARD_ID ? (
+                                <View style={styles.ownUploadAnchorMedia}>
+                                  <LinearGradient
+                                    colors={["rgba(38,244,237,0.22)", "rgba(0,0,0,0.98)", "rgba(0,0,0,1)"]}
+                                    locations={[0, 0.42, 1]}
+                                    style={styles.ownUploadAnchorBackdrop}
+                                  />
+                                  <Text style={styles.ownUploadAnchorText}>UPLOAD{"\n"}YOUR{"\n"}OWN{"\n"}STYLE</Text>
+                                  <View style={styles.ownUploadAnchorPlus}>
+                                    <Ionicons name="add" size={14} color="#26F4ED" />
+                                  </View>
                                 </View>
+                              ) : (
+                                <>
+                                  {collageImageUri ? (
+                                    <Image
+                                      source={{ uri: collageImageUri }}
+                                      style={styles.collageTileImageContained}
+                                      contentFit="cover"
+                                      onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                                      onError={() => handleCollageTileError(item.id, collageImageUri)}
+                                    />
+                                  ) : (
+                                    <View style={styles.collageTileFallback}>
+                                      <Ionicons name="image-outline" size={22} color={item.theme.text} />
+                                    </View>
+                                  )}
+                                  <LinearGradient
+                                    colors={["rgba(0,229,204,0.08)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.28)"]}
+                                    locations={[0, 0.32, 1]}
+                                    style={styles.collageTileOverlay}
+                                  />
+                                  <View
+                                    style={[
+                                      styles.collageTileGlow,
+                                      item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
+                                      {
+                                        backgroundColor: "transparent",
+                                        borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
+                                        shadowColor: "#00E5CC",
+                                        shadowOpacity: item.active ? 0.80 : 0.40,
+                                        shadowRadius: item.active ? 14 : 7,
+                                        elevation: item.active ? 12 : 6,
+                                      },
+                                    ]}
+                                  />
+                                </>
                               )}
-                              <LinearGradient
-                                colors={["rgba(0,229,204,0.08)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.28)"]}
-                                locations={[0, 0.32, 1]}
-                                style={styles.collageTileOverlay}
-                              />
-                              <View
-                                style={[
-                                  styles.collageTileGlow,
-                                  item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
-                                  {
-                                    backgroundColor: "transparent",
-                                    borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
-                                    shadowColor: "#00E5CC",
-                                    shadowOpacity: item.active ? 0.80 : 0.40,
-                                    shadowRadius: item.active ? 14 : 7,
-                                    elevation: item.active ? 12 : 6,
-                                  },
-                                ]}
-                              />
                             </View>
                           </View>
                         </Pressable>
                       );
                     })}
-                  </View>
+                  </Animated.View>
                 ))}
               </View>
-            )}
-          </View>
-        ) : styleSectionTab === "own" ? (
-          <View style={styles.collageSection}>
-            <View style={[styles.collageColumnsWrap, { gap: collageColumnGap }]}> 
-              {ownCollageColumns.map((column, columnIndex) => (
-                <View
-                  key={`own-collage-column-${columnIndex}`}
-                  style={[
-                    styles.collageColumn,
-                    {
-                      gap: collageColumnGap,
-                      marginTop: collageColumnOffsets[columnIndex] || 0,
-                    },
-                  ]}
-                >
-                  {column.map((item) => {
-                    const collageImageUri = collageTileImageOverrides[item.id] || item.imageCandidates[0] || "";
-
-                    return (
-                      <Pressable
-                        key={item.id}
-                        onPress={item.onPress}
-                        style={[
-                          styles.collageTile,
-                          item.active && styles.collageTileActive,
-                          {
-                            shadowColor: "#00E5CC",
-                            shadowOpacity: item.active ? 0.72 : 0.36,
-                            shadowRadius: item.active ? 18 : 9,
-                            shadowOffset: { width: 0, height: 0 },
-                            elevation: item.active ? 14 : 7,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.collageTileInner,
-                            {
-                              borderColor: item.active ? "#00E5CC" : item.theme.border,
-                              backgroundColor: item.theme.footerBottom,
-                            },
-                          ]}
-                        >
-                          <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
-                            {item.id === OWN_UPLOAD_CARD_ID ? (
-                              <View style={styles.ownUploadAnchorMedia}>
-                                <LinearGradient
-                                  colors={["rgba(38,244,237,0.22)", "rgba(0,0,0,0.98)", "rgba(0,0,0,1)"]}
-                                  locations={[0, 0.42, 1]}
-                                  style={styles.ownUploadAnchorBackdrop}
-                                />
-                                <Text style={styles.ownUploadAnchorText}>UPLOAD{"\n"}YOUR{"\n"}OWN{"\n"}STYLE</Text>
-                                <View style={styles.ownUploadAnchorPlus}>
-                                  <Ionicons name="add" size={14} color="#26F4ED" />
-                                </View>
-                              </View>
-                            ) : (
-                              <>
-                                {collageImageUri ? (
-                                  <Image
-                                    source={{ uri: collageImageUri }}
-                                    style={styles.collageTileImageContained}
-                                    contentFit="cover"
-                                    onLoad={(event) => handleCollageTileLoad(item.id, event)}
-                                    onError={() => handleCollageTileError(item.id, collageImageUri)}
-                                  />
-                                ) : (
-                                  <View style={styles.collageTileFallback}>
-                                    <Ionicons name="image-outline" size={22} color={item.theme.text} />
-                                  </View>
-                                )}
-                                <LinearGradient
-                                  colors={["rgba(0,229,204,0.08)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.28)"]}
-                                  locations={[0, 0.32, 1]}
-                                  style={styles.collageTileOverlay}
-                                />
-                                <View
-                                  style={[
-                                    styles.collageTileGlow,
-                                    item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
-                                    {
-                                      backgroundColor: "transparent",
-                                      borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
-                                      shadowColor: "#00E5CC",
-                                      shadowOpacity: item.active ? 0.80 : 0.40,
-                                      shadowRadius: item.active ? 14 : 7,
-                                      elevation: item.active ? 12 : 6,
-                                    },
-                                  ]}
-                                />
-                              </>
-                            )}
-                          </View>
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
+            </Animated.View>
           </View>
         ) : (
           <View style={styles.studioSection}>
@@ -2687,102 +2829,104 @@ export default function InstaMeScreen() {
                 </View>
 
                 <View style={styles.studioPanel}>
-                  <View style={[styles.artMasonryGrid, { gap: isPhoneViewport ? 8 : 12 }]}> 
-                    <Pressable
-                      onPress={() => setSelectedArtStyleId("")}
-                      style={[
-                        styles.artMasonryTile,
-                        !isPhoneViewport && styles.artMasonryTileWide,
-                        styles.artMasonryNoneTile,
-                        {
-                          width: isPhoneViewport ? artTileWidth : "100%",
-                          height: isPhoneViewport ? artTileHeights[0] : 128,
-                          backgroundColor: getArtStyleCardTheme(ART_STYLE_NONE_ID).footerBottom,
-                          borderColor: !selectedArtStyleId
-                            ? getArtStyleCardTheme(ART_STYLE_NONE_ID).glow
-                            : getArtStyleCardTheme(ART_STYLE_NONE_ID).border,
-                          shadowColor: getArtStyleCardTheme(ART_STYLE_NONE_ID).glow,
-                          shadowOpacity: !selectedArtStyleId ? 0.82 : 0.42,
-                          shadowRadius: !selectedArtStyleId ? 22 : 14,
-                          shadowOffset: { width: 0, height: !selectedArtStyleId ? 0 : 8 },
-                          elevation: !selectedArtStyleId ? 14 : 8,
-                        },
-                      ]}
-                    >
-                      <LinearGradient
-                        colors={[
-                          getArtStyleCardTheme(ART_STYLE_NONE_ID).footerTop,
-                          getArtStyleCardTheme(ART_STYLE_NONE_ID).footerBottom,
-                        ]}
-                        style={StyleSheet.absoluteFill}
-                      />
-                      <LinearGradient
-                        colors={[
-                          getArtStyleCardTheme(ART_STYLE_NONE_ID).glowSoft,
-                          "rgba(0,0,0,0.10)",
-                          "rgba(0,0,0,0.88)",
-                        ]}
-                        style={StyleSheet.absoluteFill}
-                      />
-                      <View
-                        style={[
-                          styles.artMasonryGlow,
-                          {
-                            borderColor: !selectedArtStyleId
-                              ? getArtStyleCardTheme(ART_STYLE_NONE_ID).glow
-                              : getArtStyleCardTheme(ART_STYLE_NONE_ID).border,
-                            shadowColor: getArtStyleCardTheme(ART_STYLE_NONE_ID).glow,
-                            shadowOpacity: !selectedArtStyleId ? 0.94 : 0.54,
-                            shadowRadius: !selectedArtStyleId ? 20 : 12,
-                            elevation: !selectedArtStyleId ? 14 : 8,
-                          },
-                        ]}
-                      />
-                    </Pressable>
-                    {INSTAME_ART_STYLES.map((style, index) => {
-                      const active = selectedArtStyleId === style.id;
-                      const theme = getArtStyleCardTheme(style.id);
-                      const isWide = !isPhoneViewport && index === 1;
-                      return (
-                        <Pressable
-                          key={style.id}
-                          onPress={() => setSelectedArtStyleId(style.id)}
+                  <Animated.View style={collageRevealAnimatedStyle}>
+                    <View style={[styles.collageColumnsWrap, { gap: collageColumnGap }]}> 
+                      {artCollageColumns.map((column, columnIndex) => (
+                        <Animated.View
+                          key={`art-collage-column-${columnIndex}`}
                           style={[
-                            styles.artMasonryTile,
-                            isWide && styles.artMasonryTileWide,
+                            styles.collageColumn,
+                            getCollageColumnRevealStyle(columnIndex),
                             {
-                              width: isWide ? "100%" : artTileWidth,
-                              height: isWide ? 236 : artTileHeights[index % artTileHeights.length],
-                              backgroundColor: theme.footerBottom,
-                              borderColor: active ? "#00E5CC" : theme.border,
-                              shadowColor: "#00E5CC",
-                              shadowOpacity: active ? 0.72 : 0.36,
-                              shadowRadius: active ? 18 : 9,
-                              shadowOffset: { width: 0, height: 0 },
-                              elevation: active ? 14 : 7,
+                              gap: collageColumnGap,
+                              marginTop: collageColumnOffsets[columnIndex] || 0,
                             },
-                          ]}>
-                          <View
-                            style={[
-                              styles.artMasonryGlow,
-                              {
-                                borderColor: active ? "#00E5CC" : "rgba(0,229,204,0.20)",
-                                shadowColor: "#00E5CC",
-                                shadowOpacity: active ? 0.80 : 0.40,
-                                shadowRadius: active ? 12 : 6,
-                                elevation: active ? 10 : 5,
-                              },
-                            ]}
-                          />
-                          <Image source={style.preview} style={styles.artStyleOptionImage} contentFit="cover" />
-                          <LinearGradient
-                            colors={[theme.glowSoft, "rgba(0,0,0,0.12)", "rgba(0,0,0,0.88)"]}
-                            style={styles.artStyleOptionOverlay}
-                          />
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                          ]}
+                        >
+                          {column.map((item) => {
+                            const collageImageUri = collageTileImageOverrides[item.id] || item.imageCandidates[0] || "";
+
+                            return (
+                              <Pressable
+                                key={item.id}
+                                onPress={item.onPress}
+                                style={[
+                                  styles.collageTile,
+                                  item.active && styles.collageTileActive,
+                                  {
+                                    shadowColor: "#00E5CC",
+                                    shadowOpacity: item.active ? 0.72 : 0.36,
+                                    shadowRadius: item.active ? 18 : 9,
+                                    shadowOffset: { width: 0, height: 0 },
+                                    elevation: item.active ? 14 : 7,
+                                  },
+                                ]}
+                              >
+                                <View
+                                  style={[
+                                    styles.collageTileInner,
+                                    {
+                                      borderColor: item.active ? "#00E5CC" : item.theme.border,
+                                      backgroundColor: item.theme.footerBottom,
+                                    },
+                                  ]}
+                                >
+                                  <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
+                                    {item.id === ART_STYLE_NONE_ID ? (
+                                      <View style={styles.artNoneCollageMedia}>
+                                        <LinearGradient
+                                          colors={[
+                                            getArtStyleCardTheme(ART_STYLE_NONE_ID).glowSoft,
+                                            "rgba(0,0,0,0.08)",
+                                            "rgba(0,0,0,0.94)",
+                                          ]}
+                                          locations={[0, 0.28, 1]}
+                                          style={StyleSheet.absoluteFillObject}
+                                        />
+                                        <Ionicons name="color-wand-outline" size={24} color="#FFECC8" />
+                                        <Text style={styles.artNoneCollageText}>NO ART</Text>
+                                      </View>
+                                    ) : collageImageUri ? (
+                                      <Image
+                                        source={{ uri: collageImageUri }}
+                                        style={styles.collageTileImageContained}
+                                        contentFit="cover"
+                                        onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                                        onError={() => handleCollageTileError(item.id, collageImageUri)}
+                                      />
+                                    ) : (
+                                      <View style={styles.collageTileFallback}>
+                                        <Ionicons name="image-outline" size={22} color={item.theme.text} />
+                                      </View>
+                                    )}
+                                    <LinearGradient
+                                      colors={["rgba(0,229,204,0.08)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.28)"]}
+                                      locations={[0, 0.32, 1]}
+                                      style={styles.collageTileOverlay}
+                                    />
+                                    <View
+                                      style={[
+                                        styles.collageTileGlow,
+                                        item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
+                                        {
+                                          backgroundColor: "transparent",
+                                          borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
+                                          shadowColor: "#00E5CC",
+                                          shadowOpacity: item.active ? 0.80 : 0.40,
+                                          shadowRadius: item.active ? 14 : 7,
+                                          elevation: item.active ? 12 : 6,
+                                        },
+                                      ]}
+                                    />
+                                  </View>
+                                </View>
+                              </Pressable>
+                            );
+                          })}
+                        </Animated.View>
+                      ))}
+                    </View>
+                  </Animated.View>
 
                   <View style={styles.customChangesPanel}>
                     <View style={styles.customChangesHeader}>
@@ -2977,21 +3121,49 @@ export default function InstaMeScreen() {
         animationType="fade"
         transparent
         visible={Boolean(previewStyleId)}
-        onRequestClose={() => setPreviewStyleId(null)}
+        onRequestClose={closePreviewPanel}
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Pressable style={styles.modalCloseButton} onPress={() => setPreviewStyleId(null)}>
+            <Pressable style={styles.modalCloseButton} onPress={closePreviewPanel}>
               <Ionicons name="close" size={20} color="#FFF" />
             </Pressable>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
               <View style={styles.modalHero}>
-                <Image source={{ uri: previewPanelImageUri }} style={styles.modalHeroImage} contentFit="cover" />
-                <LinearGradient
-                  colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.22)", "rgba(0,0,0,0.86)"]}
-                  locations={[0, 0.36, 1]}
-                  style={styles.modalHeroOverlay}
-                />
+                {previewStyleId === INSTAME_OWN_STYLE_ID && !selectedOwnStyleId && !ownStylePhoto ? (
+                  <Pressable
+                    onPress={() => {
+                      void pickOwnStyleImage();
+                    }}
+                    style={({ pressed }) => [
+                      styles.modalOwnStyleUploadCard,
+                      pressed ? { opacity: 0.92 } : undefined,
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={["rgba(38,244,237,0.22)", "rgba(0,0,0,0.98)", "rgba(0,0,0,1)"]}
+                      locations={[0, 0.4, 1]}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                    <View style={styles.modalOwnStyleUploadPlus}>
+                      <Ionicons name="add" size={36} color="#26F4ED" />
+                    </View>
+                    <Text style={styles.modalOwnStyleUploadText}>UPLOAD YOUR OWN STYLE</Text>
+                  </Pressable>
+                ) : previewPanelImageUri ? (
+                  <>
+                    <Image source={{ uri: previewPanelImageUri }} style={styles.modalHeroImage} contentFit="cover" />
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.04)", "rgba(0,0,0,0.22)", "rgba(0,0,0,0.86)"]}
+                      locations={[0, 0.36, 1]}
+                      style={styles.modalHeroOverlay}
+                    />
+                  </>
+                ) : (
+                  <View style={styles.modalHeroFallback}>
+                    <Ionicons name="image-outline" size={24} color="rgba(255,255,255,0.42)" />
+                  </View>
+                )}
                 {isEnhancePreviewActive ? (
                   <View style={styles.modalHeroTextWrap}>
                     <Text style={styles.modalHeroEyebrow}>Base portrait</Text>
@@ -3830,6 +4002,23 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(7,45,44,0.88)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  artNoneCollageMedia: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "#0A0806",
+  },
+  artNoneCollageText: {
+    color: "#FFE8C4",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    textShadowColor: "rgba(255,226,175,0.45)",
+    textShadowRadius: 8,
+    textShadowOffset: { width: 0, height: 0 },
   },
   studioSection: {
     marginHorizontal: 16,
@@ -5649,11 +5838,54 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#090B10",
   },
+  modalHeroFallback: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#06090D",
+  },
   modalHeroImage: {
     ...StyleSheet.absoluteFillObject,
   },
   modalHeroOverlay: {
     ...StyleSheet.absoluteFillObject,
+  },
+  modalOwnStyleUploadCard: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    backgroundColor: "#000",
+    borderWidth: 1,
+    borderColor: "rgba(38,244,237,0.58)",
+  },
+  modalOwnStyleUploadPlus: {
+    width: 124,
+    height: 124,
+    borderRadius: 62,
+    borderWidth: 1,
+    borderColor: "rgba(38,244,237,0.78)",
+    backgroundColor: "rgba(4,28,31,0.72)",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#26F4ED",
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
+  modalOwnStyleUploadText: {
+    marginTop: 22,
+    color: "#26F4ED",
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: 1.4,
+    textAlign: "center",
+    textTransform: "uppercase",
+    textShadowColor: "rgba(38,244,237,0.66)",
+    textShadowRadius: 10,
+    textShadowOffset: { width: 0, height: 0 },
   },
   modalHeroTextWrap: {
     position: "absolute",

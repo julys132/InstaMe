@@ -611,6 +611,7 @@ class ApiClient {
       height?: number;
       fileSizeBytes?: number;
     };
+    ownStyleMode?: "reference_locked" | "creative_prompt";
   }) {
     return this.request<{
       ownStyle: InstaMeOwnStyle;
