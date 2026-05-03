@@ -4923,6 +4923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const appleResult = await verifyAppleReceiptData(receiptData);
+      const receiptEnvironment = normalizeStringValue(appleResult?.environment);
       const matchingTransactions = getAppleReceiptTransactions(appleResult)
         .filter((item: any) => item?.product_id === productId)
         .sort((a: any, b: any) => {
@@ -4951,7 +4952,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (grantResult.status === "granted") {
-          return res.json({ success: true, credits: grantResult.credits });
+          return res.json({
+            success: true,
+            credits: grantResult.credits,
+            receiptEnvironment: receiptEnvironment || undefined,
+          });
         }
 
         if (grantResult.existingOwnerId && grantResult.existingOwnerId !== userId) {
@@ -4967,6 +4972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         credits: existingUser?.credits ?? 0,
         message: "Apple transaction already processed",
+        receiptEnvironment: receiptEnvironment || undefined,
       });
     } catch (error) {
       console.error("Apple verify error:", error);

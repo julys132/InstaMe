@@ -1446,8 +1446,8 @@ export default function InstaMeScreen() {
   const ownCollageItems = useMemo(() => {
     const uploadCard = {
       id: OWN_UPLOAD_CARD_ID,
-      label: ownStylePhoto || selectedSavedOwnStyle ? "Edit own style" : "Upload own style",
-      imageCandidates: getImageCandidates(ownStylePhoto?.uri, selectedSavedOwnStyle?.previewUri, ownStyleHeroUri),
+      label: "UPLOAD YOUR OWN STYLE",
+      imageCandidates: [] as string[],
       theme: getStyleCardTheme(INSTAME_OWN_STYLE_ID),
       active: selectedStyleId === INSTAME_OWN_STYLE_ID && !selectedOwnStyleId,
       onPress: () => {
@@ -1460,9 +1460,7 @@ export default function InstaMeScreen() {
           void pickOwnStyleImage();
         });
       },
-      aspectRatio:
-        collageTileAspectRatios[OWN_UPLOAD_CARD_ID] ||
-        (ownStylePhoto?.width && ownStylePhoto?.height ? ownStylePhoto.width / ownStylePhoto.height : 0.72),
+      aspectRatio: collageTileAspectRatios[OWN_UPLOAD_CARD_ID] || 0.72,
     };
 
     const savedCards = savedOwnStyles.map((style) => {
@@ -2329,38 +2327,54 @@ export default function InstaMeScreen() {
                           ]}
                         >
                           <View style={[styles.collageTileMedia, { aspectRatio: item.aspectRatio, backgroundColor: item.theme.ambient }]}> 
-                            {collageImageUri ? (
-                              <Image
-                                source={{ uri: collageImageUri }}
-                                style={styles.collageTileImageContained}
-                                contentFit="cover"
-                                onLoad={(event) => handleCollageTileLoad(item.id, event)}
-                                onError={() => handleCollageTileError(item.id, collageImageUri)}
-                              />
-                            ) : (
-                              <View style={styles.collageTileFallback}>
-                                <Ionicons name="image-outline" size={22} color={item.theme.text} />
+                            {item.id === OWN_UPLOAD_CARD_ID ? (
+                              <View style={styles.ownUploadAnchorMedia}>
+                                <LinearGradient
+                                  colors={["rgba(38,244,237,0.22)", "rgba(0,0,0,0.98)", "rgba(0,0,0,1)"]}
+                                  locations={[0, 0.42, 1]}
+                                  style={styles.ownUploadAnchorBackdrop}
+                                />
+                                <Text style={styles.ownUploadAnchorText}>UPLOAD{"\n"}YOUR{"\n"}OWN{"\n"}STYLE</Text>
+                                <View style={styles.ownUploadAnchorPlus}>
+                                  <Ionicons name="add" size={14} color="#26F4ED" />
+                                </View>
                               </View>
+                            ) : (
+                              <>
+                                {collageImageUri ? (
+                                  <Image
+                                    source={{ uri: collageImageUri }}
+                                    style={styles.collageTileImageContained}
+                                    contentFit="cover"
+                                    onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                                    onError={() => handleCollageTileError(item.id, collageImageUri)}
+                                  />
+                                ) : (
+                                  <View style={styles.collageTileFallback}>
+                                    <Ionicons name="image-outline" size={22} color={item.theme.text} />
+                                  </View>
+                                )}
+                                <LinearGradient
+                                  colors={["rgba(0,229,204,0.08)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.28)"]}
+                                  locations={[0, 0.32, 1]}
+                                  style={styles.collageTileOverlay}
+                                />
+                                <View
+                                  style={[
+                                    styles.collageTileGlow,
+                                    item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
+                                    {
+                                      backgroundColor: "transparent",
+                                      borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
+                                      shadowColor: "#00E5CC",
+                                      shadowOpacity: item.active ? 0.80 : 0.40,
+                                      shadowRadius: item.active ? 14 : 7,
+                                      elevation: item.active ? 12 : 6,
+                                    },
+                                  ]}
+                                />
+                              </>
                             )}
-                            <LinearGradient
-                              colors={["rgba(0,229,204,0.08)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.28)"]}
-                              locations={[0, 0.32, 1]}
-                              style={styles.collageTileOverlay}
-                            />
-                            <View
-                              style={[
-                                styles.collageTileGlow,
-                                item.active ? styles.collageTileGlowActive : styles.collageTileGlowIdle,
-                                {
-                                  backgroundColor: "transparent",
-                                  borderColor: item.active ? "#00E5CC" : "rgba(0,229,204,0.20)",
-                                  shadowColor: "#00E5CC",
-                                  shadowOpacity: item.active ? 0.80 : 0.40,
-                                  shadowRadius: item.active ? 14 : 7,
-                                  elevation: item.active ? 12 : 6,
-                                },
-                              ]}
-                            />
                           </View>
                         </View>
                       </Pressable>
@@ -3776,6 +3790,46 @@ const styles = StyleSheet.create({
   },
   ownUploadInlineActionTextDisabled: {
     color: "rgba(223,255,255,0.58)",
+  },
+  ownUploadAnchorMedia: {
+    flex: 1,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(38,244,237,0.62)",
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000000",
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+  },
+  ownUploadAnchorBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  ownUploadAnchorText: {
+    color: "#26F4ED",
+    fontFamily: "Inter_700Bold",
+    fontSize: 23,
+    lineHeight: 24,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    textAlign: "center",
+    textShadowColor: "rgba(38,244,237,0.82)",
+    textShadowRadius: 12,
+    textShadowOffset: { width: 0, height: 0 },
+  },
+  ownUploadAnchorPlus: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(38,244,237,0.82)",
+    backgroundColor: "rgba(7,45,44,0.88)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   studioSection: {
     marginHorizontal: 16,

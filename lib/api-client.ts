@@ -489,7 +489,12 @@ class ApiClient {
   }
 
   async verifyApplePurchase(receiptData: string, productId: string) {
-    return this.request<{ success: boolean; credits: number; error?: string } & Partial<SubscriptionStateResponse>>(
+    return this.request<{
+      success: boolean;
+      credits: number;
+      error?: string;
+      receiptEnvironment?: string;
+    } & Partial<SubscriptionStateResponse>>(
       "/credits/apple-verify",
       {
         method: "POST",

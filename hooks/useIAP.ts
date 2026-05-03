@@ -10,6 +10,7 @@ type PurchaseResult = {
   credits?: number;
   cancelled?: boolean;
   error?: string;
+  receiptEnvironment?: string;
 };
 
 type SyncResult = {
@@ -132,6 +133,53 @@ function isSubscriptionProductId(productId: string, platform: NativePlatform): b
   return Object.values(getSubscriptionMapForPlatform(platform)).includes(productId);
 }
 
+function getPurchaseTransactionKey(purchase: any): string {
+  const candidates = [
+    purchase?.transactionId,
+    purchase?.transaction_id,
+    purchase?.purchaseToken,
+    purchase?.orderId,
+    purchase?.originalTransactionIdentifierIOS,
+    purchase?.transactionDate,
+    purchase?.purchaseTime,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) continue;
+    const normalized = String(candidate).trim();
+    if (normalized) return normalized;
+  }
+
+  const productId = String(purchase?.productId || purchase?.productIdentifier || "").trim();
+  return productId ? `product:${productId}` : "";
+}
+
+function shouldRetryVerificationError(error: any): boolean {
+  const status = Number(error?.status);
+  if (!Number.isFinite(status)) {
+    return true;
+  }
+  return status >= 500;
+}
+
+function formatVerificationErrorMessage(error: any, platform: NativePlatform): string {
+  const baseMessage = typeof error?.message === "string" && error.message.trim()
+    ? error.message.trim()
+    : "Could not verify purchase.";
+
+  if (platform === "ios") {
+    return `${baseMessage} If Apple already charged you, tap Restore Purchases once to sync credits.`;
+  }
+
+  return baseMessage;
+}
+
+function waitFor(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 async function getIosReceipt(
   RNIap: any,
   purchase?: any,
@@ -196,6 +244,8 @@ export function useIAP() {
   const purchaseUpdatedSubscription = useRef<EventSubscription | null>(null);
   const purchaseErrorSubscription = useRef<EventSubscription | null>(null);
   const pendingResolve = useRef<((result: PurchaseResult) => void) | null>(null);
+  const purchaseRequestInFlight = useRef(false);
+  const processingTransactionKeys = useRef<Set<string>>(new Set());
 
   const platform = (Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : "web") as
     | NativePlatform
@@ -213,7 +263,9 @@ export function useIAP() {
 
     try {
       await RNIap.clearTransactionIOS();
+      processingTransactionKeys.current.clear();
       pendingResolve.current = null;
+      purchaseRequestInFlight.current = false;
       setIsPurchasing(false);
       return true;
     } catch {
@@ -224,6 +276,7 @@ export function useIAP() {
   const resolvePending = useCallback((result: PurchaseResult) => {
     const resolver = pendingResolve.current;
     pendingResolve.current = null;
+    purchaseRequestInFlight.current = false;
     setIsPurchasing(false);
     resolver?.(result);
   }, []);
@@ -274,6 +327,17 @@ export function useIAP() {
         purchaseUpdatedSubscription.current = RNIap.purchaseUpdatedListener(async (purchase: any) => {
           const productId = String(purchase?.productId || purchase?.productIdentifier || "").trim();
           const isSubscription = productId ? isSubscriptionProductId(productId, platform) : false;
+          const transactionKey = getPurchaseTransactionKey(purchase);
+
+          if (transactionKey && processingTransactionKeys.current.has(transactionKey)) {
+            return;
+          }
+
+          if (transactionKey) {
+            processingTransactionKeys.current.add(transactionKey);
+          }
+
+          try {
           let receipt = "";
 
           if (platform === "ios") {
@@ -290,40 +354,67 @@ export function useIAP() {
           if (!receipt) {
             resolvePending({
               success: false,
-              error: "App Store receipt is unavailable right now. Try Restore Purchases once, then retry.",
+              error: "We could not confirm this purchase yet. Tap Restore Purchases once, then retry.",
+            });
+            return;
+          }
+
+          const verifyPurchase = async () => {
+            return platform === "ios"
+              ? apiClient.verifyApplePurchase(receipt, productId)
+              : apiClient.verifyGooglePurchase(receipt, productId);
+          };
+
+          let verificationResult: any;
+          try {
+            verificationResult = await verifyPurchase();
+          } catch (verificationError: any) {
+            if (platform === "ios" && shouldRetryVerificationError(verificationError)) {
+              try {
+                await waitFor(700);
+                verificationResult = await verifyPurchase();
+              } catch (retryError: any) {
+                resolvePending({
+                  success: false,
+                  error: formatVerificationErrorMessage(retryError, platform),
+                });
+                return;
+              }
+            } else {
+              resolvePending({
+                success: false,
+                error: formatVerificationErrorMessage(verificationError, platform),
+              });
+              return;
+            }
+          }
+
+          if (!verificationResult?.success) {
+            resolvePending({
+              success: false,
+              error: verificationResult?.error || "Purchase verification failed.",
             });
             return;
           }
 
           try {
-            const verificationResult =
-              platform === "ios"
-                ? await apiClient.verifyApplePurchase(receipt, productId)
-                : await apiClient.verifyGooglePurchase(receipt, productId);
+            await RNIap.finishTransaction({ purchase, isConsumable: !isSubscription });
+          } catch {
+            // Credits and subscription state are already granted server-side.
+          }
 
-            if (!verificationResult?.success) {
-              resolvePending({
-                success: false,
-                error: verificationResult?.error || "Purchase verification failed.",
-              });
-              return;
+          resolvePending({
+            success: true,
+            credits: typeof verificationResult.credits === "number" ? verificationResult.credits : undefined,
+            receiptEnvironment:
+              typeof verificationResult.receiptEnvironment === "string"
+                ? verificationResult.receiptEnvironment
+                : undefined,
+          });
+          } finally {
+            if (transactionKey) {
+              processingTransactionKeys.current.delete(transactionKey);
             }
-
-            try {
-              await RNIap.finishTransaction({ purchase, isConsumable: !isSubscription });
-            } catch {
-              // Credits and subscription state are already granted server-side.
-            }
-
-            resolvePending({
-              success: true,
-              credits: typeof verificationResult.credits === "number" ? verificationResult.credits : undefined,
-            });
-          } catch (verificationError: any) {
-            resolvePending({
-              success: false,
-              error: verificationError?.message || "Could not verify purchase.",
-            });
           }
         });
 
@@ -357,6 +448,7 @@ export function useIAP() {
 
     return () => {
       cancelled = true;
+      processingTransactionKeys.current.clear();
       purchaseUpdatedSubscription.current?.remove?.();
       purchaseErrorSubscription.current?.remove?.();
       try {
@@ -381,6 +473,10 @@ export function useIAP() {
         return { success: false, error: "Missing product ID." };
       }
 
+      if (purchaseRequestInFlight.current) {
+        return { success: false, error: "A purchase is already in progress." };
+      }
+
       if (isPurchasing) {
         const cleared = await clearStaleIosPurchase();
         if (cleared) {
@@ -393,6 +489,7 @@ export function useIAP() {
         return { success: false, error: "A purchase is already in progress." };
       }
 
+      purchaseRequestInFlight.current = true;
       setIsPurchasing(true);
 
       return new Promise<PurchaseResult>((resolve) => {
@@ -405,6 +502,7 @@ export function useIAP() {
               apple: {
                 sku: productId,
                 andDangerouslyFinishTransactionAutomatically: false,
+                andDangerouslyFinishTransactionAutomaticallyIOS: false,
                 appAccountToken: platform === "ios" ? user?.id || undefined : undefined,
               },
               google:
@@ -501,7 +599,7 @@ export function useIAP() {
           receipt = String(purchase?.transactionReceipt || "").trim();
           if (!receipt) {
             if (!cachedIosReceipt) {
-              cachedIosReceipt = await getIosReceipt(RNIap, purchase, { allowRefresh: false });
+              cachedIosReceipt = await getIosReceipt(RNIap, purchase, { allowRefresh: true });
             }
             receipt = cachedIosReceipt;
           }

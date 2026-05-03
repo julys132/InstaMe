@@ -216,6 +216,7 @@ export default function CreditsScreen() {
     () => new Map(iap.subscriptions.map((product) => [product.productId, product])),
     [iap.subscriptions],
   );
+  const isIosPackCatalogReady = nativePlatform !== "ios" || iap.products.length > 0;
   const isAppleManagedSubscription = nativePlatform === "ios" && subscriptionProvider === "apple";
   const manageSubscriptionLabel = isAppleManagedSubscription ? "Manage on Apple" : "Manage Billing";
   const cancelSubscriptionLabel = isAppleManagedSubscription ? "Cancel on Apple" : "Cancel Subscription";
@@ -292,6 +293,10 @@ export default function CreditsScreen() {
   }
 
   async function handlePurchase(pkg: CreditPackage) {
+    if (purchaseLoading || iap.isPurchasing) {
+      return;
+    }
+
     setPurchaseLoading(pkg.id);
     try {
       if (Platform.OS === "web" && !WEB_STRIPE_CHECKOUT_ENABLED) {
@@ -315,13 +320,18 @@ export default function CreditsScreen() {
 
           await refreshCredits();
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert("Success", `${pkg.credits} credits added to your account!`);
+          const receiptEnvironment = String(iapResult.receiptEnvironment || "").toLowerCase();
+          const sandboxNotice =
+            nativePlatform === "ios" && receiptEnvironment === "sandbox"
+              ? " Purchase was verified in Apple Sandbox, so no real card charge is made (normal on TestFlight)."
+              : "";
+          Alert.alert("Success", `${pkg.credits} credits added to your account!${sandboxNotice}`);
           return;
         }
 
         throw new Error(
           nativePlatform === "ios"
-            ? "Apple credit packs are loading — tap Retry to check again, or use Restore Purchases once if this persists."
+            ? "Credit packs are still loading from the App Store. Tap Retry once, then try again."
             : "Google Play billing is not available on this build yet.",
         );
       }
@@ -625,7 +635,12 @@ export default function CreditsScreen() {
                 priceLabel={priceLabel}
                 priceSubLabel={priceSubLabel}
                 onPurchase={() => handlePurchase(pkg)}
-                loading={purchaseLoading === pkg.id || iap.isPurchasing || (Platform.OS === "web" && !WEB_STRIPE_CHECKOUT_ENABLED)}
+                loading={
+                  purchaseLoading === pkg.id ||
+                  iap.isPurchasing ||
+                  !isIosPackCatalogReady ||
+                  (Platform.OS === "web" && !WEB_STRIPE_CHECKOUT_ENABLED)
+                }
               />
                 );
               })()
@@ -689,13 +704,6 @@ export default function CreditsScreen() {
               </>
             )}
           </View>
-          <Text style={styles.paymentNote}>
-            {nativePlatform === "ios"
-              ? "Credit packs and subscriptions use Apple In-App Purchase on iPhone. Users can manage or cancel their subscription anytime from Apple subscription settings."
-              : nativePlatform
-                ? "Credit packs use Apple or Google in-app purchase on mobile. Native subscriptions are currently enabled on iPhone, and top-up packs can still be bought separately."
-                : "Secure Stripe checkout for web credit packs and subscriptions. One-time top-ups can be bought even with an active plan."}
-          </Text>
           {Platform.OS === "web" && !WEB_STRIPE_CHECKOUT_ENABLED ? (
             <Text style={styles.paymentWarning}>
               Web checkout is disabled for now while Stripe is being configured. iPhone payments remain available through Apple IAP.
@@ -770,6 +778,13 @@ export default function CreditsScreen() {
               )}
             </Pressable>
           )}
+          {nativePlatform && iap.isAvailable ? (
+            <Text style={styles.restoreHelperText}>
+              {nativePlatform === "ios"
+                ? "Restore Purchases checks your Apple account and adds any credits you already paid for but do not see yet."
+                : "Restore Purchases checks your store account and syncs purchases that are already paid but missing here."}
+            </Text>
+          ) : null}
         </Animated.View>
       </ScrollView>
     </View>
@@ -1220,13 +1235,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.white,
   },
-  paymentNote: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-    marginTop: 10,
-  },
   manageBillingHint: {
     marginTop: 12,
     fontFamily: "Inter_500Medium",
@@ -1263,6 +1271,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     color: Colors.white,
+  },
+  restoreHelperText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
   manageBillingButton: {
     alignSelf: "flex-start",
