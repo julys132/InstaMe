@@ -27,6 +27,7 @@ export type InstaMeUploadedImageRecord = {
   analysisMode?: "reference_locked" | "creative_prompt";
   analysisVersion?: number;
   imageHash?: string;
+  firstUseSurchargeCharged?: boolean;
   createdAt: string;
 };
 

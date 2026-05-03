@@ -1507,11 +1507,17 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
           : undefined;
       const analysisVersion = Number(candidate.analysisVersion);
       const imageHash = normalizeStringValue(candidate.imageHash);
+      const firstUseSurchargeChargedRaw = candidate.firstUseSurchargeCharged;
       const name = normalizeStringValue(candidate.name) || (kind === "own_style" ? "Own Style" : "Portrait");
       const width = Number(candidate.width);
       const height = Number(candidate.height);
       const fileSizeBytes = Number(candidate.fileSizeBytes);
       const createdAt = normalizeStringValue(candidate.createdAt);
+
+      const firstUseSurchargeCharged =
+        kind === "own_style"
+          ? (typeof firstUseSurchargeChargedRaw === "boolean" ? firstUseSurchargeChargedRaw : true)
+          : undefined;
 
       if (!id || !base64 || !previewBase64) return null;
       if (kind === "own_style" && !analyzedPrompt) return null;
@@ -1536,6 +1542,7 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
         analysisVersion:
           Number.isInteger(analysisVersion) && analysisVersion > 0 ? analysisVersion : undefined,
         imageHash: imageHash || undefined,
+        firstUseSurchargeCharged,
         createdAt: createdAt || new Date().toISOString(),
       };
     })
@@ -1571,6 +1578,7 @@ function toInstaMeOwnStyleSummary(image: InstaMeUploadedImageRecord) {
     previewUri: `data:${image.mimeType};base64,${image.previewBase64}`,
     promptPreview,
     imageHash: normalizeStringValue(image.imageHash) || undefined,
+    firstUseSurchargePending: image.firstUseSurchargeCharged === false,
   };
 }
 
@@ -1647,6 +1655,7 @@ function buildSavedOwnStyleRecord(options: {
     analysisMode: options.ownStyleMode,
     analysisVersion: OWN_STYLE_ANALYSIS_VERSIONS[options.ownStyleMode],
     imageHash: computeImageHash(options.stylePayload?.previewBase64 || ""),
+    firstUseSurchargeCharged: false,
     createdAt: new Date().toISOString(),
   };
 }
@@ -1677,6 +1686,10 @@ function upsertOwnStyleRecord(options: {
         analysisMode: options.savedOwnStyle.analysisMode,
         analysisVersion: options.savedOwnStyle.analysisVersion,
         imageHash: options.savedOwnStyle.imageHash,
+        firstUseSurchargeCharged:
+          typeof duplicate.firstUseSurchargeCharged === "boolean"
+            ? duplicate.firstUseSurchargeCharged
+            : options.savedOwnStyle.firstUseSurchargeCharged,
         createdAt: new Date().toISOString(),
       }
     : options.savedOwnStyle;
@@ -1690,6 +1703,38 @@ function upsertOwnStyleRecord(options: {
   return {
     savedOwnStyle: nextOwnStyle,
     nextImages: [...nextOwnStyles, ...nonOwnStyleImages].slice(0, MAX_INSTAME_LIBRARY_IMAGES_TOTAL),
+  };
+}
+
+function markOwnStyleFirstUseSurchargeCharged(
+  images: InstaMeUploadedImageRecord[],
+  styleId: string,
+): { images: InstaMeUploadedImageRecord[]; updated: InstaMeUploadedImageRecord | null } {
+  let updatedRecord: InstaMeUploadedImageRecord | null = null;
+  let changed = false;
+
+  const nextImages = images.map((entry) => {
+    if (entry.kind !== "own_style" || entry.id !== styleId) {
+      return entry;
+    }
+
+    if (entry.firstUseSurchargeCharged === true) {
+      updatedRecord = entry;
+      return entry;
+    }
+
+    changed = true;
+    const nextEntry = {
+      ...entry,
+      firstUseSurchargeCharged: true,
+    };
+    updatedRecord = nextEntry;
+    return nextEntry;
+  });
+
+  return {
+    images: changed ? nextImages : images,
+    updated: updatedRecord,
   };
 }
 
@@ -5639,8 +5684,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         generationTier.credits ||
         getInstaMeCreditsForQualityTier(transformQualityTier) ||
         (Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 2);
+      const selectedSavedOwnStyleNeedsFirstUseSurcharge = Boolean(
+        selectedSavedOwnStyle && selectedSavedOwnStyle.firstUseSurchargeCharged === false,
+      );
       const ownStyleFirstUseSurcharge =
-        isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
+        isOwnStyleRequested && (!requestedSavedOwnStyleId || selectedSavedOwnStyleNeedsFirstUseSurcharge)
+          ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS
+          : 0;
       transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
 
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
@@ -5664,6 +5714,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let nextUsageMap = styleUsageMap;
       let nextStoredImages = existingImages;
       let refreshedSavedOwnStyle = selectedSavedOwnStyle;
+      let ownStyleIdToMarkFirstUseCharged: string | null =
+        selectedSavedOwnStyleNeedsFirstUseSurcharge && selectedSavedOwnStyle
+          ? selectedSavedOwnStyle.id
+          : null;
       let savedOwnStyleSummary: ReturnType<typeof toInstaMeOwnStyleSummary> | null = refreshedSavedOwnStyle
         ? toInstaMeOwnStyleSummary(refreshedSavedOwnStyle)
         : null;
@@ -5776,6 +5830,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           nextStoredImages = saveResult.nextImages;
           savedOwnStyleSummary = toInstaMeOwnStyleSummary(saveResult.savedOwnStyle);
+          if (ownStyleFirstUseSurcharge > 0) {
+            ownStyleIdToMarkFirstUseCharged = saveResult.savedOwnStyle.id;
+          }
+        }
+      }
+
+      if (ownStyleIdToMarkFirstUseCharged) {
+        const marked = markOwnStyleFirstUseSurchargeCharged(nextStoredImages, ownStyleIdToMarkFirstUseCharged);
+        nextStoredImages = marked.images;
+        if (marked.updated) {
+          savedOwnStyleSummary = toInstaMeOwnStyleSummary(marked.updated);
+          if (refreshedSavedOwnStyle && refreshedSavedOwnStyle.id === marked.updated.id) {
+            refreshedSavedOwnStyle = marked.updated;
+          }
         }
       }
 

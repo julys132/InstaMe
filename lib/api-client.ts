@@ -34,6 +34,7 @@ export type InstaMeOwnStyle = {
   previewUri: string;
   promptPreview: string;
   imageHash?: string;
+  firstUseSurchargePending?: boolean;
 };
 
 export type InstaMeUploadedImageAsset = InstaMeUploadedImage & {

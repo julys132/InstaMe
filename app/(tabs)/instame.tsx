@@ -860,7 +860,11 @@ export default function InstaMeScreen() {
     [activeGenerationQualityTier],
   );
 
-  const isFirstOwnStyleGeneration = isOwnStyleSelected && !selectedOwnStyleId;
+  const selectedOwnStyleNeedsFirstUseSurcharge = Boolean(
+    selectedSavedOwnStyle && selectedSavedOwnStyle.firstUseSurchargePending,
+  );
+  const isFirstOwnStyleGeneration =
+    isOwnStyleSelected && (Boolean(ownStylePhoto) || selectedOwnStyleNeedsFirstUseSurcharge);
   const transformBaseCost = activeGenerationTier?.credits ?? getInstaMeCreditsForQualityTier(activeGenerationQualityTier);
   const transformCost =
     transformBaseCost +
@@ -1405,6 +1409,7 @@ export default function InstaMeScreen() {
         previewUri: buildDataUri(nextOwnStylePhoto.previewBase64 || nextOwnStylePhoto.base64, nextOwnStylePhoto.mimeType),
         promptPreview: "Saving your style...",
         imageHash: preparedHash,
+        firstUseSurchargePending: true,
       };
 
       setSavedOwnStyles((current) => [optimisticStyle, ...current.filter((style) => style.id !== optimisticId)]);
