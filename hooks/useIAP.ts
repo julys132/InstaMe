@@ -154,6 +154,14 @@ function getPurchaseTransactionKey(purchase: any): string {
   return productId ? `product:${productId}` : "";
 }
 
+function normalizeReceiptEnvironment(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== "string") return undefined;
+  const lower = raw.trim().toLowerCase();
+  if (lower === "sandbox") return "Sandbox";
+  if (lower === "production") return "Production";
+  return undefined;
+}
+
 function shouldRetryVerificationError(error: any): boolean {
   const status = Number(error?.status);
   if (!Number.isFinite(status)) {
@@ -359,9 +367,17 @@ export function useIAP() {
             return;
           }
 
+          // Some versions of react-native-iap expose an `environment` field on the
+          // purchase object (e.g. "Sandbox" for TestFlight). Pass it to the server
+          // so it can skip the production endpoint round-trip and route directly.
+          const purchaseReceiptEnv: string | undefined =
+            platform === "ios"
+              ? normalizeReceiptEnvironment(purchase?.environment || purchase?.receiptEnvironment)
+              : undefined;
+
           const verifyPurchase = async () => {
             return platform === "ios"
-              ? apiClient.verifyApplePurchase(receipt, productId)
+              ? apiClient.verifyApplePurchase(receipt, productId, purchaseReceiptEnv)
               : apiClient.verifyGooglePurchase(receipt, productId);
           };
 

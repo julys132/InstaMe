@@ -489,7 +489,7 @@ class ApiClient {
     );
   }
 
-  async verifyApplePurchase(receiptData: string, productId: string) {
+  async verifyApplePurchase(receiptData: string, productId: string, receiptEnvironment?: string) {
     return this.request<{
       success: boolean;
       credits: number;
@@ -499,7 +499,7 @@ class ApiClient {
       "/credits/apple-verify",
       {
         method: "POST",
-        body: JSON.stringify({ receiptData, productId }),
+        body: JSON.stringify({ receiptData, productId, receiptEnvironment }),
       },
       true,
     );

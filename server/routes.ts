@@ -3683,29 +3683,59 @@ async function grantVerifiedAppleSubscriptionCredits(params: {
   });
 }
 
-async function verifyAppleReceiptData(receiptData: string) {
+async function verifyAppleReceiptData(receiptData: string, receiptEnvironmentHint?: string) {
+  const sharedSecret = process.env.APPLE_SHARED_SECRET || "";
+
+  if (!sharedSecret) {
+    console.warn("[apple-iap] APPLE_SHARED_SECRET is not set — receipt verification will fail with status 21003/21004.");
+  }
+
   const verifyReceipt = async (url: string) => {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         "receipt-data": receiptData,
-        password: process.env.APPLE_SHARED_SECRET || "",
+        password: sharedSecret,
         "exclude-old-transactions": false,
       }),
     });
     return response.json();
   };
 
-  let appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
-  if (appleResult?.status === 21007) {
+  // If we already know this is a Sandbox receipt (e.g. TestFlight), skip the
+  // production round-trip and go directly to the sandbox endpoint.
+  const isSandboxHint =
+    typeof receiptEnvironmentHint === "string" &&
+    receiptEnvironmentHint.toLowerCase() === "sandbox";
+
+  let appleResult: any;
+
+  if (isSandboxHint) {
     appleResult = await verifyReceipt("https://sandbox.itunes.apple.com/verifyReceipt");
-  } else if (appleResult?.status === 21008) {
+    // If Apple says use production, honour it.
+    if (appleResult?.status === 21008) {
+      appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+    }
+  } else {
     appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+    if (appleResult?.status === 21007) {
+      appleResult = await verifyReceipt("https://sandbox.itunes.apple.com/verifyReceipt");
+    } else if (appleResult?.status === 21008) {
+      appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+    }
   }
 
   if (appleResult?.status !== 0) {
-    throw new Error("Apple receipt verification failed");
+    const appleStatus = appleResult?.status ?? "unknown";
+    // Status guide: 21003=not authenticated, 21004=wrong shared secret,
+    // 21007=use sandbox, 21010=transaction not found, 21100–21199=internal error.
+    console.error(`[apple-iap] Receipt verification failed: Apple status ${appleStatus}`, {
+      productionStatus: isSandboxHint ? undefined : appleStatus,
+      isSandboxHint,
+      sharedSecretSet: Boolean(sharedSecret),
+    });
+    throw new Error(`Apple receipt verification failed (status: ${appleStatus})`);
   }
 
   const expectedBundleId = normalizeStringValue(
@@ -3860,8 +3890,9 @@ async function syncAppleSubscriptionReceiptState(params: {
   userId: string;
   receiptData: string;
   productId?: string;
+  receiptEnvironmentHint?: string;
 }) {
-  const appleResult = await verifyAppleReceiptData(params.receiptData);
+  const appleResult = await verifyAppleReceiptData(params.receiptData, params.receiptEnvironmentHint);
   const knownSubscriptionProductIds = new Set(Object.keys(APPLE_IAP_SUBSCRIPTION_PRODUCTS));
   const receiptTransactions = getAppleReceiptTransactions(appleResult)
     .filter((transaction: any) => knownSubscriptionProductIds.has(normalizeStringValue(transaction?.product_id)))
@@ -4942,6 +4973,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ success: false, error: "Missing receipt data or product ID" });
       }
 
+      const receiptEnvironmentHint = normalizeStringValue(req.body?.receiptEnvironment);
+
       const expectedCredits = APPLE_IAP_PRODUCT_CREDITS[productId];
       const subscriptionPlanId = APPLE_IAP_SUBSCRIPTION_PRODUCTS[productId];
       const subscriptionPlan = subscriptionPlanId ? getSubscriptionPlanById(subscriptionPlanId) : undefined;
@@ -4953,6 +4986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const syncResult = await syncAppleSubscriptionReceiptState({
           userId,
           receiptData,
+          receiptEnvironmentHint,
           productId,
         });
 
@@ -4967,7 +5001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const appleResult = await verifyAppleReceiptData(receiptData);
+      const appleResult = await verifyAppleReceiptData(receiptData, receiptEnvironmentHint);
       const receiptEnvironment = normalizeStringValue(appleResult?.environment);
       const matchingTransactions = getAppleReceiptTransactions(appleResult)
         .filter((item: any) => item?.product_id === productId)
@@ -5028,6 +5062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/credits/apple-sync", authMiddleware, async (req, res) => {
     try {
       const receiptData = normalizeStringValue(req.body?.receiptData);
+      const receiptEnvironmentHint = normalizeStringValue(req.body?.receiptEnvironment);
       if (!receiptData) {
         return res.status(400).json({ success: false, error: "Missing receipt data" });
       }
@@ -5035,6 +5070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const syncResult = await syncAppleSubscriptionReceiptState({
         userId: req.user!.id,
         receiptData,
+        receiptEnvironmentHint,
       });
 
       if (syncResult.status === "claimed_by_other_user") {
