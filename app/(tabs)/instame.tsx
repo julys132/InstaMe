@@ -2711,21 +2711,6 @@ export default function InstaMeScreen() {
                 </Pressable>
 
                 <View style={styles.studioPanel}>
-                  <View style={styles.subTabBar}>
-                    {OWN_STYLE_MODE_OPTIONS.map((option) => {
-                      const active = ownStyleMode === option.value;
-                      return (
-                        <Pressable
-                          key={option.value}
-                          onPress={() => setOwnStyleMode(option.value)}
-                          style={[styles.subTab, active && styles.subTabActive]}
-                        >
-                          <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{option.label}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-
                   <Text style={styles.processingHintText}>
                     First use: {transformCost} cr. Saved styles: {activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST} cr.
                   </Text>
@@ -2796,6 +2781,20 @@ export default function InstaMeScreen() {
                     <View style={styles.customChangesHeader}>
                       <Text style={styles.customChangesTitle}>Retouch Template</Text>
                       <Text style={styles.customChangesSubtitle}>Add clothing, expression, lighting or color notes for this own style.</Text>
+                    </View>
+                    <View style={styles.subTabBar}>
+                      {OWN_STYLE_MODE_OPTIONS.map((option) => {
+                        const active = ownStyleMode === option.value;
+                        return (
+                          <Pressable
+                            key={option.value}
+                            onPress={() => setOwnStyleMode(option.value)}
+                            style={[styles.subTab, active && styles.subTabActive]}
+                          >
+                            <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{option.label}</Text>
+                          </Pressable>
+                        );
+                      })}
                     </View>
                     <TextInput
                       value={customPrompt}
