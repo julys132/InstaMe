@@ -2759,9 +2759,9 @@ async function generateOwnStyleImage(options: {
   const parts: GeminiPart[] = options.ownStyleMode === "reference_locked"
     ? [
         { text: prompt },
-        { text: "User base photo to transform. This person must remain the final subject:" },
+        { text: "User face source. Extract only the face and head from this image — it will replace the face in the style reference image below:" },
         ...toGeminiInlineImageParts(options.uploadedImages),
-        { text: "Style reference image. Use it for styling direction such as pose, lighting, and mood, but never copy its identity into the output:" },
+        { text: "Style reference image — OUTPUT BASE. Keep absolutely everything from this image (clothing, body, pose, lighting, framing, background) exactly as-is. Only replace the face and head with the user's face from the photo above:" },
         ...toGeminiInlineImageParts([options.styleReferenceImage]),
       ]
     : [

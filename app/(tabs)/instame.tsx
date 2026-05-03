@@ -236,12 +236,12 @@ const OWN_STYLE_MODE_OPTIONS: {
 }[] = [
   {
     value: "reference_locked",
-    label: "Signature Match",
+    label: "Very High Similarity",
     subtitle: "Closest match to your reference look",
   },
   {
     value: "creative_prompt",
-    label: "Creative Freedom",
+    label: "More Creative",
     subtitle: "More variety from the same style direction",
   },
 ];
