@@ -1256,6 +1256,33 @@ export default function InstaMeScreen() {
     [photo, loading, ownStyleNeedsActivation, credits, transformCost, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId],
   );
 
+  const generateBlockedReason = useMemo(() => {
+    if (loading) {
+      return null;
+    }
+
+    if (!photo) {
+      return "Select one portrait first (Uploaded or Enhanced).";
+    }
+
+    if (ownStyleNeedsActivation) {
+      return "Tap 'Use this style' to activate Own Style before Restyle.";
+    }
+
+    if (isOwnStyleSelected && !ownStylePhoto && !selectedOwnStyleId) {
+      return "Upload or select one Own Style image first.";
+    }
+
+    if (credits < transformCost) {
+      const missingCredits = Math.max(0, transformCost - credits);
+      return missingCredits > 0
+        ? `Not enough credits: ${credits}/${transformCost}. Need ${missingCredits} more.`
+        : `Not enough credits: ${credits}/${transformCost}.`;
+    }
+
+    return null;
+  }, [loading, photo, ownStyleNeedsActivation, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId, credits, transformCost]);
+
   const handleCollageTileLoad = useCallback((styleId: string, event: any) => {
     const width = event?.source?.width;
     const height = event?.source?.height;
@@ -2813,6 +2840,7 @@ export default function InstaMeScreen() {
                     </View>
                   </Pressable>
                   <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
+                  {!canGenerate && generateBlockedReason ? <Text style={styles.generateBlockedHintText}>{generateBlockedReason}</Text> : null}
                   {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
                 </View>
               </>
@@ -2984,6 +3012,7 @@ export default function InstaMeScreen() {
                     </View>
                   </Pressable>
                   <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
+                  {!canGenerate && generateBlockedReason ? <Text style={styles.generateBlockedHintText}>{generateBlockedReason}</Text> : null}
                   {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
                 </View>
               </>
@@ -3443,6 +3472,7 @@ export default function InstaMeScreen() {
                     </Pressable>
                     <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
                     <Text style={styles.generateActionHint}>Generates a new image</Text>
+                    {!canGenerate && generateBlockedReason ? <Text style={styles.generateBlockedHintText}>{generateBlockedReason}</Text> : null}
                     {loading ? <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text> : null}
                   </View>
 
@@ -5577,6 +5607,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     marginTop: -2,
+  },
+  generateBlockedHintText: {
+    textAlign: "center",
+    color: "#FF9CB2",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
   },
   costText: {
     marginLeft: 4,
