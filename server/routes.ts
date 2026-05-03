@@ -3724,7 +3724,9 @@ async function verifyAppleReceiptData(receiptData: string, receiptEnvironmentHin
     }
   } else {
     appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
-      if (appleResult?.status === 21007 || appleResult?.status === 21004 || appleResult?.status === 21002) {
+    if (appleResult?.status === 21007 || appleResult?.status === 21004 || appleResult?.status === 21002) {
+      appleResult = await verifyReceipt("https://sandbox.itunes.apple.com/verifyReceipt");
+    } else if (appleResult?.status === 21008) {
       appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
     }
   }
