@@ -1548,7 +1548,10 @@ async function verifyAppleServerSignedPayload(signedPayload) {
   const verifier = (0, import_node_crypto2.createVerify)("SHA256");
   verifier.update(parsed.signedPart);
   verifier.end();
-  if (!verifier.verify(certificateChain[0].publicKey, parsed.signature)) {
+  if (!verifier.verify(
+    { key: certificateChain[0].publicKey, dsaEncoding: "ieee-p1363" },
+    parsed.signature
+  )) {
     throw new Error("Apple notification signature is invalid");
   }
   return parsed.payload;
@@ -2325,11 +2328,13 @@ function normalizeStoredInstaMeUploadedImages(input) {
     const analysisMode = candidate.analysisMode === "creative_prompt" || candidate.analysisMode === "reference_locked" ? candidate.analysisMode : void 0;
     const analysisVersion = Number(candidate.analysisVersion);
     const imageHash = normalizeStringValue(candidate.imageHash);
+    const firstUseSurchargeChargedRaw = candidate.firstUseSurchargeCharged;
     const name = normalizeStringValue(candidate.name) || (kind === "own_style" ? "Own Style" : "Portrait");
     const width = Number(candidate.width);
     const height = Number(candidate.height);
     const fileSizeBytes = Number(candidate.fileSizeBytes);
     const createdAt = normalizeStringValue(candidate.createdAt);
+    const firstUseSurchargeCharged = kind === "own_style" ? typeof firstUseSurchargeChargedRaw === "boolean" ? firstUseSurchargeChargedRaw : true : void 0;
     if (!id || !base64 || !previewBase64) return null;
     if (kind === "own_style" && !analyzedPrompt) return null;
     if (!Number.isFinite(width) || width <= 0) return null;
@@ -2348,6 +2353,7 @@ function normalizeStoredInstaMeUploadedImages(input) {
       analysisMode,
       analysisVersion: Number.isInteger(analysisVersion) && analysisVersion > 0 ? analysisVersion : void 0,
       imageHash: imageHash || void 0,
+      firstUseSurchargeCharged,
       createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
     };
   }).filter((entry) => Boolean(entry)).slice(0, MAX_INSTAME_LIBRARY_IMAGES_TOTAL);
@@ -2374,7 +2380,8 @@ function toInstaMeOwnStyleSummary(image) {
     createdAt: image.createdAt,
     previewUri: `data:${image.mimeType};base64,${image.previewBase64}`,
     promptPreview,
-    imageHash: normalizeStringValue(image.imageHash) || void 0
+    imageHash: normalizeStringValue(image.imageHash) || void 0,
+    firstUseSurchargePending: image.firstUseSurchargeCharged === false
   };
 }
 function computeImageHash(base64) {
@@ -2419,6 +2426,7 @@ function buildSavedOwnStyleRecord(options) {
     analysisMode: options.ownStyleMode,
     analysisVersion: OWN_STYLE_ANALYSIS_VERSIONS[options.ownStyleMode],
     imageHash: computeImageHash(options.stylePayload?.previewBase64 || ""),
+    firstUseSurchargeCharged: false,
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
 }
@@ -2439,6 +2447,7 @@ function upsertOwnStyleRecord(options) {
     analysisMode: options.savedOwnStyle.analysisMode,
     analysisVersion: options.savedOwnStyle.analysisVersion,
     imageHash: options.savedOwnStyle.imageHash,
+    firstUseSurchargeCharged: typeof duplicate.firstUseSurchargeCharged === "boolean" ? duplicate.firstUseSurchargeCharged : options.savedOwnStyle.firstUseSurchargeCharged,
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   } : options.savedOwnStyle;
   const nonOwnStyleImages = options.existingImages.filter((entry) => entry.kind !== "own_style");
@@ -2449,6 +2458,30 @@ function upsertOwnStyleRecord(options) {
   return {
     savedOwnStyle: nextOwnStyle,
     nextImages: [...nextOwnStyles, ...nonOwnStyleImages].slice(0, MAX_INSTAME_LIBRARY_IMAGES_TOTAL)
+  };
+}
+function markOwnStyleFirstUseSurchargeCharged(images, styleId) {
+  let updatedRecord = null;
+  let changed = false;
+  const nextImages = images.map((entry) => {
+    if (entry.kind !== "own_style" || entry.id !== styleId) {
+      return entry;
+    }
+    if (entry.firstUseSurchargeCharged === true) {
+      updatedRecord = entry;
+      return entry;
+    }
+    changed = true;
+    const nextEntry = {
+      ...entry,
+      firstUseSurchargeCharged: true
+    };
+    updatedRecord = nextEntry;
+    return nextEntry;
+  });
+  return {
+    images: changed ? nextImages : images,
+    updated: updatedRecord
   };
 }
 function sanitizeStylingResponse(raw) {
@@ -3138,9 +3171,9 @@ async function generateOwnStyleImage(options) {
   });
   const parts = options.ownStyleMode === "reference_locked" ? [
     { text: prompt },
-    { text: "User base photo to transform. This person must remain the final subject:" },
+    { text: "User face source. Extract only the face and head from this image \u2014 it will replace the face in the style reference image below:" },
     ...toGeminiInlineImageParts(options.uploadedImages),
-    { text: "Style reference image. Use it for styling direction such as pose, lighting, and mood, but never copy its identity into the output:" },
+    { text: "Style reference image \u2014 OUTPUT BASE. Keep absolutely everything from this image (clothing, body, pose, lighting, framing, background) exactly as-is. Only replace the face and head with the user's face from the photo above:" },
     ...toGeminiInlineImageParts([options.styleReferenceImage])
   ] : [
     { text: prompt },
@@ -3797,27 +3830,46 @@ async function grantVerifiedAppleSubscriptionCredits(params) {
     };
   });
 }
-async function verifyAppleReceiptData(receiptData) {
+async function verifyAppleReceiptData(receiptData, receiptEnvironmentHint) {
+  const sharedSecret = process.env.APPLE_SHARED_SECRET || "";
+  if (!sharedSecret) {
+    console.warn("[apple-iap] APPLE_SHARED_SECRET is not set \u2014 receipt verification will fail with status 21003/21004.");
+  }
   const verifyReceipt = async (url) => {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         "receipt-data": receiptData,
-        password: process.env.APPLE_SHARED_SECRET || "",
+        password: sharedSecret,
         "exclude-old-transactions": false
       })
     });
     return response.json();
   };
-  let appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
-  if (appleResult?.status === 21007) {
+  const isSandboxHint = typeof receiptEnvironmentHint === "string" && receiptEnvironmentHint.toLowerCase() === "sandbox";
+  let appleResult;
+  if (isSandboxHint) {
     appleResult = await verifyReceipt("https://sandbox.itunes.apple.com/verifyReceipt");
-  } else if (appleResult?.status === 21008) {
+    if (appleResult?.status === 21008) {
+      appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+    }
+  } else {
     appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+    if (appleResult?.status === 21007) {
+      appleResult = await verifyReceipt("https://sandbox.itunes.apple.com/verifyReceipt");
+    } else if (appleResult?.status === 21008) {
+      appleResult = await verifyReceipt("https://buy.itunes.apple.com/verifyReceipt");
+    }
   }
   if (appleResult?.status !== 0) {
-    throw new Error("Apple receipt verification failed");
+    const appleStatus = appleResult?.status ?? "unknown";
+    console.error(`[apple-iap] Receipt verification failed: Apple status ${appleStatus}`, {
+      productionStatus: isSandboxHint ? void 0 : appleStatus,
+      isSandboxHint,
+      sharedSecretSet: Boolean(sharedSecret)
+    });
+    throw new Error(`Apple receipt verification failed (status: ${appleStatus})`);
   }
   const expectedBundleId = normalizeStringValue(
     process.env.APPLE_BUNDLE_ID || process.env.EXPO_PUBLIC_APPLE_BUNDLE_ID
@@ -3917,7 +3969,7 @@ async function findUserForAppleNotification(params) {
   return userByOriginalTransaction || null;
 }
 async function syncAppleSubscriptionReceiptState(params) {
-  const appleResult = await verifyAppleReceiptData(params.receiptData);
+  const appleResult = await verifyAppleReceiptData(params.receiptData, params.receiptEnvironmentHint);
   const knownSubscriptionProductIds = new Set(Object.keys(APPLE_IAP_SUBSCRIPTION_PRODUCTS));
   const receiptTransactions = getAppleReceiptTransactions(appleResult).filter((transaction) => knownSubscriptionProductIds.has(normalizeStringValue(transaction?.product_id))).filter((transaction) => {
     if (!params.productId) return true;
@@ -4780,6 +4832,7 @@ async function registerRoutes(app2) {
       if (!receiptData || !productId) {
         return res.status(400).json({ success: false, error: "Missing receipt data or product ID" });
       }
+      const receiptEnvironmentHint = normalizeStringValue(req.body?.receiptEnvironment);
       const expectedCredits = APPLE_IAP_PRODUCT_CREDITS[productId];
       const subscriptionPlanId = APPLE_IAP_SUBSCRIPTION_PRODUCTS[productId];
       const subscriptionPlan = subscriptionPlanId ? getSubscriptionPlanById(subscriptionPlanId) : void 0;
@@ -4790,6 +4843,7 @@ async function registerRoutes(app2) {
         const syncResult = await syncAppleSubscriptionReceiptState({
           userId,
           receiptData,
+          receiptEnvironmentHint,
           productId
         });
         if (syncResult.status === "claimed_by_other_user") {
@@ -4801,7 +4855,8 @@ async function registerRoutes(app2) {
           ...state
         });
       }
-      const appleResult = await verifyAppleReceiptData(receiptData);
+      const appleResult = await verifyAppleReceiptData(receiptData, receiptEnvironmentHint);
+      const receiptEnvironment = normalizeStringValue(appleResult?.environment);
       const matchingTransactions = getAppleReceiptTransactions(appleResult).filter((item) => item?.product_id === productId).sort((a, b) => {
         const aMs = Number.parseInt(String(a?.purchase_date_ms || "0"), 10);
         const bMs = Number.parseInt(String(b?.purchase_date_ms || "0"), 10);
@@ -4823,7 +4878,11 @@ async function registerRoutes(app2) {
           return res.status(404).json({ success: false, error: "User not found" });
         }
         if (grantResult.status === "granted") {
-          return res.json({ success: true, credits: grantResult.credits });
+          return res.json({
+            success: true,
+            credits: grantResult.credits,
+            receiptEnvironment: receiptEnvironment || void 0
+          });
         }
         if (grantResult.existingOwnerId && grantResult.existingOwnerId !== userId) {
           return res.status(409).json({ success: false, error: "This Apple purchase was already claimed." });
@@ -4833,7 +4892,8 @@ async function registerRoutes(app2) {
       return res.json({
         success: true,
         credits: existingUser?.credits ?? 0,
-        message: "Apple transaction already processed"
+        message: "Apple transaction already processed",
+        receiptEnvironment: receiptEnvironment || void 0
       });
     } catch (error) {
       console.error("Apple verify error:", error);
@@ -4843,12 +4903,14 @@ async function registerRoutes(app2) {
   app2.post("/api/credits/apple-sync", authMiddleware, async (req, res) => {
     try {
       const receiptData = normalizeStringValue(req.body?.receiptData);
+      const receiptEnvironmentHint = normalizeStringValue(req.body?.receiptEnvironment);
       if (!receiptData) {
         return res.status(400).json({ success: false, error: "Missing receipt data" });
       }
       const syncResult = await syncAppleSubscriptionReceiptState({
         userId: req.user.id,
-        receiptData
+        receiptData,
+        receiptEnvironmentHint
       });
       if (syncResult.status === "claimed_by_other_user") {
         return res.status(409).json({ success: false, error: "This Apple subscription is already linked to another account." });
@@ -5329,7 +5391,10 @@ async function registerRoutes(app2) {
         promptVariant
       });
       const baseTransformCost = generationTier.credits || getInstaMeCreditsForQualityTier(transformQualityTier) || (Number.isInteger(INSTAME_TRANSFORM_COST) && INSTAME_TRANSFORM_COST > 0 ? INSTAME_TRANSFORM_COST : 2);
-      const ownStyleFirstUseSurcharge = isOwnStyleRequested && !requestedSavedOwnStyleId ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
+      const selectedSavedOwnStyleNeedsFirstUseSurcharge = Boolean(
+        selectedSavedOwnStyle && selectedSavedOwnStyle.firstUseSurchargeCharged === false
+      );
+      const ownStyleFirstUseSurcharge = isOwnStyleRequested && (!requestedSavedOwnStyleId || selectedSavedOwnStyleNeedsFirstUseSurcharge) ? INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS : 0;
       transformCost = baseTransformCost + ownStyleFirstUseSurcharge;
       const consumed = await consumeCredits(userId, transformCost, "instame_old_money_transform");
       if (!consumed) {
@@ -5346,6 +5411,7 @@ async function registerRoutes(app2) {
       let nextUsageMap = styleUsageMap;
       let nextStoredImages = existingImages;
       let refreshedSavedOwnStyle = selectedSavedOwnStyle;
+      let ownStyleIdToMarkFirstUseCharged = selectedSavedOwnStyleNeedsFirstUseSurcharge && selectedSavedOwnStyle ? selectedSavedOwnStyle.id : null;
       let savedOwnStyleSummary = refreshedSavedOwnStyle ? toInstaMeOwnStyleSummary(refreshedSavedOwnStyle) : null;
       const activeOwnStyleReferenceImage = refreshedSavedOwnStyle ? toUploadedReferenceImageFromStoredOwnStyle(refreshedSavedOwnStyle) : ownStyleImages[0] || null;
       let analyzedOwnStylePrompt = refreshedSavedOwnStyle?.analyzedPrompt || "";
@@ -5443,6 +5509,19 @@ async function registerRoutes(app2) {
           });
           nextStoredImages = saveResult.nextImages;
           savedOwnStyleSummary = toInstaMeOwnStyleSummary(saveResult.savedOwnStyle);
+          if (ownStyleFirstUseSurcharge > 0) {
+            ownStyleIdToMarkFirstUseCharged = saveResult.savedOwnStyle.id;
+          }
+        }
+      }
+      if (ownStyleIdToMarkFirstUseCharged) {
+        const marked = markOwnStyleFirstUseSurchargeCharged(nextStoredImages, ownStyleIdToMarkFirstUseCharged);
+        nextStoredImages = marked.images;
+        if (marked.updated) {
+          savedOwnStyleSummary = toInstaMeOwnStyleSummary(marked.updated);
+          if (refreshedSavedOwnStyle && refreshedSavedOwnStyle.id === marked.updated.id) {
+            refreshedSavedOwnStyle = marked.updated;
+          }
         }
       }
       if (stylePresetId && stylePresetId !== INSTAME_OWN_STYLE_ID) {
