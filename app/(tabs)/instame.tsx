@@ -483,11 +483,6 @@ function getImageCandidates(...values: (string | null | undefined)[]): string[] 
     });
 }
 
-function resolveImageSourceUri(source: any): string {
-  const resolved = NativeImage.resolveAssetSource(source);
-  return typeof resolved?.uri === "string" ? resolved.uri : "";
-}
-
 function getPresetImageCandidates(
   preset: Pick<InstaMeStylePreset, "cover" | "representativeImage" | "examples"> | null | undefined,
 ): string[] {
@@ -1611,6 +1606,7 @@ export default function InstaMeScreen() {
       id: ART_STYLE_NONE_ID,
       label: "No art finish",
       imageCandidates: getImageCandidates(...getPresetImageCandidates(selectedStylePreset || defaultStylePreset)),
+      previewSource: null,
       theme: noneTheme,
       active: !selectedArtStyleId,
       onPress: () => setSelectedArtStyleId(""),
@@ -1620,7 +1616,8 @@ export default function InstaMeScreen() {
     const styleCards = INSTAME_ART_STYLES.map((style) => ({
       id: style.id,
       label: style.label,
-      imageCandidates: getImageCandidates(resolveImageSourceUri(style.preview)),
+      imageCandidates: [] as string[],
+      previewSource: style.preview,
       theme: getArtStyleCardTheme(style.id),
       active: selectedArtStyleId === style.id,
       onPress: () => setSelectedArtStyleId(style.id),
@@ -2886,6 +2883,13 @@ export default function InstaMeScreen() {
                                         <Ionicons name="color-wand-outline" size={24} color="#FFECC8" />
                                         <Text style={styles.artNoneCollageText}>NO ART</Text>
                                       </View>
+                                    ) : item.previewSource ? (
+                                      <Image
+                                        source={item.previewSource}
+                                        style={styles.collageTileImageContained}
+                                        contentFit="cover"
+                                        onLoad={(event) => handleCollageTileLoad(item.id, event)}
+                                      />
                                     ) : collageImageUri ? (
                                       <Image
                                         source={{ uri: collageImageUri }}
