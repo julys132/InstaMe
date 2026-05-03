@@ -416,7 +416,12 @@ async function verifyAppleServerSignedPayload(signedPayload: string): Promise<Re
   verifier.update(parsed.signedPart);
   verifier.end();
 
-  if (!verifier.verify(certificateChain[0].publicKey, parsed.signature)) {
+  if (
+    !verifier.verify(
+      { key: certificateChain[0].publicKey, dsaEncoding: "ieee-p1363" },
+      parsed.signature,
+    )
+  ) {
     throw new Error("Apple notification signature is invalid");
   }
 
