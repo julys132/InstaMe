@@ -115,7 +115,7 @@ type OwnStyleGenerationMode = "reference_locked" | "creative_prompt";
 
 const OWN_STYLE_ANALYSIS_VERSIONS: Record<OwnStyleGenerationMode, number> = {
   reference_locked: 1,
-  creative_prompt: 3,
+  creative_prompt: 4,
 };
 
 type StripeCheckoutSessionPayload = {
@@ -1233,6 +1233,8 @@ const CREATIVE_OWN_STYLE_ANALYSIS_PROMPT = [
   "Be extremely concrete and exhaustive.",
   "Describe exactly the body pose, shoulder and torso angles, hand placement, leg placement, head tilt, eye direction, facial expression, facial micro-expression, and hair arrangement (exclude hair color).",
   "Also describe wardrobe pieces and materials, lighting setup, camera angle, lens feeling, framing, subject-to-camera distance, composition geometry, background elements, mood, color palette, texture, and finish.",
+  "Create a Color Lock section that lists the dominant visual elements and their exact colors or hues (for example: bouquet flowers, clothing pieces, accessories, props, and key background accents).",
+  "These locked colors are mandatory for generation unless the user explicitly requests a color change.",
   "Write it as precise visual direction so the style can be replicated 1:1 without omissions or reinterpretations.",
   "Return only the analysis.",
 ].join(" ");
@@ -2431,6 +2433,7 @@ function isGeminiModelNotFoundError(error: unknown): boolean {
 function buildOwnStyleFallbackAnalysisPrompt(): string {
   return [
     "Use the uploaded style reference as the guide for pose, facial expression, facial micro-expression, hair arrangement, wardrobe, lighting, camera angle, framing, composition, background mood, color palette, texture, and overall aesthetic.",
+    "Preserve exact colors for dominant elements such as flowers, clothing, props, and key background accents unless the user asks to recolor them.",
     "Preserve the uploaded subject's identity exactly and transfer only the style direction from the reference image.",
   ].join(" ");
 }
@@ -2688,6 +2691,8 @@ function buildOwnStyleTransformPrompt(options: {
     "Recreate the style direction from the style reference image with strict fidelity.",
     "Keep the uploaded subject's identity exactly: face structure, skin tone, age appearance, and natural hair color must stay recognizable.",
     "Transfer the style-reference composition faithfully: body pose, camera angle, subject-to-camera relationship, framing, wardrobe, lighting, background structure, and fine details.",
+    "Color fidelity is mandatory: preserve exact colors of dominant style elements, including flowers, clothing, accessories, props, and key background accents.",
+    "Do not neutralize, desaturate, or replace these key colors (example: pink flowers must not become white) unless the additional user request explicitly asks for recoloring.",
     options.preserveBackground
       ? "Preserve the background composition and scene layout from the style direction; do not invent a different scene."
       : "Minor background reinterpretation is allowed only if needed, but keep the same camera angle, framing, and composition.",
@@ -2732,6 +2737,8 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options: {
     "Edit the uploaded portrait to match the following style direction exactly.",
     "Preserve the subject's face, identity, skin tone, and natural hair color from the uploaded portrait.",
     "Transfer the style-reference composition faithfully: pose, camera angle, framing, wardrobe, lighting, background structure, and fine details.",
+    "Color fidelity is mandatory: keep exact dominant element colors from the style direction, including flowers, clothing, accessories, props, and key background accents.",
+    "Do not neutralize or swap these key colors unless the additional user request explicitly asks for recoloring.",
     options.preserveBackground
       ? "Preserve the background composition and scene layout from the style direction."
       : "Minor background reinterpretation is allowed only if needed, while keeping the same camera relationship and framing.",
@@ -2860,7 +2867,7 @@ async function generateOwnStyleImage(options: {
           { text: "Identity source image (MANDATORY): preserve this person's identity in the final image." },
           ...toGeminiInlineImageParts(options.uploadedImages),
           {
-            text: "Style direction image (STYLE ONLY): transfer pose, expression, hair arrangement, wardrobe, lighting, camera angle, framing, composition, background details, and mood. Never copy identity from this image.",
+            text: "Style direction image (STYLE ONLY): transfer pose, expression, hair arrangement, wardrobe, lighting, camera angle, framing, composition, background details, and mood. Keep dominant element colors exact (for example pink bouquet flowers must stay pink), and never copy identity from this image.",
           },
           ...toGeminiInlineImageParts([options.styleReferenceImage]),
         ];
