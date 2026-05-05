@@ -1249,11 +1249,10 @@ export default function InstaMeScreen() {
     () => Boolean(
       photo &&
       !loading &&
-      !ownStyleNeedsActivation &&
       credits >= transformCost &&
       (!isOwnStyleSelected || ownStylePhoto || selectedOwnStyleId),
     ),
-    [photo, loading, ownStyleNeedsActivation, credits, transformCost, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId],
+    [photo, loading, credits, transformCost, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId],
   );
 
   const generateBlockedReason = useMemo(() => {
@@ -1263,10 +1262,6 @@ export default function InstaMeScreen() {
 
     if (!photo) {
       return "Select one portrait first (Uploaded or Enhanced).";
-    }
-
-    if (ownStyleNeedsActivation) {
-      return "Tap 'Use this style' to activate Own Style before Restyle.";
     }
 
     if (isOwnStyleSelected && !ownStylePhoto && !selectedOwnStyleId) {
@@ -1281,7 +1276,7 @@ export default function InstaMeScreen() {
     }
 
     return null;
-  }, [loading, photo, ownStyleNeedsActivation, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId, credits, transformCost]);
+  }, [loading, photo, isOwnStyleSelected, ownStylePhoto, selectedOwnStyleId, credits, transformCost]);
 
   const handleCollageTileLoad = useCallback((styleId: string, event: any) => {
     const width = event?.source?.width;
@@ -1970,13 +1965,6 @@ export default function InstaMeScreen() {
       Alert.alert("Style unavailable", "The selected style is no longer available. Please choose another style and try again.");
       return;
     }
-    if (ownStyleNeedsActivation) {
-      Alert.alert(
-        "Own Style not active",
-        "You uploaded an Own Style image, but another main style is still selected. Tap 'Use this style' before generating so the app cannot fall back to another preset.",
-      );
-      return;
-    }
     if (isOwnStyleSelected && !ownStylePhoto && !selectedOwnStyleId) {
       Alert.alert("Missing style image", "Upload one style reference image for Own Style before generating.");
       return;
@@ -2066,7 +2054,6 @@ export default function InstaMeScreen() {
     }
   }, [
     photo,
-    ownStyleNeedsActivation,
     credits,
     transformCost,
     selectedStylePreset,
