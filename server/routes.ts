@@ -675,7 +675,7 @@ const MAX_INSTAME_LIBRARY_IMAGES_TOTAL =
 const MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1_000_000;
 const MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 const MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 220_000;
-const MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 20_000;
+const MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8_000;
 const STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 
 const INSTAME_HIGH_RES_OUTPUT_DIMENSION = 1024;
@@ -1229,7 +1229,7 @@ const OWN_STYLE_ANALYSIS_PROMPT = [
 ].join(" ");
 
 const CREATIVE_OWN_STYLE_ANALYSIS_PROMPT =
-  "Analizeaza sub forma de text aceasta imagine din punctul de vedere al unui fotograf profesionist elite level, nu uita sa incluzi exact posingul corpului, inclinatii in unghiuri, cifre, mediul inconjurator, background, hainele purtate, expresia si mimica fetei, si felul in care cade sau este asezat parul (in descriere nu include culoarea parului). Paleta de culori, ce culori au elementele din care este compusa imaginea, vibeul imaginii, aparatul foto folosit. Pune accent pe estetica, finisaj, stil, este obligatoriu ca stilul sa fie replicat 1:1 fara urma de greseli sau misinterpretari.";
+  "Analizeaza aceasta imagine din punctul de vedere al unui fotograf profesionist elite level, nu uita sa incluzi exact posingul corpului, expresia si mimica fetei, si felul in care cade sau este asezat parul.";
 
 type GeminiUsageMetrics = {
   promptTokenCount?: number;
@@ -2678,14 +2678,7 @@ function buildOwnStyleTransformPrompt(options: {
   customPrompt: string;
   preserveBackground: boolean;
 }): string {
-  const basePrompt = `Editeaza imaginea urmand exact promptul: ${options.analyzedStylePrompt.trim()}`;
-  const extraPrompt = options.customPrompt.trim();
-
-  if (!extraPrompt) {
-    return basePrompt;
-  }
-
-  return `${basePrompt}\n\n${extraPrompt}`;
+  return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}`;
 }
 
 function buildOwnStyleReferenceLockedPrompt(options: {
@@ -2760,69 +2753,177 @@ async function generateOwnStyleImage(options: {
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
   const tracePrefix = getOwnStyleTracePrefix(options.debugTraceContext);
 
-  const prompt = options.ownStyleMode === "reference_locked"
-    ? buildOwnStyleReferenceLockedPrompt({
-        customPrompt: options.customPrompt,
-        preserveBackground: options.preserveBackground,
-      })
-    : buildOwnStyleTransformPrompt({
-        analyzedStylePrompt: options.analyzedStylePrompt,
-        customPrompt: options.customPrompt,
-        preserveBackground: options.preserveBackground,
+  // For high_res mode, use Together as primary (explicit resolution control).
+  // For preview mode, use Gemini as primary with Together fallback.
+  if (options.generationMode === "high_res" && hasTogetherImageConfig()) {
+    try {
+      const { width, height } = resolveGenerationResolution(options.generationTierId);
+      const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]!);
+      const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
+      const prompt = options.ownStyleMode === "reference_locked"
+        ? buildOwnStyleTogetherFallbackPrompt({
+            customPrompt: options.customPrompt,
+            preserveBackground: options.preserveBackground,
+          })
+        : buildOwnStyleCreativeTogetherFallbackPrompt({
+            analyzedStylePrompt: options.analyzedStylePrompt,
+            customPrompt: options.customPrompt,
+            preserveBackground: options.preserveBackground,
+          });
+
+      logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.high_res_request`, {
+        provider: "Together",
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        generationMode: options.generationMode,
+        width,
+        height,
+        uploadedImageCount: options.uploadedImages.length,
+        includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
       });
 
-  const parts: GeminiPart[] = options.ownStyleMode === "reference_locked"
-    ? [
-        { text: prompt },
-        { text: "User face source. Extract only the face and head from this image — it will replace the face in the style reference image below:" },
-        ...toGeminiInlineImageParts(options.uploadedImages),
-        { text: "Style reference image — OUTPUT BASE. Keep absolutely everything from this image (clothing, body, pose, lighting, framing, background) exactly as-is. Only replace the face and head with the user's face from the photo above:" },
-        ...toGeminiInlineImageParts([options.styleReferenceImage]),
-      ]
-    : [
-        { text: prompt },
-        { text: "Identity source image (MANDATORY): preserve this person's identity in the final image." },
-        ...toGeminiInlineImageParts(options.uploadedImages),
-        { text: "Style direction image (STYLE ONLY): transfer pose, expression, hair arrangement, styling, lighting, composition, and mood. Never copy identity from this image." },
-        ...toGeminiInlineImageParts([options.styleReferenceImage]),
-      ];
+      const imageBase64 = await generateTogetherImage({
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        referenceImages: options.ownStyleMode === "reference_locked" ? [userImageUrl, styleReferenceUrl] : [userImageUrl],
+        width,
+        height,
+        sourceWidth: options.uploadedImages[0]?.width,
+        sourceHeight: options.uploadedImages[0]?.height,
+      });
 
-  logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.request`, {
-    provider: "Google",
-    model: DEFAULT_OWN_STYLE_IMAGE_MODEL,
-    prompt,
-    generationMode: options.generationMode,
-    preserveBackground: options.preserveBackground,
-    uploadedImageCount: options.uploadedImages.length,
-    includesStyleReferenceImage: true,
-  });
+      logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.high_res_response`, {
+        provider: "Together",
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        imageReturned: Boolean(imageBase64),
+      });
 
-  const imageResponse = await generateGeminiContent({
-    model: DEFAULT_OWN_STYLE_IMAGE_MODEL,
-    parts,
-    responseModalities: ["IMAGE", "TEXT"],
-    maxOutputTokens: 1200,
-  });
-
-  const imageBase64 = extractGeminiImageBase64(imageResponse);
-  if (!imageBase64) {
-    throw new Error("Own Style generation failed. No image data returned.");
+      return {
+        imageBase64,
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        provider: "Together",
+      };
+    } catch (highResError: unknown) {
+      console.warn("Own Style high_res Together generation failed, falling back to Gemini:", highResError);
+    }
   }
 
-  logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.response`, {
-    provider: "Google",
-    model: DEFAULT_OWN_STYLE_IMAGE_MODEL,
-    prompt,
-    usage: extractGeminiUsageMetrics(imageResponse),
-    responseText: extractGeminiText(imageResponse) || null,
-    imageReturned: Boolean(imageBase64),
-  });
+  try {
+    const prompt = options.ownStyleMode === "reference_locked"
+      ? buildOwnStyleReferenceLockedPrompt({
+          customPrompt: options.customPrompt,
+          preserveBackground: options.preserveBackground,
+        })
+      : buildOwnStyleTransformPrompt({
+          analyzedStylePrompt: options.analyzedStylePrompt,
+          customPrompt: options.customPrompt,
+          preserveBackground: options.preserveBackground,
+        });
 
-  return {
-    imageBase64,
-    model: DEFAULT_OWN_STYLE_IMAGE_MODEL,
-    provider: "Google",
-  };
+    const parts: GeminiPart[] = options.ownStyleMode === "reference_locked"
+      ? [
+          { text: prompt },
+          { text: "User base photo to transform. This person must remain the final subject:" },
+          ...toGeminiInlineImageParts(options.uploadedImages),
+          { text: "Style reference image. Use it for styling direction such as pose, lighting, and mood, but never copy its hair color, bangs, haircut, or identity into the output:" },
+          ...toGeminiInlineImageParts([options.styleReferenceImage]),
+        ]
+      : [
+          { text: prompt },
+          ...toGeminiInlineImageParts(options.uploadedImages),
+        ];
+
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.request`, {
+      provider: "Google",
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      prompt,
+      generationMode: options.generationMode,
+      preserveBackground: options.preserveBackground,
+      uploadedImageCount: options.uploadedImages.length,
+      includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+    });
+
+    const imageResponse = await generateGeminiContent({
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      parts,
+      responseModalities: ["IMAGE", "TEXT"],
+      maxOutputTokens: 1200,
+    });
+
+    const imageBase64 = extractGeminiImageBase64(imageResponse);
+    if (!imageBase64) {
+      throw new Error("Own Style generation failed. No image data returned.");
+    }
+
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.response`, {
+      provider: "Google",
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      prompt,
+      usage: extractGeminiUsageMetrics(imageResponse),
+      responseText: extractGeminiText(imageResponse) || null,
+      imageReturned: Boolean(imageBase64),
+    });
+
+    return {
+      imageBase64,
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      provider: "Google",
+    };
+  } catch (error: unknown) {
+    if (!hasTogetherImageConfig() || !shouldFallbackOwnStyleToTogether(error)) {
+      throw error;
+    }
+
+    console.warn("Own Style generation falling back to Together:", error);
+    const { width, height } = resolveGenerationResolution(options.generationTierId);
+    const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]!);
+    const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
+    const prompt = options.ownStyleMode === "reference_locked"
+      ? buildOwnStyleTogetherFallbackPrompt({
+          customPrompt: options.customPrompt,
+          preserveBackground: options.preserveBackground,
+        })
+      : buildOwnStyleCreativeTogetherFallbackPrompt({
+          analyzedStylePrompt: options.analyzedStylePrompt,
+          customPrompt: options.customPrompt,
+          preserveBackground: options.preserveBackground,
+        });
+
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.fallback_request`, {
+      provider: "Together",
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      generationMode: options.generationMode,
+      uploadedImageCount: options.uploadedImages.length,
+      includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+      tokenUsage: "unavailable_from_provider_helper",
+    });
+
+    const imageBase64 = await generateTogetherImage({
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      referenceImages: options.ownStyleMode === "reference_locked" ? [userImageUrl, styleReferenceUrl] : [userImageUrl],
+      width,
+      height,
+      sourceWidth: options.uploadedImages[0]?.width,
+      sourceHeight: options.uploadedImages[0]?.height,
+    });
+
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.fallback_response`, {
+      provider: "Together",
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      imageReturned: Boolean(imageBase64),
+      tokenUsage: "unavailable_from_provider_helper",
+    });
+
+    return {
+      imageBase64,
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      provider: "Together",
+    };
+  }
 }
 
 async function generateReferenceGuidedHighResImage(options: {
