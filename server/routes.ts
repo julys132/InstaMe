@@ -115,7 +115,7 @@ type OwnStyleGenerationMode = "reference_locked" | "creative_prompt";
 
 const OWN_STYLE_ANALYSIS_VERSIONS: Record<OwnStyleGenerationMode, number> = {
   reference_locked: 1,
-  creative_prompt: 2,
+  creative_prompt: 3,
 };
 
 type StripeCheckoutSessionPayload = {
@@ -1228,8 +1228,14 @@ const OWN_STYLE_ANALYSIS_PROMPT = [
   "Do not ask questions. Do not mention limitations. Return only the analysis.",
 ].join(" ");
 
-const CREATIVE_OWN_STYLE_ANALYSIS_PROMPT =
-  "Analizeaza aceasta imagine din punctul de vedere al unui fotograf profesionist elite level, nu uita sa incluzi exact posingul corpului, expresia si mimica fetei, si felul in care cade sau este asezat parul.";
+const CREATIVE_OWN_STYLE_ANALYSIS_PROMPT = [
+  "Analyze this style-reference image in English as an elite fashion photographer and art director.",
+  "Be extremely concrete and exhaustive.",
+  "Describe exactly the body pose, shoulder and torso angles, hand placement, leg placement, head tilt, eye direction, facial expression, facial micro-expression, and hair arrangement (exclude hair color).",
+  "Also describe wardrobe pieces and materials, lighting setup, camera angle, lens feeling, framing, subject-to-camera distance, composition geometry, background elements, mood, color palette, texture, and finish.",
+  "Write it as precise visual direction so the style can be replicated 1:1 without omissions or reinterpretations.",
+  "Return only the analysis.",
+].join(" ");
 
 type GeminiUsageMetrics = {
   promptTokenCount?: number;
@@ -2678,7 +2684,23 @@ function buildOwnStyleTransformPrompt(options: {
   customPrompt: string;
   preserveBackground: boolean;
 }): string {
-  return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}`;
+  const promptParts = [
+    "Recreate the style direction from the style reference image with strict fidelity.",
+    "Keep the uploaded subject's identity exactly: face structure, skin tone, age appearance, and natural hair color must stay recognizable.",
+    "Transfer the style-reference composition faithfully: body pose, camera angle, subject-to-camera relationship, framing, wardrobe, lighting, background structure, and fine details.",
+    options.preserveBackground
+      ? "Preserve the background composition and scene layout from the style direction; do not invent a different scene."
+      : "Minor background reinterpretation is allowed only if needed, but keep the same camera angle, framing, and composition.",
+    "Style direction to execute:",
+    options.analyzedStylePrompt.trim(),
+  ];
+
+  const extraPrompt = options.customPrompt.trim();
+  if (extraPrompt) {
+    promptParts.push(`Additional user request: ${extraPrompt}`);
+  }
+
+  return promptParts.join("\n");
 }
 
 function buildOwnStyleReferenceLockedPrompt(options: {
@@ -2708,12 +2730,16 @@ function buildOwnStyleCreativeTogetherFallbackPrompt(options: {
 }): string {
   const promptParts = [
     "Edit the uploaded portrait to match the following style direction exactly.",
-    "Preserve the subject's face, identity, and skin tone from the uploaded portrait.",
+    "Preserve the subject's face, identity, skin tone, and natural hair color from the uploaded portrait.",
+    "Transfer the style-reference composition faithfully: pose, camera angle, framing, wardrobe, lighting, background structure, and fine details.",
+    options.preserveBackground
+      ? "Preserve the background composition and scene layout from the style direction."
+      : "Minor background reinterpretation is allowed only if needed, while keeping the same camera relationship and framing.",
     options.analyzedStylePrompt,
   ];
 
   if (options.customPrompt.trim()) {
-    promptParts.push(options.customPrompt.trim());
+    promptParts.push(`Additional user request: ${options.customPrompt.trim()}`);
   }
 
   return promptParts.join("\n");
@@ -2779,13 +2805,13 @@ async function generateOwnStyleImage(options: {
         width,
         height,
         uploadedImageCount: options.uploadedImages.length,
-        includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+        includesStyleReferenceImage: true,
       });
 
       const imageBase64 = await generateTogetherImage({
         model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
         prompt,
-        referenceImages: options.ownStyleMode === "reference_locked" ? [userImageUrl, styleReferenceUrl] : [userImageUrl],
+        referenceImages: [userImageUrl, styleReferenceUrl],
         width,
         height,
         sourceWidth: options.uploadedImages[0]?.width,
@@ -2831,7 +2857,12 @@ async function generateOwnStyleImage(options: {
         ]
       : [
           { text: prompt },
+          { text: "Identity source image (MANDATORY): preserve this person's identity in the final image." },
           ...toGeminiInlineImageParts(options.uploadedImages),
+          {
+            text: "Style direction image (STYLE ONLY): transfer pose, expression, hair arrangement, wardrobe, lighting, camera angle, framing, composition, background details, and mood. Never copy identity from this image.",
+          },
+          ...toGeminiInlineImageParts([options.styleReferenceImage]),
         ];
 
     logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.request`, {
@@ -2841,7 +2872,7 @@ async function generateOwnStyleImage(options: {
       generationMode: options.generationMode,
       preserveBackground: options.preserveBackground,
       uploadedImageCount: options.uploadedImages.length,
-      includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+      includesStyleReferenceImage: true,
     });
 
     const imageResponse = await generateGeminiContent({
@@ -2896,14 +2927,14 @@ async function generateOwnStyleImage(options: {
       prompt,
       generationMode: options.generationMode,
       uploadedImageCount: options.uploadedImages.length,
-      includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+      includesStyleReferenceImage: true,
       tokenUsage: "unavailable_from_provider_helper",
     });
 
     const imageBase64 = await generateTogetherImage({
       model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
       prompt,
-      referenceImages: options.ownStyleMode === "reference_locked" ? [userImageUrl, styleReferenceUrl] : [userImageUrl],
+      referenceImages: [userImageUrl, styleReferenceUrl],
       width,
       height,
       sourceWidth: options.uploadedImages[0]?.width,
