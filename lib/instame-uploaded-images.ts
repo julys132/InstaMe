@@ -44,6 +44,18 @@ export function estimateBase64Bytes(base64: string): number {
   return Math.floor((sanitized.length * 3) / 4) - padding;
 }
 
+export function inferImageMimeTypeFromBase64(base64OrDataUri: string): string {
+  const sanitized = stripDataUriPrefix(base64OrDataUri).replace(/\s+/g, "");
+  if (!sanitized) return "image/jpeg";
+
+  if (sanitized.startsWith("/9j/")) return "image/jpeg";
+  if (sanitized.startsWith("iVBORw0KGgo")) return "image/png";
+  if (sanitized.startsWith("UklGR")) return "image/webp";
+  if (sanitized.startsWith("R0lGOD")) return "image/gif";
+
+  return "image/jpeg";
+}
+
 export function buildDataUri(base64: string, mimeType: string): string {
   return `data:${mimeType};base64,${stripDataUriPrefix(base64)}`;
 }

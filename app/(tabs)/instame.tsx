@@ -37,6 +37,7 @@ import {
 } from "@/lib/api-client";
 import {
   buildDataUri,
+  inferImageMimeTypeFromBase64,
   optimizeImageAsset,
   optimizeGeneratedBase64Image,
   stripDataUriPrefix,
@@ -85,6 +86,7 @@ type GenerationResultMeta = {
   promptOnlyMode?: boolean;
   generationTierId?: string;
   stylePresetId?: string | null;
+  imageMimeType?: string;
 };
 
 type StyleCardTheme = {
@@ -769,6 +771,11 @@ export default function InstaMeScreen() {
 
     return selectedStyleId === previewStyleId;
   }, [isEnhancePreviewActive, previewStyleId, resultBase64, resultMeta?.stylePresetId, selectedStyleId]);
+
+  const resultImageMimeType = useMemo(
+    () => resultMeta?.imageMimeType || (resultBase64 ? inferImageMimeTypeFromBase64(resultBase64) : "image/jpeg"),
+    [resultBase64, resultMeta?.imageMimeType],
+  );
 
   const previewPanelImageUri = useMemo(() => {
     if (isEnhancePreviewActive) {
@@ -1872,11 +1879,13 @@ export default function InstaMeScreen() {
         },
       });
 
+      const enhancedMimeType = inferImageMimeTypeFromBase64(result.imageBase64);
+
       setPortraitEnhanceCandidate({
-        uri: `data:image/png;base64,${result.imageBase64}`,
+        uri: buildDataUri(result.imageBase64, enhancedMimeType),
         base64: result.imageBase64,
         previewBase64: result.imageBase64,
-        mimeType: "image/png",
+        mimeType: enhancedMimeType,
         kind: "enhanced",
         width: 1024,
         height: 1024,
@@ -1885,7 +1894,7 @@ export default function InstaMeScreen() {
       setComparisonImageUri(buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType));
       await persistHistoryResult({
         imageBase64: result.imageBase64,
-        mimeType: "image/png",
+        mimeType: enhancedMimeType,
         styleLabel: "Portrait Enhance",
         customPrompt: "",
         creditsCharged: portraitEnhanceCost,
@@ -2007,14 +2016,17 @@ export default function InstaMeScreen() {
         generationTierId: activeGenerationTier?.id || selectedGenerationTierId,
       });
 
+      const transformedMimeType = inferImageMimeTypeFromBase64(result.imageBase64);
+
       setResultBase64(result.imageBase64);
-  setComparisonImageUri(buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType));
+      setComparisonImageUri(buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType));
       setResultMeta({
         qualityTier: result.qualityTier,
         qualityLabel: result.qualityLabel,
         promptOnlyMode: result.promptOnlyMode,
         generationTierId: result.generationTierId,
         stylePresetId: result.stylePresetId,
+        imageMimeType: transformedMimeType,
       });
       if (result.savedOwnStyle) {
         const savedStyle = result.savedOwnStyle as InstaMeOwnStyle;
@@ -2030,7 +2042,7 @@ export default function InstaMeScreen() {
       setIsRetouchDrawerOpen(false);
       await persistHistoryResult({
         imageBase64: result.imageBase64,
-        mimeType: "image/png",
+        mimeType: transformedMimeType,
         styleLabel: selectedArtStyle ? `${selectedPreset?.label || "Chicoo"} + ${selectedArtStyle.label}` : selectedPreset?.label || "Chicoo",
         stylePresetId: result.stylePresetId,
         ownStyleId: result.savedOwnStyle?.id || selectedOwnStyleId || null,
@@ -2048,6 +2060,21 @@ export default function InstaMeScreen() {
         );
       });
     } catch (error: any) {
+      const message = typeof error?.message === "string" ? error.message : "";
+      if (isOwnStyleSelected && (error?.status === 404 || error?.status === 400) && /saved own style not found/i.test(message)) {
+        setSelectedOwnStyleId(null);
+        try {
+          const ownStylesResult = await apiClient.getInstaMeOwnStyles();
+          setSavedOwnStyles(Array.isArray(ownStylesResult.ownStyles) ? ownStylesResult.ownStyles : []);
+        } catch {
+          // Keep local state fallback even if refresh fails.
+        }
+        Alert.alert(
+          "Own Style unavailable",
+          "This saved Own Style is no longer available. Please select another saved style or upload a new one, then try again.",
+        );
+        return;
+      }
       Alert.alert("Error", error?.message || "Transformation failed.");
     } finally {
       setLoading(false);
@@ -2097,7 +2124,7 @@ export default function InstaMeScreen() {
       const result = await apiClient.editInstaMeImage({
         currentImage: {
           base64: resultBase64,
-          mimeType: "image/png",
+          mimeType: resultImageMimeType,
           width: photo?.width,
           height: photo?.height,
         },
@@ -2112,15 +2139,18 @@ export default function InstaMeScreen() {
         editTierId: selectedEditTierId,
       });
 
+      const editedMimeType = inferImageMimeTypeFromBase64(result.imageBase64);
+
       setResultBase64(result.imageBase64);
-      setComparisonImageUri(`data:image/png;base64,${previousResultBase64}`);
+      setComparisonImageUri(buildDataUri(previousResultBase64, resultImageMimeType));
       setResultMeta({
         qualityTier: result.qualityTier,
         qualityLabel: result.qualityLabel,
+        imageMimeType: editedMimeType,
       });
       await persistHistoryResult({
         imageBase64: result.imageBase64,
-        mimeType: "image/png",
+        mimeType: editedMimeType,
         styleLabel: `${selectedStylePreset?.label || "Chicoo"} Edit`,
         stylePresetId: resultMeta?.stylePresetId || selectedStyleId,
         ownStyleId: selectedOwnStyleId,
@@ -2145,6 +2175,7 @@ export default function InstaMeScreen() {
     selectedEditTierId,
     photo,
     customPrompt,
+    resultImageMimeType,
     persistHistoryResult,
     refreshCredits,
     resultMeta?.stylePresetId,
@@ -2204,11 +2235,11 @@ export default function InstaMeScreen() {
     if (!resultBase64) return;
 
     await exportBase64Image(resultBase64, {
-      mimeType: "image/png",
+      mimeType: resultImageMimeType,
       fileNamePrefix: "instame-style",
       dialogTitle: "Save Chicoo Result",
     });
-  }, [exportBase64Image, resultBase64]);
+  }, [exportBase64Image, resultBase64, resultImageMimeType]);
 
   const handleDownloadEnhancedPortrait = useCallback(async () => {
     if (!portraitEnhanceCandidate?.base64) {
@@ -3010,7 +3041,7 @@ export default function InstaMeScreen() {
           <View ref={resultCardRef} style={styles.card}>
             <Text style={styles.cardTitle}>Your result</Text>
             <Image
-              source={{ uri: `data:image/png;base64,${resultBase64}` }}
+              source={{ uri: buildDataUri(resultBase64, resultImageMimeType) }}
               style={styles.resultImage}
               contentFit="cover"
             />
@@ -3481,7 +3512,7 @@ export default function InstaMeScreen() {
                   {modalStyleResultAvailable ? (
                     <View style={styles.modalSection}>
                       <Image
-                        source={{ uri: `data:image/png;base64,${resultBase64}` }}
+                        source={{ uri: buildDataUri(resultBase64, resultImageMimeType) }}
                         style={styles.resultImage}
                         contentFit="cover"
                       />

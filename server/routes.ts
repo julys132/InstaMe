@@ -675,7 +675,7 @@ const MAX_INSTAME_LIBRARY_IMAGES_TOTAL =
 const MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1_000_000;
 const MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 const MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 220_000;
-const MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8_000;
+const MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 20_000;
 const STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 
 const INSTAME_HIGH_RES_OUTPUT_DIMENSION = 1024;
@@ -1229,7 +1229,7 @@ const OWN_STYLE_ANALYSIS_PROMPT = [
 ].join(" ");
 
 const CREATIVE_OWN_STYLE_ANALYSIS_PROMPT =
-  "Analizeaza aceasta imagine din punctul de vedere al unui fotograf profesionist elite level, nu uita sa incluzi exact posingul corpului, expresia si mimica fetei, si felul in care cade sau este asezat parul.";
+  "Analizeaza sub forma de text aceasta imagine din punctul de vedere al unui fotograf profesionist elite level, nu uita sa incluzi exact posingul corpului, inclinatii in unghiuri, cifre, mediul inconjurator, background, hainele purtate, expresia si mimica fetei, si felul in care cade sau este asezat parul (in descriere nu include culoarea parului). Paleta de culori, ce culori au elementele din care este compusa imaginea, vibeul imaginii, aparatul foto folosit. Pune accent pe estetica, finisaj, stil, este obligatoriu ca stilul sa fie replicat 1:1 fara urma de greseli sau misinterpretari.";
 
 type GeminiUsageMetrics = {
   promptTokenCount?: number;
@@ -1505,7 +1505,11 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
           : candidate.kind === "own_style"
             ? "own_style"
             : "uploaded";
-      const analyzedPrompt = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
+      const analyzedPromptRaw = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
+      const analyzedPrompt =
+        kind === "own_style"
+          ? analyzedPromptRaw || buildOwnStyleFallbackAnalysisPrompt()
+          : analyzedPromptRaw;
       const analysisMode =
         candidate.analysisMode === "creative_prompt" || candidate.analysisMode === "reference_locked"
           ? candidate.analysisMode
@@ -1525,7 +1529,6 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
           : undefined;
 
       if (!id || !base64 || !previewBase64) return null;
-      if (kind === "own_style" && !analyzedPrompt) return null;
       if (!Number.isFinite(width) || width <= 0) return null;
       if (!Number.isFinite(height) || height <= 0) return null;
 
@@ -2675,7 +2678,14 @@ function buildOwnStyleTransformPrompt(options: {
   customPrompt: string;
   preserveBackground: boolean;
 }): string {
-  return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}`;
+  const basePrompt = `Editeaza imaginea urmand exact promptul: ${options.analyzedStylePrompt.trim()}`;
+  const extraPrompt = options.customPrompt.trim();
+
+  if (!extraPrompt) {
+    return basePrompt;
+  }
+
+  return `${basePrompt}\n\n${extraPrompt}`;
 }
 
 function buildOwnStyleReferenceLockedPrompt(options: {
@@ -2771,7 +2781,10 @@ async function generateOwnStyleImage(options: {
       ]
     : [
         { text: prompt },
+        { text: "Identity source image (MANDATORY): preserve this person's identity in the final image." },
         ...toGeminiInlineImageParts(options.uploadedImages),
+        { text: "Style direction image (STYLE ONLY): transfer pose, expression, hair arrangement, styling, lighting, composition, and mood. Never copy identity from this image." },
+        ...toGeminiInlineImageParts([options.styleReferenceImage]),
       ];
 
   logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.request`, {
@@ -2781,7 +2794,7 @@ async function generateOwnStyleImage(options: {
     generationMode: options.generationMode,
     preserveBackground: options.preserveBackground,
     uploadedImageCount: options.uploadedImages.length,
-    includesStyleReferenceImage: options.ownStyleMode === "reference_locked",
+    includesStyleReferenceImage: true,
   });
 
   const imageResponse = await generateGeminiContent({
@@ -5700,7 +5713,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : null;
 
       if (requestedSavedOwnStyleId && !selectedSavedOwnStyle) {
-        return res.status(404).json({ error: "Saved own style not found." });
+        return res.status(404).json({
+          error:
+            "Saved own style not found. It may have been removed or is no longer available. Please select another Own Style or upload a new one.",
+        });
       }
 
       const styleUsageMap = normalizeUsageMap(userBeforeTransform?.instameStyleUsage);
@@ -5860,9 +5876,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (shouldUseOwnStyle && !selectedSavedOwnStyle && shouldSaveOwnStyle) {
         const ownStyleSavePayload = normalizeOwnStyleSavePayload(body.stylePhoto);
         if (ownStyleSavePayload && ownStyleSavePayload.previewBase64.length <= MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH) {
+          const analyzedPromptForStorage =
+            normalizeStringValue(analyzedOwnStylePrompt) || buildOwnStyleFallbackAnalysisPrompt();
           const savedOwnStyleRecord = buildSavedOwnStyleRecord({
             stylePayload: ownStyleSavePayload,
-            analyzedPrompt: analyzedOwnStylePrompt,
+            analyzedPrompt: analyzedPromptForStorage,
             ownStyleMode,
           });
           const saveResult = upsertOwnStyleRecord({
