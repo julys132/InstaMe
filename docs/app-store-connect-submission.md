@@ -74,7 +74,10 @@ Core features:
 - downloadable high-resolution exports
 - account-based credit system for image generations and edits
 
-Some features require credits or in-app purchases.`
+Some features require credits or in-app purchases.
+
+Terms of Use (EULA): https://instame.up.railway.app/terms
+Privacy Policy: https://instame.up.railway.app/privacy`
 
 ### General Information
 
@@ -569,6 +572,14 @@ Review notes suggestion:
 
 `iOS subscriptions are auto-renewable subscriptions managed through Apple In-App Purchase. Users can purchase, restore, upgrade, downgrade, and cancel from Apple subscription management. Credits are granted monthly based on the active plan.`
 
+3.1.2(c) resubmission note:
+
+`The subscription purchase flow now shows the subscription title, 1-month duration, included credits and services, monthly price, auto-renewal/cancellation disclosure, and functional links to Terms of Use (EULA) and Privacy Policy above each Subscribe button. App Store metadata includes the Terms of Use (EULA) URL in the app description and the Privacy Policy URL in the privacy field.`
+
+Reply to App Review after uploading the new build:
+
+`Hello, thank you for the review. We updated Chicoo's subscription purchase flow to include all required auto-renewable subscription information before purchase: subscription title, 1-month duration, included credits/services for each period, price, auto-renewal and cancellation disclosure, and functional Terms of Use (EULA) and Privacy Policy links. We also updated the App Store metadata to include the Terms of Use (EULA) link in the app description and confirmed the Privacy Policy URL is set. A screen recording is attached showing the updated subscription screen and both legal links opening successfully.`
+
 Server notification note:
 
 `The backend listens for App Store Server Notifications at /api/apple/server-notifications so Apple subscription renewals, cancellations, expirations, and revocations can update subscription state automatically.`
@@ -594,7 +605,7 @@ Use your live Railway domain right now unless you already connected a custom dom
 - Marketing URL: `https://instame.up.railway.app`
 - Support URL: `https://instame.up.railway.app/contact`
 - Privacy Policy URL: `https://instame.up.railway.app/privacy`
-- Terms of Service URL: `https://instame.up.railway.app/terms`
+- Terms of Use (EULA) URL: `https://instame.up.railway.app/terms`
 - Account Deletion URL: `https://instame.up.railway.app/delete-account`
 
 ## Items You Still Need To Fill With Real Data

@@ -7,7 +7,7 @@ export default function TermsScreen() {
     <CompliancePageLayout
       activePage="terms"
       eyebrow="Chicoo Legal"
-      title="Terms of Service"
+      title="Terms of Use (EULA)"
       intro="These terms describe how users may access Chicoo, buy credits or subscriptions, and use generated image features responsibly."
       lastUpdated="March 13, 2026"
       sections={[

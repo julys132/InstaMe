@@ -79,6 +79,7 @@ function SubPlanCard({
   activeHint,
   manageLabel,
   cancelLabel,
+  renewalDisclosure,
   onSubscribe,
   onTopUp,
   onCancel,
@@ -90,6 +91,7 @@ function SubPlanCard({
   activeHint?: string | null;
   manageLabel: string;
   cancelLabel: string;
+  renewalDisclosure: string;
   onSubscribe: () => void;
   onTopUp: () => void;
   onCancel: () => void;
@@ -119,6 +121,30 @@ function SubPlanCard({
             <Text style={styles.featureText}>{feature}</Text>
           </View>
         ))}
+      </View>
+
+      <View style={styles.subDisclosureBox}>
+        <Text style={styles.subDisclosureTitle}>Chicoo {plan.name} subscription</Text>
+        <Text style={styles.subDisclosureText}>
+          {priceLabel} per 1-month subscription period. Includes {plan.creditsPerMonth} credits each month{" "}
+          for AI portrait styling, image edits, and saved style features.
+        </Text>
+        <Text style={styles.subDisclosureText}>{renewalDisclosure}</Text>
+        <View style={styles.subLegalRow}>
+          <Pressable
+            onPress={() => { Haptics.selectionAsync(); router.push("/terms" as any); }}
+            style={({ pressed }) => [styles.subLegalLinkButton, pressed && { opacity: 0.78 }]}
+          >
+            <Text style={styles.subLegalLinkText}>Terms of Use (EULA)</Text>
+          </Pressable>
+          <Text style={styles.subLegalSeparator}>|</Text>
+          <Pressable
+            onPress={() => { Haptics.selectionAsync(); router.push("/privacy" as any); }}
+            style={({ pressed }) => [styles.subLegalLinkButton, pressed && { opacity: 0.78 }]}
+          >
+            <Text style={styles.subLegalLinkText}>Privacy Policy</Text>
+          </Pressable>
+        </View>
       </View>
 
       <Pressable
@@ -220,6 +246,10 @@ export default function CreditsScreen() {
   const isAppleManagedSubscription = nativePlatform === "ios" && subscriptionProvider === "apple";
   const manageSubscriptionLabel = isAppleManagedSubscription ? "Manage on Apple" : "Manage Billing";
   const cancelSubscriptionLabel = isAppleManagedSubscription ? "Cancel on Apple" : "Cancel Subscription";
+  const renewalDisclosure =
+    nativePlatform === "ios"
+      ? "Auto-renews monthly until canceled. Manage or cancel anytime in your App Store account settings."
+      : "Renews monthly until canceled. Manage or cancel anytime from billing settings.";
   const subscriptionManageHint = subscriptionRenewAt
     ? `Renews on ${new Date(subscriptionRenewAt).toLocaleDateString()}. ${isAppleManagedSubscription ? "Manage or cancel anytime on Apple." : "Manage or cancel anytime from billing."}`
     : isAppleManagedSubscription
@@ -663,6 +693,7 @@ export default function CreditsScreen() {
                 activeHint={subscriptionManageHint}
                 manageLabel={manageSubscriptionLabel}
                 cancelLabel={cancelSubscriptionLabel}
+                renewalDisclosure={renewalDisclosure}
                 onSubscribe={() => handleSubscribe(plan)}
                 onTopUp={() => setActiveTab("credits")}
                 onCancel={handleManageBilling}
@@ -1117,6 +1148,46 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     color: Colors.textSecondary,
+  },
+  subDisclosureBox: {
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: "rgba(255,255,255,0.035)",
+    padding: 12,
+    gap: 7,
+  },
+  subDisclosureTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.white,
+  },
+  subDisclosureText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  subLegalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 1,
+  },
+  subLegalLinkButton: {
+    paddingVertical: 2,
+  },
+  subLegalLinkText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.accentLight,
+  },
+  subLegalSeparator: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textMuted,
   },
   subButton: {
     backgroundColor: Colors.accent,
