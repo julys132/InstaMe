@@ -46,10 +46,16 @@ import {
 import Colors from "@/constants/colors";
 import { INSTAME_ART_STYLES } from "@/constants/instameArtStyles";
 import {
+  PHOTO_PACK_PRESETS,
+  STYLE_VIBE_CATEGORIES,
+  getPhotoPackPreviewImages,
+  getStyleVibeById,
+  matchStyleVibe,
+} from "@/constants/instameStyleTaxonomy";
+import {
   INSTAME_OWN_STYLE_ID,
   INSTAME_STYLE_PRESETS,
   type InstaMeStylePreset,
-  type InstaMeStyleCategory,
 } from "@shared/instame-style-presets";
 import {
   INSTAME_EDIT_TIERS,
@@ -105,11 +111,6 @@ const MAX_INSTAME_HISTORY_ITEMS = 10;
 const ENHANCE_PREVIEW_CARD_ID = "__enhance_portrait__";
 const OWN_UPLOAD_CARD_ID = "__own_upload_card__";
 const ART_STYLE_NONE_ID = "__art_style_none__";
-const STYLE_CATEGORY_OPTIONS: { key: InstaMeStyleCategory; label: string }[] = [
-  { key: "women", label: "Women" },
-  { key: "men", label: "Men" },
-  { key: "couple", label: "Couples" },
-];
 
 function resolveDisplayedGenerationQualityTier(options: {
   preset: InstaMeStylePreset | null | undefined;
@@ -520,7 +521,8 @@ export default function InstaMeScreen() {
   const [selectedStyleId, setSelectedStyleId] = useState<string>("");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
   const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art">("main");
-  const [styleCategory, setStyleCategory] = useState<InstaMeStyleCategory>("women");
+  const [selectedStyleVibeId, setSelectedStyleVibeId] = useState("all");
+  const [selectedPhotoPackId, setSelectedPhotoPackId] = useState<string | null>(null);
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
@@ -691,9 +693,35 @@ export default function InstaMeScreen() {
     [ownStylePreset, stylePresets],
   );
 
+  const styleVibeCounts = useMemo(() => {
+    const catalogPresets = stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID);
+
+    return Object.fromEntries(
+      STYLE_VIBE_CATEGORIES.map((vibe) => [
+        vibe.id,
+        catalogPresets.filter((preset) => matchStyleVibe(preset, vibe.id)).length,
+      ]),
+    ) as Record<string, number>;
+  }, [stylePresets]);
+
+  const selectedStyleVibe = useMemo(() => getStyleVibeById(selectedStyleVibeId), [selectedStyleVibeId]);
+
+  const activePhotoPack = useMemo(
+    () => PHOTO_PACK_PRESETS.find((pack) => pack.id === selectedPhotoPackId) || null,
+    [selectedPhotoPackId],
+  );
+
+  const photoPackPreviewMap = useMemo(
+    () =>
+      Object.fromEntries(
+        PHOTO_PACK_PRESETS.map((pack) => [pack.id, getPhotoPackPreviewImages(pack, stylePresets, 4)]),
+      ) as Record<string, string[]>,
+    [stylePresets],
+  );
+
   const mainOnlyStylePresets = useMemo(
-    () => stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID && (preset.category || "women") === styleCategory),
-    [stylePresets, styleCategory],
+    () => stylePresets.filter((preset) => preset.id !== INSTAME_OWN_STYLE_ID && matchStyleVibe(preset, selectedStyleVibeId)),
+    [stylePresets, selectedStyleVibeId],
   );
 
   const defaultStylePreset = useMemo(
@@ -1526,6 +1554,26 @@ export default function InstaMeScreen() {
     setPreviewStyleId(ENHANCE_PREVIEW_CARD_ID);
   }, []);
 
+  const handleStyleVibePress = useCallback((vibeId: string) => {
+    setSelectedStyleVibeId(vibeId);
+    setSelectedPhotoPackId((currentPackId) => {
+      const currentPack = PHOTO_PACK_PRESETS.find((pack) => pack.id === currentPackId);
+      return currentPack && currentPack.vibeId === vibeId ? currentPackId : null;
+    });
+    void Haptics.selectionAsync();
+  }, []);
+
+  const handlePhotoPackPress = useCallback((packId: string) => {
+    const pack = PHOTO_PACK_PRESETS.find((item) => item.id === packId);
+    if (!pack) {
+      return;
+    }
+
+    setSelectedPhotoPackId((currentPackId) => (currentPackId === pack.id ? null : pack.id));
+    setSelectedStyleVibeId(pack.vibeId);
+    void Haptics.selectionAsync();
+  }, []);
+
   const mainCollageItems = useMemo(() => {
     const enhanceCard = {
       id: ENHANCE_PREVIEW_CARD_ID,
@@ -1577,7 +1625,7 @@ export default function InstaMeScreen() {
   const ownCollageItems = useMemo(() => {
     const uploadCard = {
       id: OWN_UPLOAD_CARD_ID,
-      label: "UPLOAD YOUR OWN STYLE",
+      label: "CLONE ANY AESTHETIC",
       imageCandidates: [] as string[],
       theme: getStyleCardTheme(INSTAME_OWN_STYLE_ID),
       active: selectedStyleId === INSTAME_OWN_STYLE_ID && !selectedOwnStyleId,
@@ -2253,6 +2301,8 @@ export default function InstaMeScreen() {
     });
   }, [exportBase64Image, portraitEnhanceCandidate]);
 
+  const selectedStyleVibeCount = styleVibeCounts[selectedStyleVibe.id] ?? mainOnlyStylePresets.length;
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={["#000000", "#111111", "#000000"]} locations={[0, 0.5, 1]} style={StyleSheet.absoluteFill} />
@@ -2266,36 +2316,20 @@ export default function InstaMeScreen() {
           <View style={styles.headerTopRow}>
             <View style={styles.headerCopySolo}>
               <Text style={styles.headerBrand}>Chicoo</Text>
-              <Text style={styles.headerTitle}>Style collage</Text>
+              <Text style={styles.headerTitle}>Aesthetic studio</Text>
             </View>
             <View style={styles.headerCreditsLine}>
               <Text style={styles.headerCreditsCount}>{credits}</Text>
               <Text style={styles.headerCreditsLabel}>Credits</Text>
             </View>
           </View>
-          {styleSectionTab === "main" ? (
-            <View style={styles.categoryPillRowTop}>
-              {STYLE_CATEGORY_OPTIONS.map((cat) => {
-                const active = styleCategory === cat.key;
-                return (
-                  <Pressable
-                    key={cat.key}
-                    onPress={() => setStyleCategory(cat.key)}
-                    style={[styles.categoryPill, active && styles.categoryPillActive]}
-                  >
-                    <Text style={[styles.categoryPillText, active && styles.categoryPillTextActive]}>{cat.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          ) : null}
         </View>
 
         <View style={styles.sectionTabBarOuter}>
           <View style={styles.sectionTabBar}>
             {([
               { key: "main" as const, label: "Main Styles", icon: "sparkles" as const },
-              { key: "own" as const, label: "Own Styles", icon: "person-outline" as const },
+              { key: "own" as const, label: "Clone Aesthetic", icon: "copy-outline" as const },
               { key: "art" as const, label: "Art Styles", icon: "color-palette-outline" as const },
             ]).map((tab) => {
               const active = styleSectionTab === tab.key;
@@ -2324,13 +2358,153 @@ export default function InstaMeScreen() {
         </View>
 
         {styleSectionTab === "main" ? (
+          <>
+            <View style={styles.vibeSection}>
+              <LinearGradient
+                colors={selectedStyleVibe.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.vibeFeatureCard}
+              >
+                <View style={styles.vibeFeatureTopRow}>
+                  <View style={[styles.vibeFeatureIcon, { borderColor: selectedStyleVibe.accent }]}>
+                    <Ionicons name={selectedStyleVibe.icon as keyof typeof Ionicons.glyphMap} size={18} color={selectedStyleVibe.accent} />
+                  </View>
+                  <View style={styles.vibeFeatureCopy}>
+                    <Text style={styles.vibeFeatureEyebrow}>Curated style map</Text>
+                    <Text style={styles.vibeFeatureTitle}>{selectedStyleVibe.label}</Text>
+                  </View>
+                  <View style={styles.vibeFeatureCountPill}>
+                    <Text style={styles.vibeFeatureCountText}>{selectedStyleVibeCount} looks</Text>
+                  </View>
+                </View>
+                <Text style={styles.vibeFeatureTagline}>{selectedStyleVibe.tagline}</Text>
+                {activePhotoPack ? (
+                  <View style={styles.vibeActivePackStrip}>
+                    <Ionicons name={activePhotoPack.icon as keyof typeof Ionicons.glyphMap} size={14} color={activePhotoPack.accent} />
+                    <Text style={styles.vibeActivePackText}>
+                      {activePhotoPack.label}: {activePhotoPack.example}
+                    </Text>
+                  </View>
+                ) : null}
+              </LinearGradient>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.vibeRail}
+              >
+                {STYLE_VIBE_CATEGORIES.map((vibe) => {
+                  const active = selectedStyleVibeId === vibe.id;
+                  const count = styleVibeCounts[vibe.id] ?? 0;
+                  return (
+                    <Pressable
+                      key={vibe.id}
+                      onPress={() => handleStyleVibePress(vibe.id)}
+                      style={({ pressed }) => [
+                        styles.vibeRailCard,
+                        active && styles.vibeRailCardActive,
+                        pressed ? { opacity: 0.9, transform: [{ scale: 0.98 }] } : undefined,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={vibe.gradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.vibeRailCardFill}
+                      >
+                        <View style={styles.vibeRailCardTop}>
+                          <Ionicons name={vibe.icon as keyof typeof Ionicons.glyphMap} size={15} color={vibe.accent} />
+                          <Text style={[styles.vibeRailCount, active && { color: vibe.accent }]}>{count}</Text>
+                        </View>
+                        <Text numberOfLines={1} style={styles.vibeRailLabel}>{vibe.shortLabel}</Text>
+                      </LinearGradient>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View style={styles.packSection}>
+              <View style={styles.packHeaderRow}>
+                <View>
+                  <Text style={styles.packEyebrow}>Instagram-ready packs</Text>
+                  <Text style={styles.packTitle}>Plan a 4 or 6 image drop</Text>
+                </View>
+                <Text style={styles.packMetaText}>{activePhotoPack ? "Pack selected" : "Tap to filter"}</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
+                {PHOTO_PACK_PRESETS.map((pack) => {
+                  const active = activePhotoPack?.id === pack.id;
+                  const previewImages = photoPackPreviewMap[pack.id] || [];
+                  return (
+                    <Pressable
+                      key={pack.id}
+                      onPress={() => handlePhotoPackPress(pack.id)}
+                      style={({ pressed }) => [
+                        styles.packCard,
+                        active && styles.packCardActive,
+                        pressed ? { opacity: 0.92, transform: [{ translateY: 1 }] } : undefined,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={pack.gradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.packCardFill}
+                      >
+                        <View style={styles.packMosaic}>
+                          {previewImages.slice(0, 4).map((imageUri, index) => (
+                            <Image
+                              key={`${pack.id}-${imageUri}-${index}`}
+                              source={{ uri: imageUri }}
+                              style={styles.packMosaicImage}
+                              contentFit="cover"
+                            />
+                          ))}
+                          {previewImages.length === 0 ? (
+                            <View style={styles.packMosaicFallback}>
+                              <Ionicons name="images-outline" size={18} color="rgba(255,255,255,0.55)" />
+                            </View>
+                          ) : null}
+                        </View>
+                        <View style={styles.packCardCopy}>
+                          <View style={styles.packCardTopRow}>
+                            <Text style={styles.packCardCount}>{pack.count} images</Text>
+                            <Ionicons name={pack.icon as keyof typeof Ionicons.glyphMap} size={15} color={pack.accent} />
+                          </View>
+                          <Text style={styles.packCardTitle}>{pack.label}</Text>
+                          <Text numberOfLines={2} style={styles.packCardSubtitle}>{pack.subtitle}</Text>
+                          <Text numberOfLines={2} style={styles.packCardExample}>{pack.example}</Text>
+                        </View>
+                      </LinearGradient>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </>
+        ) : null}
+
+        {styleSectionTab === "main" ? (
           <View style={styles.collageSection}>
+            <View style={styles.collageSectionHeader}>
+              <View style={styles.collageSectionTitleWrap}>
+                <Text style={styles.collageSectionEyebrow}>
+                  {activePhotoPack ? `${activePhotoPack.count}-image direction` : "Style wall"}
+                </Text>
+                <Text style={styles.collageSectionTitle}>
+                  {activePhotoPack ? activePhotoPack.label : selectedStyleVibe.label}
+                </Text>
+              </View>
+              <Text style={styles.collageSectionMeta}>{mainOnlyStylePresets.length} styles</Text>
+            </View>
             <Animated.View style={collageRevealAnimatedStyle}>
               {mainOnlyStylePresets.length === 0 ? (
                 <View style={styles.categoryEmptyState}>
                   <Ionicons name="heart-outline" size={36} color="rgba(255,255,255,0.25)" />
                   <Text style={styles.categoryEmptyText}>Coming soon</Text>
-                  <Text style={styles.categoryEmptySubtext}>Stay tuned — new styles are on the way!</Text>
+                  <Text style={styles.categoryEmptySubtext}>Stay tuned - new styles are on the way.</Text>
                 </View>
               ) : (
                 <View style={[styles.collageColumnsWrap, { gap: collageColumnGap }]}> 
@@ -2459,6 +2633,9 @@ export default function InstaMeScreen() {
                                     },
                                   ]}
                                 />
+                                <View pointerEvents="none" style={styles.collageTileCaption}>
+                                  <Text numberOfLines={2} style={styles.collageTileCaptionText}>{item.label}</Text>
+                                </View>
                               </View>
                             </View>
                           </Pressable>
@@ -2522,7 +2699,7 @@ export default function InstaMeScreen() {
                                     locations={[0, 0.42, 1]}
                                     style={styles.ownUploadAnchorBackdrop}
                                   />
-                                  <Text style={styles.ownUploadAnchorText}>UPLOAD{"\n"}YOUR{"\n"}OWN{"\n"}STYLE</Text>
+                                  <Text style={styles.ownUploadAnchorText}>CLONE{"\n"}ANY{"\n"}AESTHETIC</Text>
                                   <View style={styles.ownUploadAnchorPlus}>
                                     <Ionicons name="add" size={14} color="#26F4ED" />
                                   </View>
@@ -2561,6 +2738,9 @@ export default function InstaMeScreen() {
                                       },
                                     ]}
                                   />
+                                  <View pointerEvents="none" style={styles.collageTileCaption}>
+                                    <Text numberOfLines={2} style={styles.collageTileCaptionText}>{item.label}</Text>
+                                  </View>
                                 </>
                               )}
                             </View>
@@ -2573,7 +2753,9 @@ export default function InstaMeScreen() {
               </View>
             </Animated.View>
           </View>
-        ) : (
+        ) : null}
+
+        {styleSectionTab !== "main" ? (
           <View style={styles.studioSection}>
             <View style={styles.studioPortraitStrip}>
               <Text style={styles.studioPortraitLabel}>Add your portrait</Text>
@@ -2724,11 +2906,12 @@ export default function InstaMeScreen() {
                     style={styles.studioHeroOverlay}
                   />
                   <View style={styles.studioHeroBadge}>
-                    <Text style={styles.studioHeroBadgeText}>Own Style</Text>
+                    <Text style={styles.studioHeroBadgeText}>Clone Any Aesthetic</Text>
                   </View>
                 </Pressable>
 
                 <View style={styles.studioPanel}>
+                  <Text style={styles.ownStylePositioningText}>Upload any aesthetic reference. Reuse it forever.</Text>
                   <Text style={styles.processingHintText}>
                     First use: {transformCost} cr. Saved styles: {activeGenerationTier?.credits ?? DEFAULT_TRANSFORM_COST} cr.
                   </Text>
@@ -2797,8 +2980,8 @@ export default function InstaMeScreen() {
 
                   <View style={styles.customChangesPanel}>
                     <View style={styles.customChangesHeader}>
-                      <Text style={styles.customChangesTitle}>Retouch Template</Text>
-                      <Text style={styles.customChangesSubtitle}>Add clothing, expression, lighting or color notes for this own style.</Text>
+                      <Text style={styles.customChangesTitle}>Aesthetic Direction</Text>
+                      <Text style={styles.customChangesSubtitle}>Add pose, mood, lighting, location or color notes for this aesthetic.</Text>
                     </View>
                     <View style={styles.subTabBar}>
                       {OWN_STYLE_MODE_OPTIONS.map((option) => {
@@ -2817,7 +3000,7 @@ export default function InstaMeScreen() {
                     <TextInput
                       value={customPrompt}
                       onChangeText={setCustomPrompt}
-                      placeholder="Example: keep the same pose, white blazer, cleaner background, softer smile."
+                      placeholder="Example: same cinematic mood, softer smile, warm dusk light, cleaner background."
                       placeholderTextColor="rgba(255,255,255,0.34)"
                       multiline
                       style={styles.customChangesInput}
@@ -2853,7 +3036,7 @@ export default function InstaMeScreen() {
                     ]}
                   >
                     <View style={styles.generateButtonInner}>
-                      {loading ? <ActivityIndicator color="#FF7FB1" /> : <Text style={styles.generateButtonText}>Create own style result</Text>}
+                      {loading ? <ActivityIndicator color="#FF7FB1" /> : <Text style={styles.generateButtonText}>Generate with this aesthetic</Text>}
                     </View>
                   </Pressable>
                   <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
@@ -2972,6 +3155,9 @@ export default function InstaMeScreen() {
                                         },
                                       ]}
                                     />
+                                    <View pointerEvents="none" style={styles.collageTileCaption}>
+                                      <Text numberOfLines={2} style={styles.collageTileCaptionText}>{item.label}</Text>
+                                    </View>
                                   </View>
                                 </View>
                               </Pressable>
@@ -2984,13 +3170,13 @@ export default function InstaMeScreen() {
 
                   <View style={styles.customChangesPanel}>
                     <View style={styles.customChangesHeader}>
-                      <Text style={styles.customChangesTitle}>Retouch Template</Text>
+                      <Text style={styles.customChangesTitle}>Art Direction</Text>
                       <Text style={styles.customChangesSubtitle}>Add optional notes if you want this art finish to lean in a specific direction.</Text>
                     </View>
                     <TextInput
                       value={customPrompt}
                       onChangeText={setCustomPrompt}
-                      placeholder="Example: more pastel colors, brighter skin, softer facial expression, longer hair."
+                      placeholder="Example: more pastel color, softer expression, warm background, cleaner light."
                       placeholderTextColor="rgba(255,255,255,0.34)"
                       multiline
                       style={styles.customChangesInput}
@@ -3035,7 +3221,7 @@ export default function InstaMeScreen() {
               </>
             )}
           </View>
-        )}
+        ) : null}
 
         {resultBase64 && styleSectionTab !== "main" ? (
           <View ref={resultCardRef} style={styles.card}>
@@ -3203,7 +3389,7 @@ export default function InstaMeScreen() {
                     <View style={styles.modalOwnStyleUploadPlus}>
                       <Ionicons name="add" size={36} color="#26F4ED" />
                     </View>
-                    <Text style={styles.modalOwnStyleUploadText}>UPLOAD YOUR OWN STYLE</Text>
+                    <Text style={styles.modalOwnStyleUploadText}>UPLOAD ANY AESTHETIC</Text>
                   </Pressable>
                 ) : previewPanelImageUri ? (
                   <>
@@ -3279,7 +3465,7 @@ export default function InstaMeScreen() {
                       <TextInput
                         value={customPrompt}
                         onChangeText={setCustomPrompt}
-                        placeholder="Example: cleaner makeup, softer smile, warmer neutrals, brighter skin, white blazer."
+                        placeholder="Example: cleaner makeup, softer smile, warmer neutrals, brighter skin, calmer background."
                         placeholderTextColor="rgba(255,255,255,0.34)"
                         multiline
                         style={styles.modalPromptInput}
@@ -3512,7 +3698,7 @@ export default function InstaMeScreen() {
                   {modalStyleResultAvailable ? (
                     <View style={styles.modalSection}>
                       <Image
-                        source={{ uri: buildDataUri(resultBase64, resultImageMimeType) }}
+                        source={{ uri: buildDataUri(resultBase64 || "", resultImageMimeType) }}
                         style={styles.resultImage}
                         contentFit="cover"
                       />
@@ -3705,6 +3891,230 @@ const styles = StyleSheet.create({
   },
   libraryHint: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
   libraryHintMuted: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 11 },
+  vibeSection: {
+    marginTop: 14,
+    gap: 12,
+  },
+  vibeFeatureCard: {
+    marginHorizontal: 16,
+    borderRadius: 24,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    overflow: "hidden",
+  },
+  vibeFeatureTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  vibeFeatureIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    backgroundColor: "rgba(0,0,0,0.34)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  vibeFeatureCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  vibeFeatureEyebrow: {
+    color: "rgba(255,255,255,0.52)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 1.2,
+  },
+  vibeFeatureTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  vibeFeatureCountPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "rgba(0,0,0,0.34)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  vibeFeatureCountText: {
+    color: "rgba(255,255,255,0.82)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  vibeFeatureTagline: {
+    marginTop: 12,
+    color: "rgba(255,255,255,0.76)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  vibeActivePackStrip: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+  vibeActivePackText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  vibeRail: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  vibeRailCard: {
+    width: 104,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  vibeRailCardActive: {
+    borderColor: "rgba(255,255,255,0.42)",
+  },
+  vibeRailCardFill: {
+    minHeight: 82,
+    padding: 10,
+    justifyContent: "space-between",
+  },
+  vibeRailCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  vibeRailCount: {
+    color: "rgba(255,255,255,0.54)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  vibeRailLabel: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  packSection: {
+    marginTop: 18,
+    gap: 12,
+  },
+  packHeaderRow: {
+    marginHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  packEyebrow: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  packTitle: {
+    marginTop: 3,
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  packMetaText: {
+    color: "rgba(255,255,255,0.48)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+  },
+  packRail: {
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  packCard: {
+    width: 238,
+    borderRadius: 22,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  packCardActive: {
+    borderColor: "rgba(126,243,255,0.56)",
+    shadowColor: "#7EF3FF",
+    shadowOpacity: 0.26,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 10,
+  },
+  packCardFill: {
+    padding: 10,
+    gap: 10,
+  },
+  packMosaic: {
+    height: 112,
+    borderRadius: 16,
+    overflow: "hidden",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    backgroundColor: "rgba(0,0,0,0.36)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  packMosaicImage: {
+    width: "50%",
+    height: "50%",
+  },
+  packMosaicFallback: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  packCardCopy: {
+    gap: 5,
+  },
+  packCardTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  packCardCount: {
+    color: "rgba(255,255,255,0.54)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  packCardTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    lineHeight: 22,
+  },
+  packCardSubtitle: {
+    color: "rgba(255,255,255,0.74)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  packCardExample: {
+    color: "rgba(255,255,255,0.42)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 15,
+  },
   card: {
     marginHorizontal: 16,
     marginTop: 12,
@@ -3873,6 +4283,35 @@ const styles = StyleSheet.create({
     marginTop: 16,
     gap: 8,
   },
+  collageSectionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 4,
+  },
+  collageSectionTitleWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  collageSectionEyebrow: {
+    color: "rgba(255,255,255,0.44)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+  },
+  collageSectionTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 19,
+    lineHeight: 23,
+  },
+  collageSectionMeta: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
   collageColumnsWrap: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -3987,6 +4426,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.80,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
+  },
+  collageTileCaption: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    bottom: 8,
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    backgroundColor: "rgba(0,0,0,0.54)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+  },
+  collageTileCaptionText: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    lineHeight: 13,
+    textAlign: "center",
   },
   collageTileImageContained: {
     ...StyleSheet.absoluteFillObject,
@@ -4387,6 +4845,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(18,18,24,0.94)",
     padding: 14,
     gap: 14,
+  },
+  ownStylePositioningText: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    lineHeight: 20,
+    letterSpacing: 0.2,
   },
   enhanceButton: {
     marginTop: 12,
