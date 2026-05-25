@@ -2623,7 +2623,18 @@ export default function InstaMeScreen() {
                           </View>
                           <Text style={styles.packCardTitle}>{pack.label}</Text>
                           <Text numberOfLines={2} style={styles.packCardSubtitle}>{pack.subtitle}</Text>
-                          <Text numberOfLines={2} style={styles.packCardExample}>{pack.example}</Text>
+                          {active ? (
+                            <View style={styles.packCardShotList}>
+                              {pack.shots.map((shot, i) => (
+                                <View key={i} style={styles.packCardShotPill}>
+                                  <Text style={styles.packCardShotPillNum}>{i + 1}</Text>
+                                  <Text style={styles.packCardShotPillText}>{shot}</Text>
+                                </View>
+                              ))}
+                            </View>
+                          ) : (
+                            <Text numberOfLines={2} style={styles.packCardExample}>{pack.example}</Text>
+                          )}
                         </View>
                       </LinearGradient>
                     </Pressable>
@@ -2664,6 +2675,15 @@ export default function InstaMeScreen() {
                       <Text style={styles.packPlannerSummaryText}>
                         {activePhotoPack.count} images • {selectedPackBriefVibe.label}
                       </Text>
+                      <Text style={styles.packPlannerDeliverableText}>{activePhotoPack.deliverable}</Text>
+                      <View style={styles.packPlannerShotGrid}>
+                        {activePhotoPack.shots.map((shot, i) => (
+                          <View key={i} style={styles.packPlannerShotRow}>
+                            <Text style={styles.packPlannerShotNum}>{i + 1}</Text>
+                            <Text style={styles.packPlannerShotLabel}>{shot}</Text>
+                          </View>
+                        ))}
+                      </View>
                     </View>
 
                     <View style={styles.packPlannerBlock}>
@@ -4496,6 +4516,30 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
   },
+  packCardShotList: {
+    gap: 4,
+    marginTop: 2,
+  },
+  packCardShotPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  packCardShotPillNum: {
+    color: "rgba(255,255,255,0.38)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    lineHeight: 14,
+    width: 14,
+    textAlign: "center",
+  },
+  packCardShotPillText: {
+    color: "rgba(255,255,255,0.68)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 14,
+    flexShrink: 1,
+  },
   packPlannerCard: {
     marginHorizontal: 16,
     borderRadius: 20,
@@ -4564,6 +4608,40 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.72)",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+  },
+  packPlannerDeliverableText: {
+    color: "rgba(255,255,255,0.52)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 4,
+  },
+  packPlannerShotGrid: {
+    gap: 5,
+    marginTop: 8,
+  },
+  packPlannerShotRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  packPlannerShotNum: {
+    color: "rgba(255,255,255,0.38)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    lineHeight: 16,
+    width: 16,
+    textAlign: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    borderRadius: 4,
+  },
+  packPlannerShotLabel: {
+    color: "rgba(255,255,255,0.84)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 16,
+    flexShrink: 1,
   },
   packPlannerBlock: {
     gap: 8,

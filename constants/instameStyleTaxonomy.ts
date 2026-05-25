@@ -24,6 +24,10 @@ export type PhotoPackPreset = {
   gradient: [string, string, string];
   subtitle: string;
   example: string;
+  /** Short label for each image in the pack, in order (e.g. "Closeup portrait") */
+  shots: string[];
+  /** What users concretely receive — shown in the planner as a summary line */
+  deliverable: string;
 };
 
 export const STYLE_VIBE_CATEGORIES: StyleVibeCategory[] = [
@@ -203,6 +207,13 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
     gradient: ["rgba(255,214,234,0.26)", "rgba(255,79,125,0.14)", "rgba(0,0,0,0.86)"],
     subtitle: "One aesthetic, four polished feed posts.",
     example: "Cover closeup, half-body editorial, seated frame, detail crop.",
+    shots: [
+      "Editorial closeup portrait",
+      "Half-body fashion frame",
+      "Seated artistic pose",
+      "Accessory or detail macro",
+    ],
+    deliverable: "4 vertical AI photos • same editorial aesthetic • ready to post individually or as a carousel",
   },
   {
     id: "story_drop_six",
@@ -214,6 +225,15 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
     gradient: ["rgba(126,243,255,0.26)", "rgba(255,79,125,0.10)", "rgba(0,0,0,0.86)"],
     subtitle: "Six frames that feel like one night-out story.",
     example: "Mirror flash, closeup, walking shot, car light, grainy portrait, final hero.",
+    shots: [
+      "Mirror flash selfie",
+      "Tight face closeup",
+      "Movement walking shot",
+      "Car interior / light bokeh",
+      "Grainy atmospheric portrait",
+      "Hero full-body final",
+    ],
+    deliverable: "6 vertical AI photos • one cohesive night-out story • post all 6 as a carousel drop",
   },
   {
     id: "clean_grid_four",
@@ -225,6 +245,13 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
     gradient: ["rgba(248,255,184,0.24)", "rgba(126,243,255,0.10)", "rgba(0,0,0,0.86)"],
     subtitle: "Soft, bright, consistent posts for a reset grid.",
     example: "Beauty closeup, daylight selfie, calm seated frame, soft portrait.",
+    shots: [
+      "Soft beauty closeup",
+      "Natural daylight portrait",
+      "Calm seated lifestyle shot",
+      "Bright outdoor full-body",
+    ],
+    deliverable: "4 vertical AI photos • clean airy palette • instant grid reset with 4 consistent posts",
   },
   {
     id: "luxe_weekend_six",
@@ -236,6 +263,15 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
     gradient: ["rgba(244,215,161,0.26)", "rgba(255,198,167,0.10)", "rgba(0,0,0,0.86)"],
     subtitle: "Hotel, city and quiet-luxury frames ready for a carousel.",
     example: "Hotel entrance, city walk, jewelry closeup, terrace, car frame, refined portrait.",
+    shots: [
+      "Hotel lobby entrance",
+      "City street walk",
+      "Jewelry or bag closeup",
+      "Terrace / rooftop frame",
+      "Luxury car pose",
+      "Refined editorial portrait",
+    ],
+    deliverable: "6 vertical AI photos • old-money palette • full weekend carousel ready to post",
   },
   {
     id: "city_muse_six",
@@ -247,6 +283,15 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
     gradient: ["rgba(180,199,255,0.24)", "rgba(201,184,255,0.10)", "rgba(0,0,0,0.86)"],
     subtitle: "A full urban drop with movement and outfit-led frames.",
     example: "Crosswalk, wall portrait, steps, street walk, denim detail, confident hero.",
+    shots: [
+      "Crosswalk action shot",
+      "Wall or mural portrait",
+      "Steps / staircase pose",
+      "Street walk movement",
+      "Outfit detail closeup",
+      "Confident hero frame",
+    ],
+    deliverable: "6 vertical AI photos • urban street palette • full city drop with variety of angles",
   },
   {
     id: "couple_drop_four",
@@ -258,6 +303,13 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
     gradient: ["rgba(255,179,230,0.24)", "rgba(126,243,255,0.10)", "rgba(0,0,0,0.86)"],
     subtitle: "Four matching frames for a shared post or carousel.",
     example: "Close pose, walking frame, candid laugh, cinematic final.",
+    shots: [
+      "Close romantic pose",
+      "Walking together frame",
+      "Candid laugh moment",
+      "Cinematic wide final",
+    ],
+    deliverable: "4 vertical AI photos • couple aesthetic • 4 matching frames to post together or separately",
   },
   {
     id: "luxe_grid_nine",
@@ -269,6 +321,18 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
     gradient: ["rgba(244,215,161,0.26)", "rgba(72,58,34,0.18)", "rgba(0,0,0,0.86)"],
     subtitle: "Nine-image grid reset — one cohesive luxury aesthetic.",
     example: "Editorial portrait, mirror selfie, café, jewelry, street, hotel, over-shoulder, flash, hero wide.",
+    shots: [
+      "Editorial hero portrait",
+      "Mirror selfie",
+      "Café or lounge scene",
+      "Jewelry macro",
+      "Street outfit shot",
+      "Hotel / resort frame",
+      "Over-shoulder walk",
+      "Flash night closeup",
+      "Wide cinematic final",
+    ],
+    deliverable: "9 vertical AI photos • luxury palette • complete 3×3 grid reset in one drop",
   },
 ];
 
