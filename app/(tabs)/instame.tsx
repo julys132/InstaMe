@@ -249,6 +249,33 @@ const OWN_STYLE_MODE_OPTIONS: {
   },
 ];
 
+const PACK_BRIEF_REQUIRED_ELEMENTS = [
+  { id: "outfit", label: "Signature outfit" },
+  { id: "location", label: "Location moment" },
+  { id: "car", label: "Car or ride frame" },
+  { id: "accessories", label: "Accessory close-up" },
+  { id: "mirror", label: "Mirror selfie" },
+  { id: "detail", label: "Detail crop" },
+] as const;
+
+const PACK_BRIEF_IDENTITY_OPTIONS = [
+  {
+    id: "portrait_reference",
+    label: "Use my portrait",
+    subtitle: "Reference your uploaded portrait for identity consistency.",
+  },
+  {
+    id: "inspired_muse",
+    label: "Inspired muse",
+    subtitle: "Keep vibe and features inspired by your brief.",
+  },
+  {
+    id: "fictional_muse",
+    label: "Fictional muse",
+    subtitle: "No portrait reference, style-led output only.",
+  },
+] as const;
+
 const STYLE_CARD_THEME_MAP: Record<string, StyleCardTheme> = {
   own_style: {
     glow: "#86F4FF",
@@ -523,6 +550,10 @@ export default function InstaMeScreen() {
   const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art">("main");
   const [selectedStyleVibeId, setSelectedStyleVibeId] = useState("all");
   const [selectedPhotoPackId, setSelectedPhotoPackId] = useState<string | null>(null);
+  const [selectedPackBriefVibeId, setSelectedPackBriefVibeId] = useState("all");
+  const [packBriefRequiredElementIds, setPackBriefRequiredElementIds] = useState<string[]>([]);
+  const [packBriefNotes, setPackBriefNotes] = useState("");
+  const [selectedPackIdentityModeId, setSelectedPackIdentityModeId] = useState<string>("portrait_reference");
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
@@ -740,6 +771,30 @@ export default function InstaMeScreen() {
   );
 
   const isPhoneViewport = viewportWidth <= 430;
+  const selectedPackBriefVibe = useMemo(() => getStyleVibeById(selectedPackBriefVibeId), [selectedPackBriefVibeId]);
+  const hasPortraitReferencePhoto = Boolean(photo);
+  const packIdentityStatusMessage = useMemo(() => {
+    if (selectedPackIdentityModeId === "portrait_reference") {
+      return hasPortraitReferencePhoto
+        ? "Portrait ready: facial traits and hair color can guide the upcoming pack flow."
+        : "Add a portrait to unlock identity-locked pack generation in the next release.";
+    }
+
+    if (selectedPackIdentityModeId === "inspired_muse") {
+      return hasPortraitReferencePhoto
+        ? "We will keep your portrait as a light guide while prioritizing pack direction."
+        : "No portrait uploaded yet. We will generate a muse inspired by your brief.";
+    }
+
+    return "Portrait not required. This mode focuses only on vibe, composition, and required elements.";
+  }, [hasPortraitReferencePhoto, selectedPackIdentityModeId]);
+  const selectedPackRequiredLabels = useMemo(
+    () =>
+      PACK_BRIEF_REQUIRED_ELEMENTS
+        .filter((item) => packBriefRequiredElementIds.includes(item.id))
+        .map((item) => item.label),
+    [packBriefRequiredElementIds],
+  );
   const collageColumnCount = viewportWidth >= 1360 ? 4 : 3;
   const collageColumnOffsets = collageColumnCount === 4 ? [0, 18, 10, 22] : isPhoneViewport ? [0, 10, 4] : [0, 18, 10];
   const collageColumnGap = isPhoneViewport ? 6 : 8;
@@ -1571,6 +1626,14 @@ export default function InstaMeScreen() {
 
     setSelectedPhotoPackId((currentPackId) => (currentPackId === pack.id ? null : pack.id));
     setSelectedStyleVibeId(pack.vibeId);
+    setSelectedPackBriefVibeId(pack.vibeId);
+    void Haptics.selectionAsync();
+  }, []);
+
+  const togglePackBriefRequiredElement = useCallback((elementId: string) => {
+    setPackBriefRequiredElementIds((current) =>
+      current.includes(elementId) ? current.filter((id) => id !== elementId) : [...current, elementId],
+    );
     void Haptics.selectionAsync();
   }, []);
 
@@ -2428,10 +2491,10 @@ export default function InstaMeScreen() {
             <View style={styles.packSection}>
               <View style={styles.packHeaderRow}>
                 <View>
-                  <Text style={styles.packEyebrow}>Instagram-ready packs</Text>
-                  <Text style={styles.packTitle}>Plan a 4 or 6 image drop</Text>
+                  <Text style={styles.packEyebrow}>Instagram content packs</Text>
+                  <Text style={styles.packTitle}>Build a coordinated pack brief</Text>
                 </View>
-                <Text style={styles.packMetaText}>{activePhotoPack ? "Pack selected" : "Tap to filter"}</Text>
+                <Text style={styles.packMetaText}>{activePhotoPack ? "Step 2 of 4" : "Step 1 of 4"}</Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
                 {PHOTO_PACK_PRESETS.map((pack) => {
@@ -2482,6 +2545,144 @@ export default function InstaMeScreen() {
                   );
                 })}
               </ScrollView>
+
+              <View style={styles.packPlannerCard}>
+                <View style={styles.packPlannerStepsRow}>
+                  <Text style={styles.packPlannerStepText}>1. Preset</Text>
+                  <Text style={styles.packPlannerStepText}>2. Brief</Text>
+                  <Text style={styles.packPlannerStepText}>3. Preview</Text>
+                  <Text style={styles.packPlannerStepText}>4. Render</Text>
+                </View>
+
+                {!activePhotoPack ? (
+                  <View style={styles.packPlannerEmptyState}>
+                    <Ionicons name="albums-outline" size={18} color="rgba(255,255,255,0.56)" />
+                    <Text style={styles.packPlannerEmptyTitle}>Choose a pack preset to begin</Text>
+                    <Text style={styles.packPlannerEmptySubtitle}>
+                      Select a 4 or 6 image drop above, then lock your brief before preview mode.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.packPlannerSummaryCard}>
+                      <Text style={styles.packPlannerSummaryTitle}>{activePhotoPack.label}</Text>
+                      <Text style={styles.packPlannerSummaryText}>
+                        {activePhotoPack.count} images • {selectedPackBriefVibe.label}
+                      </Text>
+                    </View>
+
+                    <View style={styles.packPlannerBlock}>
+                      <Text style={styles.packPlannerLabel}>Style direction</Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.packPlannerVibeRail}
+                      >
+                        {STYLE_VIBE_CATEGORIES.filter((vibe) => vibe.id !== "all").map((vibe) => {
+                          const active = selectedPackBriefVibeId === vibe.id;
+                          return (
+                            <Pressable
+                              key={`pack-vibe-${vibe.id}`}
+                              onPress={() => {
+                                setSelectedPackBriefVibeId(vibe.id);
+                                void Haptics.selectionAsync();
+                              }}
+                              style={({ pressed }) => [
+                                styles.packPlannerVibeChip,
+                                active && styles.packPlannerVibeChipActive,
+                                pressed ? { opacity: 0.9 } : undefined,
+                              ]}
+                            >
+                              <Ionicons name={vibe.icon as keyof typeof Ionicons.glyphMap} size={12} color={active ? vibe.accent : "rgba(255,255,255,0.75)"} />
+                              <Text style={[styles.packPlannerVibeChipText, active && { color: "#FFF" }]}>{vibe.shortLabel}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+
+                    <View style={styles.packPlannerBlock}>
+                      <Text style={styles.packPlannerLabel}>Required elements</Text>
+                      <View style={styles.packPlannerElementWrap}>
+                        {PACK_BRIEF_REQUIRED_ELEMENTS.map((element) => {
+                          const active = packBriefRequiredElementIds.includes(element.id);
+                          return (
+                            <Pressable
+                              key={element.id}
+                              onPress={() => togglePackBriefRequiredElement(element.id)}
+                              style={({ pressed }) => [
+                                styles.packPlannerElementChip,
+                                active && styles.packPlannerElementChipActive,
+                                pressed ? { opacity: 0.88 } : undefined,
+                              ]}
+                            >
+                              <Text style={[styles.packPlannerElementChipText, active && styles.packPlannerElementChipTextActive]}>
+                                {element.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </View>
+
+                    <View style={styles.packPlannerBlock}>
+                      <Text style={styles.packPlannerLabel}>Identity source</Text>
+                      <View style={styles.packPlannerIdentityList}>
+                        {PACK_BRIEF_IDENTITY_OPTIONS.map((mode) => {
+                          const active = selectedPackIdentityModeId === mode.id;
+                          return (
+                            <Pressable
+                              key={mode.id}
+                              onPress={() => {
+                                setSelectedPackIdentityModeId(mode.id);
+                                void Haptics.selectionAsync();
+                              }}
+                              style={({ pressed }) => [
+                                styles.packPlannerIdentityCard,
+                                active && styles.packPlannerIdentityCardActive,
+                                pressed ? { opacity: 0.92 } : undefined,
+                              ]}
+                            >
+                              <Text style={styles.packPlannerIdentityTitle}>{mode.label}</Text>
+                              <Text style={styles.packPlannerIdentitySubtitle}>{mode.subtitle}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      <Text style={styles.packPlannerIdentityHint}>{packIdentityStatusMessage}</Text>
+                    </View>
+
+                    <View style={styles.packPlannerBlock}>
+                      <Text style={styles.packPlannerLabel}>Custom notes (optional)</Text>
+                      <TextInput
+                        value={packBriefNotes}
+                        onChangeText={setPackBriefNotes}
+                        placeholder="Add must-have scenes, outfit notes, or posting goal"
+                        placeholderTextColor="rgba(255,255,255,0.40)"
+                        multiline
+                        maxLength={220}
+                        style={styles.packPlannerNotesInput}
+                      />
+                    </View>
+
+                    <View style={styles.packPlannerDraftSummary}>
+                      <Text style={styles.packPlannerDraftSummaryTitle}>Draft brief</Text>
+                      <Text style={styles.packPlannerDraftSummaryText}>
+                        Vibe: {selectedPackBriefVibe.label}
+                        {"\n"}
+                        Must-have: {selectedPackRequiredLabels.length > 0 ? selectedPackRequiredLabels.join(", ") : "Not selected yet"}
+                        {"\n"}
+                        Notes: {packBriefNotes.trim() ? packBriefNotes.trim() : "No custom notes"}
+                      </Text>
+                    </View>
+
+                    <Pressable disabled style={styles.packPlannerComingSoonButton}>
+                      <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.packPlannerComingSoonText}>Grid preview generation coming soon</Text>
+                    </Pressable>
+                  </>
+                )}
+              </View>
             </View>
           </>
         ) : null}
@@ -4114,6 +4315,212 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 11,
     lineHeight: 15,
+  },
+  packPlannerCard: {
+    marginHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(12,12,16,0.95)",
+    padding: 12,
+    gap: 12,
+  },
+  packPlannerStepsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  packPlannerStepText: {
+    color: "rgba(255,255,255,0.56)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  packPlannerEmptyState: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  packPlannerEmptyTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  packPlannerEmptySubtitle: {
+    color: "rgba(255,255,255,0.66)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  packPlannerSummaryCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.28)",
+    backgroundColor: "rgba(126,243,255,0.09)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 2,
+  },
+  packPlannerSummaryTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  packPlannerSummaryText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  packPlannerBlock: {
+    gap: 8,
+  },
+  packPlannerLabel: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  packPlannerVibeRail: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  packPlannerVibeChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  packPlannerVibeChipActive: {
+    borderColor: "rgba(255,255,255,0.36)",
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+  packPlannerVibeChipText: {
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  packPlannerElementWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  packPlannerElementChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  packPlannerElementChipActive: {
+    borderColor: "rgba(255,79,125,0.52)",
+    backgroundColor: "rgba(255,79,125,0.14)",
+  },
+  packPlannerElementChipText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+  },
+  packPlannerElementChipTextActive: {
+    color: "#FFF",
+  },
+  packPlannerIdentityList: {
+    gap: 8,
+  },
+  packPlannerIdentityCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 3,
+  },
+  packPlannerIdentityCardActive: {
+    borderColor: "rgba(0,229,204,0.56)",
+    backgroundColor: "rgba(0,229,204,0.12)",
+  },
+  packPlannerIdentityTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  packPlannerIdentitySubtitle: {
+    color: "rgba(255,255,255,0.66)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  packPlannerIdentityHint: {
+    color: "rgba(255,255,255,0.54)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  packPlannerNotesInput: {
+    minHeight: 72,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: "#FFF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+    textAlignVertical: "top",
+  },
+  packPlannerDraftSummary: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(0,0,0,0.32)",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 4,
+  },
+  packPlannerDraftSummaryTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  packPlannerDraftSummaryText: {
+    color: "rgba(255,255,255,0.68)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 17,
+  },
+  packPlannerComingSoonButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    opacity: 0.8,
+  },
+  packPlannerComingSoonText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
   card: {
     marginHorizontal: 16,
