@@ -17,7 +17,7 @@ export type StyleVibeCategory = {
 export type PhotoPackPreset = {
   id: string;
   label: string;
-  count: 4 | 6;
+  count: 4 | 6 | 9;
   vibeId: string;
   icon: string;
   accent: string;
@@ -258,6 +258,17 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
     gradient: ["rgba(255,179,230,0.24)", "rgba(126,243,255,0.10)", "rgba(0,0,0,0.86)"],
     subtitle: "Four matching frames for a shared post or carousel.",
     example: "Close pose, walking frame, candid laugh, cinematic final.",
+  },
+  {
+    id: "luxe_grid_nine",
+    label: "Luxe Grid 9",
+    count: 9,
+    vibeId: "old_money_luxe",
+    icon: "grid-outline",
+    accent: "#F4D7A1",
+    gradient: ["rgba(244,215,161,0.26)", "rgba(72,58,34,0.18)", "rgba(0,0,0,0.86)"],
+    subtitle: "Nine-image grid reset — one cohesive luxury aesthetic.",
+    example: "Editorial portrait, mirror selfie, café, jewelry, street, hotel, over-shoulder, flash, hero wide.",
   },
 ];
 

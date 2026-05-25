@@ -805,6 +805,57 @@ class ApiClient {
       true,
     );
   }
+  async generateInstaMeGridPreview(payload: {
+    packId: string;
+    packLabel: string;
+    packCount: number;
+    vibeId: string;
+    vibeLabel: string;
+    requiredElementIds: string[];
+    notes: string;
+    identityMode: "portrait_reference" | "inspired_muse" | "fictional_muse";
+    portrait?: { base64: string; mimeType?: string };
+  }) {
+    return this.request<{
+      previewBase64: string;
+      creditsCharged: number;
+      creditsRemaining: number;
+    }>(
+      "/instame/grid-preview",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      true,
+    );
+  }
+
+  async generateInstaMeGridRender(payload: {
+    packId: string;
+    packLabel: string;
+    packCount: number;
+    vibeId: string;
+    vibeLabel: string;
+    requiredElementIds: string[];
+    notes: string;
+    identityMode: "portrait_reference" | "inspired_muse" | "fictional_muse";
+    portrait?: { base64: string; mimeType?: string };
+  }) {
+    return this.request<{
+      images: Array<{ shotIndex: number; shotLabel: string; imageBase64: string }>;
+      totalRequested: number;
+      totalRendered: number;
+      creditsCharged: number;
+      creditsRemaining: number;
+    }>(
+      "/instame/grid-render",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      true,
+    );
+  }
 }
 
 export const apiClient = new ApiClient();

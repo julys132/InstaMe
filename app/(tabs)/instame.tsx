@@ -557,6 +557,11 @@ export default function InstaMeScreen() {
   const [packBriefRequiredElementIds, setPackBriefRequiredElementIds] = useState<string[]>([]);
   const [packBriefNotes, setPackBriefNotes] = useState("");
   const [selectedPackIdentityModeId, setSelectedPackIdentityModeId] = useState<string>("portrait_reference");
+  const [packGridPreviewBase64, setPackGridPreviewBase64] = useState<string | null>(null);
+  const [packGridPreviewLoading, setPackGridPreviewLoading] = useState(false);
+  const [packGridRenderImages, setPackGridRenderImages] = useState<Array<{ shotIndex: number; shotLabel: string; imageBase64: string }>>([]);
+  const [packGridRenderLoading, setPackGridRenderLoading] = useState(false);
+  const [packGridError, setPackGridError] = useState<string | null>(null);
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
@@ -1646,6 +1651,75 @@ export default function InstaMeScreen() {
     void Haptics.selectionAsync();
   }, []);
 
+  const handleGenerateGridPreview = useCallback(async () => {
+    if (!activePhotoPack) return;
+    if (selectedPackIdentityModeId === "portrait_reference" && !photo) {
+      Alert.alert("Portrait required", "Add a portrait above before using identity-locked generation.");
+      return;
+    }
+    const portraitPayload =
+      selectedPackIdentityModeId === "portrait_reference" && photo
+        ? { base64: photo.base64, mimeType: photo.mimeType }
+        : undefined;
+    setPackGridPreviewLoading(true);
+    setPackGridError(null);
+    setPackGridPreviewBase64(null);
+    setPackGridRenderImages([]);
+    try {
+      const result = await apiClient.generateInstaMeGridPreview({
+        packId: activePhotoPack.id,
+        packLabel: activePhotoPack.label,
+        packCount: activePhotoPack.count,
+        vibeId: selectedPackBriefVibeId,
+        vibeLabel: selectedPackBriefVibe.label,
+        requiredElementIds: packBriefRequiredElementIds,
+        notes: packBriefNotes,
+        identityMode: selectedPackIdentityModeId as "portrait_reference" | "inspired_muse" | "fictional_muse",
+        portrait: portraitPayload,
+      });
+      setPackGridPreviewBase64(result.previewBase64);
+      await refreshCredits();
+    } catch (error: any) {
+      setPackGridError(error?.message || "Failed to generate grid preview. Please try again.");
+    } finally {
+      setPackGridPreviewLoading(false);
+    }
+  }, [activePhotoPack, selectedPackBriefVibeId, selectedPackBriefVibe, packBriefRequiredElementIds, packBriefNotes, selectedPackIdentityModeId, photo, refreshCredits]);
+
+  const handleRenderGridPack = useCallback(async () => {
+    if (!activePhotoPack) return;
+    if (selectedPackIdentityModeId === "portrait_reference" && !photo) {
+      Alert.alert("Portrait required", "Add a portrait above before using identity-locked generation.");
+      return;
+    }
+    const portraitPayload =
+      ["portrait_reference", "inspired_muse"].includes(selectedPackIdentityModeId) && photo
+        ? { base64: photo.base64, mimeType: photo.mimeType }
+        : undefined;
+    setPackGridRenderLoading(true);
+    setPackGridError(null);
+    setPackGridRenderImages([]);
+    try {
+      const result = await apiClient.generateInstaMeGridRender({
+        packId: activePhotoPack.id,
+        packLabel: activePhotoPack.label,
+        packCount: activePhotoPack.count,
+        vibeId: selectedPackBriefVibeId,
+        vibeLabel: selectedPackBriefVibe.label,
+        requiredElementIds: packBriefRequiredElementIds,
+        notes: packBriefNotes,
+        identityMode: selectedPackIdentityModeId as "portrait_reference" | "inspired_muse" | "fictional_muse",
+        portrait: portraitPayload,
+      });
+      setPackGridRenderImages(result.images);
+      await refreshCredits();
+    } catch (error: any) {
+      setPackGridError(error?.message || "Failed to render pack images. Please try again.");
+    } finally {
+      setPackGridRenderLoading(false);
+    }
+  }, [activePhotoPack, selectedPackBriefVibeId, selectedPackBriefVibe, packBriefRequiredElementIds, packBriefNotes, selectedPackIdentityModeId, photo, refreshCredits]);
+
   const mainCollageItems = useMemo(() => {
     const enhanceCard = {
       id: ENHANCE_PREVIEW_CARD_ID,
@@ -2697,10 +2771,95 @@ export default function InstaMeScreen() {
                       </Text>
                     </View>
 
-                    <Pressable disabled style={styles.packPlannerComingSoonButton}>
-                      <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.7)" />
-                      <Text style={styles.packPlannerComingSoonText}>Grid preview generation coming soon</Text>
-                    </Pressable>
+                    {packGridError ? (
+                      <View style={styles.packPlannerErrorCard}>
+                        <Text style={styles.packPlannerErrorText}>{packGridError}</Text>
+                      </View>
+                    ) : null}
+
+                    {packGridPreviewBase64 ? (
+                      <View style={styles.packPlannerPreviewCard}>
+                        <Text style={styles.packPlannerLabel}>Grid concept preview</Text>
+                        <NativeImage
+                          source={{ uri: `data:image/png;base64,${packGridPreviewBase64}` }}
+                          style={styles.packPlannerPreviewImage}
+                          resizeMode="cover"
+                        />
+                        <Pressable
+                          onPress={handleRenderGridPack}
+                          disabled={packGridRenderLoading}
+                          style={({ pressed }) => [
+                            styles.packPlannerRenderButton,
+                            (packGridRenderLoading || pressed) && { opacity: 0.7 },
+                          ]}
+                        >
+                          {packGridRenderLoading ? (
+                            <ActivityIndicator size="small" color="#FFF" />
+                          ) : (
+                            <Ionicons name="images-outline" size={14} color="#FFF" />
+                          )}
+                          <Text style={styles.packPlannerRenderButtonText}>
+                            {packGridRenderLoading
+                              ? "Rendering images\u2026"
+                              : `Render all ${activePhotoPack.count} images \u2014 ${activePhotoPack.count} credits`}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+
+                    {packGridRenderImages.length > 0 ? (
+                      <View style={styles.packPlannerResultsGrid}>
+                        <Text style={styles.packPlannerLabel}>
+                          {packGridRenderImages.length} image{packGridRenderImages.length !== 1 ? "s" : ""} ready
+                        </Text>
+                        <View style={styles.packPlannerResultsWrap}>
+                          {packGridRenderImages.map((img) => (
+                            <NativeImage
+                              key={img.shotIndex}
+                              source={{ uri: `data:image/png;base64,${img.imageBase64}` }}
+                              style={styles.packPlannerResultThumb}
+                              resizeMode="cover"
+                            />
+                          ))}
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {!packGridPreviewBase64 ? (
+                      <Pressable
+                        onPress={handleGenerateGridPreview}
+                        disabled={packGridPreviewLoading || !isPackBriefConfigured}
+                        style={({ pressed }) => [
+                          styles.packPlannerPreviewButton,
+                          (!isPackBriefConfigured || packGridPreviewLoading || pressed) && { opacity: 0.6 },
+                        ]}
+                      >
+                        {packGridPreviewLoading ? (
+                          <ActivityIndicator size="small" color="#000" />
+                        ) : (
+                          <Ionicons name="grid-outline" size={14} color="#000" />
+                        )}
+                        <Text style={styles.packPlannerPreviewButtonText}>
+                          {packGridPreviewLoading
+                            ? "Generating grid preview\u2026"
+                            : isPackBriefConfigured
+                              ? "Generate grid preview \u2014 2 credits"
+                              : "Select a vibe and at least one element to preview"}
+                        </Text>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        onPress={() => {
+                          setPackGridPreviewBase64(null);
+                          setPackGridRenderImages([]);
+                          setPackGridError(null);
+                        }}
+                        style={styles.packPlannerResetButton}
+                      >
+                        <Ionicons name="refresh-outline" size={13} color="rgba(255,255,255,0.72)" />
+                        <Text style={styles.packPlannerResetButtonText}>Start over</Text>
+                      </Pressable>
+                    )}
                   </>
                 )}
               </View>
@@ -4547,6 +4706,84 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.72)",
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
+  },
+  packPlannerPreviewButton: {
+    borderRadius: 12,
+    backgroundColor: "#FFF",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  packPlannerPreviewButtonText: {
+    color: "#000",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  packPlannerRenderButton: {
+    borderRadius: 12,
+    backgroundColor: "rgba(126,243,255,0.80)",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    marginTop: 4,
+  },
+  packPlannerRenderButtonText: {
+    color: "#000",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  packPlannerResetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+  },
+  packPlannerResetButtonText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  packPlannerErrorCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,79,125,0.36)",
+    backgroundColor: "rgba(255,79,125,0.10)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  packPlannerErrorText: {
+    color: "#FF7A9E",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  packPlannerPreviewCard: {
+    gap: 8,
+  },
+  packPlannerPreviewImage: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 12,
+  },
+  packPlannerResultsGrid: {
+    gap: 8,
+  },
+  packPlannerResultsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  packPlannerResultThumb: {
+    width: "48%",
+    aspectRatio: 0.8,
+    borderRadius: 10,
   },
   card: {
     marginHorizontal: 16,

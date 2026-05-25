@@ -84,6 +84,16 @@ import {
   type RuntimeImageInput,
 } from "./lib/instame-image";
 import { getStyleAssetObject } from "./lib/railway-bucket";
+import {
+  buildGridPackShotPlan,
+  buildGridPreviewPrompt,
+  buildGridShotRenderPrompt,
+  GRID_PREVIEW_CREDIT_COST,
+  GRID_RENDER_CREDIT_COST_PER_IMAGE,
+  type GridPackBrief,
+  type GridPackIdentityMode,
+  type GridPackRequiredElementId,
+} from "./lib/instame-grid-pack";
 
 function getGeminiApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -6510,6 +6520,209 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(503).json({ error: temporaryServiceMessage });
       }
       res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // ─── Instagram Grid Pack — Preview ───────────────────────────────────────────
+  // POST /api/instame/grid-preview
+  // Generates a single Instagram grid concept preview image.
+  // Cost: GRID_PREVIEW_CREDIT_COST credits (flat).
+  app.post("/api/instame/grid-preview", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+
+    const packId = normalizeStringValue(body.packId);
+    const vibeId = normalizeStringValue(body.vibeId);
+    const vibeLabel = normalizeStringValue(body.vibeLabel) || vibeId;
+    const packLabel = normalizeStringValue(body.packLabel) || packId;
+    const packCount = typeof body.packCount === "number" ? body.packCount : 4;
+    const identityMode: GridPackIdentityMode = ["portrait_reference", "inspired_muse", "fictional_muse"].includes(
+      body.identityMode,
+    )
+      ? (body.identityMode as GridPackIdentityMode)
+      : "fictional_muse";
+    const requiredElementIds: GridPackRequiredElementId[] = Array.isArray(body.requiredElementIds)
+      ? body.requiredElementIds.filter((id: unknown) =>
+          ["outfit", "location", "car", "accessories", "mirror", "detail"].includes(id as string),
+        )
+      : [];
+    const notes = normalizeStringValue(body.notes);
+
+    if (!packId || !vibeId) {
+      return res.status(400).json({ error: "packId and vibeId are required." });
+    }
+
+    let portraitInput: RuntimeImageInput | undefined;
+    if (identityMode === "portrait_reference" && body.portrait?.base64) {
+      const base64 = normalizeStringValue(body.portrait.base64);
+      if (!base64) {
+        return res.status(400).json({ error: "portrait.base64 is required when identityMode is portrait_reference." });
+      }
+      portraitInput = {
+        base64,
+        mimeType: normalizeStringValue(body.portrait.mimeType) || "image/jpeg",
+      };
+    }
+
+    const brief: GridPackBrief = { packId, packLabel, packCount, vibeId, vibeLabel, requiredElementIds, notes, identityMode };
+
+    let creditsConsumed = false;
+    try {
+      const consumed = await consumeCredits(userId, GRID_PREVIEW_CREDIT_COST, "instame_grid_preview");
+      if (!consumed) {
+        return res.status(402).json({
+          error: `Not enough credits. Grid preview costs ${GRID_PREVIEW_CREDIT_COST} credits.`,
+          requiredCredits: GRID_PREVIEW_CREDIT_COST,
+        });
+      }
+      creditsConsumed = true;
+
+      const prompt = buildGridPreviewPrompt(brief);
+      const images: RuntimeImageInput[] = portraitInput ? [portraitInput] : [];
+
+      const previewBase64 = await generateOpenAiImage({
+        model: "gpt-image-1",
+        prompt,
+        images,
+        size: "1024x1024",
+        quality: "low",
+      });
+
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
+
+      return res.json({
+        previewBase64,
+        creditsCharged: GRID_PREVIEW_CREDIT_COST,
+        creditsRemaining: updatedUser?.credits ?? 0,
+      });
+    } catch (error: unknown) {
+      console.error("InstaMe grid-preview error:", error);
+      if (creditsConsumed) {
+        await refundCredits(userId, GRID_PREVIEW_CREDIT_COST, "instame_grid_preview_failed");
+      }
+      const errorMessage = toErrorMessage(error, "Failed to generate grid preview");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // ─── Instagram Grid Pack — Render ─────────────────────────────────────────────
+  // POST /api/instame/grid-render
+  // Generates all individual images in a pack sequentially.
+  // Cost: GRID_RENDER_CREDIT_COST_PER_IMAGE × packCount credits charged upfront;
+  //       each failed image is refunded individually.
+  app.post("/api/instame/grid-render", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+
+    const packId = normalizeStringValue(body.packId);
+    const vibeId = normalizeStringValue(body.vibeId);
+    const vibeLabel = normalizeStringValue(body.vibeLabel) || vibeId;
+    const packLabel = normalizeStringValue(body.packLabel) || packId;
+    const packCount = typeof body.packCount === "number" ? body.packCount : 4;
+    const identityMode: GridPackIdentityMode = ["portrait_reference", "inspired_muse", "fictional_muse"].includes(
+      body.identityMode,
+    )
+      ? (body.identityMode as GridPackIdentityMode)
+      : "fictional_muse";
+    const requiredElementIds: GridPackRequiredElementId[] = Array.isArray(body.requiredElementIds)
+      ? body.requiredElementIds.filter((id: unknown) =>
+          ["outfit", "location", "car", "accessories", "mirror", "detail"].includes(id as string),
+        )
+      : [];
+    const notes = normalizeStringValue(body.notes);
+
+    if (!packId || !vibeId) {
+      return res.status(400).json({ error: "packId and vibeId are required." });
+    }
+
+    let portraitInput: RuntimeImageInput | undefined;
+    if (identityMode === "portrait_reference" && body.portrait?.base64) {
+      const base64 = normalizeStringValue(body.portrait.base64);
+      if (!base64) {
+        return res.status(400).json({ error: "portrait.base64 is required when identityMode is portrait_reference." });
+      }
+      portraitInput = {
+        base64,
+        mimeType: normalizeStringValue(body.portrait.mimeType) || "image/jpeg",
+      };
+    } else if (identityMode === "portrait_reference") {
+      return res.status(400).json({ error: "A portrait image is required for portrait_reference identity mode." });
+    }
+
+    const brief: GridPackBrief = { packId, packLabel, packCount, vibeId, vibeLabel, requiredElementIds, notes, identityMode };
+    const shotPlan = buildGridPackShotPlan(brief);
+    const totalShots = shotPlan.length;
+    const totalCost = GRID_RENDER_CREDIT_COST_PER_IMAGE * totalShots;
+
+    let creditsConsumedCount = 0;
+    try {
+      const consumed = await consumeCredits(userId, totalCost, "instame_grid_render");
+      if (!consumed) {
+        return res.status(402).json({
+          error: `Not enough credits. Rendering ${totalShots} images costs ${totalCost} credits.`,
+          requiredCredits: totalCost,
+        });
+      }
+      creditsConsumedCount = totalCost;
+
+      const renderedImages: Array<{ shotIndex: number; shotLabel: string; imageBase64: string }> = [];
+
+      for (const shot of shotPlan) {
+        try {
+          const prompt = buildGridShotRenderPrompt({
+            shot,
+            brief,
+            totalShots,
+            hasPortraitReference: Boolean(portraitInput),
+          });
+
+          const images: RuntimeImageInput[] = portraitInput ? [portraitInput] : [];
+
+          const imageBase64 = await generateOpenAiImage({
+            model: "gpt-image-1",
+            prompt,
+            images,
+            size: "1024x1536",
+            quality: "medium",
+          });
+
+          renderedImages.push({ shotIndex: shot.index, shotLabel: shot.shotLabel, imageBase64 });
+        } catch (shotError: unknown) {
+          // Refund the credit for this individual failed shot and continue with remaining shots
+          console.error(`InstaMe grid-render shot ${shot.index} error:`, shotError);
+          await refundCredits(userId, GRID_RENDER_CREDIT_COST_PER_IMAGE, `instame_grid_render_shot_${shot.index}_failed`);
+          creditsConsumedCount -= GRID_RENDER_CREDIT_COST_PER_IMAGE;
+        }
+      }
+
+      if (renderedImages.length === 0) {
+        return res.status(503).json({ error: "All images failed to generate. Credits have been refunded. Please try again." });
+      }
+
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
+
+      return res.json({
+        images: renderedImages,
+        totalRequested: totalShots,
+        totalRendered: renderedImages.length,
+        creditsCharged: creditsConsumedCount,
+        creditsRemaining: updatedUser?.credits ?? 0,
+      });
+    } catch (error: unknown) {
+      console.error("InstaMe grid-render error:", error);
+      if (creditsConsumedCount > 0) {
+        await refundCredits(userId, creditsConsumedCount, "instame_grid_render_failed");
+      }
+      const errorMessage = toErrorMessage(error, "Failed to render grid pack");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
     }
   });
 

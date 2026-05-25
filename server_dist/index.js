@@ -1362,6 +1362,308 @@ async function getStyleAssetObject(relativePath) {
   }
 }
 
+// server/lib/instame-grid-pack.ts
+var VIBE_PROMPT_HINTS = {
+  signature_editorial: "polished editorial photography, studio-quality light, magazine energy, clean skin, cinematic composition, fashion-forward",
+  flash_night: "night flash photography, Y2K grain, after-dark paparazzi energy, high contrast, dark backgrounds",
+  old_money_luxe: "quiet luxury, muted beige/grey/black palette, European elegance, cinematic editorial, subtle film grain, premium but natural, rich-girl aesthetic",
+  clean_glow: "soft natural light, bright skin tone, airy and clean palette, effortless everyday beauty, fresh glow",
+  cafe_lifestyle: "caf\xE9 terrace, warm morning light, latte art, effortless Parisian lifestyle, candid warmth, relaxed aesthetic",
+  street_luxe: "urban movement, confident street presence, dynamic composition, denim and leather styling, city backdrop",
+  mirror_selfies: "creator mirror frame, fitting room or hotel bathroom, outfit reveal energy, casual luxury, iphone aesthetic",
+  travel_escape: "sun-drenched travel content, architectural backgrounds, Mediterranean or European city, golden hour light",
+  car_luxe: "luxury car interior or exterior, dashboard glow, cinematic automotive perspective, premium lifestyle",
+  soft_romantic: "blush tones, floral details, soft gestures, romantic editorial, warm haze, feminine elegance",
+  cozy_home: "intimate interior frames, soft bedroom or sofa setting, polished homebody aesthetic, warm tones",
+  event_glam: "party shine, glam evening look, jewelry and dress detail, polished event photography, sparkle",
+  life_moments: "warm personal frames, emotional and natural, memory-like quality, candid warmth, storytelling",
+  couple_shoots: "synchronized couple energy, shared chemistry, cinematic two-person composition, matching aesthetic",
+  men_editorial: "moody urban street portraits, confident masculine framing, editorial menswear, architectural backdrops"
+};
+var REQUIRED_ELEMENT_LABELS = {
+  outfit: "signature outfit clearly visible",
+  location: "recognizable location in frame",
+  car: "luxury car or ride visible",
+  accessories: "jewelry or accessory close-up",
+  mirror: "mirror selfie framing",
+  detail: "stylish detail crop \u2014 fabric, jewelry, or shoes"
+};
+var PACK_SHOT_RECIPES = {
+  signature_four: [
+    {
+      shotType: "cover_portrait",
+      shotLabel: "Cover Portrait",
+      shotDescription: "tight editorial portrait, direct gaze, strong directional light, magazine-front energy"
+    },
+    {
+      shotType: "half_body",
+      shotLabel: "Half-Body Editorial",
+      shotDescription: "half-body fashion frame, full outfit prominent, confident posture"
+    },
+    {
+      shotType: "seated_lifestyle",
+      shotLabel: "Seated Lifestyle",
+      shotDescription: "candid seated moment, natural relaxed expression, environment visible behind"
+    },
+    {
+      shotType: "detail_crop",
+      shotLabel: "Detail Crop",
+      shotDescription: "extreme close-up detail \u2014 jewelry, bag strap, shoes or fabric texture"
+    }
+  ],
+  story_drop_six: [
+    {
+      shotType: "mirror_flash",
+      shotLabel: "Mirror Flash",
+      shotDescription: "hotel or home mirror selfie with flash, full outfit reveal, flash reflection visible"
+    },
+    {
+      shotType: "face_closeup",
+      shotLabel: "Face Close-Up",
+      shotDescription: "editorial face close-up, sharp eyes, dramatic or soft directional light"
+    },
+    {
+      shotType: "walking_shot",
+      shotLabel: "Walking Shot",
+      shotDescription: "mid-movement walking frame, confident stride, urban or venue backdrop"
+    },
+    {
+      shotType: "blurry_flash",
+      shotLabel: "Blurry Flash Moment",
+      shotDescription: "intentionally blurry flash candid, night-out or party energy, motion blur"
+    },
+    {
+      shotType: "grainy_portrait",
+      shotLabel: "Grainy Portrait",
+      shotDescription: "high-grain analog-style portrait, intimate scale, warm or desaturated tone"
+    },
+    {
+      shotType: "hero_final",
+      shotLabel: "Hero Final",
+      shotDescription: "signature composed hero shot, full look visible, best editorial energy of the set"
+    }
+  ],
+  clean_grid_four: [
+    {
+      shotType: "beauty_closeup",
+      shotLabel: "Beauty Close-Up",
+      shotDescription: "face and neck beauty shot, clean skin, natural makeup, soft front light, no shadows"
+    },
+    {
+      shotType: "daylight_selfie",
+      shotLabel: "Daylight Selfie",
+      shotDescription: "bright natural-light selfie, relaxed authentic expression, outdoor or window light"
+    },
+    {
+      shotType: "calm_seated",
+      shotLabel: "Calm Seated",
+      shotDescription: "peaceful seated frame in a bright minimal space \u2014 caf\xE9, desk or living room"
+    },
+    {
+      shotType: "soft_portrait",
+      shotLabel: "Soft Portrait",
+      shotDescription: "full or half-body portrait in soft diffused light, neutral background, clean and minimal"
+    }
+  ],
+  luxe_weekend_six: [
+    {
+      shotType: "hotel_entrance",
+      shotLabel: "Hotel Entrance",
+      shotDescription: "luxury hotel lobby or entrance, marble architecture, polished arrival moment"
+    },
+    {
+      shotType: "city_walk",
+      shotLabel: "City Walk",
+      shotDescription: "elegant European city walk, polished outfit, cobblestone or wide boulevard backdrop"
+    },
+    {
+      shotType: "jewelry_closeup",
+      shotLabel: "Jewelry Close-Up",
+      shotDescription: "hand or neck close-up focusing on gold jewelry \u2014 watch, ring, or necklace"
+    },
+    {
+      shotType: "terrace_moment",
+      shotLabel: "Terrace Moment",
+      shotDescription: "luxury terrace or hotel balcony, city or sea view, relaxed elegant posture"
+    },
+    {
+      shotType: "car_frame",
+      shotLabel: "Car Frame",
+      shotDescription: "luxury car door, window or interior \u2014 Mercedes G-Class, 911 or equivalent"
+    },
+    {
+      shotType: "refined_portrait",
+      shotLabel: "Refined Portrait",
+      shotDescription: "polished editorial portrait in a quiet luxury setting \u2014 understated power and elegance"
+    }
+  ],
+  city_muse_six: [
+    {
+      shotType: "crosswalk",
+      shotLabel: "Crosswalk",
+      shotDescription: "dynamic crosswalk shot, mid-movement, urban energy, confident stride"
+    },
+    {
+      shotType: "wall_portrait",
+      shotLabel: "Wall Portrait",
+      shotDescription: "posed against textured urban wall, direct gaze, architectural geometric framing"
+    },
+    {
+      shotType: "steps_sit",
+      shotLabel: "Steps Sit",
+      shotDescription: "sitting or leaning on outdoor steps, layered city depth in background"
+    },
+    {
+      shotType: "street_walk",
+      shotLabel: "Street Walk",
+      shotDescription: "candid street walk, mid-movement, natural expression, full look visible"
+    },
+    {
+      shotType: "outfit_detail",
+      shotLabel: "Outfit Detail",
+      shotDescription: "close-up of outfit detail \u2014 jacket collar, belt, boots or bag handle"
+    },
+    {
+      shotType: "hero_confident",
+      shotLabel: "Hero Confident",
+      shotDescription: "strong full or half-body hero shot, urban backdrop, full look composed confidently"
+    }
+  ],
+  couple_drop_four: [
+    {
+      shotType: "close_pose",
+      shotLabel: "Close Pose",
+      shotDescription: "intimate close pose, faces near each other, genuine connection and chemistry"
+    },
+    {
+      shotType: "walking_couple",
+      shotLabel: "Walking Frame",
+      shotDescription: "walking side by side, hands held or shoulders touching, light and dynamic movement"
+    },
+    {
+      shotType: "candid_laugh",
+      shotLabel: "Candid Laugh",
+      shotDescription: "genuine candid laughter moment, real emotion, warm and natural light"
+    },
+    {
+      shotType: "cinematic_final",
+      shotLabel: "Cinematic Final",
+      shotDescription: "wide cinematic two-shot, environment prominent, couple as subjects in the scene"
+    }
+  ],
+  luxe_grid_nine: [
+    {
+      shotType: "editorial_portrait",
+      shotLabel: "Editorial Portrait",
+      shotDescription: "cover-quality editorial portrait, strong direct gaze, polished directional light"
+    },
+    {
+      shotType: "mirror_selfie",
+      shotLabel: "Mirror Selfie",
+      shotDescription: "hotel or home mirror selfie, full outfit visible, clean reflection"
+    },
+    {
+      shotType: "cafe_candid",
+      shotLabel: "Caf\xE9 Candid",
+      shotDescription: "candid caf\xE9 moment, coffee cup in hand, warm ambient interior light"
+    },
+    {
+      shotType: "jewelry_detail",
+      shotLabel: "Jewelry Detail",
+      shotDescription: "hand or neck close-up on gold jewelry \u2014 ring, necklace or earring"
+    },
+    {
+      shotType: "street_walk",
+      shotLabel: "Street Walk",
+      shotDescription: "confident street walking shot, full outfit look, European or urban street backdrop"
+    },
+    {
+      shotType: "hotel_interior",
+      shotLabel: "Hotel Interior",
+      shotDescription: "luxury hotel interior frame \u2014 lobby corridor, suite bed or ornate staircase"
+    },
+    {
+      shotType: "over_shoulder",
+      shotLabel: "Over-Shoulder",
+      shotDescription: "over-the-shoulder walking shot, partial face visible, elegant composition"
+    },
+    {
+      shotType: "blurry_flash",
+      shotLabel: "Flash Moment",
+      shotDescription: "intentionally blurry flash candid, party or night energy, motion blur"
+    },
+    {
+      shotType: "hero_wide",
+      shotLabel: "Hero Wide",
+      shotDescription: "wide editorial hero shot, full environment visible, signature composed pose"
+    }
+  ]
+};
+var FALLBACK_SHOT_RECIPE = PACK_SHOT_RECIPES["signature_four"];
+function resolvePackShotRecipe(packId) {
+  return PACK_SHOT_RECIPES[packId] ?? FALLBACK_SHOT_RECIPE;
+}
+function getVibePromptHint(vibeId) {
+  return VIBE_PROMPT_HINTS[vibeId] ?? vibeId.replace(/_/g, " ");
+}
+function assignElementsToShots(shotCount, requiredElementIds) {
+  const assignments = Array(shotCount).fill(null);
+  let elementIndex = 0;
+  for (let shotIndex = 0; shotIndex < shotCount && elementIndex < requiredElementIds.length; shotIndex++) {
+    assignments[shotIndex] = requiredElementIds[elementIndex];
+    elementIndex++;
+  }
+  return assignments;
+}
+function buildGridPackShotPlan(brief) {
+  const recipe = resolvePackShotRecipe(brief.packId);
+  const elementAssignments = assignElementsToShots(recipe.length, brief.requiredElementIds);
+  return recipe.map((template, index) => ({
+    ...template,
+    index,
+    assignedElement: elementAssignments[index]
+  }));
+}
+function buildGridPreviewPrompt(brief) {
+  const vibeHint = getVibePromptHint(brief.vibeId);
+  const shots = buildGridPackShotPlan(brief);
+  const count = shots.length;
+  const cols = count <= 4 ? 2 : 3;
+  const rows = count <= 4 ? 2 : count <= 6 ? 2 : 3;
+  const elementLabels = brief.requiredElementIds.map((id) => REQUIRED_ELEMENT_LABELS[id]);
+  const elementsNote = elementLabels.length > 0 ? `Required visual elements distributed across the grid: ${elementLabels.join("; ")}.` : "";
+  const shotDescriptions = shots.map((s) => `[${s.index + 1}] ${s.shotLabel}: ${s.shotDescription}`).join(" | ");
+  const identityNote = brief.identityMode === "portrait_reference" ? "The same woman appears in every photo with identical facial features, hair color, and general styling throughout the grid." : brief.identityMode === "inspired_muse" ? "A consistent editorial woman muse appears throughout the grid, her style inspired by the brief." : "A fictional editorial muse appears consistently across all photos in the grid.";
+  const notesNote = brief.notes.trim() ? `Additional creative direction: ${brief.notes.trim()}.` : "";
+  return [
+    `Generate a photorealistic Instagram profile page screenshot showing a ${cols}\xD7${rows} photo grid.`,
+    `All ${count} photos share one cohesive aesthetic: ${vibeHint}.`,
+    `Shot composition across the grid: ${shotDescriptions}.`,
+    elementsNote,
+    identityNote,
+    notesNote,
+    `The result looks like a real iPhone Instagram feed screenshot. Photos are naturally shot and edited with a consistent color palette. All ${count} photo tiles are tiled in a ${cols}-column grid filling the entire image \u2014 no UI chrome, no text, just the photo grid. Premium, authentic, ready-to-post quality.`
+  ].filter(Boolean).join(" ");
+}
+function buildGridShotRenderPrompt(options) {
+  const { shot, brief, totalShots, hasPortraitReference } = options;
+  const vibeHint = getVibePromptHint(brief.vibeId);
+  const elementNote = shot.assignedElement ? ` This specific photo must clearly show: ${REQUIRED_ELEMENT_LABELS[shot.assignedElement]}.` : "";
+  const identityInstruction = hasPortraitReference ? " Preserve the exact facial features, hair color, and hair style from the provided reference portrait." : brief.identityMode === "inspired_muse" ? " The subject is a consistent editorial woman whose look is inspired by the brief direction." : " The subject is a stylish editorial woman whose appearance is consistent with the pack aesthetic.";
+  const notesNote = brief.notes.trim() && shot.index === 0 ? ` Additional creative direction: ${brief.notes.trim()}.` : "";
+  return [
+    `Instagram portrait photo. Shot ${shot.index + 1} of ${totalShots} in a ${brief.vibeLabel} pack.`,
+    `Shot type: ${shot.shotLabel}. ${shot.shotDescription}.`,
+    `Visual aesthetic: ${vibeHint}.`,
+    elementNote,
+    identityInstruction,
+    notesNote,
+    "Vertical 4:5 Instagram format. Photorealistic, natural iPhone or editorial photography. No AI artifacts. Premium but authentic feed image. Ready to post on Instagram."
+  ].filter(Boolean).join(" ");
+}
+var GRID_PREVIEW_CREDIT_COST = 2;
+var GRID_RENDER_CREDIT_COST_PER_IMAGE = 1;
+
 // server/routes.ts
 function getGeminiApiKey() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -1374,7 +1676,7 @@ function getGeminiApiKey() {
 }
 var OWN_STYLE_ANALYSIS_VERSIONS = {
   reference_locked: 1,
-  creative_prompt: 2
+  creative_prompt: 4
 };
 function firstHeaderValue(value) {
   return Array.isArray(value) ? value[0] : value;
@@ -2145,7 +2447,16 @@ var OWN_STYLE_ANALYSIS_PROMPT = [
   "Write a rich, detailed English analysis that can be reused as style direction for a separate image generation step.",
   "Do not ask questions. Do not mention limitations. Return only the analysis."
 ].join(" ");
-var CREATIVE_OWN_STYLE_ANALYSIS_PROMPT = "Analizeaza aceasta imagine din punctul de vedere al unui fotograf profesionist elite level, nu uita sa incluzi exact posingul corpului, expresia si mimica fetei, si felul in care cade sau este asezat parul.";
+var CREATIVE_OWN_STYLE_ANALYSIS_PROMPT = [
+  "Analyze this style-reference image in English as an elite fashion photographer and art director.",
+  "Be extremely concrete and exhaustive.",
+  "Describe exactly the body pose, shoulder and torso angles, hand placement, leg placement, head tilt, eye direction, facial expression, facial micro-expression, and hair arrangement (exclude hair color).",
+  "Also describe wardrobe pieces and materials, lighting setup, camera angle, lens feeling, framing, subject-to-camera distance, composition geometry, background elements, mood, color palette, texture, and finish.",
+  "Create a Color Lock section that lists the dominant visual elements and their exact colors or hues (for example: bouquet flowers, clothing pieces, accessories, props, and key background accents).",
+  "These locked colors are mandatory for generation unless the user explicitly requests a color change.",
+  "Write it as precise visual direction so the style can be replicated 1:1 without omissions or reinterpretations.",
+  "Return only the analysis."
+].join(" ");
 function normalizeStringList(input) {
   if (!Array.isArray(input)) return [];
   return input.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean);
@@ -2324,7 +2635,8 @@ function normalizeStoredInstaMeUploadedImages(input) {
       normalizeStringValue(candidate.previewBase64) || base64
     ).replace(/\s+/g, "");
     const kind = candidate.kind === "enhanced" ? "enhanced" : candidate.kind === "own_style" ? "own_style" : "uploaded";
-    const analyzedPrompt = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
+    const analyzedPromptRaw = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
+    const analyzedPrompt = kind === "own_style" ? analyzedPromptRaw || buildOwnStyleFallbackAnalysisPrompt() : analyzedPromptRaw;
     const analysisMode = candidate.analysisMode === "creative_prompt" || candidate.analysisMode === "reference_locked" ? candidate.analysisMode : void 0;
     const analysisVersion = Number(candidate.analysisVersion);
     const imageHash = normalizeStringValue(candidate.imageHash);
@@ -2336,7 +2648,6 @@ function normalizeStoredInstaMeUploadedImages(input) {
     const createdAt = normalizeStringValue(candidate.createdAt);
     const firstUseSurchargeCharged = kind === "own_style" ? typeof firstUseSurchargeChargedRaw === "boolean" ? firstUseSurchargeChargedRaw : true : void 0;
     if (!id || !base64 || !previewBase64) return null;
-    if (kind === "own_style" && !analyzedPrompt) return null;
     if (!Number.isFinite(width) || width <= 0) return null;
     if (!Number.isFinite(height) || height <= 0) return null;
     return {
@@ -2958,6 +3269,7 @@ function isGeminiModelNotFoundError(error) {
 function buildOwnStyleFallbackAnalysisPrompt() {
   return [
     "Use the uploaded style reference as the guide for pose, facial expression, facial micro-expression, hair arrangement, wardrobe, lighting, camera angle, framing, composition, background mood, color palette, texture, and overall aesthetic.",
+    "Preserve exact colors for dominant elements such as flowers, clothing, props, and key background accents unless the user asks to recolor them.",
     "Preserve the uploaded subject's identity exactly and transfer only the style direction from the reference image."
   ].join(" ");
 }
@@ -3143,7 +3455,21 @@ async function analyzeOwnStyleReferenceImage(styleImage, options) {
   }
 }
 function buildOwnStyleTransformPrompt(options) {
-  return `Editeaza imaginea urmand exact promtul: ${options.analyzedStylePrompt}`;
+  const promptParts = [
+    "Recreate the style direction from the style reference image with strict fidelity.",
+    "Keep the uploaded subject's identity exactly: face structure, skin tone, age appearance, and natural hair color must stay recognizable.",
+    "Transfer the style-reference composition faithfully: body pose, camera angle, subject-to-camera relationship, framing, wardrobe, lighting, background structure, and fine details.",
+    "Color fidelity is mandatory: preserve exact colors of dominant style elements, including flowers, clothing, accessories, props, and key background accents.",
+    "Do not neutralize, desaturate, or replace these key colors (example: pink flowers must not become white) unless the additional user request explicitly asks for recoloring.",
+    options.preserveBackground ? "Preserve the background composition and scene layout from the style direction; do not invent a different scene." : "Minor background reinterpretation is allowed only if needed, but keep the same camera angle, framing, and composition.",
+    "Style direction to execute:",
+    options.analyzedStylePrompt.trim()
+  ];
+  const extraPrompt = options.customPrompt.trim();
+  if (extraPrompt) {
+    promptParts.push(`Additional user request: ${extraPrompt}`);
+  }
+  return promptParts.join("\n");
 }
 function buildOwnStyleReferenceLockedPrompt(options) {
   const promptParts = [
@@ -3159,58 +3485,187 @@ function buildOwnStyleReferenceLockedPrompt(options) {
   }
   return promptParts.join("\n");
 }
+function buildOwnStyleCreativeTogetherFallbackPrompt(options) {
+  const promptParts = [
+    "Edit the uploaded portrait to match the following style direction exactly.",
+    "Preserve the subject's face, identity, skin tone, and natural hair color from the uploaded portrait.",
+    "Transfer the style-reference composition faithfully: pose, camera angle, framing, wardrobe, lighting, background structure, and fine details.",
+    "Color fidelity is mandatory: keep exact dominant element colors from the style direction, including flowers, clothing, accessories, props, and key background accents.",
+    "Do not neutralize or swap these key colors unless the additional user request explicitly asks for recoloring.",
+    options.preserveBackground ? "Preserve the background composition and scene layout from the style direction." : "Minor background reinterpretation is allowed only if needed, while keeping the same camera relationship and framing.",
+    options.analyzedStylePrompt
+  ];
+  if (options.customPrompt.trim()) {
+    promptParts.push(`Additional user request: ${options.customPrompt.trim()}`);
+  }
+  return promptParts.join("\n");
+}
+function buildOwnStyleTogetherFallbackPrompt(options) {
+  const promptParts = [
+    "Replace the face and head of the person in the style reference image with the face and head from the uploaded user portrait.",
+    "This is a face swap: the output must look exactly like the style reference but with the user's face, skin tone, and facial features.",
+    "Keep the hair styling from the style reference, but preserve the user's natural hair color and hair length.",
+    "Do not add bangs or fringe unless they exist in the user portrait.",
+    "Keep everything else from the style reference exactly as-is: clothing, pose, body, lighting, framing, background, and composition.",
+    "The result must be photorealistic and seamless."
+  ];
+  if (options.customPrompt.trim()) {
+    promptParts.push(`Apply these changes to the result: ${options.customPrompt.trim()}`);
+  }
+  return promptParts.join("\n");
+}
 async function generateOwnStyleImage(options) {
   const tracePrefix = getOwnStyleTracePrefix(options.debugTraceContext);
-  const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleReferenceLockedPrompt({
-    customPrompt: options.customPrompt,
-    preserveBackground: options.preserveBackground
-  }) : buildOwnStyleTransformPrompt({
-    analyzedStylePrompt: options.analyzedStylePrompt,
-    customPrompt: options.customPrompt,
-    preserveBackground: options.preserveBackground
-  });
-  const parts = options.ownStyleMode === "reference_locked" ? [
-    { text: prompt },
-    { text: "User face source. Extract only the face and head from this image \u2014 it will replace the face in the style reference image below:" },
-    ...toGeminiInlineImageParts(options.uploadedImages),
-    { text: "Style reference image \u2014 OUTPUT BASE. Keep absolutely everything from this image (clothing, body, pose, lighting, framing, background) exactly as-is. Only replace the face and head with the user's face from the photo above:" },
-    ...toGeminiInlineImageParts([options.styleReferenceImage])
-  ] : [
-    { text: prompt },
-    ...toGeminiInlineImageParts(options.uploadedImages)
-  ];
-  logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.request`, {
-    provider: "Google",
-    model: DEFAULT_OWN_STYLE_IMAGE_MODEL,
-    prompt,
-    generationMode: options.generationMode,
-    preserveBackground: options.preserveBackground,
-    uploadedImageCount: options.uploadedImages.length,
-    includesStyleReferenceImage: options.ownStyleMode === "reference_locked"
-  });
-  const imageResponse = await generateGeminiContent({
-    model: DEFAULT_OWN_STYLE_IMAGE_MODEL,
-    parts,
-    responseModalities: ["IMAGE", "TEXT"],
-    maxOutputTokens: 1200
-  });
-  const imageBase64 = extractGeminiImageBase64(imageResponse);
-  if (!imageBase64) {
-    throw new Error("Own Style generation failed. No image data returned.");
+  if (options.generationMode === "high_res" && hasTogetherImageConfig()) {
+    try {
+      const { width, height } = resolveGenerationResolution(options.generationTierId);
+      const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
+      const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
+      const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleTogetherFallbackPrompt({
+        customPrompt: options.customPrompt,
+        preserveBackground: options.preserveBackground
+      }) : buildOwnStyleCreativeTogetherFallbackPrompt({
+        analyzedStylePrompt: options.analyzedStylePrompt,
+        customPrompt: options.customPrompt,
+        preserveBackground: options.preserveBackground
+      });
+      logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.high_res_request`, {
+        provider: "Together",
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        generationMode: options.generationMode,
+        width,
+        height,
+        uploadedImageCount: options.uploadedImages.length,
+        includesStyleReferenceImage: true
+      });
+      const imageBase64 = await generateTogetherImage({
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        referenceImages: [userImageUrl, styleReferenceUrl],
+        width,
+        height,
+        sourceWidth: options.uploadedImages[0]?.width,
+        sourceHeight: options.uploadedImages[0]?.height
+      });
+      logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.high_res_response`, {
+        provider: "Together",
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        prompt,
+        imageReturned: Boolean(imageBase64)
+      });
+      return {
+        imageBase64,
+        model: DEFAULT_TOGETHER_PRO_IMAGE_MODEL,
+        provider: "Together"
+      };
+    } catch (highResError) {
+      console.warn("Own Style high_res Together generation failed, falling back to Gemini:", highResError);
+    }
   }
-  logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.response`, {
-    provider: "Google",
-    model: DEFAULT_OWN_STYLE_IMAGE_MODEL,
-    prompt,
-    usage: extractGeminiUsageMetrics(imageResponse),
-    responseText: extractGeminiText(imageResponse) || null,
-    imageReturned: Boolean(imageBase64)
-  });
-  return {
-    imageBase64,
-    model: DEFAULT_OWN_STYLE_IMAGE_MODEL,
-    provider: "Google"
-  };
+  try {
+    const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleReferenceLockedPrompt({
+      customPrompt: options.customPrompt,
+      preserveBackground: options.preserveBackground
+    }) : buildOwnStyleTransformPrompt({
+      analyzedStylePrompt: options.analyzedStylePrompt,
+      customPrompt: options.customPrompt,
+      preserveBackground: options.preserveBackground
+    });
+    const parts = options.ownStyleMode === "reference_locked" ? [
+      { text: prompt },
+      { text: "User base photo to transform. This person must remain the final subject:" },
+      ...toGeminiInlineImageParts(options.uploadedImages),
+      { text: "Style reference image. Use it for styling direction such as pose, lighting, and mood, but never copy its hair color, bangs, haircut, or identity into the output:" },
+      ...toGeminiInlineImageParts([options.styleReferenceImage])
+    ] : [
+      { text: prompt },
+      { text: "Identity source image (MANDATORY): preserve this person's identity in the final image." },
+      ...toGeminiInlineImageParts(options.uploadedImages),
+      {
+        text: "Style direction image (STYLE ONLY): transfer pose, expression, hair arrangement, wardrobe, lighting, camera angle, framing, composition, background details, and mood. Keep dominant element colors exact (for example pink bouquet flowers must stay pink), and never copy identity from this image."
+      },
+      ...toGeminiInlineImageParts([options.styleReferenceImage])
+    ];
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.request`, {
+      provider: "Google",
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      prompt,
+      generationMode: options.generationMode,
+      preserveBackground: options.preserveBackground,
+      uploadedImageCount: options.uploadedImages.length,
+      includesStyleReferenceImage: true
+    });
+    const imageResponse = await generateGeminiContent({
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      parts,
+      responseModalities: ["IMAGE", "TEXT"],
+      maxOutputTokens: 1200
+    });
+    const imageBase64 = extractGeminiImageBase64(imageResponse);
+    if (!imageBase64) {
+      throw new Error("Own Style generation failed. No image data returned.");
+    }
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.response`, {
+      provider: "Google",
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      prompt,
+      usage: extractGeminiUsageMetrics(imageResponse),
+      responseText: extractGeminiText(imageResponse) || null,
+      imageReturned: Boolean(imageBase64)
+    });
+    return {
+      imageBase64,
+      model: DEFAULT_STYLE_IMAGE_MODEL,
+      provider: "Google"
+    };
+  } catch (error) {
+    if (!hasTogetherImageConfig() || !shouldFallbackOwnStyleToTogether(error)) {
+      throw error;
+    }
+    console.warn("Own Style generation falling back to Together:", error);
+    const { width, height } = resolveGenerationResolution(options.generationTierId);
+    const userImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
+    const styleReferenceUrl = toRuntimeAssetUrl(options.req, options.styleReferenceImage);
+    const prompt = options.ownStyleMode === "reference_locked" ? buildOwnStyleTogetherFallbackPrompt({
+      customPrompt: options.customPrompt,
+      preserveBackground: options.preserveBackground
+    }) : buildOwnStyleCreativeTogetherFallbackPrompt({
+      analyzedStylePrompt: options.analyzedStylePrompt,
+      customPrompt: options.customPrompt,
+      preserveBackground: options.preserveBackground
+    });
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.fallback_request`, {
+      provider: "Together",
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      generationMode: options.generationMode,
+      uploadedImageCount: options.uploadedImages.length,
+      includesStyleReferenceImage: true,
+      tokenUsage: "unavailable_from_provider_helper"
+    });
+    const imageBase64 = await generateTogetherImage({
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      referenceImages: [userImageUrl, styleReferenceUrl],
+      width,
+      height,
+      sourceWidth: options.uploadedImages[0]?.width,
+      sourceHeight: options.uploadedImages[0]?.height
+    });
+    logInstaMeDebugTrace(options.debugTraceContext, `${tracePrefix}.generation.fallback_response`, {
+      provider: "Together",
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      prompt,
+      imageReturned: Boolean(imageBase64),
+      tokenUsage: "unavailable_from_provider_helper"
+    });
+    return {
+      imageBase64,
+      model: options.generationMode === "high_res" ? DEFAULT_TOGETHER_PRO_IMAGE_MODEL : DEFAULT_TOGETHER_FLASH_IMAGE_MODEL,
+      provider: "Together"
+    };
+  }
 }
 async function generateReferenceGuidedHighResImage(options) {
   const { width, height, sizeLabel } = resolveGenerationResolution(options.generationTierId);
@@ -5377,7 +5832,9 @@ async function registerRoutes(app2) {
       );
       const selectedSavedOwnStyle = requestedSavedOwnStyleId ? savedOwnStyles.find((entry) => entry.id === requestedSavedOwnStyleId) || null : null;
       if (requestedSavedOwnStyleId && !selectedSavedOwnStyle) {
-        return res.status(404).json({ error: "Saved own style not found." });
+        return res.status(404).json({
+          error: "Saved own style not found. It may have been removed or is no longer available. Please select another Own Style or upload a new one."
+        });
       }
       const styleUsageMap = normalizeUsageMap(userBeforeTransform?.instameStyleUsage);
       const priorStyleUseCount = stylePresetId ? styleUsageMap[stylePresetId] || 0 : 0;
@@ -5498,9 +5955,10 @@ async function registerRoutes(app2) {
       if (shouldUseOwnStyle && !selectedSavedOwnStyle && shouldSaveOwnStyle) {
         const ownStyleSavePayload = normalizeOwnStyleSavePayload(body.stylePhoto);
         if (ownStyleSavePayload && ownStyleSavePayload.previewBase64.length <= MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH) {
+          const analyzedPromptForStorage = normalizeStringValue(analyzedOwnStylePrompt) || buildOwnStyleFallbackAnalysisPrompt();
           const savedOwnStyleRecord = buildSavedOwnStyleRecord({
             stylePayload: ownStyleSavePayload,
-            analyzedPrompt: analyzedOwnStylePrompt,
+            analyzedPrompt: analyzedPromptForStorage,
             ownStyleMode
           });
           const saveResult = upsertOwnStyleRecord({
@@ -5922,6 +6380,167 @@ async function registerRoutes(app2) {
         return res.status(503).json({ error: temporaryServiceMessage });
       }
       res.status(500).json({ error: errorMessage });
+    }
+  });
+  app2.post("/api/instame/grid-preview", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const body = req.body || {};
+    const packId = normalizeStringValue(body.packId);
+    const vibeId = normalizeStringValue(body.vibeId);
+    const vibeLabel = normalizeStringValue(body.vibeLabel) || vibeId;
+    const packLabel = normalizeStringValue(body.packLabel) || packId;
+    const packCount = typeof body.packCount === "number" ? body.packCount : 4;
+    const identityMode = ["portrait_reference", "inspired_muse", "fictional_muse"].includes(
+      body.identityMode
+    ) ? body.identityMode : "fictional_muse";
+    const requiredElementIds = Array.isArray(body.requiredElementIds) ? body.requiredElementIds.filter(
+      (id) => ["outfit", "location", "car", "accessories", "mirror", "detail"].includes(id)
+    ) : [];
+    const notes = normalizeStringValue(body.notes);
+    if (!packId || !vibeId) {
+      return res.status(400).json({ error: "packId and vibeId are required." });
+    }
+    let portraitInput;
+    if (identityMode === "portrait_reference" && body.portrait?.base64) {
+      const base64 = normalizeStringValue(body.portrait.base64);
+      if (!base64) {
+        return res.status(400).json({ error: "portrait.base64 is required when identityMode is portrait_reference." });
+      }
+      portraitInput = {
+        base64,
+        mimeType: normalizeStringValue(body.portrait.mimeType) || "image/jpeg"
+      };
+    }
+    const brief = { packId, packLabel, packCount, vibeId, vibeLabel, requiredElementIds, notes, identityMode };
+    let creditsConsumed = false;
+    try {
+      const consumed = await consumeCredits(userId, GRID_PREVIEW_CREDIT_COST, "instame_grid_preview");
+      if (!consumed) {
+        return res.status(402).json({
+          error: `Not enough credits. Grid preview costs ${GRID_PREVIEW_CREDIT_COST} credits.`,
+          requiredCredits: GRID_PREVIEW_CREDIT_COST
+        });
+      }
+      creditsConsumed = true;
+      const prompt = buildGridPreviewPrompt(brief);
+      const images = portraitInput ? [portraitInput] : [];
+      const previewBase64 = await generateOpenAiImage({
+        model: "gpt-image-1",
+        prompt,
+        images,
+        size: "1024x1024",
+        quality: "low"
+      });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
+      return res.json({
+        previewBase64,
+        creditsCharged: GRID_PREVIEW_CREDIT_COST,
+        creditsRemaining: updatedUser?.credits ?? 0
+      });
+    } catch (error) {
+      console.error("InstaMe grid-preview error:", error);
+      if (creditsConsumed) {
+        await refundCredits(userId, GRID_PREVIEW_CREDIT_COST, "instame_grid_preview_failed");
+      }
+      const errorMessage = toErrorMessage(error, "Failed to generate grid preview");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+  app2.post("/api/instame/grid-render", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const body = req.body || {};
+    const packId = normalizeStringValue(body.packId);
+    const vibeId = normalizeStringValue(body.vibeId);
+    const vibeLabel = normalizeStringValue(body.vibeLabel) || vibeId;
+    const packLabel = normalizeStringValue(body.packLabel) || packId;
+    const packCount = typeof body.packCount === "number" ? body.packCount : 4;
+    const identityMode = ["portrait_reference", "inspired_muse", "fictional_muse"].includes(
+      body.identityMode
+    ) ? body.identityMode : "fictional_muse";
+    const requiredElementIds = Array.isArray(body.requiredElementIds) ? body.requiredElementIds.filter(
+      (id) => ["outfit", "location", "car", "accessories", "mirror", "detail"].includes(id)
+    ) : [];
+    const notes = normalizeStringValue(body.notes);
+    if (!packId || !vibeId) {
+      return res.status(400).json({ error: "packId and vibeId are required." });
+    }
+    let portraitInput;
+    if (identityMode === "portrait_reference" && body.portrait?.base64) {
+      const base64 = normalizeStringValue(body.portrait.base64);
+      if (!base64) {
+        return res.status(400).json({ error: "portrait.base64 is required when identityMode is portrait_reference." });
+      }
+      portraitInput = {
+        base64,
+        mimeType: normalizeStringValue(body.portrait.mimeType) || "image/jpeg"
+      };
+    } else if (identityMode === "portrait_reference") {
+      return res.status(400).json({ error: "A portrait image is required for portrait_reference identity mode." });
+    }
+    const brief = { packId, packLabel, packCount, vibeId, vibeLabel, requiredElementIds, notes, identityMode };
+    const shotPlan = buildGridPackShotPlan(brief);
+    const totalShots = shotPlan.length;
+    const totalCost = GRID_RENDER_CREDIT_COST_PER_IMAGE * totalShots;
+    let creditsConsumedCount = 0;
+    try {
+      const consumed = await consumeCredits(userId, totalCost, "instame_grid_render");
+      if (!consumed) {
+        return res.status(402).json({
+          error: `Not enough credits. Rendering ${totalShots} images costs ${totalCost} credits.`,
+          requiredCredits: totalCost
+        });
+      }
+      creditsConsumedCount = totalCost;
+      const renderedImages = [];
+      for (const shot of shotPlan) {
+        try {
+          const prompt = buildGridShotRenderPrompt({
+            shot,
+            brief,
+            totalShots,
+            hasPortraitReference: Boolean(portraitInput)
+          });
+          const images = portraitInput ? [portraitInput] : [];
+          const imageBase64 = await generateOpenAiImage({
+            model: "gpt-image-1",
+            prompt,
+            images,
+            size: "1024x1536",
+            quality: "medium"
+          });
+          renderedImages.push({ shotIndex: shot.index, shotLabel: shot.shotLabel, imageBase64 });
+        } catch (shotError) {
+          console.error(`InstaMe grid-render shot ${shot.index} error:`, shotError);
+          await refundCredits(userId, GRID_RENDER_CREDIT_COST_PER_IMAGE, `instame_grid_render_shot_${shot.index}_failed`);
+          creditsConsumedCount -= GRID_RENDER_CREDIT_COST_PER_IMAGE;
+        }
+      }
+      if (renderedImages.length === 0) {
+        return res.status(503).json({ error: "All images failed to generate. Credits have been refunded. Please try again." });
+      }
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
+      return res.json({
+        images: renderedImages,
+        totalRequested: totalShots,
+        totalRendered: renderedImages.length,
+        creditsCharged: creditsConsumedCount,
+        creditsRemaining: updatedUser?.credits ?? 0
+      });
+    } catch (error) {
+      console.error("InstaMe grid-render error:", error);
+      if (creditsConsumedCount > 0) {
+        await refundCredits(userId, creditsConsumedCount, "instame_grid_render_failed");
+      }
+      const errorMessage = toErrorMessage(error, "Failed to render grid pack");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
     }
   });
   const httpServer = (0, import_node_http.createServer)(app2);
