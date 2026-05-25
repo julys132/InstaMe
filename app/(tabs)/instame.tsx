@@ -258,6 +258,9 @@ const PACK_BRIEF_REQUIRED_ELEMENTS = [
   { id: "detail", label: "Detail crop" },
 ] as const;
 
+const PACK_BRIEF_FLOW_STEPS = ["Preset", "Brief", "Preview", "Render"] as const;
+const PACK_BRIEF_NOTES_MAX_LENGTH = 220;
+
 const PACK_BRIEF_IDENTITY_OPTIONS = [
   {
     id: "portrait_reference",
@@ -772,8 +775,8 @@ export default function InstaMeScreen() {
 
   const isPhoneViewport = viewportWidth <= 430;
   const selectedPackBriefVibe = useMemo(() => getStyleVibeById(selectedPackBriefVibeId), [selectedPackBriefVibeId]);
-  const hasPortraitReferencePhoto = Boolean(photo);
   const packIdentityStatusMessage = useMemo(() => {
+    const hasPortraitReferencePhoto = Boolean(photo);
     if (selectedPackIdentityModeId === "portrait_reference") {
       return hasPortraitReferencePhoto
         ? "Portrait ready: facial traits and hair color can guide the upcoming pack flow."
@@ -787,7 +790,7 @@ export default function InstaMeScreen() {
     }
 
     return "Portrait not required. This mode focuses only on vibe, composition, and required elements.";
-  }, [hasPortraitReferencePhoto, selectedPackIdentityModeId]);
+  }, [photo, selectedPackIdentityModeId]);
   const selectedPackRequiredLabels = useMemo(
     () =>
       PACK_BRIEF_REQUIRED_ELEMENTS
@@ -795,6 +798,12 @@ export default function InstaMeScreen() {
         .map((item) => item.label),
     [packBriefRequiredElementIds],
   );
+  const packBriefVibeOptions = useMemo(
+    () => STYLE_VIBE_CATEGORIES.filter((vibe) => vibe.id !== "all"),
+    [],
+  );
+  const isPackBriefConfigured = selectedPackBriefVibeId !== "all" && packBriefRequiredElementIds.length > 0;
+  const packPlannerCurrentStep = !activePhotoPack ? 1 : isPackBriefConfigured ? 3 : 2;
   const collageColumnCount = viewportWidth >= 1360 ? 4 : 3;
   const collageColumnOffsets = collageColumnCount === 4 ? [0, 18, 10, 22] : isPhoneViewport ? [0, 10, 4] : [0, 18, 10];
   const collageColumnGap = isPhoneViewport ? 6 : 8;
@@ -2494,7 +2503,9 @@ export default function InstaMeScreen() {
                   <Text style={styles.packEyebrow}>Instagram content packs</Text>
                   <Text style={styles.packTitle}>Build a coordinated pack brief</Text>
                 </View>
-                <Text style={styles.packMetaText}>{activePhotoPack ? "Step 2 of 4" : "Step 1 of 4"}</Text>
+                <Text style={styles.packMetaText}>
+                  Step {packPlannerCurrentStep} of {PACK_BRIEF_FLOW_STEPS.length}
+                </Text>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
                 {PHOTO_PACK_PRESETS.map((pack) => {
@@ -2548,10 +2559,20 @@ export default function InstaMeScreen() {
 
               <View style={styles.packPlannerCard}>
                 <View style={styles.packPlannerStepsRow}>
-                  <Text style={styles.packPlannerStepText}>1. Preset</Text>
-                  <Text style={styles.packPlannerStepText}>2. Brief</Text>
-                  <Text style={styles.packPlannerStepText}>3. Preview</Text>
-                  <Text style={styles.packPlannerStepText}>4. Render</Text>
+                  {PACK_BRIEF_FLOW_STEPS.map((stepLabel, index) => {
+                    const stepNumber = index + 1;
+                    return (
+                      <Text
+                        key={stepLabel}
+                        style={[
+                          styles.packPlannerStepText,
+                          stepNumber <= packPlannerCurrentStep && styles.packPlannerStepTextActive,
+                        ]}
+                      >
+                        {stepNumber}. {stepLabel}
+                      </Text>
+                    );
+                  })}
                 </View>
 
                 {!activePhotoPack ? (
@@ -2578,7 +2599,7 @@ export default function InstaMeScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.packPlannerVibeRail}
                       >
-                        {STYLE_VIBE_CATEGORIES.filter((vibe) => vibe.id !== "all").map((vibe) => {
+                        {packBriefVibeOptions.map((vibe) => {
                           const active = selectedPackBriefVibeId === vibe.id;
                           return (
                             <Pressable
@@ -2660,7 +2681,7 @@ export default function InstaMeScreen() {
                         placeholder="Add must-have scenes, outfit notes, or posting goal"
                         placeholderTextColor="rgba(255,255,255,0.40)"
                         multiline
-                        maxLength={220}
+                        maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
                         style={styles.packPlannerNotesInput}
                       />
                     </View>
@@ -2670,7 +2691,7 @@ export default function InstaMeScreen() {
                       <Text style={styles.packPlannerDraftSummaryText}>
                         Vibe: {selectedPackBriefVibe.label}
                         {"\n"}
-                        Must-have: {selectedPackRequiredLabels.length > 0 ? selectedPackRequiredLabels.join(", ") : "Not selected yet"}
+                        Required elements: {selectedPackRequiredLabels.length > 0 ? selectedPackRequiredLabels.join(", ") : "Not selected yet"}
                         {"\n"}
                         Notes: {packBriefNotes.trim() ? packBriefNotes.trim() : "No custom notes"}
                       </Text>
@@ -4340,6 +4361,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  packPlannerStepTextActive: {
+    color: "#FFF",
+    borderColor: "rgba(126,243,255,0.42)",
+    backgroundColor: "rgba(126,243,255,0.15)",
   },
   packPlannerEmptyState: {
     borderRadius: 14,
