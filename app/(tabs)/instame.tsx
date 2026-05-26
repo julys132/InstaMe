@@ -53,6 +53,10 @@ import {
   matchStyleVibe,
 } from "@/constants/instameStyleTaxonomy";
 import {
+  GRID_PIPELINE_AESTHETICS,
+  type GridPipelineAesthetic,
+} from "@/constants/gridPipelineAesthetics";
+import {
   INSTAME_OWN_STYLE_ID,
   INSTAME_STYLE_PRESETS,
   type InstaMeStylePreset,
@@ -550,7 +554,7 @@ export default function InstaMeScreen() {
   );
   const [selectedStyleId, setSelectedStyleId] = useState<string>("");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
-  const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art">("main");
+  const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art" | "grid">("main");
   const [selectedStyleVibeId, setSelectedStyleVibeId] = useState("all");
   const [selectedPhotoPackId, setSelectedPhotoPackId] = useState<string | null>(null);
   const [selectedPackBriefVibeId, setSelectedPackBriefVibeId] = useState("all");
@@ -562,6 +566,26 @@ export default function InstaMeScreen() {
   const [packGridRenderImages, setPackGridRenderImages] = useState<Array<{ shotIndex: number; shotLabel: string; imageBase64: string }>>([]);
   const [packGridRenderLoading, setPackGridRenderLoading] = useState(false);
   const [packGridError, setPackGridError] = useState<string | null>(null);
+
+  // ─── Grid Pipeline state ───────────────────────────────────────────────────
+  const [pipelineAestheticId, setPipelineAestheticId] = useState<string | null>(null);
+  const [pipelineImageCount, setPipelineImageCount] = useState<6 | 9 | 12>(6);
+  const [pipelineExtraNotes, setPipelineExtraNotes] = useState("");
+  const [pipelinePlanLoading, setPipelinePlanLoading] = useState(false);
+  const [pipelineRenderLoading, setPipelineRenderLoading] = useState(false);
+  const [pipelinePlan, setPipelinePlan] = useState<null | {
+    imageCount: number;
+    aesthetic: string;
+    palette: string;
+    lightType: string;
+    shots: Array<{ position: number; type: string; label: string; hairstyle: string | null; angle: string | null; imagePrompt: string }>;
+  }>(null);
+  const [pipelineContinuityContext, setPipelineContinuityContext] = useState<null | {
+    aesthetic: string; palette: string; lightType: string; usedScenes: string[]; usedHairstyles: string[];
+  }>(null);
+  const [pipelineRenderResults, setPipelineRenderResults] = useState<Array<{ position: number; label: string; type: string; imageBase64: string }>>([]);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
+  // ──────────────────────────────────────────────────────────────────────────
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
@@ -1720,6 +1744,85 @@ export default function InstaMeScreen() {
     }
   }, [activePhotoPack, selectedPackBriefVibeId, selectedPackBriefVibe, packBriefRequiredElementIds, packBriefNotes, selectedPackIdentityModeId, photo, refreshCredits]);
 
+  // ─── Grid Pipeline callbacks ──────────────────────────────────────────────
+
+  const handlePipelineGeneratePlan = useCallback(async () => {
+    if (!pipelineAestheticId) return;
+    const aesthetic = GRID_PIPELINE_AESTHETICS.find((a) => a.id === pipelineAestheticId);
+    if (!aesthetic) return;
+    setPipelinePlanLoading(true);
+    setPipelineError(null);
+    setPipelinePlan(null);
+    setPipelineRenderResults([]);
+    try {
+      const result = await apiClient.generateInstaMeGridPipelinePlan({
+        imageCount: pipelineImageCount,
+        aesthetic: aesthetic.id,
+        palette: aesthetic.defaultPalette,
+        lightType: aesthetic.defaultLightType,
+        extraNotes: pipelineExtraNotes,
+        hasPortraitReference: Boolean(photo),
+      });
+      setPipelinePlan(result.plan);
+      setPipelineContinuityContext(result.continuityContext);
+      void refreshCredits();
+    } catch (error: any) {
+      setPipelineError(error?.message || "Failed to generate grid plan. Please try again.");
+    } finally {
+      setPipelinePlanLoading(false);
+    }
+  }, [pipelineAestheticId, pipelineImageCount, pipelineExtraNotes, photo, refreshCredits]);
+
+  const handlePipelineRender = useCallback(async () => {
+    if (!pipelinePlan) return;
+    setPipelineRenderLoading(true);
+    setPipelineError(null);
+    setPipelineRenderResults([]);
+    try {
+      const result = await apiClient.generateInstaMeGridPipelineRender({
+        plan: pipelinePlan,
+        portrait: photo?.base64,
+      });
+      setPipelineRenderResults(result.images);
+      void refreshCredits();
+    } catch (error: any) {
+      setPipelineError(error?.message || "Failed to render grid images. Please try again.");
+    } finally {
+      setPipelineRenderLoading(false);
+    }
+  }, [pipelinePlan, photo, refreshCredits]);
+
+  const handlePipelineExtend = useCallback(async () => {
+    if (!pipelineContinuityContext) return;
+    setPipelinePlanLoading(true);
+    setPipelineError(null);
+    setPipelineRenderResults([]);
+    try {
+      const result = await apiClient.generateInstaMeGridPipelineExtend({
+        newImageCount: pipelineImageCount,
+        continuityContext: pipelineContinuityContext,
+        hasPortraitReference: Boolean(photo),
+        extraNotes: pipelineExtraNotes,
+      });
+      setPipelinePlan(result.plan);
+      setPipelineContinuityContext(result.continuityContext);
+      void refreshCredits();
+    } catch (error: any) {
+      setPipelineError(error?.message || "Failed to extend grid. Please try again.");
+    } finally {
+      setPipelinePlanLoading(false);
+    }
+  }, [pipelineContinuityContext, pipelineImageCount, pipelineExtraNotes, photo, refreshCredits]);
+
+  const handlePipelineReset = useCallback(() => {
+    setPipelinePlan(null);
+    setPipelineContinuityContext(null);
+    setPipelineRenderResults([]);
+    setPipelineError(null);
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   const mainCollageItems = useMemo(() => {
     const enhanceCard = {
       id: ENHANCE_PREVIEW_CARD_ID,
@@ -2473,10 +2576,11 @@ export default function InstaMeScreen() {
 
         <View style={styles.sectionTabBarOuter}>
           <View style={styles.sectionTabBar}>
-            {([
+          {([  
               { key: "main" as const, label: "Main Styles", icon: "sparkles" as const },
               { key: "own" as const, label: "Clone Aesthetic", icon: "copy-outline" as const },
               { key: "art" as const, label: "Art Styles", icon: "color-palette-outline" as const },
+              { key: "grid" as const, label: "Instagrid", icon: "grid-outline" as const },
             ]).map((tab) => {
               const active = styleSectionTab === tab.key;
               return (
@@ -3621,6 +3725,185 @@ export default function InstaMeScreen() {
                 </View>
               </>
             )}
+          </View>
+        ) : null}
+
+        {styleSectionTab === "grid" ? (
+          <View style={styles.pipelineSection}>
+            {/* ── Aesthetic selector ── */}
+            <View style={styles.pipelineBlock}>
+              <Text style={styles.pipelineEyebrow}>Two-Step AI Grid</Text>
+              <Text style={styles.pipelineTitle}>Choose your aesthetic</Text>
+              <Text style={styles.pipelineSubtitle}>
+                Gemini Flash designs the shot plan. GPT Image 2 renders each frame.
+              </Text>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pipelineAestheticRail}>
+              {GRID_PIPELINE_AESTHETICS.map((aesthetic) => {
+                const active = pipelineAestheticId === aesthetic.id;
+                return (
+                  <Pressable
+                    key={aesthetic.id}
+                    onPress={() => {
+                      setPipelineAestheticId(aesthetic.id);
+                      void Haptics.selectionAsync();
+                    }}
+                    style={({ pressed }) => [
+                      styles.pipelineAestheticCard,
+                      active && styles.pipelineAestheticCardActive,
+                      pressed ? { opacity: 0.9, transform: [{ scale: 0.97 }] } : undefined,
+                    ]}
+                  >
+                    <LinearGradient
+                      colors={aesthetic.gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.pipelineAestheticCardFill}
+                    >
+                      <View style={[styles.pipelineAestheticIconWrap, { borderColor: aesthetic.accent }]}>
+                        <Ionicons name={aesthetic.icon as keyof typeof Ionicons.glyphMap} size={18} color={aesthetic.accent} />
+                      </View>
+                      <Text style={[styles.pipelineAestheticLabel, active && { color: aesthetic.accent }]}>{aesthetic.label}</Text>
+                      <Text numberOfLines={2} style={styles.pipelineAestheticTagline}>{aesthetic.tagline}</Text>
+                      {active ? (
+                        <View style={styles.pipelineAestheticPaletteRow}>
+                          <Ionicons name="color-filter-outline" size={10} color="rgba(255,255,255,0.55)" />
+                          <Text numberOfLines={1} style={styles.pipelineAestheticPaletteText}>{aesthetic.defaultPalette}</Text>
+                        </View>
+                      ) : null}
+                    </LinearGradient>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            {/* ── Config row ── */}
+            {pipelineAestheticId ? (
+              <View style={styles.pipelineConfigCard}>
+                <Text style={styles.pipelineConfigTitle}>Grid size</Text>
+                <View style={styles.pipelineCountRow}>
+                  {([6, 9, 12] as const).map((n) => (
+                    <Pressable
+                      key={n}
+                      onPress={() => setPipelineImageCount(n)}
+                      style={[styles.pipelineCountChip, pipelineImageCount === n && styles.pipelineCountChipActive]}
+                    >
+                      <Text style={[styles.pipelineCountChipText, pipelineImageCount === n && styles.pipelineCountChipTextActive]}>
+                        {n} images
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text style={[styles.pipelineConfigTitle, { marginTop: 12 }]}>Extra notes (optional)</Text>
+                <TextInput
+                  value={pipelineExtraNotes}
+                  onChangeText={setPipelineExtraNotes}
+                  placeholder="e.g. include red dress, outdoor only, Paris location..."
+                  placeholderTextColor="rgba(255,255,255,0.32)"
+                  multiline
+                  style={styles.pipelineNotesInput}
+                />
+
+                {/* ── Error ── */}
+                {pipelineError ? (
+                  <View style={styles.pipelineErrorCard}>
+                    <Ionicons name="alert-circle-outline" size={14} color="#FF6B6B" />
+                    <Text style={styles.pipelineErrorText}>{pipelineError}</Text>
+                  </View>
+                ) : null}
+
+                {/* ── Plan result ── */}
+                {pipelinePlan ? (
+                  <View style={styles.pipelinePlanCard}>
+                    <Text style={styles.pipelinePlanTitle}>
+                      Shot plan ready — {pipelinePlan.imageCount} images
+                    </Text>
+                    <Text style={styles.pipelinePlanMeta}>{pipelinePlan.aesthetic} · {pipelinePlan.lightType}</Text>
+                    {pipelinePlan.shots.map((shot) => (
+                      <View key={shot.position} style={styles.pipelinePlanRow}>
+                        <View style={[styles.pipelinePlanTypeBadge,
+                          shot.type === "COMPLEX" ? styles.pipelinePlanTypeBadgeComplex
+                          : shot.type === "SIMPLE" ? styles.pipelinePlanTypeBadgeSimple
+                          : styles.pipelinePlanTypeBadgeMedium
+                        ]}>
+                          <Text style={styles.pipelinePlanTypeBadgeText}>{shot.type[0]}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.pipelinePlanShotLabel}>{shot.position}. {shot.label}</Text>
+                          {shot.hairstyle ? <Text style={styles.pipelinePlanShotMeta}>{shot.hairstyle} · {shot.angle}</Text> : null}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {/* ── Render results grid ── */}
+                {pipelineRenderResults.length > 0 ? (
+                  <View style={styles.pipelineResultsGrid}>
+                    {pipelineRenderResults.map((img) => (
+                      <View key={img.position} style={styles.pipelineResultThumbWrap}>
+                        <Image
+                          source={{ uri: `data:image/png;base64,${img.imageBase64}` }}
+                          style={styles.pipelineResultThumb}
+                          contentFit="cover"
+                        />
+                        <Text numberOfLines={1} style={styles.pipelineResultThumbLabel}>{img.position}. {img.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {/* ── Action buttons ── */}
+                <View style={styles.pipelineActionsRow}>
+                  {!pipelinePlan ? (
+                    <Pressable
+                      onPress={() => void handlePipelineGeneratePlan()}
+                      disabled={pipelinePlanLoading}
+                      style={({ pressed }) => [styles.pipelinePlanButton, pressed && { opacity: 0.88 }]}
+                    >
+                      {pipelinePlanLoading ? (
+                        <ActivityIndicator size="small" color="#0a0a0f" />
+                      ) : (
+                        <Text style={styles.pipelinePlanButtonText}>Generate shot plan — 1 credit</Text>
+                      )}
+                    </Pressable>
+                  ) : pipelineRenderResults.length === 0 ? (
+                    <Pressable
+                      onPress={() => void handlePipelineRender()}
+                      disabled={pipelineRenderLoading}
+                      style={({ pressed }) => [styles.pipelineRenderButton, pressed && { opacity: 0.88 }]}
+                    >
+                      {pipelineRenderLoading ? (
+                        <ActivityIndicator size="small" color="#0a0a0f" />
+                      ) : (
+                        <Text style={styles.pipelineRenderButtonText}>
+                          Render {pipelinePlan.imageCount} images — {pipelinePlan.imageCount} credits
+                        </Text>
+                      )}
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={() => void handlePipelineExtend()}
+                      disabled={pipelinePlanLoading}
+                      style={({ pressed }) => [styles.pipelineExtendButton, pressed && { opacity: 0.88 }]}
+                    >
+                      {pipelinePlanLoading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.pipelineExtendButtonText}>Extend grid (+{pipelineImageCount} more)</Text>
+                      )}
+                    </Pressable>
+                  )}
+                  {(pipelinePlan || pipelineRenderResults.length > 0) ? (
+                    <Pressable onPress={handlePipelineReset} style={styles.pipelineResetButton}>
+                      <Text style={styles.pipelineResetButtonText}>Start over</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -4855,6 +5138,283 @@ const styles = StyleSheet.create({
   },
   packPlannerResultsWrap: {
     flexDirection: "row",
+
+  // ─── Grid Pipeline styles ───────────────────────────────────────────────────
+  pipelineSection: {
+    gap: 16,
+    paddingBottom: 24,
+  },
+  pipelineBlock: {
+    paddingHorizontal: 16,
+    gap: 4,
+  },
+  pipelineEyebrow: {
+    color: "rgba(255,255,255,0.46)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  pipelineTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    lineHeight: 28,
+  },
+  pipelineSubtitle: {
+    color: "rgba(255,255,255,0.56)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  pipelineAestheticRail: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    gap: 12,
+  },
+  pipelineAestheticCard: {
+    width: 200,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+  },
+  pipelineAestheticCardActive: {
+    borderColor: "rgba(255,255,255,0.36)",
+  },
+  pipelineAestheticCardFill: {
+    padding: 14,
+    gap: 8,
+  },
+  pipelineAestheticIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  pipelineAestheticLabel: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  pipelineAestheticTagline: {
+    color: "rgba(255,255,255,0.60)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  pipelineAestheticPaletteRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 2,
+  },
+  pipelineAestheticPaletteText: {
+    color: "rgba(255,255,255,0.48)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    lineHeight: 14,
+    flex: 1,
+  },
+  pipelineConfigCard: {
+    marginHorizontal: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.09)",
+    backgroundColor: "rgba(12,12,16,0.96)",
+    padding: 14,
+    gap: 8,
+  },
+  pipelineConfigTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  pipelineCountRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  pipelineCountChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  pipelineCountChipActive: {
+    borderColor: "rgba(255,255,255,0.55)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  pipelineCountChipText: {
+    color: "rgba(255,255,255,0.56)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  pipelineCountChipTextActive: {
+    color: "#FFF",
+  },
+  pipelineNotesInput: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    color: "#FFF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    padding: 10,
+    minHeight: 64,
+    textAlignVertical: "top",
+  },
+  pipelineErrorCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,79,125,0.36)",
+    backgroundColor: "rgba(255,79,125,0.10)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  pipelineErrorText: {
+    color: "#FF7A9E",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 18,
+    flex: 1,
+  },
+  pipelinePlanCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.22)",
+    backgroundColor: "rgba(126,243,255,0.06)",
+    padding: 12,
+    gap: 8,
+  },
+  pipelinePlanTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  pipelinePlanMeta: {
+    color: "rgba(255,255,255,0.52)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+  pipelinePlanRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  pipelinePlanTypeBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pipelinePlanTypeBadgeComplex: {
+    backgroundColor: "rgba(255,79,125,0.36)",
+  },
+  pipelinePlanTypeBadgeSimple: {
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  pipelinePlanTypeBadgeMedium: {
+    backgroundColor: "rgba(126,243,255,0.28)",
+  },
+  pipelinePlanTypeBadgeText: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+  },
+  pipelinePlanShotLabel: {
+    color: "rgba(255,255,255,0.84)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  pipelinePlanShotMeta: {
+    color: "rgba(255,255,255,0.40)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  pipelineResultsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  pipelineResultThumbWrap: {
+    width: "48%",
+    gap: 4,
+  },
+  pipelineResultThumb: {
+    width: "100%",
+    aspectRatio: 2 / 3,
+    borderRadius: 10,
+  },
+  pipelineResultThumbLabel: {
+    color: "rgba(255,255,255,0.54)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    lineHeight: 14,
+  },
+  pipelineActionsRow: {
+    gap: 8,
+    marginTop: 4,
+  },
+  pipelinePlanButton: {
+    backgroundColor: "#00E5CC",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  pipelinePlanButtonText: {
+    color: "#0a0a0f",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  pipelineRenderButton: {
+    backgroundColor: "#FF4F7D",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  pipelineRenderButtonText: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  pipelineExtendButton: {
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.44)",
+    backgroundColor: "rgba(126,243,255,0.10)",
+  },
+  pipelineExtendButtonText: {
+    color: "#7EF3FF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  pipelineResetButton: {
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  pipelineResetButtonText: {
+    color: "rgba(255,255,255,0.56)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  // ───────────────────────────────────────────────────────────────────────────
     flexWrap: "wrap",
     gap: 6,
   },

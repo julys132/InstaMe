@@ -71,6 +71,69 @@ export type GridContinuityContext = {
   usedHairstyles: string[];
 };
 
+// ─── Aesthetic vocabulary (mirrors constants/gridPipelineAesthetics.ts) ──────
+// Kept server-side so the system prompt can inject specific vocabulary without
+// requiring the frontend constants to be imported in the server bundle.
+
+const PIPELINE_AESTHETIC_VOCABULARY: Record<string, string[]> = {
+  "Dark Academia": [
+    "antique library shelves",
+    "vintage leather armchairs",
+    "candle glow",
+    "dark wood paneling",
+    "scholarly architecture",
+    "moody editorial",
+    "aged paper texture",
+    "burgundy velvet",
+  ],
+  "Desert Oasis Luxury": [
+    "desert resort",
+    "clay and adobe walls",
+    "palm tree shadows",
+    "rattan and wicker",
+    "infinity pool",
+    "warm arid luxury",
+    "sand dune backdrop",
+    "Moroccan tilework",
+  ],
+  "Luxury European Lifestyle": [
+    "Parisian boulevard",
+    "Italian piazza",
+    "luxury boutique façade",
+    "café terrasse",
+    "cobblestone street",
+    "European architecture",
+    "fashion week energy",
+    "ornate balcony",
+  ],
+  "Minimalist Scandinavian Wellness": [
+    "clean white minimalist interior",
+    "natural birch wood",
+    "hygge atmosphere",
+    "wellness retreat",
+    "organic linen textures",
+    "Nordic simplicity",
+    "stone and concrete",
+    "indoor plants",
+  ],
+  "Old Money Luxury": [
+    "quiet luxury",
+    "heritage architectural details",
+    "tailored silhouettes",
+    "classic European manor",
+    "equestrian references",
+    "understated wealth",
+    "cashmere and silk",
+    "private members club",
+  ],
+};
+
+function getAestheticVocabularyLine(aesthetic: string): string {
+  const vocab = PIPELINE_AESTHETIC_VOCABULARY[aesthetic];
+  if (!vocab || vocab.length === 0) return "";
+  return `Aesthetic visual vocabulary (use these in imagePrompt fields): ${vocab.join(", ")}.`;
+}
+
 // ─── Hairstyle & angle banks (for position enforcement) ──────────────────────
 
 const HAIRSTYLE_BANK = [
@@ -109,6 +172,7 @@ export function buildMasterGridSystemPrompt(inputs: GridPipelineUserInputs): str
 
   const hairstyleList = HAIRSTYLE_BANK.join(", ");
   const angleList = ANGLE_BANK.join(", ");
+  const vocabularyLine = getAestheticVocabularyLine(aesthetic);
 
   const portraitInstruction = hasPortraitReference
     ? "A portrait reference image of the model WILL be passed to GPT Image 2 alongside each prompt. Each imagePrompt MUST include the instruction: 'Preserve the model's face and identity exactly from the provided reference image.'"
@@ -125,7 +189,7 @@ Aesthetic: ${aesthetic}
 Color palette: ${palette}
 Light type: ${lightType}
 Image count: ${imageCount}
-Extra notes from user: ${extraNotes || "none"}
+${vocabularyLine ? vocabularyLine + "\n" : ""}Extra notes from user: ${extraNotes || "none"}
 
 ═══════════════════════════════════════════════
 CONTRAST MATRIX (MANDATORY — do not deviate)
@@ -191,6 +255,8 @@ export function buildContinuityGridSystemPrompt(
     .map(({ position, type }) => `  - Position ${position}: ${type}`)
     .join("\n");
 
+  const vocabularyLine = getAestheticVocabularyLine(context.aesthetic);
+
   const usedScenesList = context.usedScenes.length > 0 ? context.usedScenes.join(", ") : "none";
   const usedHairstylesList = context.usedHairstyles.length > 0 ? context.usedHairstyles.join(", ") : "none";
 
@@ -208,7 +274,7 @@ EXISTING GRID CONTEXT (maintain coherence)
 Aesthetic: ${context.aesthetic}
 Color palette: ${context.palette}
 Light type: ${context.lightType}
-Already-used scenes (AVOID repeating these): ${usedScenesList}
+${vocabularyLine ? vocabularyLine + "\n" : ""}Already-used scenes (AVOID repeating these): ${usedScenesList}
 Already-used hairstyles (AVOID repeating these): ${usedHairstylesList}
 
 ═══════════════════════════════════════════════
