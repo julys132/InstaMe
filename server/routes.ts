@@ -94,6 +94,17 @@ import {
   type GridPackIdentityMode,
   type GridPackRequiredElementId,
 } from "./lib/instame-grid-pack";
+import {
+  buildMasterGridSystemPrompt,
+  buildContinuityGridSystemPrompt,
+  callGeminiFlashText,
+  parseGridPlan,
+  extractContinuityContext,
+  GRID_PIPELINE_PLAN_CREDIT_COST,
+  GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE,
+  type GridPipelineUserInputs,
+  type GridContinuityContext,
+} from "./lib/instame-grid-pipeline";
 
 function getGeminiApiKey(): string {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -6520,6 +6531,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(503).json({ error: temporaryServiceMessage });
       }
       res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // ─── Instagram Grid Pipeline — Step 1: Plan (Master) ─────────────────────────
+  // POST /api/instame/grid-pipeline/plan
+  // Calls Gemini Flash with a rigid system prompt to produce a structured JSON shot
+  // plan (GridPlan). Cost: GRID_PIPELINE_PLAN_CREDIT_COST credit (flat).
+  app.post("/api/instame/grid-pipeline/plan", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+
+    const imageCount = body.imageCount;
+    if (imageCount !== 6 && imageCount !== 9 && imageCount !== 12) {
+      return res.status(400).json({ error: "imageCount must be 6, 9, or 12." });
+    }
+    const aesthetic = normalizeStringValue(body.aesthetic);
+    if (!aesthetic) {
+      return res.status(400).json({ error: "aesthetic is required." });
+    }
+    const palette = normalizeStringValue(body.palette) || "muted neutrals";
+    const lightType = normalizeStringValue(body.lightType) || "soft natural light";
+    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+    const hasPortraitReference = body.hasPortraitReference === true;
+
+    const inputs: GridPipelineUserInputs = {
+      imageCount,
+      aesthetic,
+      palette,
+      lightType,
+      extraNotes,
+      hasPortraitReference,
+    };
+
+    await consumeCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_plan");
+    let planConsumed = true;
+
+    try {
+      const apiKey = getGeminiApiKey();
+      const systemPrompt = buildMasterGridSystemPrompt(inputs);
+
+      const rawJson = await callGeminiFlashText({
+        systemPrompt,
+        geminiApiBaseUrl: GEMINI_API_BASE_URL,
+        geminiApiKey: apiKey,
+        model: DEFAULT_STYLE_TEXT_MODEL,
+      });
+
+      const plan = parseGridPlan(rawJson, imageCount);
+      const continuityContext = extractContinuityContext(plan);
+
+      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      planConsumed = false;
+
+      return res.json({
+        plan,
+        continuityContext,
+        creditsCharged: GRID_PIPELINE_PLAN_CREDIT_COST,
+        creditsRemaining: updatedUser?.credits ?? 0,
+      });
+    } catch (error) {
+      if (planConsumed) {
+        await refundCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_plan_failed");
+      }
+      console.error("InstaMe grid-pipeline/plan error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to generate grid plan");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // ─── Instagram Grid Pipeline — Step 2: Render ────────────────────────────────
+  // POST /api/instame/grid-pipeline/render
+  // Takes a GridPlan (from /plan) and renders each shot with GPT Image 2.
+  // Cost: GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE × shots requested.
+  app.post("/api/instame/grid-pipeline/render", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+
+    const plan = body.plan;
+    if (!plan || !Array.isArray(plan.shots) || plan.shots.length === 0) {
+      return res.status(400).json({ error: "plan with shots is required." });
+    }
+
+    const portrait: string | undefined =
+      typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : undefined;
+
+    const totalShots: number = plan.shots.length;
+    const totalCost = totalShots * GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
+
+    await consumeCredits(userId, totalCost, "instame_grid_pipeline_render");
+    let creditsConsumedCount = totalCost;
+
+    try {
+      const results: Array<{ position: number; label: string; type: string; imageBase64: string }> = [];
+      let creditsFailed = 0;
+
+      for (const shot of plan.shots as Array<{ position: number; label: string; type: string; imagePrompt: string }>) {
+        const shotPrompt = typeof shot.imagePrompt === "string" ? shot.imagePrompt : "";
+        if (!shotPrompt) {
+          creditsFailed += GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
+          continue;
+        }
+        try {
+          const images: import("./lib/instame-image").RuntimeImageInput[] = [];
+          if (portrait) {
+            images.push({ base64: portrait, mimeType: "image/jpeg" });
+          }
+          const generated = await generateOpenAiImage({
+            model: "gpt-image-1",
+            prompt: shotPrompt,
+            images: images.length > 0 ? images : undefined,
+            size: "1024x1536",
+            quality: "medium",
+          });
+          results.push({
+            position: shot.position,
+            label: shot.label,
+            type: shot.type,
+            imageBase64: generated.imageBase64,
+          });
+        } catch (shotError) {
+          console.error(`InstaMe grid-pipeline/render shot ${shot.position} error:`, shotError);
+          creditsFailed += GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
+          await refundCredits(userId, GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE, "instame_grid_pipeline_render_shot_failed");
+        }
+      }
+
+      creditsConsumedCount = 0;
+      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+
+      return res.json({
+        images: results,
+        totalRequested: totalShots,
+        totalRendered: results.length,
+        creditsCharged: totalCost - creditsFailed,
+        creditsRemaining: updatedUser?.credits ?? 0,
+      });
+    } catch (error) {
+      if (creditsConsumedCount > 0) {
+        await refundCredits(userId, creditsConsumedCount, "instame_grid_pipeline_render_failed");
+      }
+      console.error("InstaMe grid-pipeline/render error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to render grid images");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // ─── Instagram Grid Pipeline — Continuity (Extend) ───────────────────────────
+  // POST /api/instame/grid-pipeline/extend
+  // Calls Gemini Flash with the previous grid context + new count to produce a
+  // continuation plan with no repeated scenes or hairstyles.
+  // Cost: GRID_PIPELINE_PLAN_CREDIT_COST credit (flat, same as /plan).
+  app.post("/api/instame/grid-pipeline/extend", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+
+    const newImageCount = body.newImageCount;
+    if (newImageCount !== 6 && newImageCount !== 9 && newImageCount !== 12) {
+      return res.status(400).json({ error: "newImageCount must be 6, 9, or 12." });
+    }
+
+    const ctx = body.continuityContext as GridContinuityContext | undefined;
+    if (!ctx || !ctx.aesthetic) {
+      return res.status(400).json({ error: "continuityContext (from previous plan) is required." });
+    }
+
+    const hasPortraitReference = body.hasPortraitReference === true;
+    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+
+    await consumeCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_extend");
+    let planConsumed = true;
+
+    try {
+      const apiKey = getGeminiApiKey();
+      const systemPrompt = buildContinuityGridSystemPrompt(ctx, newImageCount, hasPortraitReference, extraNotes);
+
+      const rawJson = await callGeminiFlashText({
+        systemPrompt,
+        geminiApiBaseUrl: GEMINI_API_BASE_URL,
+        geminiApiKey: apiKey,
+        model: DEFAULT_STYLE_TEXT_MODEL,
+      });
+
+      const plan = parseGridPlan(rawJson, newImageCount);
+      // Merge used scenes/hairstyles for the next potential extension
+      const nextContinuityContext = extractContinuityContext(plan);
+      nextContinuityContext.usedScenes = [...new Set([...(ctx.usedScenes || []), ...nextContinuityContext.usedScenes])];
+      nextContinuityContext.usedHairstyles = [...new Set([...(ctx.usedHairstyles || []), ...nextContinuityContext.usedHairstyles])];
+
+      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      planConsumed = false;
+
+      return res.json({
+        plan,
+        continuityContext: nextContinuityContext,
+        creditsCharged: GRID_PIPELINE_PLAN_CREDIT_COST,
+        creditsRemaining: updatedUser?.credits ?? 0,
+      });
+    } catch (error) {
+      if (planConsumed) {
+        await refundCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_extend_failed");
+      }
+      console.error("InstaMe grid-pipeline/extend error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to generate continuity grid plan");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
     }
   });
 

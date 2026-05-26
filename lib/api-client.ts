@@ -856,6 +856,122 @@ class ApiClient {
       true,
     );
   }
+
+  // ─── Grid Pipeline (Two-Step AI) ─────────────────────────────────────────
+
+  /** Step 1 (Master): Call Gemini Flash to generate a structured shot plan. */
+  async generateInstaMeGridPipelinePlan(payload: {
+    imageCount: 6 | 9 | 12;
+    aesthetic: string;
+    palette: string;
+    lightType: string;
+    extraNotes?: string;
+    hasPortraitReference?: boolean;
+  }) {
+    return this.request<{
+      plan: {
+        imageCount: number;
+        aesthetic: string;
+        palette: string;
+        lightType: string;
+        shots: Array<{
+          position: number;
+          type: "COMPLEX" | "SIMPLE" | "MEDIUM";
+          label: string;
+          hairstyle: string | null;
+          angle: string | null;
+          imagePrompt: string;
+        }>;
+      };
+      continuityContext: {
+        aesthetic: string;
+        palette: string;
+        lightType: string;
+        usedScenes: string[];
+        usedHairstyles: string[];
+      };
+      creditsCharged: number;
+      creditsRemaining: number;
+    }>(
+      "/instame/grid-pipeline/plan",
+      { method: "POST", body: JSON.stringify(payload) },
+      true,
+    );
+  }
+
+  /** Step 2: Render each shot from a GridPlan with GPT Image 2. */
+  async generateInstaMeGridPipelineRender(payload: {
+    plan: {
+      shots: Array<{
+        position: number;
+        label: string;
+        type: string;
+        imagePrompt: string;
+      }>;
+    };
+    portrait?: string; // base64
+  }) {
+    return this.request<{
+      images: Array<{
+        position: number;
+        label: string;
+        type: string;
+        imageBase64: string;
+      }>;
+      totalRequested: number;
+      totalRendered: number;
+      creditsCharged: number;
+      creditsRemaining: number;
+    }>(
+      "/instame/grid-pipeline/render",
+      { method: "POST", body: JSON.stringify(payload) },
+      true,
+    );
+  }
+
+  /** Continuity (Extend): Call Gemini Flash to generate a continuation plan. */
+  async generateInstaMeGridPipelineExtend(payload: {
+    newImageCount: 6 | 9 | 12;
+    continuityContext: {
+      aesthetic: string;
+      palette: string;
+      lightType: string;
+      usedScenes: string[];
+      usedHairstyles: string[];
+    };
+    hasPortraitReference?: boolean;
+    extraNotes?: string;
+  }) {
+    return this.request<{
+      plan: {
+        imageCount: number;
+        aesthetic: string;
+        palette: string;
+        lightType: string;
+        shots: Array<{
+          position: number;
+          type: "COMPLEX" | "SIMPLE" | "MEDIUM";
+          label: string;
+          hairstyle: string | null;
+          angle: string | null;
+          imagePrompt: string;
+        }>;
+      };
+      continuityContext: {
+        aesthetic: string;
+        palette: string;
+        lightType: string;
+        usedScenes: string[];
+        usedHairstyles: string[];
+      };
+      creditsCharged: number;
+      creditsRemaining: number;
+    }>(
+      "/instame/grid-pipeline/extend",
+      { method: "POST", body: JSON.stringify(payload) },
+      true,
+    );
+  }
 }
 
 export const apiClient = new ApiClient();

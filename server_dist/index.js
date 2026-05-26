@@ -1664,6 +1664,284 @@ function buildGridShotRenderPrompt(options) {
 var GRID_PREVIEW_CREDIT_COST = 2;
 var GRID_RENDER_CREDIT_COST_PER_IMAGE = 1;
 
+// server/lib/instame-grid-pipeline.ts
+var HAIRSTYLE_BANK = [
+  "sleek low bun",
+  "high bouncy ponytail",
+  "loose beach waves",
+  "silk scarf wrap",
+  "straight blowout",
+  "messy textured updo",
+  "half-up half-down",
+  "braided crown",
+  "slicked-back wet look",
+  "voluminous old-money blowout"
+];
+var ANGLE_BANK = ["front-facing", "side profile", "from behind", "over-the-shoulder", "overhead tilt", "three-quarter turn"];
+function buildMasterGridSystemPrompt(inputs) {
+  const { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference } = inputs;
+  const positionMap = buildPositionMap(imageCount);
+  const positionInstructions = positionMap.map(
+    ({ position, type }) => `  - Position ${position}: ${type} \u2014 ${POSITION_TYPE_RULES[type]}`
+  ).join("\n");
+  const hairstyleList = HAIRSTYLE_BANK.join(", ");
+  const angleList = ANGLE_BANK.join(", ");
+  const portraitInstruction = hasPortraitReference ? "A portrait reference image of the model WILL be passed to GPT Image 2 alongside each prompt. Each imagePrompt MUST include the instruction: 'Preserve the model's face and identity exactly from the provided reference image.'" : "No portrait reference is available. Each imagePrompt should describe the model generically in a way that is consistent across all shots (same apparent age, skin tone, body type).";
+  return `You are an expert Instagram content strategist and AI photo director.
+Your ONLY task is to generate a structured JSON shot plan for a ${imageCount}-image Instagram grid.
+You must output VALID JSON and NOTHING else \u2014 no markdown, no explanation, no code fences.
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+GRID PARAMETERS
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+Aesthetic: ${aesthetic}
+Color palette: ${palette}
+Light type: ${lightType}
+Image count: ${imageCount}
+Extra notes from user: ${extraNotes || "none"}
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+CONTRAST MATRIX (MANDATORY \u2014 do not deviate)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+You MUST assign the correct type to every position:
+${positionInstructions}
+
+Position type rules:
+- COMPLEX: medium or full-body frame with action, movement, or location rich in detail.
+- SIMPLE: minimalist flat-lay, accessory macro, geometric shadow, or texture detail \u2014 NO model required.
+- MEDIUM: elegant portrait or mirror selfie \u2014 tight on face/shoulders, calm and refined.
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+DIVERSITY RULES (MANDATORY)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+Every position where the model appears MUST have:
+  1. A different hairstyle (choose from: ${hairstyleList})
+  2. A different camera angle (choose from: ${angleList})
+  3. A different location or scene context
+
+NO two adjacent positions may share the same hairstyle OR the same angle.
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+PORTRAIT REFERENCE
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+${portraitInstruction}
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+OUTPUT FORMAT (strict \u2014 output ONLY this JSON, no extra text)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+{
+  "imageCount": ${imageCount},
+  "aesthetic": "${aesthetic}",
+  "palette": "${palette}",
+  "lightType": "${lightType}",
+  "shots": [
+    {
+      "position": 1,
+      "type": "COMPLEX" | "SIMPLE" | "MEDIUM",
+      "label": "<short human-readable scene label>",
+      "hairstyle": "<hairstyle or null if no model in frame>",
+      "angle": "<camera angle or null if no model in frame>",
+      "imagePrompt": "<complete, self-contained prompt for GPT Image 2 \u2014 include aesthetic, palette, light, scene, hairstyle, angle, and any portrait-reference instruction>"
+    }
+    // ... one entry per position, total ${imageCount} entries
+  ]
+}`;
+}
+function buildContinuityGridSystemPrompt(context, newImageCount, hasPortraitReference, extraNotes = "") {
+  const positionMap = buildPositionMap(newImageCount);
+  const positionInstructions = positionMap.map(({ position, type }) => `  - Position ${position}: ${type}`).join("\n");
+  const usedScenesList = context.usedScenes.length > 0 ? context.usedScenes.join(", ") : "none";
+  const usedHairstylesList = context.usedHairstyles.length > 0 ? context.usedHairstyles.join(", ") : "none";
+  const portraitInstruction = hasPortraitReference ? "Portrait reference IS available. Include in each imagePrompt: 'Preserve the model's face and identity exactly from the provided reference image.'" : "No portrait reference. Describe the model generically but consistently across all shots.";
+  return `You are an expert Instagram content strategist and AI photo director.
+You are continuing an existing Instagram grid. Your ONLY task is to generate a JSON shot plan for ${newImageCount} NEW images that extend the grid seamlessly.
+Output VALID JSON and NOTHING else.
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+EXISTING GRID CONTEXT (maintain coherence)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+Aesthetic: ${context.aesthetic}
+Color palette: ${context.palette}
+Light type: ${context.lightType}
+Already-used scenes (AVOID repeating these): ${usedScenesList}
+Already-used hairstyles (AVOID repeating these): ${usedHairstylesList}
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+NEW GRID PARAMETERS
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+New image count: ${newImageCount}
+Extra notes: ${extraNotes || "none"}
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+CONTRAST MATRIX (MANDATORY)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+${positionInstructions}
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+CONTINUITY RULES (MANDATORY)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+1. Keep IDENTICAL: palette (${context.palette}), light type (${context.lightType}), aesthetic mood.
+2. Use FRESH scenes \u2014 none of the already-used scenes above.
+3. Use FRESH hairstyles \u2014 none of the already-used hairstyles above. Choose from: ${HAIRSTYLE_BANK.join(", ")}.
+4. Use FRESH camera angles \u2014 vary from: ${ANGLE_BANK.join(", ")}.
+5. SIMPLE positions must be pure minimalist object/texture shots \u2014 no model.
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+PORTRAIT REFERENCE
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+${portraitInstruction}
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+OUTPUT FORMAT (output ONLY this JSON)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+{
+  "imageCount": ${newImageCount},
+  "aesthetic": "${context.aesthetic}",
+  "palette": "${context.palette}",
+  "lightType": "${context.lightType}",
+  "shots": [
+    {
+      "position": 1,
+      "type": "COMPLEX" | "SIMPLE" | "MEDIUM",
+      "label": "<scene label>",
+      "hairstyle": "<hairstyle or null>",
+      "angle": "<angle or null>",
+      "imagePrompt": "<complete GPT Image 2 prompt>"
+    }
+  ]
+}`;
+}
+var POSITION_TYPE_RULES = {
+  COMPLEX: "medium or full-body frame, action, movement, rich location details",
+  SIMPLE: "minimalist flat-lay / accessory macro / geometric shadow / texture \u2014 no model",
+  MEDIUM: "elegant tight portrait or mirror selfie \u2014 face/shoulders, calm composition"
+};
+function buildPositionMap(count) {
+  const result = [];
+  for (let i = 1; i <= count; i++) {
+    let type;
+    if (i % 2 === 0) {
+      type = "SIMPLE";
+    } else if (i === 3 || i === 7 || i === 11) {
+      type = "MEDIUM";
+    } else {
+      type = "COMPLEX";
+    }
+    result.push({ position: i, type });
+  }
+  return result;
+}
+async function callGeminiFlashText(options) {
+  const model = options.model || "gemini-2.0-flash";
+  const modelName = model.startsWith("models/") ? model.slice("models/".length) : model;
+  const url = `${options.geminiApiBaseUrl}/models/${encodeURIComponent(modelName)}:generateContent`;
+  const payload = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: options.systemPrompt }]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json"
+    }
+  };
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": options.geminiApiKey
+    },
+    body: JSON.stringify(payload)
+  });
+  const rawText = await response.text();
+  if (!response.ok) {
+    let remoteMessage = "";
+    try {
+      const parsed = JSON.parse(rawText);
+      const err = parsed.error;
+      remoteMessage = (typeof err?.message === "string" ? err.message : "") || rawText;
+    } catch {
+      remoteMessage = rawText;
+    }
+    throw new Error(`Gemini Flash error (${response.status}): ${remoteMessage}`);
+  }
+  try {
+    const parsed = JSON.parse(rawText);
+    const candidates = Array.isArray(parsed.candidates) ? parsed.candidates : [];
+    for (const candidate of candidates) {
+      const c = candidate;
+      const content = c.content;
+      const parts = Array.isArray(content?.parts) ? content.parts : [];
+      for (const part of parts) {
+        const p = part;
+        if (typeof p.text === "string" && p.text.trim().length > 0) {
+          return p.text.trim();
+        }
+      }
+    }
+  } catch {
+  }
+  throw new Error("Gemini Flash returned no usable text.");
+}
+function parseGridPlan(rawJson, expectedCount) {
+  let parsed;
+  try {
+    const clean = rawJson.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    parsed = JSON.parse(clean);
+  } catch {
+    throw new Error("Grid plan parsing failed: Gemini did not return valid JSON.");
+  }
+  const root = parsed;
+  if (!Array.isArray(root.shots) || root.shots.length === 0) {
+    throw new Error("Grid plan parsing failed: 'shots' array is missing or empty.");
+  }
+  if (root.shots.length !== expectedCount) {
+    throw new Error(
+      `Grid plan parsing failed: expected ${expectedCount} shots, got ${root.shots.length}.`
+    );
+  }
+  const shots = root.shots.map((s, idx) => {
+    const shot = s;
+    const position = typeof shot.position === "number" ? shot.position : idx + 1;
+    const type = shot.type === "COMPLEX" || shot.type === "SIMPLE" || shot.type === "MEDIUM" ? shot.type : "COMPLEX";
+    const label = typeof shot.label === "string" ? shot.label : `Shot ${position}`;
+    const hairstyle = typeof shot.hairstyle === "string" ? shot.hairstyle : null;
+    const angle = typeof shot.angle === "string" ? shot.angle : null;
+    const imagePrompt = typeof shot.imagePrompt === "string" ? shot.imagePrompt : "";
+    if (!imagePrompt) {
+      throw new Error(`Grid plan parsing failed: shot ${position} is missing imagePrompt.`);
+    }
+    return { position, type, label, hairstyle, angle, imagePrompt };
+  });
+  return {
+    imageCount: expectedCount,
+    aesthetic: typeof root.aesthetic === "string" ? root.aesthetic : "",
+    palette: typeof root.palette === "string" ? root.palette : "",
+    lightType: typeof root.lightType === "string" ? root.lightType : "",
+    shots
+  };
+}
+function extractContinuityContext(plan) {
+  const usedScenes = [];
+  const usedHairstyles = [];
+  for (const shot of plan.shots) {
+    if (shot.label) usedScenes.push(shot.label);
+    if (shot.hairstyle) usedHairstyles.push(shot.hairstyle);
+  }
+  return {
+    aesthetic: plan.aesthetic,
+    palette: plan.palette,
+    lightType: plan.lightType,
+    usedScenes: [...new Set(usedScenes)],
+    usedHairstyles: [...new Set(usedHairstyles)]
+  };
+}
+var GRID_PIPELINE_PLAN_CREDIT_COST = 1;
+var GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = 1;
+
 // server/routes.ts
 function getGeminiApiKey() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -6380,6 +6658,179 @@ async function registerRoutes(app2) {
         return res.status(503).json({ error: temporaryServiceMessage });
       }
       res.status(500).json({ error: errorMessage });
+    }
+  });
+  app2.post("/api/instame/grid-pipeline/plan", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const body = req.body || {};
+    const imageCount = body.imageCount;
+    if (imageCount !== 6 && imageCount !== 9 && imageCount !== 12) {
+      return res.status(400).json({ error: "imageCount must be 6, 9, or 12." });
+    }
+    const aesthetic = normalizeStringValue(body.aesthetic);
+    if (!aesthetic) {
+      return res.status(400).json({ error: "aesthetic is required." });
+    }
+    const palette = normalizeStringValue(body.palette) || "muted neutrals";
+    const lightType = normalizeStringValue(body.lightType) || "soft natural light";
+    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+    const hasPortraitReference = body.hasPortraitReference === true;
+    const inputs = {
+      imageCount,
+      aesthetic,
+      palette,
+      lightType,
+      extraNotes,
+      hasPortraitReference
+    };
+    await consumeCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_plan");
+    let planConsumed = true;
+    try {
+      const apiKey = getGeminiApiKey();
+      const systemPrompt = buildMasterGridSystemPrompt(inputs);
+      const rawJson = await callGeminiFlashText({
+        systemPrompt,
+        geminiApiBaseUrl: GEMINI_API_BASE_URL,
+        geminiApiKey: apiKey,
+        model: DEFAULT_STYLE_TEXT_MODEL
+      });
+      const plan = parseGridPlan(rawJson, imageCount);
+      const continuityContext = extractContinuityContext(plan);
+      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      planConsumed = false;
+      return res.json({
+        plan,
+        continuityContext,
+        creditsCharged: GRID_PIPELINE_PLAN_CREDIT_COST,
+        creditsRemaining: updatedUser?.credits ?? 0
+      });
+    } catch (error) {
+      if (planConsumed) {
+        await refundCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_plan_failed");
+      }
+      console.error("InstaMe grid-pipeline/plan error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to generate grid plan");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+  app2.post("/api/instame/grid-pipeline/render", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const body = req.body || {};
+    const plan = body.plan;
+    if (!plan || !Array.isArray(plan.shots) || plan.shots.length === 0) {
+      return res.status(400).json({ error: "plan with shots is required." });
+    }
+    const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const totalShots = plan.shots.length;
+    const totalCost = totalShots * GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
+    await consumeCredits(userId, totalCost, "instame_grid_pipeline_render");
+    let creditsConsumedCount = totalCost;
+    try {
+      const results = [];
+      let creditsFailed = 0;
+      for (const shot of plan.shots) {
+        const shotPrompt = typeof shot.imagePrompt === "string" ? shot.imagePrompt : "";
+        if (!shotPrompt) {
+          creditsFailed += GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
+          continue;
+        }
+        try {
+          const images = [];
+          if (portrait) {
+            images.push({ base64: portrait, mimeType: "image/jpeg" });
+          }
+          const generated = await generateOpenAiImage({
+            model: "gpt-image-1",
+            prompt: shotPrompt,
+            images: images.length > 0 ? images : void 0,
+            size: "1024x1536",
+            quality: "medium"
+          });
+          results.push({
+            position: shot.position,
+            label: shot.label,
+            type: shot.type,
+            imageBase64: generated.imageBase64
+          });
+        } catch (shotError) {
+          console.error(`InstaMe grid-pipeline/render shot ${shot.position} error:`, shotError);
+          creditsFailed += GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
+          await refundCredits(userId, GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE, "instame_grid_pipeline_render_shot_failed");
+        }
+      }
+      creditsConsumedCount = 0;
+      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      return res.json({
+        images: results,
+        totalRequested: totalShots,
+        totalRendered: results.length,
+        creditsCharged: totalCost - creditsFailed,
+        creditsRemaining: updatedUser?.credits ?? 0
+      });
+    } catch (error) {
+      if (creditsConsumedCount > 0) {
+        await refundCredits(userId, creditsConsumedCount, "instame_grid_pipeline_render_failed");
+      }
+      console.error("InstaMe grid-pipeline/render error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to render grid images");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+  app2.post("/api/instame/grid-pipeline/extend", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const body = req.body || {};
+    const newImageCount = body.newImageCount;
+    if (newImageCount !== 6 && newImageCount !== 9 && newImageCount !== 12) {
+      return res.status(400).json({ error: "newImageCount must be 6, 9, or 12." });
+    }
+    const ctx = body.continuityContext;
+    if (!ctx || !ctx.aesthetic) {
+      return res.status(400).json({ error: "continuityContext (from previous plan) is required." });
+    }
+    const hasPortraitReference = body.hasPortraitReference === true;
+    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+    await consumeCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_extend");
+    let planConsumed = true;
+    try {
+      const apiKey = getGeminiApiKey();
+      const systemPrompt = buildContinuityGridSystemPrompt(ctx, newImageCount, hasPortraitReference, extraNotes);
+      const rawJson = await callGeminiFlashText({
+        systemPrompt,
+        geminiApiBaseUrl: GEMINI_API_BASE_URL,
+        geminiApiKey: apiKey,
+        model: DEFAULT_STYLE_TEXT_MODEL
+      });
+      const plan = parseGridPlan(rawJson, newImageCount);
+      const nextContinuityContext = extractContinuityContext(plan);
+      nextContinuityContext.usedScenes = [.../* @__PURE__ */ new Set([...ctx.usedScenes || [], ...nextContinuityContext.usedScenes])];
+      nextContinuityContext.usedHairstyles = [.../* @__PURE__ */ new Set([...ctx.usedHairstyles || [], ...nextContinuityContext.usedHairstyles])];
+      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      planConsumed = false;
+      return res.json({
+        plan,
+        continuityContext: nextContinuityContext,
+        creditsCharged: GRID_PIPELINE_PLAN_CREDIT_COST,
+        creditsRemaining: updatedUser?.credits ?? 0
+      });
+    } catch (error) {
+      if (planConsumed) {
+        await refundCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_extend_failed");
+      }
+      console.error("InstaMe grid-pipeline/extend error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to generate continuity grid plan");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
     }
   });
   app2.post("/api/instame/grid-preview", authMiddleware, async (req, res) => {
