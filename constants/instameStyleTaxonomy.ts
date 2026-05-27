@@ -28,6 +28,8 @@ export type PhotoPackPreset = {
   shots: string[];
   /** What users concretely receive — shown in the planner as a summary line */
   deliverable: string;
+  /** Local reference images shown on the card (static require) */
+  previewImages?: ReturnType<typeof require>[];
 };
 
 export const STYLE_VIBE_CATEGORIES: StyleVibeCategory[] = [
@@ -216,6 +218,12 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Hero dramatic portrait",
     ],
     deliverable: "6 vertical AI photos • deep brown & burgundy palette • one cohesive dark academia story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/dark-academia-1.png"),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/dark-academia-2.png"),
+    ],
   },
   {
     id: "Desert Oasis Luxury",
@@ -236,6 +244,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Golden hour hero",
     ],
     deliverable: "6 vertical AI photos • terracotta & sandy gold palette • warm desert luxury carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/desert-oasis-1.png"),
+    ],
   },
   {
     id: "Luxury European Lifestyle",
@@ -256,6 +268,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Fashion week hero",
     ],
     deliverable: "6 vertical AI photos • champagne & cobblestone tones • European lifestyle carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/luxury-european-1.png"),
+    ],
   },
   {
     id: "Minimalist Scandinavian Wellness",
@@ -276,6 +292,12 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Nordic calm hero",
     ],
     deliverable: "6 vertical AI photos • crisp white & sage palette • minimalist wellness grid",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/scandi-wellness-1.png"),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/scandi-wellness-2.png"),
+    ],
   },
   {
     id: "Old Money Luxury",
@@ -299,6 +321,12 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Quiet luxury hero",
     ],
     deliverable: "9 vertical AI photos • muted beige & ivory palette • complete old money 3×3 grid reset",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/old-money-1.png"),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/old-money-2.png"),
+    ],
   },
   {
     id: "Amalfi Coast Vibe",
@@ -319,6 +347,12 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Golden hour seaside hero",
     ],
     deliverable: "6 vertical AI photos • azure & terracotta palette • one cohesive Amalfi summer story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/amalfi-1.png"),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/amalfi-2.png"),
+    ],
   },
   {
     id: "French Riviera Vintage Summer",
@@ -339,6 +373,12 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Riviera promenade hero",
     ],
     deliverable: "6 vertical AI photos • sandy gold & navy palette • vintage French Riviera carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/french-riviera-1.png"),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/french-riviera-2.png"),
+    ],
   },
   {
     id: "Private Jet & Executive",
@@ -359,6 +399,12 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "City skyline from altitude",
     ],
     deliverable: "6 vertical AI photos • charcoal & champagne palette • executive aviation editorial",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/private-jet-1.png"),
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/private-jet-2.png"),
+    ],
   },
   {
     id: "couple_drop_four",

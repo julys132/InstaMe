@@ -2691,7 +2691,7 @@ export default function InstaMeScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
                 {PHOTO_PACK_PRESETS.map((pack) => {
                   const active = activePhotoPack?.id === pack.id;
-                  const previewImages = photoPackPreviewMap[pack.id] || [];
+                  const hasImages = (pack.previewImages?.length ?? 0) > 0;
                   return (
                     <Pressable
                       key={pack.id}
@@ -2699,40 +2699,37 @@ export default function InstaMeScreen() {
                       style={({ pressed }) => [
                         styles.packCard,
                         active && styles.packCardActive,
-                        pressed ? { opacity: 0.92, transform: [{ translateY: 1 }] } : undefined,
+                        pressed ? { opacity: 0.9, transform: [{ scale: 0.97 }] } : undefined,
                       ]}
                     >
-                      <LinearGradient
-                        colors={pack.gradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.packCardFill}
-                      >
-                        <View style={styles.packMosaic}>
-                          {previewImages.slice(0, 4).map((imageUri, index) => (
-                            <Image
-                              key={`${pack.id}-${imageUri}-${index}`}
-                              source={{ uri: imageUri }}
-                              style={styles.packMosaicImage}
-                              contentFit="cover"
-                            />
-                          ))}
-                          {previewImages.length === 0 ? (
-                            <View style={styles.packMosaicFallback}>
-                              <Ionicons name="images-outline" size={18} color="rgba(255,255,255,0.55)" />
-                            </View>
-                          ) : null}
+                      {/* Background: diptych if 2+ images, single full-bleed, or gradient fallback */}
+                      {(pack.previewImages?.length ?? 0) >= 2 ? (
+                        <View style={styles.packCardDiptych}>
+                          <Image source={pack.previewImages![0]} style={styles.packCardDiptychHalf} contentFit="cover" />
+                          <Image source={pack.previewImages![1]} style={styles.packCardDiptychHalf} contentFit="cover" />
                         </View>
-                        <View style={styles.packCardCopy}>
-                          <View style={styles.packCardTopRow}>
-                            <Text style={styles.packCardCount}>{pack.count} images</Text>
-                            <Ionicons name={pack.icon as keyof typeof Ionicons.glyphMap} size={15} color={pack.accent} />
-                          </View>
+                      ) : hasImages ? (
+                        <Image source={pack.previewImages![0]} style={StyleSheet.absoluteFillObject as any} contentFit="cover" />
+                      ) : (
+                        <LinearGradient colors={pack.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject as any} />
+                      )}
+
+                      {/* Bottom gradient overlay with text */}
+                      <LinearGradient
+                        colors={["transparent", "transparent", "rgba(0,0,0,0.68)", "rgba(0,0,0,0.96)"]}
+                        locations={[0, 0.38, 0.70, 1]}
+                        style={styles.packCardOverlay}
+                      >
+                        <View style={styles.packCardTopRow}>
+                          <Text style={styles.packCardCount}>{pack.count} IMAGES</Text>
+                          <Ionicons name={pack.icon as keyof typeof Ionicons.glyphMap} size={13} color={pack.accent} />
+                        </View>
+                        <View style={styles.packCardBottomCopy}>
                           <Text style={styles.packCardTitle}>{pack.label}</Text>
                           <Text numberOfLines={2} style={styles.packCardSubtitle}>{pack.subtitle}</Text>
                           {active ? (
                             <View style={styles.packCardShotList}>
-                              {pack.shots.map((shot, i) => (
+                              {pack.shots.slice(0, 4).map((shot, i) => (
                                 <View key={i} style={styles.packCardShotPill}>
                                   <Text style={styles.packCardShotPillNum}>{i + 1}</Text>
                                   <Text style={styles.packCardShotPillText}>{shot}</Text>
@@ -4555,20 +4552,36 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   packCard: {
-    width: 238,
-    borderRadius: 22,
+    width: 148,
+    aspectRatio: 9 / 16,
+    borderRadius: 16,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(12,12,16,0.95)",
   },
   packCardActive: {
-    borderColor: "rgba(126,243,255,0.56)",
-    shadowColor: "#7EF3FF",
-    shadowOpacity: 0.26,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.52)",
+    shadowColor: "#fff",
+    shadowOpacity: 0.14,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
+  },
+  packCardDiptych: {
+    ...StyleSheet.absoluteFillObject,
+    flexDirection: "row",
+  },
+  packCardDiptychHalf: {
+    flex: 1,
+    height: "100%",
+  },
+  packCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
+    padding: 10,
+    paddingBottom: 12,
   },
   packCardFill: {
     padding: 10,
@@ -4600,6 +4613,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+  },
+  packCardBottomCopy: {
+    gap: 4,
   },
   packCardCount: {
     color: "rgba(255,255,255,0.54)",
