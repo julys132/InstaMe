@@ -566,11 +566,8 @@ export default function InstaMeScreen() {
   const [packGridRenderImages, setPackGridRenderImages] = useState<Array<{ shotIndex: number; shotLabel: string; imageBase64: string }>>([]);
   const [packGridRenderLoading, setPackGridRenderLoading] = useState(false);
   const [packGridError, setPackGridError] = useState<string | null>(null);
-
-  // ─── Grid Pipeline state ───────────────────────────────────────────────────
-  const [pipelineAestheticId, setPipelineAestheticId] = useState<string | null>(null);
-  const [pipelineImageCount, setPipelineImageCount] = useState<6 | 9 | 12>(6);
-  const [pipelineExtraNotes, setPipelineExtraNotes] = useState("");
+  const [packImagePreviewId, setPackImagePreviewId] = useState<string | null>(null);
+  const [packImagePreviewIndex, setPackImagePreviewIndex] = useState(0);
   const [pipelinePlanLoading, setPipelinePlanLoading] = useState(false);
   const [pipelineRenderLoading, setPipelineRenderLoading] = useState(false);
   const [pipelinePlan, setPipelinePlan] = useState<null | {
@@ -2692,24 +2689,31 @@ export default function InstaMeScreen() {
                 {PHOTO_PACK_PRESETS.map((pack) => {
                   const active = activePhotoPack?.id === pack.id;
                   const hasImages = (pack.previewImages?.length ?? 0) > 0;
+                  const imgCount = pack.previewImages?.length ?? 0;
                   return (
                     <Pressable
                       key={pack.id}
-                      onPress={() => handlePhotoPackPress(pack.id)}
+                      onPress={() => {
+                        if (hasImages) {
+                          setPackImagePreviewId(pack.id);
+                          setPackImagePreviewIndex(0);
+                        }
+                        handlePhotoPackPress(pack.id);
+                      }}
                       style={({ pressed }) => [
                         styles.packCard,
                         active && styles.packCardActive,
                         pressed ? { opacity: 0.9, transform: [{ scale: 0.97 }] } : undefined,
                       ]}
                     >
-                      {/* Background: diptych if 2+ images, single full-bleed, or gradient fallback */}
-                      {(pack.previewImages?.length ?? 0) >= 2 ? (
+                      {/* Background: diptych if 2+ images, single contain, or gradient fallback */}
+                      {imgCount >= 2 ? (
                         <View style={styles.packCardDiptych}>
-                          <Image source={pack.previewImages![0]} style={styles.packCardDiptychHalf} contentFit="cover" />
-                          <Image source={pack.previewImages![1]} style={styles.packCardDiptychHalf} contentFit="cover" />
+                          <Image source={pack.previewImages![0]} style={styles.packCardDiptychHalf} contentFit="contain" />
+                          <Image source={pack.previewImages![1]} style={styles.packCardDiptychHalf} contentFit="contain" />
                         </View>
                       ) : hasImages ? (
-                        <Image source={pack.previewImages![0]} style={StyleSheet.absoluteFillObject as any} contentFit="cover" />
+                        <Image source={pack.previewImages![0]} style={StyleSheet.absoluteFillObject as any} contentFit="contain" />
                       ) : (
                         <LinearGradient colors={pack.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject as any} />
                       )}
@@ -2722,7 +2726,13 @@ export default function InstaMeScreen() {
                       >
                         <View style={styles.packCardTopRow}>
                           <Text style={styles.packCardCount}>{pack.count} IMAGES</Text>
-                          <Ionicons name={pack.icon as keyof typeof Ionicons.glyphMap} size={13} color={pack.accent} />
+                          {hasImages ? (
+                            <View style={styles.packCardExpandHint}>
+                              <Ionicons name="expand-outline" size={11} color="rgba(255,255,255,0.72)" />
+                            </View>
+                          ) : (
+                            <Ionicons name={pack.icon as keyof typeof Ionicons.glyphMap} size={13} color={pack.accent} />
+                          )}
                         </View>
                         <View style={styles.packCardBottomCopy}>
                           <Text style={styles.packCardTitle}>{pack.label}</Text>
@@ -3866,6 +3876,81 @@ export default function InstaMeScreen() {
 
       </ScrollView>
 
+      {/* ── Aesthetic image lightbox ── */}
+      {(() => {
+        const previewPack = packImagePreviewId ? PHOTO_PACK_PRESETS.find((p) => p.id === packImagePreviewId) : null;
+        const images = previewPack?.previewImages ?? [];
+        return (
+          <Modal
+            animationType="fade"
+            transparent
+            visible={Boolean(previewPack)}
+            onRequestClose={() => setPackImagePreviewId(null)}
+            statusBarTranslucent
+          >
+            <View style={styles.packLightboxBackdrop}>
+              {/* Header */}
+              <View style={styles.packLightboxHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.packLightboxTitle}>{previewPack?.label}</Text>
+                  <Text style={styles.packLightboxSubtitle}>{previewPack?.count} images · tap to select</Text>
+                </View>
+                <Pressable onPress={() => setPackImagePreviewId(null)} style={styles.packLightboxClose}>
+                  <Ionicons name="close" size={22} color="#FFF" />
+                </Pressable>
+              </View>
+
+              {/* Image pager */}
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={(e) => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / viewportWidth);
+                  setPackImagePreviewIndex(idx);
+                }}
+                style={{ flex: 1 }}
+              >
+                {images.map((src, i) => (
+                  <View key={i} style={[styles.packLightboxPage, { width: viewportWidth }]}>
+                    <Image source={src} style={styles.packLightboxImage} contentFit="contain" />
+                  </View>
+                ))}
+              </ScrollView>
+
+              {/* Dots */}
+              {images.length > 1 ? (
+                <View style={styles.packLightboxDots}>
+                  {images.map((_, i) => (
+                    <View
+                      key={i}
+                      style={[
+                        styles.packLightboxDot,
+                        i === packImagePreviewIndex && styles.packLightboxDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Footer: select button */}
+              <View style={styles.packLightboxFooter}>
+                <Pressable
+                  onPress={() => {
+                    if (previewPack) handlePhotoPackPress(previewPack.id);
+                    setPackImagePreviewId(null);
+                  }}
+                  style={({ pressed }) => [styles.packLightboxSelectButton, pressed && { opacity: 0.85 }]}
+                >
+                  <Ionicons name="checkmark-circle-outline" size={16} color="#0a0a0f" />
+                  <Text style={styles.packLightboxSelectText}>Select {previewPack?.label}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
+        );
+      })()}
+
       <Modal
         animationType="fade"
         transparent
@@ -4617,6 +4702,92 @@ const styles = StyleSheet.create({
   packCardBottomCopy: {
     gap: 4,
   },
+  packCardExpandHint: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // ── Aesthetic lightbox ──────────────────────────────────────────────────────
+  packLightboxBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.97)",
+  },
+  packLightboxHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 56,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  packLightboxTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+  },
+  packLightboxSubtitle: {
+    color: "rgba(255,255,255,0.46)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  packLightboxClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  packLightboxPage: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  packLightboxImage: {
+    width: "100%",
+    flex: 1,
+  },
+  packLightboxDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 16,
+  },
+  packLightboxDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.28)",
+  },
+  packLightboxDotActive: {
+    backgroundColor: "#FFF",
+    width: 18,
+  },
+  packLightboxFooter: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 8,
+  },
+  packLightboxSelectButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#FFF",
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  packLightboxSelectText: {
+    color: "#0a0a0f",
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  // ───────────────────────────────────────────────────────────────────────────
   packCardCount: {
     color: "rgba(255,255,255,0.54)",
     fontFamily: "Inter_700Bold",
