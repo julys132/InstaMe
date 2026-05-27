@@ -568,6 +568,9 @@ export default function InstaMeScreen() {
   const [packGridError, setPackGridError] = useState<string | null>(null);
   const [packImagePreviewId, setPackImagePreviewId] = useState<string | null>(null);
   const [packImagePreviewIndex, setPackImagePreviewIndex] = useState(0);
+  const [pipelineAestheticId, setPipelineAestheticId] = useState<string | null>(null);
+  const [pipelineImageCount, setPipelineImageCount] = useState<6 | 9 | 12>(6);
+  const [pipelineExtraNotes, setPipelineExtraNotes] = useState("");
   const [pipelinePlanLoading, setPipelinePlanLoading] = useState(false);
   const [pipelineRenderLoading, setPipelineRenderLoading] = useState(false);
   const [pipelinePlan, setPipelinePlan] = useState<null | {
