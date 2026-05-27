@@ -2711,10 +2711,7 @@ export default function InstaMeScreen() {
                     >
                       {/* Background: diptych if 2+ images, single contain, or gradient fallback */}
                       {imgCount >= 2 ? (
-                        <View style={styles.packCardDiptych}>
-                          <Image source={pack.previewImages![0]} style={styles.packCardDiptychHalf} contentFit="contain" />
-                          <Image source={pack.previewImages![1]} style={styles.packCardDiptychHalf} contentFit="contain" />
-                        </View>
+                        <Image source={pack.previewImages![0]} style={StyleSheet.absoluteFillObject as any} contentFit="contain" />
                       ) : hasImages ? (
                         <Image source={pack.previewImages![0]} style={StyleSheet.absoluteFillObject as any} contentFit="contain" />
                       ) : (
