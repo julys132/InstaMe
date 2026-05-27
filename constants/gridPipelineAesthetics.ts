@@ -168,8 +168,6 @@ export const GRID_PIPELINE_AESTHETICS: GridPipelineAesthetic[] = [
       "refined restraint",
     ],
   },
-];
-
   {
     id: "Amalfi Coast Vibe",
     label: "Amalfi Coast Vibe",
