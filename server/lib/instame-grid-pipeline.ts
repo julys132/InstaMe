@@ -126,6 +126,36 @@ const PIPELINE_AESTHETIC_VOCABULARY: Record<string, string[]> = {
     "cashmere and silk",
     "private members club",
   ],
+  "Amalfi Coast Vibe": [
+    "Amalfi cliffside terraces",
+    "lemon groves and citrus detail",
+    "azure Mediterranean water",
+    "whitewashed walls with bougainvillea",
+    "ceramic tile patterns",
+    "boat deck on turquoise bay",
+    "Italian coastal village alleys",
+    "sun-soaked summer editorial",
+  ],
+  "French Riviera Vintage Summer": [
+    "Saint-Tropez harbor",
+    "vintage yacht deck",
+    "retro straw hat and sunglasses",
+    "marinière stripe detail",
+    "golden sandy beach",
+    "pastel parasol shade",
+    "French Riviera promenade",
+    "60s summer film grain",
+  ],
+  "Private Jet & Executive": [
+    "private jet interior leather seat",
+    "aircraft window golden hour",
+    "runway tarmac boarding",
+    "executive tailored power dressing",
+    "luxury aviation lounge",
+    "monogram luggage detail",
+    "sleek jet staircase",
+    "city skyline from altitude",
+  ],
 };
 
 function getAestheticVocabularyLine(aesthetic: string): string {

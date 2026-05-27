@@ -554,7 +554,7 @@ export default function InstaMeScreen() {
   );
   const [selectedStyleId, setSelectedStyleId] = useState<string>("");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
-  const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art" | "grid">("main");
+  const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art">("main");
   const [selectedStyleVibeId, setSelectedStyleVibeId] = useState("all");
   const [selectedPhotoPackId, setSelectedPhotoPackId] = useState<string | null>(null);
   const [selectedPackBriefVibeId, setSelectedPackBriefVibeId] = useState("all");
@@ -831,8 +831,8 @@ export default function InstaMeScreen() {
     () => STYLE_VIBE_CATEGORIES.filter((vibe) => vibe.id !== "all"),
     [],
   );
-  const isPackBriefConfigured = selectedPackBriefVibeId !== "all" && packBriefRequiredElementIds.length > 0;
-  const packPlannerCurrentStep = !activePhotoPack ? 1 : isPackBriefConfigured ? 3 : 2;
+  const isPackBriefConfigured = Boolean(activePhotoPack);
+  const packPlannerCurrentStep = !activePhotoPack ? 1 : pipelinePlan ? (pipelineRenderResults.length > 0 ? 4 : 3) : 2;
   const collageColumnCount = viewportWidth >= 1360 ? 4 : 3;
   const collageColumnOffsets = collageColumnCount === 4 ? [0, 18, 10, 22] : isPhoneViewport ? [0, 10, 4] : [0, 18, 10];
   const collageColumnGap = isPhoneViewport ? 6 : 8;
@@ -1665,6 +1665,14 @@ export default function InstaMeScreen() {
     setSelectedPhotoPackId((currentPackId) => (currentPackId === pack.id ? null : pack.id));
     setSelectedStyleVibeId(pack.vibeId);
     setSelectedPackBriefVibeId(pack.vibeId);
+    // Reset pipeline state when switching aesthetics
+    setPipelinePlan(null);
+    setPipelineContinuityContext(null);
+    setPipelineRenderResults([]);
+    setPipelineError(null);
+    setPackGridPreviewBase64(null);
+    setPackGridRenderImages([]);
+    setPackGridError(null);
     void Haptics.selectionAsync();
   }, []);
 
@@ -1681,68 +1689,64 @@ export default function InstaMeScreen() {
       Alert.alert("Portrait required", "Add a portrait above before using identity-locked generation.");
       return;
     }
-    const portraitPayload =
-      selectedPackIdentityModeId === "portrait_reference" && photo
-        ? { base64: photo.base64, mimeType: photo.mimeType }
-        : undefined;
+    const aesthetic = GRID_PIPELINE_AESTHETICS.find((a) => a.id === activePhotoPack.id);
+    const elementsNote =
+      packBriefRequiredElementIds.length > 0
+        ? `Include: ${packBriefRequiredElementIds
+            .map((id) => PACK_BRIEF_REQUIRED_ELEMENTS.find((e) => e.id === id)?.label)
+            .filter(Boolean)
+            .join(", ")}.`
+        : "";
+    const extraNotes = [elementsNote, packBriefNotes.trim()].filter(Boolean).join(" ");
     setPackGridPreviewLoading(true);
     setPackGridError(null);
-    setPackGridPreviewBase64(null);
-    setPackGridRenderImages([]);
+    setPipelinePlan(null);
+    setPipelineRenderResults([]);
+    setPipelineError(null);
     try {
-      const result = await apiClient.generateInstaMeGridPreview({
-        packId: activePhotoPack.id,
-        packLabel: activePhotoPack.label,
-        packCount: activePhotoPack.count,
-        vibeId: selectedPackBriefVibeId,
-        vibeLabel: selectedPackBriefVibe.label,
-        requiredElementIds: packBriefRequiredElementIds,
-        notes: packBriefNotes,
-        identityMode: selectedPackIdentityModeId as "portrait_reference" | "inspired_muse" | "fictional_muse",
-        portrait: portraitPayload,
+      const result = await apiClient.generateInstaMeGridPipelinePlan({
+        imageCount: activePhotoPack.count as 6 | 9 | 12,
+        aesthetic: activePhotoPack.id,
+        palette: aesthetic?.defaultPalette || "",
+        lightType: aesthetic?.defaultLightType || "",
+        extraNotes: extraNotes || undefined,
+        hasPortraitReference: selectedPackIdentityModeId === "portrait_reference" && Boolean(photo),
       });
-      setPackGridPreviewBase64(result.previewBase64);
+      setPipelinePlan(result.plan);
+      setPipelineContinuityContext(result.continuityContext);
       await refreshCredits();
     } catch (error: any) {
-      setPackGridError(error?.message || "Failed to generate grid preview. Please try again.");
+      setPackGridError(error?.message || "Failed to generate shot plan. Please try again.");
     } finally {
       setPackGridPreviewLoading(false);
     }
-  }, [activePhotoPack, selectedPackBriefVibeId, selectedPackBriefVibe, packBriefRequiredElementIds, packBriefNotes, selectedPackIdentityModeId, photo, refreshCredits]);
+  }, [activePhotoPack, packBriefRequiredElementIds, packBriefNotes, selectedPackIdentityModeId, photo, refreshCredits]);
 
   const handleRenderGridPack = useCallback(async () => {
-    if (!activePhotoPack) return;
+    if (!activePhotoPack || !pipelinePlan) return;
     if (selectedPackIdentityModeId === "portrait_reference" && !photo) {
       Alert.alert("Portrait required", "Add a portrait above before using identity-locked generation.");
       return;
     }
-    const portraitPayload =
-      ["portrait_reference", "inspired_muse"].includes(selectedPackIdentityModeId) && photo
-        ? { base64: photo.base64, mimeType: photo.mimeType }
-        : undefined;
+    const portrait =
+      selectedPackIdentityModeId === "portrait_reference" && photo ? photo.base64 : undefined;
     setPackGridRenderLoading(true);
     setPackGridError(null);
-    setPackGridRenderImages([]);
+    setPipelineError(null);
+    setPipelineRenderResults([]);
     try {
-      const result = await apiClient.generateInstaMeGridRender({
-        packId: activePhotoPack.id,
-        packLabel: activePhotoPack.label,
-        packCount: activePhotoPack.count,
-        vibeId: selectedPackBriefVibeId,
-        vibeLabel: selectedPackBriefVibe.label,
-        requiredElementIds: packBriefRequiredElementIds,
-        notes: packBriefNotes,
-        identityMode: selectedPackIdentityModeId as "portrait_reference" | "inspired_muse" | "fictional_muse",
-        portrait: portraitPayload,
+      const result = await apiClient.generateInstaMeGridPipelineRender({
+        plan: pipelinePlan,
+        portrait,
       });
-      setPackGridRenderImages(result.images);
+      setPipelineRenderResults(result.images);
       await refreshCredits();
     } catch (error: any) {
       setPackGridError(error?.message || "Failed to render pack images. Please try again.");
     } finally {
       setPackGridRenderLoading(false);
     }
-  }, [activePhotoPack, selectedPackBriefVibeId, selectedPackBriefVibe, packBriefRequiredElementIds, packBriefNotes, selectedPackIdentityModeId, photo, refreshCredits]);
+  }, [activePhotoPack, pipelinePlan, selectedPackIdentityModeId, photo, refreshCredits]);
 
   // ─── Grid Pipeline callbacks ──────────────────────────────────────────────
 
@@ -2580,7 +2584,6 @@ export default function InstaMeScreen() {
               { key: "main" as const, label: "Main Styles", icon: "sparkles" as const },
               { key: "own" as const, label: "Clone Aesthetic", icon: "copy-outline" as const },
               { key: "art" as const, label: "Art Styles", icon: "color-palette-outline" as const },
-              { key: "grid" as const, label: "Instagrid", icon: "grid-outline" as const },
             ]).map((tab) => {
               const active = styleSectionTab === tab.key;
               return (
@@ -2736,9 +2739,7 @@ export default function InstaMeScreen() {
                                 </View>
                               ))}
                             </View>
-                          ) : (
-                            <Text numberOfLines={2} style={styles.packCardExample}>{pack.example}</Text>
-                          )}
+                          ) : null}
                         </View>
                       </LinearGradient>
                     </Pressable>
@@ -2895,20 +2896,25 @@ export default function InstaMeScreen() {
                       </Text>
                     </View>
 
-                    {packGridError ? (
+                    {(packGridError || pipelineError) ? (
                       <View style={styles.packPlannerErrorCard}>
-                        <Text style={styles.packPlannerErrorText}>{packGridError}</Text>
+                        <Text style={styles.packPlannerErrorText}>{packGridError || pipelineError}</Text>
                       </View>
                     ) : null}
 
-                    {packGridPreviewBase64 ? (
+                    {pipelinePlan ? (
                       <View style={styles.packPlannerPreviewCard}>
-                        <Text style={styles.packPlannerLabel}>Grid concept preview</Text>
-                        <NativeImage
-                          source={{ uri: `data:image/png;base64,${packGridPreviewBase64}` }}
-                          style={styles.packPlannerPreviewImage}
-                          resizeMode="cover"
-                        />
+                        <Text style={styles.packPlannerLabel}>Shot plan — {pipelinePlan.imageCount} images</Text>
+                        <View style={styles.packPlannerShotGrid}>
+                          {pipelinePlan.shots.map((shot) => (
+                            <View key={shot.position} style={styles.packPlannerShotRow}>
+                              <Text style={styles.packPlannerShotNum}>{shot.position}</Text>
+                              <Text style={styles.packPlannerShotLabel}>
+                                {shot.label}{shot.hairstyle ? ` · ${shot.hairstyle}` : ""}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
                         <Pressable
                           onPress={handleRenderGridPack}
                           disabled={packGridRenderLoading}
@@ -2925,21 +2931,21 @@ export default function InstaMeScreen() {
                           <Text style={styles.packPlannerRenderButtonText}>
                             {packGridRenderLoading
                               ? "Rendering images\u2026"
-                              : `Render all ${activePhotoPack.count} images \u2014 ${activePhotoPack.count} credits`}
+                              : `Render all ${pipelinePlan.imageCount} images \u2014 ${pipelinePlan.imageCount} credits`}
                           </Text>
                         </Pressable>
                       </View>
                     ) : null}
 
-                    {packGridRenderImages.length > 0 ? (
+                    {pipelineRenderResults.length > 0 ? (
                       <View style={styles.packPlannerResultsGrid}>
                         <Text style={styles.packPlannerLabel}>
-                          {packGridRenderImages.length} image{packGridRenderImages.length !== 1 ? "s" : ""} ready
+                          {pipelineRenderResults.length} image{pipelineRenderResults.length !== 1 ? "s" : ""} ready
                         </Text>
                         <View style={styles.packPlannerResultsWrap}>
-                          {packGridRenderImages.map((img) => (
+                          {pipelineRenderResults.map((img) => (
                             <NativeImage
-                              key={img.shotIndex}
+                              key={img.position}
                               source={{ uri: `data:image/png;base64,${img.imageBase64}` }}
                               style={styles.packPlannerResultThumb}
                               resizeMode="cover"
@@ -2949,13 +2955,13 @@ export default function InstaMeScreen() {
                       </View>
                     ) : null}
 
-                    {!packGridPreviewBase64 ? (
+                    {!pipelinePlan ? (
                       <Pressable
                         onPress={handleGenerateGridPreview}
-                        disabled={packGridPreviewLoading || !isPackBriefConfigured}
+                        disabled={packGridPreviewLoading}
                         style={({ pressed }) => [
                           styles.packPlannerPreviewButton,
-                          (!isPackBriefConfigured || packGridPreviewLoading || pressed) && { opacity: 0.6 },
+                          (packGridPreviewLoading || pressed) && { opacity: 0.6 },
                         ]}
                       >
                         {packGridPreviewLoading ? (
@@ -2965,17 +2971,17 @@ export default function InstaMeScreen() {
                         )}
                         <Text style={styles.packPlannerPreviewButtonText}>
                           {packGridPreviewLoading
-                            ? "Generating grid preview\u2026"
-                            : isPackBriefConfigured
-                              ? "Generate grid preview \u2014 2 credits"
-                              : "Select a vibe and at least one element to preview"}
+                            ? "Generating shot plan\u2026"
+                            : "Generate shot plan \u2014 1 credit"}
                         </Text>
                       </Pressable>
                     ) : (
                       <Pressable
                         onPress={() => {
-                          setPackGridPreviewBase64(null);
-                          setPackGridRenderImages([]);
+                          setPipelinePlan(null);
+                          setPipelineRenderResults([]);
+                          setPipelineContinuityContext(null);
+                          setPipelineError(null);
                           setPackGridError(null);
                         }}
                         style={styles.packPlannerResetButton}
@@ -3725,185 +3731,6 @@ export default function InstaMeScreen() {
                 </View>
               </>
             )}
-          </View>
-        ) : null}
-
-        {styleSectionTab === "grid" ? (
-          <View style={styles.pipelineSection}>
-            {/* ── Aesthetic selector ── */}
-            <View style={styles.pipelineBlock}>
-              <Text style={styles.pipelineEyebrow}>Two-Step AI Grid</Text>
-              <Text style={styles.pipelineTitle}>Choose your aesthetic</Text>
-              <Text style={styles.pipelineSubtitle}>
-                Gemini Flash designs the shot plan. GPT Image 2 renders each frame.
-              </Text>
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pipelineAestheticRail}>
-              {GRID_PIPELINE_AESTHETICS.map((aesthetic) => {
-                const active = pipelineAestheticId === aesthetic.id;
-                return (
-                  <Pressable
-                    key={aesthetic.id}
-                    onPress={() => {
-                      setPipelineAestheticId(aesthetic.id);
-                      void Haptics.selectionAsync();
-                    }}
-                    style={({ pressed }) => [
-                      styles.pipelineAestheticCard,
-                      active && styles.pipelineAestheticCardActive,
-                      pressed ? { opacity: 0.9, transform: [{ scale: 0.97 }] } : undefined,
-                    ]}
-                  >
-                    <LinearGradient
-                      colors={aesthetic.gradient}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.pipelineAestheticCardFill}
-                    >
-                      <View style={[styles.pipelineAestheticIconWrap, { borderColor: aesthetic.accent }]}>
-                        <Ionicons name={aesthetic.icon as keyof typeof Ionicons.glyphMap} size={18} color={aesthetic.accent} />
-                      </View>
-                      <Text style={[styles.pipelineAestheticLabel, active && { color: aesthetic.accent }]}>{aesthetic.label}</Text>
-                      <Text numberOfLines={2} style={styles.pipelineAestheticTagline}>{aesthetic.tagline}</Text>
-                      {active ? (
-                        <View style={styles.pipelineAestheticPaletteRow}>
-                          <Ionicons name="color-filter-outline" size={10} color="rgba(255,255,255,0.55)" />
-                          <Text numberOfLines={1} style={styles.pipelineAestheticPaletteText}>{aesthetic.defaultPalette}</Text>
-                        </View>
-                      ) : null}
-                    </LinearGradient>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-
-            {/* ── Config row ── */}
-            {pipelineAestheticId ? (
-              <View style={styles.pipelineConfigCard}>
-                <Text style={styles.pipelineConfigTitle}>Grid size</Text>
-                <View style={styles.pipelineCountRow}>
-                  {([6, 9, 12] as const).map((n) => (
-                    <Pressable
-                      key={n}
-                      onPress={() => setPipelineImageCount(n)}
-                      style={[styles.pipelineCountChip, pipelineImageCount === n && styles.pipelineCountChipActive]}
-                    >
-                      <Text style={[styles.pipelineCountChipText, pipelineImageCount === n && styles.pipelineCountChipTextActive]}>
-                        {n} images
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={[styles.pipelineConfigTitle, { marginTop: 12 }]}>Extra notes (optional)</Text>
-                <TextInput
-                  value={pipelineExtraNotes}
-                  onChangeText={setPipelineExtraNotes}
-                  placeholder="e.g. include red dress, outdoor only, Paris location..."
-                  placeholderTextColor="rgba(255,255,255,0.32)"
-                  multiline
-                  style={styles.pipelineNotesInput}
-                />
-
-                {/* ── Error ── */}
-                {pipelineError ? (
-                  <View style={styles.pipelineErrorCard}>
-                    <Ionicons name="alert-circle-outline" size={14} color="#FF6B6B" />
-                    <Text style={styles.pipelineErrorText}>{pipelineError}</Text>
-                  </View>
-                ) : null}
-
-                {/* ── Plan result ── */}
-                {pipelinePlan ? (
-                  <View style={styles.pipelinePlanCard}>
-                    <Text style={styles.pipelinePlanTitle}>
-                      Shot plan ready — {pipelinePlan.imageCount} images
-                    </Text>
-                    <Text style={styles.pipelinePlanMeta}>{pipelinePlan.aesthetic} · {pipelinePlan.lightType}</Text>
-                    {pipelinePlan.shots.map((shot) => (
-                      <View key={shot.position} style={styles.pipelinePlanRow}>
-                        <View style={[styles.pipelinePlanTypeBadge,
-                          shot.type === "COMPLEX" ? styles.pipelinePlanTypeBadgeComplex
-                          : shot.type === "SIMPLE" ? styles.pipelinePlanTypeBadgeSimple
-                          : styles.pipelinePlanTypeBadgeMedium
-                        ]}>
-                          <Text style={styles.pipelinePlanTypeBadgeText}>{shot.type[0]}</Text>
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.pipelinePlanShotLabel}>{shot.position}. {shot.label}</Text>
-                          {shot.hairstyle ? <Text style={styles.pipelinePlanShotMeta}>{shot.hairstyle} · {shot.angle}</Text> : null}
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-
-                {/* ── Render results grid ── */}
-                {pipelineRenderResults.length > 0 ? (
-                  <View style={styles.pipelineResultsGrid}>
-                    {pipelineRenderResults.map((img) => (
-                      <View key={img.position} style={styles.pipelineResultThumbWrap}>
-                        <Image
-                          source={{ uri: `data:image/png;base64,${img.imageBase64}` }}
-                          style={styles.pipelineResultThumb}
-                          contentFit="cover"
-                        />
-                        <Text numberOfLines={1} style={styles.pipelineResultThumbLabel}>{img.position}. {img.label}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-
-                {/* ── Action buttons ── */}
-                <View style={styles.pipelineActionsRow}>
-                  {!pipelinePlan ? (
-                    <Pressable
-                      onPress={() => void handlePipelineGeneratePlan()}
-                      disabled={pipelinePlanLoading}
-                      style={({ pressed }) => [styles.pipelinePlanButton, pressed && { opacity: 0.88 }]}
-                    >
-                      {pipelinePlanLoading ? (
-                        <ActivityIndicator size="small" color="#0a0a0f" />
-                      ) : (
-                        <Text style={styles.pipelinePlanButtonText}>Generate shot plan — 1 credit</Text>
-                      )}
-                    </Pressable>
-                  ) : pipelineRenderResults.length === 0 ? (
-                    <Pressable
-                      onPress={() => void handlePipelineRender()}
-                      disabled={pipelineRenderLoading}
-                      style={({ pressed }) => [styles.pipelineRenderButton, pressed && { opacity: 0.88 }]}
-                    >
-                      {pipelineRenderLoading ? (
-                        <ActivityIndicator size="small" color="#0a0a0f" />
-                      ) : (
-                        <Text style={styles.pipelineRenderButtonText}>
-                          Render {pipelinePlan.imageCount} images — {pipelinePlan.imageCount} credits
-                        </Text>
-                      )}
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      onPress={() => void handlePipelineExtend()}
-                      disabled={pipelinePlanLoading}
-                      style={({ pressed }) => [styles.pipelineExtendButton, pressed && { opacity: 0.88 }]}
-                    >
-                      {pipelinePlanLoading ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={styles.pipelineExtendButtonText}>Extend grid (+{pipelineImageCount} more)</Text>
-                      )}
-                    </Pressable>
-                  )}
-                  {(pipelinePlan || pipelineRenderResults.length > 0) ? (
-                    <Pressable onPress={handlePipelineReset} style={styles.pipelineResetButton}>
-                      <Text style={styles.pipelineResetButtonText}>Start over</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </View>
-            ) : null}
           </View>
         ) : null}
 

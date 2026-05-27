@@ -170,6 +170,83 @@ export const GRID_PIPELINE_AESTHETICS: GridPipelineAesthetic[] = [
   },
 ];
 
+  {
+    id: "Amalfi Coast Vibe",
+    label: "Amalfi Coast Vibe",
+    shortLabel: "Amalfi Coast",
+    tagline: "Clifftops, lemon groves, azure water and Italian summer light.",
+    defaultPalette: "azure blue, terracotta, lemon yellow, whitewash, bougainvillea pink",
+    defaultLightType: "bright Mediterranean midday, warm golden coastal glow",
+    icon: "boat-outline",
+    accent: "#6BBDE2",
+    gradient: [
+      "rgba(60,130,180,0.62)",
+      "rgba(30,80,120,0.86)",
+      "rgba(5,10,18,0.97)",
+    ],
+    promptKeywords: [
+      "Amalfi cliffside terraces",
+      "lemon groves and citrus detail",
+      "azure Mediterranean water",
+      "whitewashed walls with bougainvillea",
+      "ceramic tile patterns",
+      "boat deck on turquoise bay",
+      "Italian coastal village alleys",
+      "sun-soaked summer editorial",
+    ],
+  },
+  {
+    id: "French Riviera Vintage Summer",
+    label: "French Riviera Vintage Summer",
+    shortLabel: "French Riviera",
+    tagline: "Saint-Tropez harbor, vintage yachts and 60s Riviera glamour.",
+    defaultPalette: "sandy gold, navy, cream, coral, faded blue",
+    defaultLightType: "warm Riviera afternoon, vintage film-grain light",
+    icon: "umbrella-outline",
+    accent: "#F5C97A",
+    gradient: [
+      "rgba(190,155,80,0.60)",
+      "rgba(100,80,30,0.86)",
+      "rgba(8,7,4,0.97)",
+    ],
+    promptKeywords: [
+      "Saint-Tropez harbor",
+      "vintage yacht deck",
+      "retro straw hat and sunglasses",
+      "marinière stripe detail",
+      "golden sandy beach",
+      "pastel parasol shade",
+      "French Riviera promenade",
+      "60s summer film grain",
+    ],
+  },
+  {
+    id: "Private Jet & Executive",
+    label: "Private Jet & Executive",
+    shortLabel: "Private Jet",
+    tagline: "Jet interiors, runways, executive power dressing at altitude.",
+    defaultPalette: "charcoal, ivory, champagne, polished steel, warm black",
+    defaultLightType: "aircraft window golden hour, cool aviation ambient light",
+    icon: "airplane-outline",
+    accent: "#D4C9A8",
+    gradient: [
+      "rgba(70,65,55,0.72)",
+      "rgba(35,32,24,0.90)",
+      "rgba(5,5,3,0.97)",
+    ],
+    promptKeywords: [
+      "private jet interior leather seat",
+      "aircraft window golden hour",
+      "runway tarmac boarding",
+      "executive tailored power dressing",
+      "luxury aviation lounge",
+      "monogram luggage detail",
+      "sleek jet staircase",
+      "city skyline from altitude",
+    ],
+  },
+];
+
 /** Returns an aesthetic by its id, or undefined */
 export function getGridPipelineAestheticById(
   id: string,
