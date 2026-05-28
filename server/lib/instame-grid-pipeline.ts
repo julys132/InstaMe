@@ -552,3 +552,132 @@ export const GRID_PIPELINE_PLAN_CREDIT_COST = 1;
 
 /** 1 credit per rendered image in Step 2 */
 export const GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = 1;
+
+/** 2 credits for composite preview (Gemini plan + GPT composite render) */
+export const GRID_PIPELINE_COMPOSITE_CREDIT_COST = 2;
+
+/** 1 credit per image extracted from the composite */
+export const GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = 1;
+
+// ─── Grid position helpers ────────────────────────────────────────────────────
+
+const GRID_COLS = 3; // Instagram always uses 3 columns
+
+/**
+ * Returns a human-readable grid position label.
+ * e.g. position 1 in a 9-image grid → "row 1, column 1 (top-left)"
+ */
+export function getGridPositionLabel(position: number, imageCount: number): string {
+  const totalRows = Math.ceil(imageCount / GRID_COLS);
+  const row = Math.ceil(position / GRID_COLS);
+  const col = ((position - 1) % GRID_COLS) + 1;
+  const rowLabel = row === 1 ? "top" : row === totalRows ? "bottom" : "center";
+  const colLabel = col === 1 ? "left" : col === GRID_COLS ? "right" : "center";
+  const corner =
+    rowLabel === "center" && colLabel === "center"
+      ? "center of grid"
+      : rowLabel === colLabel
+      ? rowLabel
+      : `${rowLabel}-${colLabel}`;
+  return `row ${row}, column ${col} (${corner})`;
+}
+
+// ─── Composite grid prompt ────────────────────────────────────────────────────
+
+/**
+ * Builds the GPT Image 2 prompt for generating a single composite
+ * Instagram grid preview image containing all shots in a grid layout.
+ */
+export function buildCompositeGridPrompt(plan: GridPlan, hasPortraitReference: boolean): string {
+  const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
+
+  const shotLines = plan.shots
+    .map((shot) => {
+      const row = Math.ceil(shot.position / GRID_COLS);
+      const col = ((shot.position - 1) % GRID_COLS) + 1;
+      const detail = [
+        shot.label,
+        shot.hairstyle ? `hairstyle: ${shot.hairstyle}` : null,
+        shot.angle ? `camera angle: ${shot.angle}` : null,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      return `  Position ${shot.position} (row ${row}, col ${col}): ${detail}`;
+    })
+    .join("\n");
+
+  const portraitNote = hasPortraitReference
+    ? "A female model with consistent identity appears in all relevant cells."
+    : "A stylish female model with consistent appearance throughout appears in the relevant cells.";
+
+  return `Create a photorealistic Instagram profile grid preview image showing exactly ${plan.imageCount} coordinated editorial photos arranged in a ${GRID_COLS}-column × ${totalRows}-row grid, exactly as they appear on an Instagram profile page.
+
+GRID STRUCTURE: ${plan.imageCount} equal cells in ${totalRows} row${totalRows > 1 ? "s" : ""} of ${GRID_COLS} columns. Cells are separated by a thin white 1px divider (like Instagram). The grid fills the entire canvas.
+
+AESTHETIC: ${plan.aesthetic}
+COLOR PALETTE: ${plan.palette}
+LIGHT TYPE: ${plan.lightType}
+
+CELL CONTENTS (left to right, top to bottom — numbering is exact):
+${shotLines}
+
+RULES:
+- All cells share identical color grading, tonal range, and aesthetic mood
+- Each cell is clearly distinct but visually harmonious with all others
+- ${portraitNote}
+- No extra borders or margins outside the grid — the grid fills the entire image
+- Professional editorial photography quality, photorealistic`;
+}
+
+// ─── Extraction prompt ────────────────────────────────────────────────────────
+
+/**
+ * Builds the GPT Image 2 prompt to extract and recreate one cell from the
+ * composite grid at full standalone resolution.
+ */
+export function buildExtractionPrompt(params: {
+  position: number;
+  imageCount: number;
+  shot: { label: string; hairstyle: string | null; angle: string | null; type: string };
+  hasPortrait: boolean;
+  aesthetic: string;
+  palette: string;
+  lightType: string;
+}): string {
+  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType } = params;
+  const totalRows = Math.ceil(imageCount / GRID_COLS);
+  const row = Math.ceil(position / GRID_COLS);
+  const col = ((position - 1) % GRID_COLS) + 1;
+  const rowLabel = row === 1 ? "top" : row === totalRows ? "bottom" : "center";
+  const colLabel = col === 1 ? "left" : col === GRID_COLS ? "right" : "center";
+  const corner =
+    rowLabel === "center" && colLabel === "center"
+      ? "center of the grid"
+      : `${rowLabel}-${colLabel} of the grid`;
+
+  const typeDesc =
+    shot.type === "SIMPLE"
+      ? "Flat-lay / object detail — no person in frame"
+      : shot.type === "MEDIUM"
+      ? "Tight portrait — face and shoulders, calm and refined"
+      : "Full or medium body — action, movement, or rich location";
+
+  const portraitInstruction = hasPortrait
+    ? `\nCRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait. Adapt their face naturally to the scene. Never alter their identity.`
+    : "";
+
+  return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
+
+EXACT POSITION: position ${position}, counting left to right, top to bottom — row ${row}, column ${col} (${corner}).
+
+TARGET CELL DETAILS:
+- Scene: ${shot.label}${shot.hairstyle ? `\n- Hairstyle: ${shot.hairstyle}` : ""}${shot.angle ? `\n- Camera angle: ${shot.angle}` : ""}
+- Shot type: ${typeDesc}
+
+OUTPUT REQUIREMENTS:
+- Output ONLY this single standalone photo — no grid lines, no other cells, no borders
+- 100% faithful replica of the composition, subject, colors, lighting, and background from that exact cell
+- Maintain the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting
+- Ultra-detailed, photorealistic, shot with a professional 8K camera
+- Vertical portrait format (4:5 ratio)${portraitInstruction}`;
+}

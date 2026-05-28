@@ -279,7 +279,7 @@ const PACK_BRIEF_REQUIRED_ELEMENTS = [
   { id: "detail", label: "Detail crop" },
 ] as const;
 
-const PACK_BRIEF_FLOW_STEPS = ["Preset", "Brief", "Preview", "Render"] as const;
+const PACK_BRIEF_FLOW_STEPS = ["Preset", "Brief", "Visual Grid", "Extract"] as const;
 const PACK_BRIEF_NOTES_MAX_LENGTH = 220;
 
 const PACK_BRIEF_IDENTITY_OPTIONS = [
@@ -1754,23 +1754,26 @@ export default function InstaMeScreen() {
     const extraNotes = [elementsNote, packBriefNotes.trim()].filter(Boolean).join(" ");
     setPackGridPreviewLoading(true);
     setPackGridError(null);
+    setPackGridPreviewBase64(null);
     setPipelinePlan(null);
     setPipelineRenderResults([]);
     setPipelineError(null);
     try {
-      const result = await apiClient.generateInstaMeGridPipelinePlan({
+      const result = await apiClient.generateInstaMeGridCompositePreview({
         imageCount: activePhotoPack.count,
         aesthetic: activePhotoPack.id,
         palette: aesthetic?.defaultPalette || "",
         lightType: aesthetic?.defaultLightType || "",
         extraNotes: extraNotes || undefined,
         hasPortraitReference: selectedPackIdentityModeId === "portrait_reference" && Boolean(photo),
+        portrait: selectedPackIdentityModeId === "portrait_reference" && photo ? photo.base64 : undefined,
       });
+      setPackGridPreviewBase64(result.gridImageBase64);
       setPipelinePlan(result.plan);
       setPipelineContinuityContext(result.continuityContext);
       await refreshCredits();
     } catch (error: any) {
-      setPackGridError(error?.message || "Failed to generate shot plan. Please try again.");
+      setPackGridError(error?.message || "Failed to generate visual grid preview. Please try again.");
     } finally {
       setPackGridPreviewLoading(false);
     }
@@ -1782,37 +1785,57 @@ export default function InstaMeScreen() {
       Alert.alert("Portrait required", "Add a portrait above before using identity-locked generation.");
       return;
     }
+    if (!packGridPreviewBase64) {
+      Alert.alert("Missing visual preview", "Generate the visual grid preview before extracting individual images.");
+      return;
+    }
     if (shotsToRender.length === 0) {
       Alert.alert("No images selected", "Select at least one image from the pack before rendering.");
       return;
     }
 
+    const orderedShots = [...shotsToRender].sort((a, b) => a.position - b.position);
+    const positions = orderedShots.map((shot) => shot.position);
+
     const portrait = selectedPackIdentityModeId === "portrait_reference" && photo ? photo.base64 : undefined;
-    const selectedPlan: PipelinePlanState = {
-      ...pipelinePlan,
-      imageCount: shotsToRender.length,
-      shots: shotsToRender,
-    };
+
     setPackGridRenderLoading(true);
     setPackGridError(null);
     setPipelineError(null);
     setPipelineRenderResults([]);
     try {
-      const result = await apiClient.generateInstaMeGridPipelineRender({
-        plan: selectedPlan,
+      const result = await apiClient.generateInstaMeGridExtractShots({
+        gridImageBase64: packGridPreviewBase64,
+        plan: {
+          aesthetic: pipelinePlan.aesthetic,
+          palette: pipelinePlan.palette,
+          lightType: pipelinePlan.lightType,
+          shots: pipelinePlan.shots.map((shot) => ({
+            position: shot.position,
+            label: shot.label,
+            hairstyle: shot.hairstyle,
+            angle: shot.angle,
+            type: shot.type,
+          })),
+        },
+        positions,
         portrait,
       });
-      setPipelineRenderResults(result.images);
+      setPipelineRenderResults([...result.images].sort((a, b) => a.position - b.position));
       await refreshCredits();
     } catch (error: any) {
-      setPackGridError(error?.message || "Failed to render pack images. Please try again.");
+      setPackGridError(error?.message || "Failed to extract selected grid images. Please try again.");
     } finally {
       setPackGridRenderLoading(false);
     }
-  }, [activePhotoPack, pipelinePlan, selectedPackIdentityModeId, photo, refreshCredits]);
+  }, [activePhotoPack, pipelinePlan, selectedPackIdentityModeId, photo, refreshCredits, packGridPreviewBase64]);
 
   const handleRenderGridPack = useCallback(() => {
     if (!activePhotoPack || !pipelinePlan) return;
+    if (!packGridPreviewBase64) {
+      Alert.alert("Generate preview first", "Create a visual grid preview before extracting separate images.");
+      return;
+    }
 
     const shotsToRender = pipelinePlan.shots.filter((shot) => selectedPipelineShotPositions.includes(shot.position));
     if (shotsToRender.length === 0) {
@@ -1820,12 +1843,23 @@ export default function InstaMeScreen() {
       return;
     }
 
+    const orderedShots = [...shotsToRender].sort((a, b) => a.position - b.position);
+    const extractionOrder = orderedShots
+      .map((shot) => {
+        const row = Math.ceil(shot.position / 3);
+        const col = ((shot.position - 1) % 3) + 1;
+        return `${shot.position}(r${row},c${col})`;
+      })
+      .join(", ");
+
     const excludedCount = pipelinePlan.shots.length - shotsToRender.length;
-    const title = `Generate ${shotsToRender.length} separate image${shotsToRender.length === 1 ? "" : "s"}?`;
+    const title = `Extract ${shotsToRender.length} separate image${shotsToRender.length === 1 ? "" : "s"}?`;
     const message = [
-      `${activePhotoPack.label} will be rendered with GPT Image at medium quality.`,
+      `${activePhotoPack.label} will be extracted from the visual grid with GPT Image at medium quality.`,
       `Selected: ${shotsToRender.length}/${pipelinePlan.shots.length} image${pipelinePlan.shots.length === 1 ? "" : "s"}.`,
       excludedCount > 0 ? `Excluded: ${excludedCount} image${excludedCount === 1 ? "" : "s"}.` : "All pack images are selected.",
+      "Order is strict: row 1 left-to-right, then row 2, then row 3.",
+      `Extraction sequence: ${extractionOrder}.`,
       `Cost: ${shotsToRender.length} credit${shotsToRender.length === 1 ? "" : "s"}.`,
     ].join("\n");
 
@@ -1835,11 +1869,11 @@ export default function InstaMeScreen() {
         text: "Generate",
         style: "default",
         onPress: () => {
-          void renderSelectedGridPackShots(shotsToRender);
+          void renderSelectedGridPackShots(orderedShots);
         },
       },
     ]);
-  }, [activePhotoPack, pipelinePlan, renderSelectedGridPackShots, selectedPipelineShotPositions]);
+  }, [activePhotoPack, pipelinePlan, renderSelectedGridPackShots, selectedPipelineShotPositions, packGridPreviewBase64]);
 
   // ─── Grid Pipeline callbacks ──────────────────────────────────────────────
 
@@ -3013,11 +3047,24 @@ export default function InstaMeScreen() {
 
                     {pipelinePlan ? (
                       <View style={styles.packPlannerPreviewCard}>
+                        {packGridPreviewBase64 ? (
+                          <View style={styles.packPlannerCompositeCard}>
+                            <Text style={styles.packPlannerLabel}>Visual grid preview</Text>
+                            <Text style={styles.packPlannerSelectionHint}>
+                              Position order is strict: row 1 left-to-right, then row 2, then row 3.
+                            </Text>
+                            <NativeImage
+                              source={{ uri: `data:image/png;base64,${packGridPreviewBase64}` }}
+                              style={styles.packPlannerPreviewImage}
+                              resizeMode="cover"
+                            />
+                          </View>
+                        ) : null}
                         <View style={styles.packPlannerSelectionHeader}>
                           <View style={{ flex: 1 }}>
                             <Text style={styles.packPlannerLabel}>Shot plan - {pipelinePlan.imageCount} images</Text>
                             <Text style={styles.packPlannerSelectionHint}>
-                              Select the images to generate separately at medium quality.
+                              Select the images you want to extract as separate files at medium quality.
                             </Text>
                           </View>
                           <View style={styles.packPlannerSelectionPill}>
@@ -3053,6 +3100,8 @@ export default function InstaMeScreen() {
                         <View style={styles.packPlannerShotGrid}>
                           {pipelinePlan.shots.map((shot) => {
                             const selected = selectedPipelineShotPositions.includes(shot.position);
+                            const row = Math.ceil(shot.position / 3);
+                            const col = ((shot.position - 1) % 3) + 1;
                             return (
                               <Pressable
                                 key={shot.position}
@@ -3071,7 +3120,8 @@ export default function InstaMeScreen() {
                                   {shot.position}
                                 </Text>
                                 <Text style={[styles.packPlannerShotLabel, !selected && styles.packPlannerShotLabelExcluded]}>
-                                  {shot.label}{shot.hairstyle ? ` - ${shot.hairstyle}` : ""}
+                                  {`row ${row}, col ${col} - ${shot.label}`}
+                                  {shot.hairstyle ? ` - ${shot.hairstyle}` : ""}
                                 </Text>
                               </Pressable>
                             );
@@ -3080,10 +3130,10 @@ export default function InstaMeScreen() {
                         <View style={styles.packPlannerRenderSummary}>
                           <Text style={styles.packPlannerRenderSummaryText}>
                             {excludedPipelineShotCount > 0
-                              ? `${excludedPipelineShotCount} excluded. ${selectedPipelineShotCount} will be generated.`
-                              : `All ${selectedPipelineShotCount} images will be generated.`}
+                              ? `${excludedPipelineShotCount} excluded. ${selectedPipelineShotCount} will be extracted.`
+                              : `All ${selectedPipelineShotCount} images will be extracted.`}
                           </Text>
-                          <Text style={styles.packPlannerRenderSummaryText}>GPT Image - medium quality</Text>
+                          <Text style={styles.packPlannerRenderSummaryText}>GPT Image - medium quality, exact row/column mapping</Text>
                         </View>
                         <Pressable
                           onPress={handleRenderGridPack}
@@ -3100,8 +3150,8 @@ export default function InstaMeScreen() {
                           )}
                           <Text style={styles.packPlannerRenderButtonText}>
                             {packGridRenderLoading
-                              ? "Rendering images\u2026"
-                              : `Confirm ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
+                              ? "Extracting images\u2026"
+                              : `Confirm extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
                           </Text>
                         </Pressable>
                       </View>
@@ -3155,8 +3205,8 @@ export default function InstaMeScreen() {
                         )}
                         <Text style={styles.packPlannerPreviewButtonText}>
                           {packGridPreviewLoading
-                            ? "Generating shot plan\u2026"
-                            : "Generate shot plan \u2014 1 credit"}
+                            ? "Generating visual grid preview\u2026"
+                            : "Generate visual grid preview \u2014 2 credits"}
                         </Text>
                       </Pressable>
                     ) : (
@@ -3167,6 +3217,7 @@ export default function InstaMeScreen() {
                           setPipelineContinuityContext(null);
                           setPipelineError(null);
                           setPackGridError(null);
+                          setPackGridPreviewBase64(null);
                         }}
                         style={styles.packPlannerResetButton}
                       >
@@ -5415,6 +5466,14 @@ const styles = StyleSheet.create({
   },
   packPlannerPreviewCard: {
     gap: 8,
+  },
+  packPlannerCompositeCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    padding: 10,
+    gap: 6,
   },
   packPlannerPreviewImage: {
     width: "100%",

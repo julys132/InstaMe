@@ -97,11 +97,15 @@ import {
 import {
   buildMasterGridSystemPrompt,
   buildContinuityGridSystemPrompt,
+  buildCompositeGridPrompt,
+  buildExtractionPrompt,
   callGeminiFlashText,
   parseGridPlan,
   extractContinuityContext,
   GRID_PIPELINE_PLAN_CREDIT_COST,
   GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE,
+  GRID_PIPELINE_COMPOSITE_CREDIT_COST,
+  GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
   type GridPipelineImageCount,
   type GridPipelineUserInputs,
   type GridContinuityContext,
@@ -6563,6 +6567,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const lightType = normalizeStringValue(body.lightType) || "soft natural light";
     const extraNotes = normalizeStringValue(body.extraNotes) || "";
     const hasPortraitReference = body.hasPortraitReference === true;
+    const portrait: string | undefined =
+      typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : undefined;
 
     const inputs: GridPipelineUserInputs = {
       imageCount,
@@ -6753,6 +6759,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("InstaMe grid-pipeline/extend error:", error);
       const errorMessage = toErrorMessage(error, "Failed to generate continuity grid plan");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // ─── Instagram Grid Pipeline — Composite Preview (NEW FLOW) ─────────────────
+  // POST /api/instame/grid-pipeline/composite-preview
+  // Calls Gemini Flash to plan shots, then GPT Image 2 to render a single composite
+  // Instagram grid preview image. User reviews the visual before extracting shots.
+  // Cost: GRID_PIPELINE_COMPOSITE_CREDIT_COST (covers plan + composite render).
+  app.post("/api/instame/grid-pipeline/composite-preview", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+
+    const imageCount: GridPipelineImageCount = [4, 6, 9, 12].includes(body.imageCount)
+      ? (body.imageCount as GridPipelineImageCount)
+      : 9;
+    const aesthetic = normalizeStringValue(body.aesthetic) || "Old Money Luxury";
+    const palette = normalizeStringValue(body.palette) || "";
+    const lightType = normalizeStringValue(body.lightType) || "";
+    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+    const hasPortraitReference = body.hasPortraitReference === true;
+
+    const inputs: GridPipelineUserInputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
+
+    await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
+    let consumed = true;
+
+    try {
+      const geminiApiKey = getGeminiApiKey();
+      const geminiApiBaseUrl =
+        process.env.GEMINI_API_BASE_URL ||
+        process.env.AI_INTEGRATIONS_GEMINI_API_BASE_URL ||
+        "https://generativelanguage.googleapis.com/v1beta";
+
+      const systemPrompt = buildMasterGridSystemPrompt(inputs);
+      const rawPlan = await callGeminiFlashText({ systemPrompt, geminiApiBaseUrl, geminiApiKey });
+      const plan = parseGridPlan(rawPlan, imageCount);
+      const continuityContext = extractContinuityContext(plan);
+
+      const compositePrompt = buildCompositeGridPrompt(plan, hasPortraitReference);
+
+      const compositeImages: import("./lib/instame-image").RuntimeImageInput[] = [];
+      if (portrait) {
+        compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
+      }
+
+      const composite = await generateOpenAiImage({
+        model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+        prompt: compositePrompt,
+        images: compositeImages.length > 0 ? compositeImages : undefined,
+        size: "1024x1024",
+        quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
+      });
+
+      consumed = false;
+      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+
+      return res.json({
+        gridImageBase64: composite.imageBase64,
+        plan,
+        continuityContext,
+        imageCount,
+        creditsCharged: GRID_PIPELINE_COMPOSITE_CREDIT_COST,
+        creditsRemaining: updatedUser?.credits ?? 0,
+      });
+    } catch (error) {
+      if (consumed) {
+        await refundCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview_failed");
+      }
+      console.error("InstaMe grid-pipeline/composite-preview error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to generate composite grid preview");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+
+  // ─── Instagram Grid Pipeline — Extract Shots (NEW FLOW) ──────────────────────
+  // POST /api/instame/grid-pipeline/extract-shots
+  // Takes the composite grid image + plan + selected positions + optional portrait.
+  // For each selected position, extracts and recreates that cell at full quality.
+  // Cost: GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE × positions.length
+  app.post("/api/instame/grid-pipeline/extract-shots", authMiddleware, async (req, res) => {
+    const userId = req.user!.id;
+    const body = req.body || {};
+
+    const gridImageBase64 = normalizeStringValue(body.gridImageBase64);
+    if (!gridImageBase64) {
+      return res.status(400).json({ error: "gridImageBase64 is required." });
+    }
+
+    const plan = body.plan;
+    if (!plan || !Array.isArray(plan.shots) || plan.shots.length === 0) {
+      return res.status(400).json({ error: "plan with shots is required." });
+    }
+
+    const positions: number[] = Array.isArray(body.positions)
+      ? (body.positions as unknown[]).filter((p): p is number => typeof p === "number")
+      : (plan.shots as Array<{ position: number }>).map((s) => s.position);
+
+    const uniqueSortedPositions = [...new Set(positions)].sort((a, b) => a - b);
+
+    if (uniqueSortedPositions.length === 0) {
+      return res.status(400).json({ error: "At least one position must be selected." });
+    }
+
+    const portrait: string | undefined =
+      typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : undefined;
+
+    const imageCount: number = plan.shots.length;
+    const aesthetic = normalizeStringValue(plan.aesthetic) || "";
+    const palette = normalizeStringValue(plan.palette) || "";
+    const lightType = normalizeStringValue(plan.lightType) || "";
+
+    const totalCost = uniqueSortedPositions.length * GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+    await consumeCredits(userId, totalCost, "instame_grid_pipeline_extract_shots");
+    let creditsConsumedCount = totalCost;
+
+    try {
+      const results: Array<{ position: number; label: string; type: string; imageBase64: string }> = [];
+      let creditsFailed = 0;
+
+      const shotsToExtract = (
+        plan.shots as Array<{ position: number; label: string; hairstyle: string | null; angle: string | null; type: string }>
+      ).filter((shot) => uniqueSortedPositions.includes(shot.position));
+
+      for (const shot of shotsToExtract) {
+        try {
+          const extractPrompt = buildExtractionPrompt({
+            position: shot.position,
+            imageCount,
+            shot,
+            hasPortrait: Boolean(portrait),
+            aesthetic,
+            palette,
+            lightType,
+          });
+
+          const images: import("./lib/instame-image").RuntimeImageInput[] = [
+            { base64: gridImageBase64, mimeType: "image/png" },
+          ];
+          if (portrait) {
+            images.push({ base64: portrait, mimeType: "image/jpeg" });
+          }
+
+          const generated = await generateOpenAiImage({
+            model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+            prompt: extractPrompt,
+            images,
+            size: "1024x1536",
+            quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
+          });
+
+          results.push({
+            position: shot.position,
+            label: shot.label,
+            type: shot.type,
+            imageBase64: generated.imageBase64,
+          });
+        } catch (shotError) {
+          console.error(`InstaMe grid-pipeline/extract-shots position ${shot.position} error:`, shotError);
+          creditsFailed += GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+          await refundCredits(
+            userId,
+            GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
+            "instame_grid_pipeline_extract_shot_failed",
+          );
+        }
+      }
+
+      creditsConsumedCount = 0;
+      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+
+      return res.json({
+        images: results,
+        totalRequested: uniqueSortedPositions.length,
+        totalExtracted: results.length,
+        creditsCharged: totalCost - creditsFailed,
+        creditsRemaining: updatedUser?.credits ?? 0,
+      });
+    } catch (error) {
+      if (creditsConsumedCount > 0) {
+        await refundCredits(userId, creditsConsumedCount, "instame_grid_pipeline_extract_shots_failed");
+      }
+      console.error("InstaMe grid-pipeline/extract-shots error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to extract grid shots");
       const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
       if (temporaryServiceMessage) {
         return res.status(503).json({ error: temporaryServiceMessage });

@@ -974,6 +974,93 @@ class ApiClient {
       true,
     );
   }
+
+  /**
+   * NEW FLOW Step 1: Generate a composite Instagram grid preview image.
+   * Internally calls Gemini Flash (plan) then GPT Image 2 (composite render).
+   * Cost: 2 credits.
+   */
+  async generateInstaMeGridCompositePreview(payload: {
+    imageCount: 4 | 6 | 9 | 12;
+    aesthetic: string;
+    palette: string;
+    lightType: string;
+    extraNotes?: string;
+    hasPortraitReference?: boolean;
+    portrait?: string; // base64
+  }) {
+    return this.request<{
+      gridImageBase64: string;
+      plan: {
+        imageCount: number;
+        aesthetic: string;
+        palette: string;
+        lightType: string;
+        shots: Array<{
+          position: number;
+          type: "COMPLEX" | "SIMPLE" | "MEDIUM";
+          label: string;
+          hairstyle: string | null;
+          angle: string | null;
+          imagePrompt: string;
+        }>;
+      };
+      continuityContext: {
+        aesthetic: string;
+        palette: string;
+        lightType: string;
+        usedScenes: string[];
+        usedHairstyles: string[];
+      };
+      imageCount: number;
+      creditsCharged: number;
+      creditsRemaining: number;
+    }>(
+      "/instame/grid-pipeline/composite-preview",
+      { method: "POST", body: JSON.stringify(payload) },
+      true,
+    );
+  }
+
+  /**
+   * NEW FLOW Step 2: Extract individual shots from a composite grid image.
+   * For each selected position, GPT Image 2 recreates the cell at full quality.
+   * Cost: 1 credit per position.
+   */
+  async generateInstaMeGridExtractShots(payload: {
+    gridImageBase64: string;
+    plan: {
+      aesthetic: string;
+      palette: string;
+      lightType: string;
+      shots: Array<{
+        position: number;
+        label: string;
+        hairstyle: string | null;
+        angle: string | null;
+        type: string;
+      }>;
+    };
+    positions: number[];
+    portrait?: string; // base64
+  }) {
+    return this.request<{
+      images: Array<{
+        position: number;
+        label: string;
+        type: string;
+        imageBase64: string;
+      }>;
+      totalRequested: number;
+      totalExtracted: number;
+      creditsCharged: number;
+      creditsRemaining: number;
+    }>(
+      "/instame/grid-pipeline/extract-shots",
+      { method: "POST", body: JSON.stringify(payload) },
+      true,
+    );
+  }
 }
 
 export const apiClient = new ApiClient();

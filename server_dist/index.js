@@ -2032,6 +2032,68 @@ function extractContinuityContext(plan) {
 }
 var GRID_PIPELINE_PLAN_CREDIT_COST = 1;
 var GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = 1;
+var GRID_PIPELINE_COMPOSITE_CREDIT_COST = 2;
+var GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = 1;
+var GRID_COLS = 3;
+function buildCompositeGridPrompt(plan, hasPortraitReference) {
+  const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
+  const shotLines = plan.shots.map((shot) => {
+    const row = Math.ceil(shot.position / GRID_COLS);
+    const col = (shot.position - 1) % GRID_COLS + 1;
+    const detail = [
+      shot.label,
+      shot.hairstyle ? `hairstyle: ${shot.hairstyle}` : null,
+      shot.angle ? `camera angle: ${shot.angle}` : null
+    ].filter(Boolean).join(", ");
+    return `  Position ${shot.position} (row ${row}, col ${col}): ${detail}`;
+  }).join("\n");
+  const portraitNote = hasPortraitReference ? "A female model with consistent identity appears in all relevant cells." : "A stylish female model with consistent appearance throughout appears in the relevant cells.";
+  return `Create a photorealistic Instagram profile grid preview image showing exactly ${plan.imageCount} coordinated editorial photos arranged in a ${GRID_COLS}-column \xD7 ${totalRows}-row grid, exactly as they appear on an Instagram profile page.
+
+GRID STRUCTURE: ${plan.imageCount} equal cells in ${totalRows} row${totalRows > 1 ? "s" : ""} of ${GRID_COLS} columns. Cells are separated by a thin white 1px divider (like Instagram). The grid fills the entire canvas.
+
+AESTHETIC: ${plan.aesthetic}
+COLOR PALETTE: ${plan.palette}
+LIGHT TYPE: ${plan.lightType}
+
+CELL CONTENTS (left to right, top to bottom \u2014 numbering is exact):
+${shotLines}
+
+RULES:
+- All cells share identical color grading, tonal range, and aesthetic mood
+- Each cell is clearly distinct but visually harmonious with all others
+- ${portraitNote}
+- No extra borders or margins outside the grid \u2014 the grid fills the entire image
+- Professional editorial photography quality, photorealistic`;
+}
+function buildExtractionPrompt(params) {
+  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType } = params;
+  const totalRows = Math.ceil(imageCount / GRID_COLS);
+  const row = Math.ceil(position / GRID_COLS);
+  const col = (position - 1) % GRID_COLS + 1;
+  const rowLabel = row === 1 ? "top" : row === totalRows ? "bottom" : "center";
+  const colLabel = col === 1 ? "left" : col === GRID_COLS ? "right" : "center";
+  const corner = rowLabel === "center" && colLabel === "center" ? "center of the grid" : `${rowLabel}-${colLabel} of the grid`;
+  const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
+  const portraitInstruction = hasPortrait ? `
+CRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait. Adapt their face naturally to the scene. Never alter their identity.` : "";
+  return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
+
+EXACT POSITION: position ${position}, counting left to right, top to bottom \u2014 row ${row}, column ${col} (${corner}).
+
+TARGET CELL DETAILS:
+- Scene: ${shot.label}${shot.hairstyle ? `
+- Hairstyle: ${shot.hairstyle}` : ""}${shot.angle ? `
+- Camera angle: ${shot.angle}` : ""}
+- Shot type: ${typeDesc}
+
+OUTPUT REQUIREMENTS:
+- Output ONLY this single standalone photo \u2014 no grid lines, no other cells, no borders
+- 100% faithful replica of the composition, subject, colors, lighting, and background from that exact cell
+- Maintain the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting
+- Ultra-detailed, photorealistic, shot with a professional 8K camera
+- Vertical portrait format (4:5 ratio)${portraitInstruction}`;
+}
 
 // server/routes.ts
 function getGeminiApiKey() {
@@ -6772,6 +6834,7 @@ async function registerRoutes(app2) {
     const lightType = normalizeStringValue(body.lightType) || "soft natural light";
     const extraNotes = normalizeStringValue(body.extraNotes) || "";
     const hasPortraitReference = body.hasPortraitReference === true;
+    const portrait2 = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const inputs = {
       imageCount,
       aesthetic,
@@ -6821,7 +6884,7 @@ async function registerRoutes(app2) {
     if (!plan || !Array.isArray(plan.shots) || plan.shots.length === 0) {
       return res.status(400).json({ error: "plan with shots is required." });
     }
-    const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const portrait2 = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const totalShots = plan.shots.length;
     const totalCost = totalShots * GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
     await consumeCredits(userId, totalCost, "instame_grid_pipeline_render");
@@ -6837,8 +6900,8 @@ async function registerRoutes(app2) {
         }
         try {
           const images = [];
-          if (portrait) {
-            images.push({ base64: portrait, mimeType: "image/jpeg" });
+          if (portrait2) {
+            images.push({ base64: portrait2, mimeType: "image/jpeg" });
           }
           const generated = await generateOpenAiImage({
             model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
@@ -6925,6 +6988,150 @@ async function registerRoutes(app2) {
       }
       console.error("InstaMe grid-pipeline/extend error:", error);
       const errorMessage = toErrorMessage(error, "Failed to generate continuity grid plan");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+  app2.post("/api/instame/grid-pipeline/composite-preview", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const body = req.body || {};
+    const imageCount = [4, 6, 9, 12].includes(body.imageCount) ? body.imageCount : 9;
+    const aesthetic = normalizeStringValue(body.aesthetic) || "Old Money Luxury";
+    const palette = normalizeStringValue(body.palette) || "";
+    const lightType = normalizeStringValue(body.lightType) || "";
+    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+    const hasPortraitReference = body.hasPortraitReference === true;
+    const inputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
+    await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
+    let consumed = true;
+    try {
+      const geminiApiKey = getGeminiApiKey();
+      const geminiApiBaseUrl = process.env.GEMINI_API_BASE_URL || process.env.AI_INTEGRATIONS_GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
+      const systemPrompt = buildMasterGridSystemPrompt(inputs);
+      const rawPlan = await callGeminiFlashText({ systemPrompt, geminiApiBaseUrl, geminiApiKey });
+      const plan = parseGridPlan(rawPlan, imageCount);
+      const continuityContext = extractContinuityContext(plan);
+      const compositePrompt = buildCompositeGridPrompt(plan, hasPortraitReference);
+      const compositeImages = [];
+      if (portrait) {
+        compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
+      }
+      const composite = await generateOpenAiImage({
+        model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+        prompt: compositePrompt,
+        images: compositeImages.length > 0 ? compositeImages : void 0,
+        size: "1024x1024",
+        quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
+      });
+      consumed = false;
+      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      return res.json({
+        gridImageBase64: composite.imageBase64,
+        plan,
+        continuityContext,
+        imageCount,
+        creditsCharged: GRID_PIPELINE_COMPOSITE_CREDIT_COST,
+        creditsRemaining: updatedUser?.credits ?? 0
+      });
+    } catch (error) {
+      if (consumed) {
+        await refundCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview_failed");
+      }
+      console.error("InstaMe grid-pipeline/composite-preview error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to generate composite grid preview");
+      const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
+      if (temporaryServiceMessage) {
+        return res.status(503).json({ error: temporaryServiceMessage });
+      }
+      return res.status(500).json({ error: errorMessage });
+    }
+  });
+  app2.post("/api/instame/grid-pipeline/extract-shots", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const body = req.body || {};
+    const gridImageBase64 = normalizeStringValue(body.gridImageBase64);
+    if (!gridImageBase64) {
+      return res.status(400).json({ error: "gridImageBase64 is required." });
+    }
+    const plan = body.plan;
+    if (!plan || !Array.isArray(plan.shots) || plan.shots.length === 0) {
+      return res.status(400).json({ error: "plan with shots is required." });
+    }
+    const positions = Array.isArray(body.positions) ? body.positions.filter((p) => typeof p === "number") : plan.shots.map((s) => s.position);
+    const uniqueSortedPositions = [...new Set(positions)].sort((a, b) => a - b);
+    if (uniqueSortedPositions.length === 0) {
+      return res.status(400).json({ error: "At least one position must be selected." });
+    }
+    const portrait2 = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const imageCount = plan.shots.length;
+    const aesthetic = normalizeStringValue(plan.aesthetic) || "";
+    const palette = normalizeStringValue(plan.palette) || "";
+    const lightType = normalizeStringValue(plan.lightType) || "";
+    const totalCost = uniqueSortedPositions.length * GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+    await consumeCredits(userId, totalCost, "instame_grid_pipeline_extract_shots");
+    let creditsConsumedCount = totalCost;
+    try {
+      const results = [];
+      let creditsFailed = 0;
+      const shotsToExtract = plan.shots.filter((shot) => uniqueSortedPositions.includes(shot.position));
+      for (const shot of shotsToExtract) {
+        try {
+          const extractPrompt = buildExtractionPrompt({
+            position: shot.position,
+            imageCount,
+            shot,
+            hasPortrait: Boolean(portrait2),
+            aesthetic,
+            palette,
+            lightType
+          });
+          const images = [
+            { base64: gridImageBase64, mimeType: "image/png" }
+          ];
+          if (portrait2) {
+            images.push({ base64: portrait2, mimeType: "image/jpeg" });
+          }
+          const generated = await generateOpenAiImage({
+            model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+            prompt: extractPrompt,
+            images,
+            size: "1024x1536",
+            quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
+          });
+          results.push({
+            position: shot.position,
+            label: shot.label,
+            type: shot.type,
+            imageBase64: generated.imageBase64
+          });
+        } catch (shotError) {
+          console.error(`InstaMe grid-pipeline/extract-shots position ${shot.position} error:`, shotError);
+          creditsFailed += GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+          await refundCredits(
+            userId,
+            GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
+            "instame_grid_pipeline_extract_shot_failed"
+          );
+        }
+      }
+      creditsConsumedCount = 0;
+      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      return res.json({
+        images: results,
+        totalRequested: uniqueSortedPositions.length,
+        totalExtracted: results.length,
+        creditsCharged: totalCost - creditsFailed,
+        creditsRemaining: updatedUser?.credits ?? 0
+      });
+    } catch (error) {
+      if (creditsConsumedCount > 0) {
+        await refundCredits(userId, creditsConsumedCount, "instame_grid_pipeline_extract_shots_failed");
+      }
+      console.error("InstaMe grid-pipeline/extract-shots error:", error);
+      const errorMessage = toErrorMessage(error, "Failed to extract grid shots");
       const temporaryServiceMessage = toUserFacingTemporaryImageServiceMessage(errorMessage);
       if (temporaryServiceMessage) {
         return res.status(503).json({ error: temporaryServiceMessage });
