@@ -968,6 +968,8 @@ function resolveOpenAiImageRequest(model) {
     return { model };
   }
   const aliases = /* @__PURE__ */ new Map([
+    ["gpt-image-2", { model: "gpt-image-2" }],
+    ["gpt image 2", { model: "gpt-image-2" }],
     ["gpt-image-1.5", { model: "gpt-image-1.5" }],
     ["gpt image 1.5", { model: "gpt-image-1.5" }],
     ["gpt-image-1", { model: "gpt-image-1" }],
@@ -2386,6 +2388,9 @@ var DEFAULT_TOGETHER_PRO_IMAGE_MODEL = process.env.STYLE_HIGH_RES_TOGETHER_MODEL
 var STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "512x512";
 var INSTAME_PORTRAIT_ENHANCE_MODEL = process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || DEFAULT_TOGETHER_FLASH_IMAGE_MODEL;
 var INSTAME_PORTRAIT_ENHANCE_SIZE = (process.env.INSTAME_PORTRAIT_ENHANCE_SIZE || INSTAME_PORTRAIT_ENHANCE_TIER.output).trim() || "1024 x 1024";
+var GRID_PIPELINE_ALLOWED_IMAGE_COUNTS = /* @__PURE__ */ new Set([4, 6, 9, 12]);
+var GRID_PIPELINE_RENDER_OPENAI_MODEL = process.env.INSTAME_GRID_PIPELINE_RENDER_MODEL || "gpt-image-1";
+var GRID_PIPELINE_RENDER_OPENAI_QUALITY = "medium";
 var INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path2.resolve(
   process.cwd(),
   "assets",
@@ -2394,6 +2399,9 @@ var INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path2.resolve(
   "prompt.txt"
 );
 var EXPOSE_STYLE_DEBUG_PROMPT = normalizeStringValue(process.env.EXPOSE_STYLE_DEBUG_PROMPT).toLowerCase() === "true";
+function isGridPipelineImageCount(value) {
+  return typeof value === "number" && GRID_PIPELINE_ALLOWED_IMAGE_COUNTS.has(value);
+}
 var MAX_IMAGE_COUNT_BY_MODE = {
   single_item: 10,
   multi_item: 3
@@ -6753,8 +6761,8 @@ async function registerRoutes(app2) {
     const userId = req.user.id;
     const body = req.body || {};
     const imageCount = body.imageCount;
-    if (imageCount !== 6 && imageCount !== 9 && imageCount !== 12) {
-      return res.status(400).json({ error: "imageCount must be 6, 9, or 12." });
+    if (!isGridPipelineImageCount(imageCount)) {
+      return res.status(400).json({ error: "imageCount must be 4, 6, 9, or 12." });
     }
     const aesthetic = normalizeStringValue(body.aesthetic);
     if (!aesthetic) {
@@ -6833,11 +6841,11 @@ async function registerRoutes(app2) {
             images.push({ base64: portrait, mimeType: "image/jpeg" });
           }
           const generated = await generateOpenAiImage({
-            model: "gpt-image-1",
+            model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
             prompt: shotPrompt,
             images: images.length > 0 ? images : void 0,
             size: "1024x1536",
-            quality: "medium"
+            quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
           });
           results.push({
             position: shot.position,
@@ -6858,7 +6866,9 @@ async function registerRoutes(app2) {
         totalRequested: totalShots,
         totalRendered: results.length,
         creditsCharged: totalCost - creditsFailed,
-        creditsRemaining: updatedUser?.credits ?? 0
+        creditsRemaining: updatedUser?.credits ?? 0,
+        model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+        quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
       });
     } catch (error) {
       if (creditsConsumedCount > 0) {
@@ -6877,8 +6887,8 @@ async function registerRoutes(app2) {
     const userId = req.user.id;
     const body = req.body || {};
     const newImageCount = body.newImageCount;
-    if (newImageCount !== 6 && newImageCount !== 9 && newImageCount !== 12) {
-      return res.status(400).json({ error: "newImageCount must be 6, 9, or 12." });
+    if (!isGridPipelineImageCount(newImageCount)) {
+      return res.status(400).json({ error: "newImageCount must be 4, 6, 9, or 12." });
     }
     const ctx = body.continuityContext;
     if (!ctx || !ctx.aesthetic) {

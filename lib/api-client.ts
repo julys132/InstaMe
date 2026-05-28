@@ -847,6 +847,8 @@ class ApiClient {
       totalRendered: number;
       creditsCharged: number;
       creditsRemaining: number;
+      model?: string;
+      quality?: "low" | "medium" | "high" | "auto";
     }>(
       "/instame/grid-render",
       {
@@ -861,7 +863,7 @@ class ApiClient {
 
   /** Step 1 (Master): Call Gemini Flash to generate a structured shot plan. */
   async generateInstaMeGridPipelinePlan(payload: {
-    imageCount: 6 | 9 | 12;
+    imageCount: 4 | 6 | 9 | 12;
     aesthetic: string;
     palette: string;
     lightType: string;
@@ -931,7 +933,7 @@ class ApiClient {
 
   /** Continuity (Extend): Call Gemini Flash to generate a continuation plan. */
   async generateInstaMeGridPipelineExtend(payload: {
-    newImageCount: 6 | 9 | 12;
+    newImageCount: 4 | 6 | 9 | 12;
     continuityContext: {
       aesthetic: string;
       palette: string;

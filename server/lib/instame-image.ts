@@ -53,6 +53,8 @@ function resolveOpenAiImageRequest(model: string): {
   }
 
   const aliases = new Map<string, { model: string; inputFidelity?: "high" | "low" }>([
+    ["gpt-image-2", { model: "gpt-image-2" }],
+    ["gpt image 2", { model: "gpt-image-2" }],
     ["gpt-image-1.5", { model: "gpt-image-1.5" }],
     ["gpt image 1.5", { model: "gpt-image-1.5" }],
     ["gpt-image-1", { model: "gpt-image-1" }],

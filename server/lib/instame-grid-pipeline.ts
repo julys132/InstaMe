@@ -46,9 +46,11 @@ export type GridPlan = {
   shots: GridShotPlan[];
 };
 
+export type GridPipelineImageCount = 4 | 6 | 9 | 12;
+
 export type GridPipelineUserInputs = {
-  /** Number of images: 6, 9, or 12 */
-  imageCount: 6 | 9 | 12;
+  /** Number of images: 4, 6, 9, or 12 */
+  imageCount: GridPipelineImageCount;
   /** Aesthetic name (e.g. "Old Money Luxe", "Flash Night", "Clean Glow") */
   aesthetic: string;
   /** Dominant palette (e.g. "muted beige, ivory, warm sand") */
@@ -275,7 +277,7 @@ OUTPUT FORMAT (strict — output ONLY this JSON, no extra text)
  */
 export function buildContinuityGridSystemPrompt(
   context: GridContinuityContext,
-  newImageCount: 6 | 9 | 12,
+  newImageCount: GridPipelineImageCount,
   hasPortraitReference: boolean,
   extraNotes = "",
 ): string {

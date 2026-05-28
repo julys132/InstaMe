@@ -99,6 +99,23 @@ type GenerationResultMeta = {
   imageMimeType?: string;
 };
 
+type PipelineShotPlanItem = {
+  position: number;
+  type: string;
+  label: string;
+  hairstyle: string | null;
+  angle: string | null;
+  imagePrompt: string;
+};
+
+type PipelinePlanState = {
+  imageCount: number;
+  aesthetic: string;
+  palette: string;
+  lightType: string;
+  shots: PipelineShotPlanItem[];
+};
+
 type StyleCardTheme = {
   glow: string;
   glowSoft: string;
@@ -569,17 +586,12 @@ export default function InstaMeScreen() {
   const [packImagePreviewId, setPackImagePreviewId] = useState<string | null>(null);
   const [packImagePreviewIndex, setPackImagePreviewIndex] = useState(0);
   const [pipelineAestheticId, setPipelineAestheticId] = useState<string | null>(null);
-  const [pipelineImageCount, setPipelineImageCount] = useState<6 | 9 | 12>(6);
+  const [pipelineImageCount, setPipelineImageCount] = useState<4 | 6 | 9 | 12>(6);
   const [pipelineExtraNotes, setPipelineExtraNotes] = useState("");
   const [pipelinePlanLoading, setPipelinePlanLoading] = useState(false);
   const [pipelineRenderLoading, setPipelineRenderLoading] = useState(false);
-  const [pipelinePlan, setPipelinePlan] = useState<null | {
-    imageCount: number;
-    aesthetic: string;
-    palette: string;
-    lightType: string;
-    shots: Array<{ position: number; type: string; label: string; hairstyle: string | null; angle: string | null; imagePrompt: string }>;
-  }>(null);
+  const [pipelinePlan, setPipelinePlan] = useState<PipelinePlanState | null>(null);
+  const [selectedPipelineShotPositions, setSelectedPipelineShotPositions] = useState<number[]>([]);
   const [pipelineContinuityContext, setPipelineContinuityContext] = useState<null | {
     aesthetic: string; palette: string; lightType: string; usedScenes: string[]; usedHairstyles: string[];
   }>(null);
@@ -832,6 +844,18 @@ export default function InstaMeScreen() {
     [],
   );
   const isPackBriefConfigured = Boolean(activePhotoPack);
+  const selectedPipelineShots = useMemo(
+    () =>
+      pipelinePlan
+        ? pipelinePlan.shots.filter((shot) => selectedPipelineShotPositions.includes(shot.position))
+        : [],
+    [pipelinePlan, selectedPipelineShotPositions],
+  );
+  const selectedPipelineShotCount = selectedPipelineShots.length;
+  const excludedPipelineShotCount = Math.max(0, (pipelinePlan?.shots.length || 0) - selectedPipelineShotCount);
+  const areAllPipelineShotsSelected = Boolean(
+    pipelinePlan?.shots.length && selectedPipelineShotCount === pipelinePlan.shots.length,
+  );
   const packPlannerCurrentStep = !activePhotoPack ? 1 : pipelinePlan ? (pipelineRenderResults.length > 0 ? 4 : 3) : 2;
   const collageColumnCount = viewportWidth >= 1360 ? 4 : 3;
   const collageColumnOffsets = collageColumnCount === 4 ? [0, 18, 10, 22] : isPhoneViewport ? [0, 10, 4] : [0, 18, 10];
@@ -853,6 +877,15 @@ export default function InstaMeScreen() {
     }),
     [collageRevealProgress],
   );
+
+  useEffect(() => {
+    if (!pipelinePlan) {
+      setSelectedPipelineShotPositions([]);
+      return;
+    }
+
+    setSelectedPipelineShotPositions(pipelinePlan.shots.map((shot) => shot.position));
+  }, [pipelinePlan]);
 
   const getCollageColumnRevealStyle = useCallback((columnIndex: number) => {
     const delayStart = Math.min(0.42, columnIndex * 0.14);
@@ -1683,6 +1716,27 @@ export default function InstaMeScreen() {
     void Haptics.selectionAsync();
   }, []);
 
+  const togglePipelineShotSelection = useCallback((position: number) => {
+    setSelectedPipelineShotPositions((current) =>
+      current.includes(position) ? current.filter((item) => item !== position) : [...current, position],
+    );
+    setPipelineRenderResults([]);
+    void Haptics.selectionAsync();
+  }, []);
+
+  const selectAllPipelineShots = useCallback(() => {
+    if (!pipelinePlan) return;
+    setSelectedPipelineShotPositions(pipelinePlan.shots.map((shot) => shot.position));
+    setPipelineRenderResults([]);
+    void Haptics.selectionAsync();
+  }, [pipelinePlan]);
+
+  const clearPipelineShotSelection = useCallback(() => {
+    setSelectedPipelineShotPositions([]);
+    setPipelineRenderResults([]);
+    void Haptics.selectionAsync();
+  }, []);
+
   const handleGenerateGridPreview = useCallback(async () => {
     if (!activePhotoPack) return;
     if (selectedPackIdentityModeId === "portrait_reference" && !photo) {
@@ -1705,7 +1759,7 @@ export default function InstaMeScreen() {
     setPipelineError(null);
     try {
       const result = await apiClient.generateInstaMeGridPipelinePlan({
-        imageCount: activePhotoPack.count as 6 | 9 | 12,
+        imageCount: activePhotoPack.count,
         aesthetic: activePhotoPack.id,
         palette: aesthetic?.defaultPalette || "",
         lightType: aesthetic?.defaultLightType || "",
@@ -1722,21 +1776,30 @@ export default function InstaMeScreen() {
     }
   }, [activePhotoPack, packBriefRequiredElementIds, packBriefNotes, selectedPackIdentityModeId, photo, refreshCredits]);
 
-  const handleRenderGridPack = useCallback(async () => {
+  const renderSelectedGridPackShots = useCallback(async (shotsToRender: PipelineShotPlanItem[]) => {
     if (!activePhotoPack || !pipelinePlan) return;
     if (selectedPackIdentityModeId === "portrait_reference" && !photo) {
       Alert.alert("Portrait required", "Add a portrait above before using identity-locked generation.");
       return;
     }
-    const portrait =
-      selectedPackIdentityModeId === "portrait_reference" && photo ? photo.base64 : undefined;
+    if (shotsToRender.length === 0) {
+      Alert.alert("No images selected", "Select at least one image from the pack before rendering.");
+      return;
+    }
+
+    const portrait = selectedPackIdentityModeId === "portrait_reference" && photo ? photo.base64 : undefined;
+    const selectedPlan: PipelinePlanState = {
+      ...pipelinePlan,
+      imageCount: shotsToRender.length,
+      shots: shotsToRender,
+    };
     setPackGridRenderLoading(true);
     setPackGridError(null);
     setPipelineError(null);
     setPipelineRenderResults([]);
     try {
       const result = await apiClient.generateInstaMeGridPipelineRender({
-        plan: pipelinePlan,
+        plan: selectedPlan,
         portrait,
       });
       setPipelineRenderResults(result.images);
@@ -1747,6 +1810,36 @@ export default function InstaMeScreen() {
       setPackGridRenderLoading(false);
     }
   }, [activePhotoPack, pipelinePlan, selectedPackIdentityModeId, photo, refreshCredits]);
+
+  const handleRenderGridPack = useCallback(() => {
+    if (!activePhotoPack || !pipelinePlan) return;
+
+    const shotsToRender = pipelinePlan.shots.filter((shot) => selectedPipelineShotPositions.includes(shot.position));
+    if (shotsToRender.length === 0) {
+      Alert.alert("No images selected", "Select at least one image from the pack before rendering.");
+      return;
+    }
+
+    const excludedCount = pipelinePlan.shots.length - shotsToRender.length;
+    const title = `Generate ${shotsToRender.length} separate image${shotsToRender.length === 1 ? "" : "s"}?`;
+    const message = [
+      `${activePhotoPack.label} will be rendered with GPT Image at medium quality.`,
+      `Selected: ${shotsToRender.length}/${pipelinePlan.shots.length} image${pipelinePlan.shots.length === 1 ? "" : "s"}.`,
+      excludedCount > 0 ? `Excluded: ${excludedCount} image${excludedCount === 1 ? "" : "s"}.` : "All pack images are selected.",
+      `Cost: ${shotsToRender.length} credit${shotsToRender.length === 1 ? "" : "s"}.`,
+    ].join("\n");
+
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Generate",
+        style: "default",
+        onPress: () => {
+          void renderSelectedGridPackShots(shotsToRender);
+        },
+      },
+    ]);
+  }, [activePhotoPack, pipelinePlan, renderSelectedGridPackShots, selectedPipelineShotPositions]);
 
   // ─── Grid Pipeline callbacks ──────────────────────────────────────────────
 
@@ -2554,6 +2647,15 @@ export default function InstaMeScreen() {
     });
   }, [exportBase64Image, portraitEnhanceCandidate]);
 
+  const handleDownloadPackImage = useCallback(async (imageBase64: string, label: string, position: number) => {
+    const safeLabel = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `image-${position}`;
+    await exportBase64Image(imageBase64, {
+      mimeType: "image/png",
+      fileNamePrefix: `chicoo-pack-${position}-${safeLabel}`,
+      dialogTitle: "Save Pack Image",
+    });
+  }, [exportBase64Image]);
+
   const selectedStyleVibeCount = styleVibeCounts[selectedStyleVibe.id] ?? mainOnlyStylePresets.length;
 
   return (
@@ -2911,23 +3013,84 @@ export default function InstaMeScreen() {
 
                     {pipelinePlan ? (
                       <View style={styles.packPlannerPreviewCard}>
-                        <Text style={styles.packPlannerLabel}>Shot plan — {pipelinePlan.imageCount} images</Text>
+                        <View style={styles.packPlannerSelectionHeader}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.packPlannerLabel}>Shot plan - {pipelinePlan.imageCount} images</Text>
+                            <Text style={styles.packPlannerSelectionHint}>
+                              Select the images to generate separately at medium quality.
+                            </Text>
+                          </View>
+                          <View style={styles.packPlannerSelectionPill}>
+                            <Text style={styles.packPlannerSelectionPillText}>
+                              {selectedPipelineShotCount}/{pipelinePlan.shots.length}
+                            </Text>
+                          </View>
+                        </View>
+                        <View style={styles.packPlannerSelectionActions}>
+                          <Pressable
+                            onPress={selectAllPipelineShots}
+                            disabled={areAllPipelineShotsSelected}
+                            style={({ pressed }) => [
+                              styles.packPlannerSelectionAction,
+                              areAllPipelineShotsSelected && styles.packPlannerSelectionActionDisabled,
+                              pressed && !areAllPipelineShotsSelected ? { opacity: 0.86 } : undefined,
+                            ]}
+                          >
+                            <Text style={styles.packPlannerSelectionActionText}>Select all</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={clearPipelineShotSelection}
+                            disabled={selectedPipelineShotCount === 0}
+                            style={({ pressed }) => [
+                              styles.packPlannerSelectionAction,
+                              selectedPipelineShotCount === 0 && styles.packPlannerSelectionActionDisabled,
+                              pressed && selectedPipelineShotCount > 0 ? { opacity: 0.86 } : undefined,
+                            ]}
+                          >
+                            <Text style={styles.packPlannerSelectionActionText}>Exclude all</Text>
+                          </Pressable>
+                        </View>
                         <View style={styles.packPlannerShotGrid}>
-                          {pipelinePlan.shots.map((shot) => (
-                            <View key={shot.position} style={styles.packPlannerShotRow}>
-                              <Text style={styles.packPlannerShotNum}>{shot.position}</Text>
-                              <Text style={styles.packPlannerShotLabel}>
-                                {shot.label}{shot.hairstyle ? ` · ${shot.hairstyle}` : ""}
-                              </Text>
-                            </View>
-                          ))}
+                          {pipelinePlan.shots.map((shot) => {
+                            const selected = selectedPipelineShotPositions.includes(shot.position);
+                            return (
+                              <Pressable
+                                key={shot.position}
+                                onPress={() => togglePipelineShotSelection(shot.position)}
+                                style={({ pressed }) => [
+                                  styles.packPlannerShotRow,
+                                  styles.packPlannerShotSelectableRow,
+                                  selected ? styles.packPlannerShotSelectedRow : styles.packPlannerShotExcludedRow,
+                                  pressed ? { opacity: 0.88 } : undefined,
+                                ]}
+                              >
+                                <View style={[styles.packPlannerShotCheck, selected && styles.packPlannerShotCheckActive]}>
+                                  <Ionicons name={selected ? "checkmark" : "close"} size={12} color={selected ? "#000" : "rgba(255,255,255,0.48)"} />
+                                </View>
+                                <Text style={[styles.packPlannerShotNum, selected && styles.packPlannerShotNumSelected]}>
+                                  {shot.position}
+                                </Text>
+                                <Text style={[styles.packPlannerShotLabel, !selected && styles.packPlannerShotLabelExcluded]}>
+                                  {shot.label}{shot.hairstyle ? ` - ${shot.hairstyle}` : ""}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                        <View style={styles.packPlannerRenderSummary}>
+                          <Text style={styles.packPlannerRenderSummaryText}>
+                            {excludedPipelineShotCount > 0
+                              ? `${excludedPipelineShotCount} excluded. ${selectedPipelineShotCount} will be generated.`
+                              : `All ${selectedPipelineShotCount} images will be generated.`}
+                          </Text>
+                          <Text style={styles.packPlannerRenderSummaryText}>GPT Image - medium quality</Text>
                         </View>
                         <Pressable
                           onPress={handleRenderGridPack}
-                          disabled={packGridRenderLoading}
+                          disabled={packGridRenderLoading || selectedPipelineShotCount === 0}
                           style={({ pressed }) => [
                             styles.packPlannerRenderButton,
-                            (packGridRenderLoading || pressed) && { opacity: 0.7 },
+                            (packGridRenderLoading || selectedPipelineShotCount === 0 || pressed) && { opacity: 0.7 },
                           ]}
                         >
                           {packGridRenderLoading ? (
@@ -2938,7 +3101,7 @@ export default function InstaMeScreen() {
                           <Text style={styles.packPlannerRenderButtonText}>
                             {packGridRenderLoading
                               ? "Rendering images\u2026"
-                              : `Render all ${pipelinePlan.imageCount} images \u2014 ${pipelinePlan.imageCount} credits`}
+                              : `Confirm ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
                           </Text>
                         </Pressable>
                       </View>
@@ -2951,12 +3114,26 @@ export default function InstaMeScreen() {
                         </Text>
                         <View style={styles.packPlannerResultsWrap}>
                           {pipelineRenderResults.map((img) => (
-                            <NativeImage
+                            <Pressable
                               key={img.position}
-                              source={{ uri: `data:image/png;base64,${img.imageBase64}` }}
-                              style={styles.packPlannerResultThumb}
-                              resizeMode="cover"
-                            />
+                              onPress={() => void handleDownloadPackImage(img.imageBase64, img.label, img.position)}
+                              style={({ pressed }) => [
+                                styles.packPlannerResultCard,
+                                pressed ? { opacity: 0.88 } : undefined,
+                              ]}
+                            >
+                              <NativeImage
+                                source={{ uri: `data:image/png;base64,${img.imageBase64}` }}
+                                style={styles.packPlannerResultThumb}
+                                resizeMode="cover"
+                              />
+                              <View style={styles.packPlannerResultFooter}>
+                                <Text numberOfLines={1} style={styles.packPlannerResultLabel}>
+                                  {img.position}. {img.label}
+                                </Text>
+                                <Ionicons name="download-outline" size={13} color="#FFF" />
+                              </View>
+                            </Pressable>
                           ))}
                         </View>
                       </View>
@@ -4917,10 +5094,84 @@ const styles = StyleSheet.create({
     gap: 5,
     marginTop: 8,
   },
+  packPlannerSelectionHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  packPlannerSelectionHint: {
+    color: "rgba(255,255,255,0.54)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+  packPlannerSelectionPill: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.36)",
+    backgroundColor: "rgba(126,243,255,0.12)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  packPlannerSelectionPillText: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  packPlannerSelectionActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  packPlannerSelectionAction: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  packPlannerSelectionActionDisabled: {
+    opacity: 0.42,
+  },
+  packPlannerSelectionActionText: {
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+  },
   packPlannerShotRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
+  },
+  packPlannerShotSelectableRow: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+  },
+  packPlannerShotSelectedRow: {
+    borderColor: "rgba(126,243,255,0.35)",
+    backgroundColor: "rgba(126,243,255,0.08)",
+  },
+  packPlannerShotExcludedRow: {
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  packPlannerShotCheck: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  packPlannerShotCheckActive: {
+    borderColor: "rgba(126,243,255,0.85)",
+    backgroundColor: "#7EF3FF",
   },
   packPlannerShotNum: {
     color: "rgba(255,255,255,0.38)",
@@ -4933,12 +5184,20 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.15)",
     borderRadius: 4,
   },
+  packPlannerShotNumSelected: {
+    color: "#DFFFFF",
+    borderColor: "rgba(126,243,255,0.38)",
+  },
   packPlannerShotLabel: {
     color: "rgba(255,255,255,0.84)",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     lineHeight: 16,
     flexShrink: 1,
+  },
+  packPlannerShotLabelExcluded: {
+    color: "rgba(255,255,255,0.36)",
+    textDecorationLine: "line-through",
   },
   packPlannerBlock: {
     gap: 8,
@@ -5113,6 +5372,21 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 12,
   },
+  packPlannerRenderSummary: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.18)",
+    backgroundColor: "rgba(126,243,255,0.07)",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 3,
+  },
+  packPlannerRenderSummaryText: {
+    color: "rgba(223,255,255,0.78)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 15,
+  },
   packPlannerResetButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -5152,8 +5426,38 @@ const styles = StyleSheet.create({
   },
   packPlannerResultsWrap: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  packPlannerResultCard: {
+    width: "48%",
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  packPlannerResultThumb: {
+    width: "100%",
+    aspectRatio: 4 / 5,
+  },
+  packPlannerResultFooter: {
+    minHeight: 34,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.54)",
+  },
+  packPlannerResultLabel: {
+    flex: 1,
+    color: "rgba(255,255,255,0.82)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+  },
 
-  // ─── Grid Pipeline styles ───────────────────────────────────────────────────
+  // Grid Pipeline styles
   pipelineSection: {
     gap: 16,
     paddingBottom: 24,
@@ -5427,15 +5731,6 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.56)",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
-  },
-  // ───────────────────────────────────────────────────────────────────────────
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  packPlannerResultThumb: {
-    width: "48%",
-    aspectRatio: 0.8,
-    borderRadius: 10,
   },
   card: {
     marginHorizontal: 16,

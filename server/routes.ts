@@ -102,6 +102,7 @@ import {
   extractContinuityContext,
   GRID_PIPELINE_PLAN_CREDIT_COST,
   GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE,
+  type GridPipelineImageCount,
   type GridPipelineUserInputs,
   type GridContinuityContext,
 } from "./lib/instame-grid-pipeline";
@@ -674,6 +675,10 @@ const INSTAME_PORTRAIT_ENHANCE_MODEL =
 const INSTAME_PORTRAIT_ENHANCE_SIZE =
   (process.env.INSTAME_PORTRAIT_ENHANCE_SIZE || INSTAME_PORTRAIT_ENHANCE_TIER.output).trim() ||
   "1024 x 1024";
+const GRID_PIPELINE_ALLOWED_IMAGE_COUNTS = new Set<number>([4, 6, 9, 12]);
+const GRID_PIPELINE_RENDER_OPENAI_MODEL =
+  process.env.INSTAME_GRID_PIPELINE_RENDER_MODEL || "gpt-image-1";
+const GRID_PIPELINE_RENDER_OPENAI_QUALITY = "medium" as const;
 const INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path.resolve(
   process.cwd(),
   "assets",
@@ -683,6 +688,10 @@ const INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path.resolve(
 );
 const EXPOSE_STYLE_DEBUG_PROMPT =
   normalizeStringValue(process.env.EXPOSE_STYLE_DEBUG_PROMPT).toLowerCase() === "true";
+
+function isGridPipelineImageCount(value: unknown): value is GridPipelineImageCount {
+  return typeof value === "number" && GRID_PIPELINE_ALLOWED_IMAGE_COUNTS.has(value);
+}
 const MAX_IMAGE_COUNT_BY_MODE: Record<ImageInputMode, number> = {
   single_item: 10,
   multi_item: 3,
@@ -6543,8 +6552,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const body = req.body || {};
 
     const imageCount = body.imageCount;
-    if (imageCount !== 6 && imageCount !== 9 && imageCount !== 12) {
-      return res.status(400).json({ error: "imageCount must be 6, 9, or 12." });
+    if (!isGridPipelineImageCount(imageCount)) {
+      return res.status(400).json({ error: "imageCount must be 4, 6, 9, or 12." });
     }
     const aesthetic = normalizeStringValue(body.aesthetic);
     if (!aesthetic) {
@@ -6642,11 +6651,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             images.push({ base64: portrait, mimeType: "image/jpeg" });
           }
           const generated = await generateOpenAiImage({
-            model: "gpt-image-1",
+            model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
             prompt: shotPrompt,
             images: images.length > 0 ? images : undefined,
             size: "1024x1536",
-            quality: "medium",
+            quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
           });
           results.push({
             position: shot.position,
@@ -6670,6 +6679,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalRendered: results.length,
         creditsCharged: totalCost - creditsFailed,
         creditsRemaining: updatedUser?.credits ?? 0,
+        model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+        quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
       });
     } catch (error) {
       if (creditsConsumedCount > 0) {
@@ -6695,8 +6706,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const body = req.body || {};
 
     const newImageCount = body.newImageCount;
-    if (newImageCount !== 6 && newImageCount !== 9 && newImageCount !== 12) {
-      return res.status(400).json({ error: "newImageCount must be 6, 9, or 12." });
+    if (!isGridPipelineImageCount(newImageCount)) {
+      return res.status(400).json({ error: "newImageCount must be 4, 6, 9, or 12." });
     }
 
     const ctx = body.continuityContext as GridContinuityContext | undefined;
