@@ -402,7 +402,7 @@ export async function callGeminiFlashText(options: {
   geminiApiKey: string;
   model?: string;
 }): Promise<string> {
-  const model = options.model || "gemini-2.0-flash";
+  const model = options.model || "gemini-3-flash-preview";
   const modelName = model.startsWith("models/") ? model.slice("models/".length) : model;
 
   const url = `${options.geminiApiBaseUrl}/models/${encodeURIComponent(modelName)}:generateContent`;

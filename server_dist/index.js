@@ -1923,7 +1923,7 @@ function buildPositionMap(count) {
   return result;
 }
 async function callGeminiFlashText(options) {
-  const model = options.model || "gemini-2.0-flash";
+  const model = options.model || "gemini-3-flash-preview";
   const modelName = model.startsWith("models/") ? model.slice("models/".length) : model;
   const url = `${options.geminiApiBaseUrl}/models/${encodeURIComponent(modelName)}:generateContent`;
   const payload = {
@@ -7011,7 +7011,12 @@ async function registerRoutes(app2) {
       const geminiApiKey = getGeminiApiKey();
       const geminiApiBaseUrl = process.env.GEMINI_API_BASE_URL || process.env.AI_INTEGRATIONS_GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
       const systemPrompt = buildMasterGridSystemPrompt(inputs);
-      const rawPlan = await callGeminiFlashText({ systemPrompt, geminiApiBaseUrl, geminiApiKey });
+      const rawPlan = await callGeminiFlashText({
+        systemPrompt,
+        geminiApiBaseUrl,
+        geminiApiKey,
+        model: DEFAULT_STYLE_TEXT_MODEL
+      });
       const plan = parseGridPlan(rawPlan, imageCount);
       const continuityContext = extractContinuityContext(plan);
       const compositePrompt = buildCompositeGridPrompt(plan, hasPortraitReference);

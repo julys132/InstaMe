@@ -6798,7 +6798,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "https://generativelanguage.googleapis.com/v1beta";
 
       const systemPrompt = buildMasterGridSystemPrompt(inputs);
-      const rawPlan = await callGeminiFlashText({ systemPrompt, geminiApiBaseUrl, geminiApiKey });
+      const rawPlan = await callGeminiFlashText({
+        systemPrompt,
+        geminiApiBaseUrl,
+        geminiApiKey,
+        model: DEFAULT_STYLE_TEXT_MODEL,
+      });
       const plan = parseGridPlan(rawPlan, imageCount);
       const continuityContext = extractContinuityContext(plan);
 
