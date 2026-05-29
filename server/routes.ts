@@ -6784,6 +6784,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const lightType = normalizeStringValue(body.lightType) || "";
     const extraNotes = normalizeStringValue(body.extraNotes) || "";
     const hasPortraitReference = body.hasPortraitReference === true;
+    const portrait: string | undefined =
+      typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : undefined;
 
     const inputs: GridPipelineUserInputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
 

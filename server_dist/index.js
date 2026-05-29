@@ -6835,7 +6835,7 @@ async function registerRoutes(app2) {
     const lightType = normalizeStringValue(body.lightType) || "soft natural light";
     const extraNotes = normalizeStringValue(body.extraNotes) || "";
     const hasPortraitReference = body.hasPortraitReference === true;
-    const portrait2 = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const inputs = {
       imageCount,
       aesthetic,
@@ -6885,7 +6885,7 @@ async function registerRoutes(app2) {
     if (!plan || !Array.isArray(plan.shots) || plan.shots.length === 0) {
       return res.status(400).json({ error: "plan with shots is required." });
     }
-    const portrait2 = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const totalShots = plan.shots.length;
     const totalCost = totalShots * GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
     await consumeCredits(userId, totalCost, "instame_grid_pipeline_render");
@@ -6901,8 +6901,8 @@ async function registerRoutes(app2) {
         }
         try {
           const images = [];
-          if (portrait2) {
-            images.push({ base64: portrait2, mimeType: "image/jpeg" });
+          if (portrait) {
+            images.push({ base64: portrait, mimeType: "image/jpeg" });
           }
           const generated = await generateOpenAiImage({
             model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
@@ -7005,6 +7005,7 @@ async function registerRoutes(app2) {
     const lightType = normalizeStringValue(body.lightType) || "";
     const extraNotes = normalizeStringValue(body.extraNotes) || "";
     const hasPortraitReference = body.hasPortraitReference === true;
+    const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const inputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
     await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
     let consumed = true;
@@ -7071,7 +7072,7 @@ async function registerRoutes(app2) {
     if (uniqueSortedPositions.length === 0) {
       return res.status(400).json({ error: "At least one position must be selected." });
     }
-    const portrait2 = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const imageCount = plan.shots.length;
     const aesthetic = normalizeStringValue(plan.aesthetic) || "";
     const palette = normalizeStringValue(plan.palette) || "";
@@ -7089,7 +7090,7 @@ async function registerRoutes(app2) {
             position: shot.position,
             imageCount,
             shot,
-            hasPortrait: Boolean(portrait2),
+            hasPortrait: Boolean(portrait),
             aesthetic,
             palette,
             lightType
@@ -7097,8 +7098,8 @@ async function registerRoutes(app2) {
           const images = [
             { base64: gridImageBase64, mimeType: "image/png" }
           ];
-          if (portrait2) {
-            images.push({ base64: portrait2, mimeType: "image/jpeg" });
+          if (portrait) {
+            images.push({ base64: portrait, mimeType: "image/jpeg" });
           }
           const generated = await generateOpenAiImage({
             model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
