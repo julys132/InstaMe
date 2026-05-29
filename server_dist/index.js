@@ -1923,8 +1923,9 @@ function buildPositionMap(count) {
   return result;
 }
 async function callGeminiFlashText(options) {
-  const model = options.model || "gemini-3-flash-preview";
-  const modelName = model.startsWith("models/") ? model.slice("models/".length) : model;
+  const requestedModel = options.model || "gemini-3-flash-preview";
+  const normalizedModel = requestedModel.startsWith("models/") ? requestedModel.slice("models/".length) : requestedModel;
+  const modelName = normalizedModel === "gemini-2.0-flash" || normalizedModel === "gemini-2.0-flash-exp" ? "gemini-3-flash-preview" : normalizedModel;
   const url = `${options.geminiApiBaseUrl}/models/${encodeURIComponent(modelName)}:generateContent`;
   const payload = {
     contents: [
