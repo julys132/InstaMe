@@ -283,6 +283,7 @@ const PACK_BRIEF_FLOW_STEPS = ["Preset", "Brief", "Visual Grid", "Extract"] as c
 const PACK_BRIEF_NOTES_MAX_LENGTH = 220;
 
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
+const PACK_CUSTOM_PALETTE_ID = "custom-palette";
 
 const PACK_COLOR_PALETTES = [
   {
@@ -344,6 +345,66 @@ const PACK_COLOR_PALETTES = [
     label: "Forest Amber",
     paletteText: "forest green, soft cream, amber",
     colors: ["#1F4D3B", "#EFE7D4", "#C47F33"],
+  },
+  {
+    id: "midnight-platinum",
+    label: "Midnight Platinum",
+    paletteText: "midnight black, cool platinum, soft graphite",
+    colors: ["#111216", "#C9CDD3", "#616771"],
+  },
+  {
+    id: "blush-cinnamon",
+    label: "Blush Cinnamon",
+    paletteText: "blush pink, cinnamon brown, muted cream",
+    colors: ["#D2A6A4", "#8B5D47", "#EFE2D4"],
+  },
+  {
+    id: "sunset-coral-navy",
+    label: "Sunset Coral",
+    paletteText: "sunset coral, faded peach, deep navy",
+    colors: ["#D56D5D", "#E9B7A0", "#1F314B"],
+  },
+  {
+    id: "lavender-slate-smoke",
+    label: "Lavender Slate",
+    paletteText: "lavender gray, slate blue, smoke white",
+    colors: ["#9B95AA", "#56627A", "#E6E7EA"],
+  },
+  {
+    id: "desert-terracotta-stone",
+    label: "Desert Terracotta",
+    paletteText: "terracotta orange, sand beige, warm stone",
+    colors: ["#B76D4E", "#D9BF9C", "#8C7B6B"],
+  },
+  {
+    id: "aqua-shell-charcoal",
+    label: "Aqua Shell",
+    paletteText: "aqua blue, shell white, charcoal",
+    colors: ["#4D9FA8", "#EEE8DE", "#2F3338"],
+  },
+  {
+    id: "violet-ink-champagne",
+    label: "Violet Ink",
+    paletteText: "deep violet, ink black, champagne",
+    colors: ["#4D375E", "#17181C", "#CBB08A"],
+  },
+  {
+    id: "mint-ash-camel",
+    label: "Mint Camel",
+    paletteText: "muted mint, ash gray, camel tan",
+    colors: ["#8EA99A", "#9D9A95", "#B78B60"],
+  },
+  {
+    id: "ruby-smoke-ivory",
+    label: "Ruby Smoke",
+    paletteText: "ruby red, smoke gray, ivory",
+    colors: ["#8A2F3A", "#77747A", "#F0ECE3"],
+  },
+  {
+    id: "ocean-steel-sand",
+    label: "Ocean Steel",
+    paletteText: "ocean teal, steel gray, pale sand",
+    colors: ["#296C73", "#7D8792", "#D7CCBA"],
   },
 ] as const;
 
@@ -626,6 +687,7 @@ export default function InstaMeScreen() {
   const [packBriefNotes, setPackBriefNotes] = useState("");
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
   const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string>(PACK_COLOR_PALETTES[0].id);
+  const [customPackPaletteText, setCustomPackPaletteText] = useState("");
   const [packGridPreviewBase64, setPackGridPreviewBase64] = useState<string | null>(null);
   const [packGridPreviewLoading, setPackGridPreviewLoading] = useState(false);
   const [packGridRenderImages, setPackGridRenderImages] = useState<Array<{ shotIndex: number; shotLabel: string; imageBase64: string }>>([]);
@@ -867,6 +929,11 @@ export default function InstaMeScreen() {
   const selectedPackPalette = useMemo(
     () => PACK_COLOR_PALETTES.find((palette) => palette.id === selectedPackPaletteId) || PACK_COLOR_PALETTES[0],
     [selectedPackPaletteId],
+  );
+  const isCustomPackPalette = selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID;
+  const selectedPackPalettePrompt = useMemo(
+    () => (isCustomPackPalette ? customPackPaletteText.trim() : selectedPackPalette.paletteText),
+    [customPackPaletteText, isCustomPackPalette, selectedPackPalette],
   );
   const selectedPackRequiredLabels = useMemo(
     () =>
@@ -1731,7 +1798,7 @@ export default function InstaMeScreen() {
       return;
     }
 
-    setSelectedPhotoPackId((currentPackId) => (currentPackId === pack.id ? null : pack.id));
+    setSelectedPhotoPackId(pack.id);
     setSelectedStyleVibeId(pack.vibeId);
     setSelectedPackBriefVibeId(pack.vibeId);
     // Reset pipeline state when switching aesthetics
@@ -1779,6 +1846,10 @@ export default function InstaMeScreen() {
       Alert.alert("Portrait required", "Add a portrait above before generating this pack.");
       return;
     }
+    if (isCustomPackPalette && !selectedPackPalettePrompt) {
+      Alert.alert("Custom palette required", "Enter your custom color palette before generating the visual grid.");
+      return;
+    }
     const aesthetic = GRID_PIPELINE_AESTHETICS.find((a) => a.id === activePhotoPack.id);
     const elementsNote =
       packBriefRequiredElementIds.length > 0
@@ -1800,7 +1871,7 @@ export default function InstaMeScreen() {
       const result = await apiClient.generateInstaMeGridCompositePreview({
         imageCount: selectedPackImageCount,
         aesthetic: activePhotoPack.id,
-        palette: selectedPackPalette.paletteText || aesthetic?.defaultPalette || "",
+        palette: selectedPackPalettePrompt || aesthetic?.defaultPalette || "",
         lightType: aesthetic?.defaultLightType || "",
         extraNotes: extraNotes || undefined,
         hasPortraitReference: Boolean(photo),
@@ -1821,8 +1892,9 @@ export default function InstaMeScreen() {
     packBriefNotes,
     photo,
     refreshCredits,
+    isCustomPackPalette,
     selectedPackImageCount,
-    selectedPackPalette,
+    selectedPackPalettePrompt,
   ]);
 
   const renderSelectedGridPackShots = useCallback(async (shotsToRender: PipelineShotPlanItem[]) => {
@@ -2882,6 +2954,7 @@ export default function InstaMeScreen() {
                         if (hasImages) {
                           setPackImagePreviewId(pack.id);
                           setPackImagePreviewIndex(0);
+                          return;
                         }
                         handlePhotoPackPress(pack.id);
                       }}
@@ -2959,7 +3032,6 @@ export default function InstaMeScreen() {
                       <Text style={styles.packPlannerSummaryText}>
                         {selectedPackImageCount} images • {selectedPackBriefVibe.label}
                       </Text>
-                      <Text style={styles.packPlannerDeliverableText}>{activePhotoPack.deliverable}</Text>
                     </View>
 
                     <View style={styles.packPlannerBlock}>
@@ -3053,7 +3125,42 @@ export default function InstaMeScreen() {
                             </Pressable>
                           );
                         })}
+                        <Pressable
+                          onPress={() => {
+                            setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID);
+                            void Haptics.selectionAsync();
+                          }}
+                          style={({ pressed }) => [
+                            styles.packPlannerPaletteCard,
+                            styles.packPlannerPaletteCustomCard,
+                            selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID && styles.packPlannerPaletteCardActive,
+                            pressed ? { opacity: 0.9 } : undefined,
+                          ]}
+                        >
+                          <View style={styles.packPlannerPaletteCustomIconWrap}>
+                            <Ionicons name="color-palette-outline" size={14} color="rgba(255,255,255,0.82)" />
+                            <Ionicons name="create-outline" size={12} color="rgba(255,255,255,0.82)" />
+                          </View>
+                          <Text style={styles.packPlannerPaletteTitle}>Custom palette</Text>
+                          <Text numberOfLines={2} style={styles.packPlannerPaletteSubtitle}>Type your own color direction</Text>
+                        </Pressable>
                       </ScrollView>
+                      {selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID ? (
+                        <>
+                          <TextInput
+                            value={customPackPaletteText}
+                            onChangeText={setCustomPackPaletteText}
+                            onFocus={() => setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID)}
+                            placeholder="Ex: ivory cream, burgundy wine, matte black, antique gold"
+                            placeholderTextColor="rgba(255,255,255,0.40)"
+                            maxLength={120}
+                            style={styles.packPlannerPaletteCustomInput}
+                          />
+                          <Text style={styles.packPlannerPaletteCustomHint}>
+                            Use 3-5 colors, separated by commas.
+                          </Text>
+                        </>
+                      ) : null}
                     </View>
 
                     <View style={styles.packPlannerBlock}>
@@ -3098,7 +3205,7 @@ export default function InstaMeScreen() {
                       <Text style={styles.packPlannerDraftSummaryText}>
                         Vibe: {selectedPackBriefVibe.label}
                         {"\n"}
-                        Palette: {selectedPackPalette.label}
+                        Palette: {isCustomPackPalette ? (selectedPackPalettePrompt || "Custom palette (not set)") : selectedPackPalette.label}
                         {"\n"}
                         Selected tags: {selectedPackRequiredLabels.length > 0 ? selectedPackRequiredLabels.join(", ") : "Not selected yet"}
                         {"\n"}
@@ -4188,7 +4295,7 @@ export default function InstaMeScreen() {
               <View style={styles.packLightboxHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.packLightboxTitle}>{previewPack?.label}</Text>
-                  <Text style={styles.packLightboxSubtitle}>{previewPack?.count} images · tap to select</Text>
+                  <Text style={styles.packLightboxSubtitle}>6/9/12 images · tap Select preset</Text>
                 </View>
                 <Pressable onPress={() => setPackImagePreviewId(null)} style={styles.packLightboxClose}>
                   <Ionicons name="close" size={22} color="#FFF" />
@@ -4232,7 +4339,9 @@ export default function InstaMeScreen() {
               <View style={styles.packLightboxFooter}>
                 <Pressable
                   onPress={() => {
-                    if (previewPack) handlePhotoPackPress(previewPack.id);
+                    if (previewPack) {
+                      handlePhotoPackPress(previewPack.id);
+                    }
                     setPackImagePreviewId(null);
                   }}
                   style={({ pressed }) => [styles.packLightboxSelectButton, pressed && { opacity: 0.85 }]}
@@ -5387,9 +5496,17 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 6,
   },
+  packPlannerPaletteCustomCard: {
+    borderStyle: "dashed",
+  },
   packPlannerPaletteCardActive: {
     borderColor: "rgba(126,243,255,0.46)",
     backgroundColor: "rgba(126,243,255,0.12)",
+  },
+  packPlannerPaletteCustomIconWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   packPlannerPaletteSwatches: {
     flexDirection: "row",
@@ -5409,6 +5526,23 @@ const styles = StyleSheet.create({
   },
   packPlannerPaletteSubtitle: {
     color: "rgba(255,255,255,0.62)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+  },
+  packPlannerPaletteCustomInput: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    color: "#FFF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    marginTop: 2,
+  },
+  packPlannerPaletteCustomHint: {
+    color: "rgba(255,255,255,0.50)",
     fontFamily: "Inter_400Regular",
     fontSize: 10,
   },
