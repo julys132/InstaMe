@@ -681,7 +681,7 @@ const INSTAME_PORTRAIT_ENHANCE_SIZE =
   "1024 x 1024";
 const GRID_PIPELINE_ALLOWED_IMAGE_COUNTS = new Set<number>([4, 6, 9, 12]);
 const GRID_PIPELINE_RENDER_OPENAI_MODEL =
-  process.env.INSTAME_GRID_PIPELINE_RENDER_MODEL || "gpt-image-1";
+  process.env.INSTAME_GRID_PIPELINE_RENDER_MODEL || "gpt-image-2-2026-04-21";
 const GRID_PIPELINE_RENDER_OPENAI_QUALITY = "medium" as const;
 const INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path.resolve(
   process.cwd(),
@@ -7024,11 +7024,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const images: RuntimeImageInput[] = portraitInput ? [portraitInput] : [];
 
       const previewBase64 = await generateOpenAiImage({
-        model: "gpt-image-1",
+        model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
         prompt,
         images,
         size: "1024x1024",
-        quality: "low",
+        quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
       });
 
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
@@ -7126,11 +7126,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const images: RuntimeImageInput[] = portraitInput ? [portraitInput] : [];
 
           const imageBase64 = await generateOpenAiImage({
-            model: "gpt-image-1",
+            model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
             prompt,
             images,
             size: "1024x1536",
-            quality: "medium",
+            quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
           });
 
           renderedImages.push({ shotIndex: shot.index, shotLabel: shot.shotLabel, imageBase64 });

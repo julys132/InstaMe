@@ -2453,7 +2453,7 @@ var STYLE_IMAGE_SIZE = (process.env.STYLE_IMAGE_SIZE || "512x512").trim() || "51
 var INSTAME_PORTRAIT_ENHANCE_MODEL = process.env.INSTAME_PORTRAIT_ENHANCE_MODEL || DEFAULT_TOGETHER_FLASH_IMAGE_MODEL;
 var INSTAME_PORTRAIT_ENHANCE_SIZE = (process.env.INSTAME_PORTRAIT_ENHANCE_SIZE || INSTAME_PORTRAIT_ENHANCE_TIER.output).trim() || "1024 x 1024";
 var GRID_PIPELINE_ALLOWED_IMAGE_COUNTS = /* @__PURE__ */ new Set([4, 6, 9, 12]);
-var GRID_PIPELINE_RENDER_OPENAI_MODEL = process.env.INSTAME_GRID_PIPELINE_RENDER_MODEL || "gpt-image-1";
+var GRID_PIPELINE_RENDER_OPENAI_MODEL = process.env.INSTAME_GRID_PIPELINE_RENDER_MODEL || "gpt-image-2-2026-04-21";
 var GRID_PIPELINE_RENDER_OPENAI_QUALITY = "medium";
 var INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path2.resolve(
   process.cwd(),
@@ -7190,11 +7190,11 @@ async function registerRoutes(app2) {
       const prompt = buildGridPreviewPrompt(brief);
       const images = portraitInput ? [portraitInput] : [];
       const previewBase64 = await generateOpenAiImage({
-        model: "gpt-image-1",
+        model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
         prompt,
         images,
         size: "1024x1024",
-        quality: "low"
+        quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
       });
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       return res.json({
@@ -7271,11 +7271,11 @@ async function registerRoutes(app2) {
           });
           const images = portraitInput ? [portraitInput] : [];
           const imageBase64 = await generateOpenAiImage({
-            model: "gpt-image-1",
+            model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
             prompt,
             images,
             size: "1024x1536",
-            quality: "medium"
+            quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
           });
           renderedImages.push({ shotIndex: shot.index, shotLabel: shot.shotLabel, imageBase64 });
         } catch (shotError) {
