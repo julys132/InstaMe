@@ -6596,7 +6596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const plan = parseGridPlan(rawJson, imageCount);
       const continuityContext = extractContinuityContext(plan);
 
-      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
       planConsumed = false;
 
       return res.json({
@@ -6677,7 +6677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       creditsConsumedCount = 0;
-      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
 
       return res.json({
         images: results,
@@ -6744,7 +6744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       nextContinuityContext.usedScenes = [...new Set([...(ctx.usedScenes || []), ...nextContinuityContext.usedScenes])];
       nextContinuityContext.usedHairstyles = [...new Set([...(ctx.usedHairstyles || []), ...nextContinuityContext.usedHairstyles])];
 
-      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
       planConsumed = false;
 
       return res.json({
@@ -6825,7 +6825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       consumed = false;
-      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
 
       return res.json({
         gridImageBase64: composite.imageBase64,
@@ -6943,7 +6943,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       creditsConsumedCount = 0;
-      const updatedUser = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
 
       return res.json({
         images: results,

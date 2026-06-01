@@ -6857,7 +6857,7 @@ async function registerRoutes(app2) {
       });
       const plan = parseGridPlan(rawJson, imageCount);
       const continuityContext = extractContinuityContext(plan);
-      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       planConsumed = false;
       return res.json({
         plan,
@@ -6924,7 +6924,7 @@ async function registerRoutes(app2) {
         }
       }
       creditsConsumedCount = 0;
-      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       return res.json({
         images: results,
         totalRequested: totalShots,
@@ -6975,7 +6975,7 @@ async function registerRoutes(app2) {
       const nextContinuityContext = extractContinuityContext(plan);
       nextContinuityContext.usedScenes = [.../* @__PURE__ */ new Set([...ctx.usedScenes || [], ...nextContinuityContext.usedScenes])];
       nextContinuityContext.usedHairstyles = [.../* @__PURE__ */ new Set([...ctx.usedHairstyles || [], ...nextContinuityContext.usedHairstyles])];
-      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       planConsumed = false;
       return res.json({
         plan,
@@ -7034,7 +7034,7 @@ async function registerRoutes(app2) {
         quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
       });
       consumed = false;
-      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       return res.json({
         gridImageBase64: composite.imageBase64,
         plan,
@@ -7125,7 +7125,7 @@ async function registerRoutes(app2) {
         }
       }
       creditsConsumedCount = 0;
-      const updatedUser = await db.query.users.findFirst({ where: (0, import_drizzle_orm3.eq)(users.id, userId) });
+      const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       return res.json({
         images: results,
         totalRequested: uniqueSortedPositions.length,
