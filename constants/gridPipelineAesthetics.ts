@@ -119,7 +119,7 @@ export const GRID_PIPELINE_AESTHETICS: GridPipelineAesthetic[] = [
     label: "Minimalist Scandinavian Wellness",
     shortLabel: "Scandi Wellness",
     tagline: "Clean whites, birch wood, hygge and Nordic calm.",
-    defaultPalette: "crisp white, ash grey, nude, warm birch, sage",
+    defaultPalette: "crisp white, ash grey, soft beige, warm birch, sage",
     defaultLightType: "soft diffused Nordic daylight, clean natural light",
     icon: "leaf-outline",
     accent: "#A8BBA8",

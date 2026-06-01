@@ -2795,6 +2795,32 @@ function normalizeStringValue(input) {
   }
   return "";
 }
+var GRID_PROMPT_TERM_REPLACEMENTS = [
+  [/\bnudity\b/gi, "fully covered styling"],
+  [/\bnude tones?\b/gi, "skin-tone neutrals"],
+  [/\bnude\b/gi, "skin-tone beige"],
+  [/\bsexual\b/gi, "intimate editorial"],
+  [/\bsex\b/gi, "intimate editorial"],
+  [/\bsexy\b/gi, "glamorous"],
+  [/\bseductive\b/gi, "refined"],
+  [/\berotic\b/gi, "artistic"],
+  [/\blingerie\b/gi, "tailored fashion set"],
+  [/\bboudoir\b/gi, "private-suite editorial"],
+  [/\bnsfw\b/gi, "safe style"],
+  [/\bprovocative\b/gi, "confident"],
+  [/\bexplicit\b/gi, "detailed"],
+  [/\btopless\b/gi, "covered styling"],
+  [/\brevealing\b/gi, "fashion-forward"],
+  [/\bcleavage\b/gi, "deep neckline"]
+];
+function sanitizeGridPromptText(input) {
+  if (!input) return "";
+  let sanitized = input;
+  for (const [pattern, replacement] of GRID_PROMPT_TERM_REPLACEMENTS) {
+    sanitized = sanitized.replace(pattern, replacement);
+  }
+  return sanitized.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
 function parseAppleMilliseconds(input) {
   const value = normalizeStringValue(input);
   if (!value) return 0;
@@ -6828,13 +6854,13 @@ async function registerRoutes(app2) {
     if (!isGridPipelineImageCount(imageCount)) {
       return res.status(400).json({ error: "imageCount must be 4, 6, 9, or 12." });
     }
-    const aesthetic = normalizeStringValue(body.aesthetic);
+    const aesthetic = sanitizeGridPromptText(normalizeStringValue(body.aesthetic));
     if (!aesthetic) {
       return res.status(400).json({ error: "aesthetic is required." });
     }
-    const palette = normalizeStringValue(body.palette) || "muted neutrals";
-    const lightType = normalizeStringValue(body.lightType) || "soft natural light";
-    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+    const palette = sanitizeGridPromptText(normalizeStringValue(body.palette) || "muted neutrals");
+    const lightType = sanitizeGridPromptText(normalizeStringValue(body.lightType) || "soft natural light");
+    const extraNotes = sanitizeGridPromptText(normalizeStringValue(body.extraNotes) || "");
     const hasPortraitReference = body.hasPortraitReference === true;
     const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const inputs = {
@@ -6896,7 +6922,8 @@ async function registerRoutes(app2) {
       let creditsFailed = 0;
       for (const shot of plan.shots) {
         const shotPrompt = typeof shot.imagePrompt === "string" ? shot.imagePrompt : "";
-        if (!shotPrompt) {
+        const safeShotPrompt = sanitizeGridPromptText(shotPrompt);
+        if (!safeShotPrompt) {
           creditsFailed += GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE;
           continue;
         }
@@ -6907,7 +6934,7 @@ async function registerRoutes(app2) {
           }
           const generatedImageBase64 = await generateOpenAiImage({
             model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
-            prompt: shotPrompt,
+            prompt: safeShotPrompt,
             images: images.length > 0 ? images : void 0,
             size: "1024x1536",
             quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
@@ -6955,12 +6982,22 @@ async function registerRoutes(app2) {
     if (!isGridPipelineImageCount(newImageCount)) {
       return res.status(400).json({ error: "newImageCount must be 4, 6, 9, or 12." });
     }
-    const ctx = body.continuityContext;
-    if (!ctx || !ctx.aesthetic) {
+    const rawCtx = body.continuityContext;
+    if (!rawCtx || !rawCtx.aesthetic) {
       return res.status(400).json({ error: "continuityContext (from previous plan) is required." });
     }
+    const ctx = {
+      aesthetic: sanitizeGridPromptText(normalizeStringValue(rawCtx.aesthetic)),
+      palette: sanitizeGridPromptText(normalizeStringValue(rawCtx.palette)),
+      lightType: sanitizeGridPromptText(normalizeStringValue(rawCtx.lightType)),
+      usedScenes: Array.isArray(rawCtx.usedScenes) ? rawCtx.usedScenes.map((scene) => sanitizeGridPromptText(normalizeStringValue(scene))).filter(Boolean) : [],
+      usedHairstyles: Array.isArray(rawCtx.usedHairstyles) ? rawCtx.usedHairstyles.map((hairstyle) => sanitizeGridPromptText(normalizeStringValue(hairstyle))).filter(Boolean) : []
+    };
+    if (!ctx.aesthetic) {
+      return res.status(400).json({ error: "continuityContext.aesthetic is required." });
+    }
     const hasPortraitReference = body.hasPortraitReference === true;
-    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+    const extraNotes = sanitizeGridPromptText(normalizeStringValue(body.extraNotes) || "");
     await consumeCredits(userId, GRID_PIPELINE_PLAN_CREDIT_COST, "instame_grid_pipeline_extend");
     let planConsumed = true;
     try {
@@ -6974,8 +7011,15 @@ async function registerRoutes(app2) {
       });
       const plan = parseGridPlan(rawJson, newImageCount);
       const nextContinuityContext = extractContinuityContext(plan);
-      nextContinuityContext.usedScenes = [.../* @__PURE__ */ new Set([...ctx.usedScenes || [], ...nextContinuityContext.usedScenes])];
-      nextContinuityContext.usedHairstyles = [.../* @__PURE__ */ new Set([...ctx.usedHairstyles || [], ...nextContinuityContext.usedHairstyles])];
+      nextContinuityContext.aesthetic = sanitizeGridPromptText(nextContinuityContext.aesthetic);
+      nextContinuityContext.palette = sanitizeGridPromptText(nextContinuityContext.palette);
+      nextContinuityContext.lightType = sanitizeGridPromptText(nextContinuityContext.lightType);
+      nextContinuityContext.usedScenes = [
+        ...(/* @__PURE__ */ new Set([...ctx.usedScenes || [], ...nextContinuityContext.usedScenes])).values()
+      ].map((scene) => sanitizeGridPromptText(scene)).filter(Boolean);
+      nextContinuityContext.usedHairstyles = [
+        ...(/* @__PURE__ */ new Set([...ctx.usedHairstyles || [], ...nextContinuityContext.usedHairstyles])).values()
+      ].map((hairstyle) => sanitizeGridPromptText(hairstyle)).filter(Boolean);
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       planConsumed = false;
       return res.json({
@@ -7001,10 +7045,10 @@ async function registerRoutes(app2) {
     const userId = req.user.id;
     const body = req.body || {};
     const imageCount = [4, 6, 9, 12].includes(body.imageCount) ? body.imageCount : 9;
-    const aesthetic = normalizeStringValue(body.aesthetic) || "Old Money Luxury";
-    const palette = normalizeStringValue(body.palette) || "";
-    const lightType = normalizeStringValue(body.lightType) || "";
-    const extraNotes = normalizeStringValue(body.extraNotes) || "";
+    const aesthetic = sanitizeGridPromptText(normalizeStringValue(body.aesthetic) || "Old Money Luxury");
+    const palette = sanitizeGridPromptText(normalizeStringValue(body.palette) || "");
+    const lightType = sanitizeGridPromptText(normalizeStringValue(body.lightType) || "");
+    const extraNotes = sanitizeGridPromptText(normalizeStringValue(body.extraNotes) || "");
     const hasPortraitReference = body.hasPortraitReference === true;
     const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const inputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
@@ -7022,7 +7066,7 @@ async function registerRoutes(app2) {
       });
       const plan = parseGridPlan(rawPlan, imageCount);
       const continuityContext = extractContinuityContext(plan);
-      const compositePrompt = buildCompositeGridPrompt(plan, hasPortraitReference);
+      const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference));
       const compositeImages = [];
       if (portrait) {
         compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
@@ -7075,9 +7119,9 @@ async function registerRoutes(app2) {
     }
     const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
     const imageCount = plan.shots.length;
-    const aesthetic = normalizeStringValue(plan.aesthetic) || "";
-    const palette = normalizeStringValue(plan.palette) || "";
-    const lightType = normalizeStringValue(plan.lightType) || "";
+    const aesthetic = sanitizeGridPromptText(normalizeStringValue(plan.aesthetic) || "");
+    const palette = sanitizeGridPromptText(normalizeStringValue(plan.palette) || "");
+    const lightType = sanitizeGridPromptText(normalizeStringValue(plan.lightType) || "");
     const totalCost = uniqueSortedPositions.length * GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
     await consumeCredits(userId, totalCost, "instame_grid_pipeline_extract_shots");
     let creditsConsumedCount = totalCost;
@@ -7087,15 +7131,21 @@ async function registerRoutes(app2) {
       const shotsToExtract = plan.shots.filter((shot) => uniqueSortedPositions.includes(shot.position));
       for (const shot of shotsToExtract) {
         try {
-          const extractPrompt = buildExtractionPrompt({
+          const safeShot = {
+            ...shot,
+            label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
+            hairstyle: shot.hairstyle ? sanitizeGridPromptText(normalizeStringValue(shot.hairstyle)) : null,
+            angle: shot.angle ? sanitizeGridPromptText(normalizeStringValue(shot.angle)) : null
+          };
+          const extractPrompt = sanitizeGridPromptText(buildExtractionPrompt({
             position: shot.position,
             imageCount,
-            shot,
+            shot: safeShot,
             hasPortrait: Boolean(portrait),
             aesthetic,
             palette,
             lightType
-          });
+          }));
           const images = [
             { base64: gridImageBase64, mimeType: "image/png" }
           ];
@@ -7152,8 +7202,8 @@ async function registerRoutes(app2) {
     const body = req.body || {};
     const packId = normalizeStringValue(body.packId);
     const vibeId = normalizeStringValue(body.vibeId);
-    const vibeLabel = normalizeStringValue(body.vibeLabel) || vibeId;
-    const packLabel = normalizeStringValue(body.packLabel) || packId;
+    const vibeLabel = sanitizeGridPromptText(normalizeStringValue(body.vibeLabel) || vibeId);
+    const packLabel = sanitizeGridPromptText(normalizeStringValue(body.packLabel) || packId);
     const packCount = typeof body.packCount === "number" ? body.packCount : 4;
     const identityMode = ["portrait_reference", "inspired_muse", "fictional_muse"].includes(
       body.identityMode
@@ -7161,7 +7211,7 @@ async function registerRoutes(app2) {
     const requiredElementIds = Array.isArray(body.requiredElementIds) ? body.requiredElementIds.filter(
       (id) => ["outfit", "location", "car", "accessories", "mirror", "detail"].includes(id)
     ) : [];
-    const notes = normalizeStringValue(body.notes);
+    const notes = sanitizeGridPromptText(normalizeStringValue(body.notes));
     if (!packId || !vibeId) {
       return res.status(400).json({ error: "packId and vibeId are required." });
     }
@@ -7187,7 +7237,7 @@ async function registerRoutes(app2) {
         });
       }
       creditsConsumed = true;
-      const prompt = buildGridPreviewPrompt(brief);
+      const prompt = sanitizeGridPromptText(buildGridPreviewPrompt(brief));
       const images = portraitInput ? [portraitInput] : [];
       const previewBase64 = await generateOpenAiImage({
         model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
@@ -7220,8 +7270,8 @@ async function registerRoutes(app2) {
     const body = req.body || {};
     const packId = normalizeStringValue(body.packId);
     const vibeId = normalizeStringValue(body.vibeId);
-    const vibeLabel = normalizeStringValue(body.vibeLabel) || vibeId;
-    const packLabel = normalizeStringValue(body.packLabel) || packId;
+    const vibeLabel = sanitizeGridPromptText(normalizeStringValue(body.vibeLabel) || vibeId);
+    const packLabel = sanitizeGridPromptText(normalizeStringValue(body.packLabel) || packId);
     const packCount = typeof body.packCount === "number" ? body.packCount : 4;
     const identityMode = ["portrait_reference", "inspired_muse", "fictional_muse"].includes(
       body.identityMode
@@ -7229,7 +7279,7 @@ async function registerRoutes(app2) {
     const requiredElementIds = Array.isArray(body.requiredElementIds) ? body.requiredElementIds.filter(
       (id) => ["outfit", "location", "car", "accessories", "mirror", "detail"].includes(id)
     ) : [];
-    const notes = normalizeStringValue(body.notes);
+    const notes = sanitizeGridPromptText(normalizeStringValue(body.notes));
     if (!packId || !vibeId) {
       return res.status(400).json({ error: "packId and vibeId are required." });
     }
@@ -7263,12 +7313,12 @@ async function registerRoutes(app2) {
       const renderedImages = [];
       for (const shot of shotPlan) {
         try {
-          const prompt = buildGridShotRenderPrompt({
+          const prompt = sanitizeGridPromptText(buildGridShotRenderPrompt({
             shot,
             brief,
             totalShots,
             hasPortraitReference: Boolean(portraitInput)
-          });
+          }));
           const images = portraitInput ? [portraitInput] : [];
           const imageBase64 = await generateOpenAiImage({
             model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
