@@ -955,7 +955,6 @@ export default function InstaMeScreen() {
     [pipelinePlan, selectedPipelineShotPositions],
   );
   const selectedPipelineShotCount = selectedPipelineShots.length;
-  const excludedPipelineShotCount = Math.max(0, (pipelinePlan?.shots.length || 0) - selectedPipelineShotCount);
   const areAllPipelineShotsSelected = Boolean(
     pipelinePlan?.shots.length && selectedPipelineShotCount === pipelinePlan.shots.length,
   );
@@ -3222,93 +3221,79 @@ export default function InstaMeScreen() {
                     {pipelinePlan ? (
                       <View style={styles.packPlannerPreviewCard}>
                         {packGridPreviewBase64 ? (
-                          <View style={styles.packPlannerCompositeCard}>
-                            <Text style={styles.packPlannerLabel}>Visual grid preview</Text>
-                            <Text style={styles.packPlannerSelectionHint}>
-                              Position order is strict: row 1 left-to-right, then row 2, then row 3.
-                            </Text>
-                            <NativeImage
-                              source={{ uri: `data:image/png;base64,${packGridPreviewBase64}` }}
-                              style={styles.packPlannerPreviewImage}
-                              resizeMode="cover"
-                            />
-                          </View>
-                        ) : null}
-                        <View style={styles.packPlannerSelectionHeader}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.packPlannerLabel}>Shot plan - {pipelinePlan.imageCount} images</Text>
-                            <Text style={styles.packPlannerSelectionHint}>
-                              Select the images you want to extract as separate files at medium quality.
-                            </Text>
-                          </View>
-                          <View style={styles.packPlannerSelectionPill}>
-                            <Text style={styles.packPlannerSelectionPillText}>
-                              {selectedPipelineShotCount}/{pipelinePlan.shots.length}
-                            </Text>
-                          </View>
-                        </View>
-                        <View style={styles.packPlannerSelectionActions}>
-                          <Pressable
-                            onPress={selectAllPipelineShots}
-                            disabled={areAllPipelineShotsSelected}
-                            style={({ pressed }) => [
-                              styles.packPlannerSelectionAction,
-                              areAllPipelineShotsSelected && styles.packPlannerSelectionActionDisabled,
-                              pressed && !areAllPipelineShotsSelected ? { opacity: 0.86 } : undefined,
-                            ]}
-                          >
-                            <Text style={styles.packPlannerSelectionActionText}>Select all</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={clearPipelineShotSelection}
-                            disabled={selectedPipelineShotCount === 0}
-                            style={({ pressed }) => [
-                              styles.packPlannerSelectionAction,
-                              selectedPipelineShotCount === 0 && styles.packPlannerSelectionActionDisabled,
-                              pressed && selectedPipelineShotCount > 0 ? { opacity: 0.86 } : undefined,
-                            ]}
-                          >
-                            <Text style={styles.packPlannerSelectionActionText}>Exclude all</Text>
-                          </Pressable>
-                        </View>
-                        <View style={styles.packPlannerShotGrid}>
-                          {pipelinePlan.shots.map((shot) => {
-                            const selected = selectedPipelineShotPositions.includes(shot.position);
-                            const row = Math.ceil(shot.position / 3);
-                            const col = ((shot.position - 1) % 3) + 1;
-                            return (
+                          <>
+                            <View style={styles.packPlannerCompositeCard}>
+                              <View style={styles.packPlannerPreviewFrame}>
+                                <NativeImage
+                                  source={{ uri: `data:image/png;base64,${packGridPreviewBase64}` }}
+                                  style={styles.packPlannerPreviewImage}
+                                  resizeMode="cover"
+                                />
+                                {pipelinePlan.shots.map((shot) => {
+                                  const selected = selectedPipelineShotPositions.includes(shot.position);
+                                  const totalRows = Math.ceil(pipelinePlan.shots.length / 3);
+                                  const rowIndex = Math.floor((shot.position - 1) / 3);
+                                  const colIndex = (shot.position - 1) % 3;
+                                  const cellWidth = `${100 / 3}%` as `${number}%`;
+                                  const cellHeight = `${100 / totalRows}%` as `${number}%`;
+                                  const left = `${colIndex * (100 / 3)}%` as `${number}%`;
+                                  const top = `${rowIndex * (100 / totalRows)}%` as `${number}%`;
+
+                                  return (
+                                    <Pressable
+                                      key={shot.position}
+                                      accessibilityRole="button"
+                                      accessibilityLabel={`Toggle preview image ${shot.position}`}
+                                      onPress={() => togglePipelineShotSelection(shot.position)}
+                                      style={({ pressed }) => [
+                                        styles.packPlannerPreviewCell,
+                                        { left, top, width: cellWidth, height: cellHeight },
+                                        selected
+                                          ? styles.packPlannerPreviewCellSelected
+                                          : styles.packPlannerPreviewCellExcluded,
+                                        pressed ? styles.packPlannerPreviewCellPressed : undefined,
+                                      ]}
+                                    >
+                                      {!selected ? (
+                                        <View style={styles.packPlannerPreviewCellBadge}>
+                                          <Ionicons name="close" size={14} color="#FFF" />
+                                        </View>
+                                      ) : null}
+                                    </Pressable>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                            <View style={styles.packPlannerVisualActionRow}>
                               <Pressable
-                                key={shot.position}
-                                onPress={() => togglePipelineShotSelection(shot.position)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Select all preview images"
+                                onPress={selectAllPipelineShots}
+                                disabled={areAllPipelineShotsSelected}
                                 style={({ pressed }) => [
-                                  styles.packPlannerShotRow,
-                                  styles.packPlannerShotSelectableRow,
-                                  selected ? styles.packPlannerShotSelectedRow : styles.packPlannerShotExcludedRow,
-                                  pressed ? { opacity: 0.88 } : undefined,
+                                  styles.packPlannerVisualAction,
+                                  areAllPipelineShotsSelected && styles.packPlannerVisualActionDisabled,
+                                  pressed && !areAllPipelineShotsSelected ? { opacity: 0.84 } : undefined,
                                 ]}
                               >
-                                <View style={[styles.packPlannerShotCheck, selected && styles.packPlannerShotCheckActive]}>
-                                  <Ionicons name={selected ? "checkmark" : "close"} size={12} color={selected ? "#000" : "rgba(255,255,255,0.48)"} />
-                                </View>
-                                <Text style={[styles.packPlannerShotNum, selected && styles.packPlannerShotNumSelected]}>
-                                  {shot.position}
-                                </Text>
-                                <Text style={[styles.packPlannerShotLabel, !selected && styles.packPlannerShotLabelExcluded]}>
-                                  {`row ${row}, col ${col} - ${shot.label}`}
-                                  {shot.hairstyle ? ` - ${shot.hairstyle}` : ""}
-                                </Text>
+                                <Ionicons name="checkmark-done" size={16} color="rgba(255,255,255,0.78)" />
                               </Pressable>
-                            );
-                          })}
-                        </View>
-                        <View style={styles.packPlannerRenderSummary}>
-                          <Text style={styles.packPlannerRenderSummaryText}>
-                            {excludedPipelineShotCount > 0
-                              ? `${excludedPipelineShotCount} excluded. ${selectedPipelineShotCount} will be extracted.`
-                              : `All ${selectedPipelineShotCount} images will be extracted.`}
-                          </Text>
-                          <Text style={styles.packPlannerRenderSummaryText}>GPT Image - medium quality, exact row/column mapping</Text>
-                        </View>
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel="Exclude all preview images"
+                                onPress={clearPipelineShotSelection}
+                                disabled={selectedPipelineShotCount === 0}
+                                style={({ pressed }) => [
+                                  styles.packPlannerVisualAction,
+                                  selectedPipelineShotCount === 0 && styles.packPlannerVisualActionDisabled,
+                                  pressed && selectedPipelineShotCount > 0 ? { opacity: 0.84 } : undefined,
+                                ]}
+                              >
+                                <Ionicons name="close-circle-outline" size={16} color="rgba(255,255,255,0.78)" />
+                              </Pressable>
+                            </View>
+                          </>
+                        ) : null}
                         <Pressable
                           onPress={handleRenderGridPack}
                           disabled={packGridRenderLoading || selectedPipelineShotCount === 0}
@@ -3324,8 +3309,8 @@ export default function InstaMeScreen() {
                           )}
                           <Text style={styles.packPlannerRenderButtonText}>
                             {packGridRenderLoading
-                              ? "Extracting images\u2026"
-                              : `Confirm extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
+                              ? "Extracting images..."
+                              : `Extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
                           </Text>
                         </Pressable>
                       </View>
@@ -5736,13 +5721,66 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 10,
-    gap: 6,
+    padding: 6,
+    overflow: "hidden",
+  },
+  packPlannerPreviewFrame: {
+    width: "100%",
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
   packPlannerPreviewImage: {
     width: "100%",
-    aspectRatio: 1,
-    borderRadius: 12,
+    height: "100%",
+  },
+  packPlannerPreviewCell: {
+    position: "absolute",
+    borderWidth: 1,
+    alignItems: "flex-end",
+    justifyContent: "flex-start",
+    padding: 6,
+  },
+  packPlannerPreviewCellSelected: {
+    borderColor: "transparent",
+    backgroundColor: "transparent",
+  },
+  packPlannerPreviewCellExcluded: {
+    borderColor: "rgba(255,255,255,0.32)",
+    backgroundColor: "rgba(0,0,0,0.58)",
+  },
+  packPlannerPreviewCellPressed: {
+    backgroundColor: "rgba(126,243,255,0.16)",
+  },
+  packPlannerPreviewCellBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.40)",
+  },
+  packPlannerVisualActionRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 10,
+    paddingTop: 4,
+  },
+  packPlannerVisualAction: {
+    width: 36,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  packPlannerVisualActionDisabled: {
+    opacity: 0.38,
   },
   packPlannerResultsGrid: {
     gap: 8,

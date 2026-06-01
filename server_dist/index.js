@@ -2065,6 +2065,7 @@ RULES:
 - Each cell is clearly distinct but visually harmonious with all others
 - ${portraitNote}
 - No extra borders or margins outside the grid \u2014 the grid fills the entire image
+- Render photos only: no text, captions, labels, numbers, UI chrome, stickers, logos, watermarks, signs, or readable words anywhere in the image
 - Professional editorial photography quality, photorealistic`;
 }
 function buildExtractionPrompt(params) {
