@@ -6674,6 +6674,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const results: Array<{ position: number; label: string; type: string; imageBase64: string }> = [];
       let creditsFailed = 0;
+      const failedPositions: number[] = [];
 
       for (const shot of plan.shots as Array<{ position: number; label: string; type: string; imagePrompt: string }>) {
         const shotPrompt = typeof shot.imagePrompt === "string" ? shot.imagePrompt : "";
@@ -7004,6 +7005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (shotError) {
           console.error(`InstaMe grid-pipeline/extract-shots position ${shot.position} error:`, shotError);
           creditsFailed += GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+          failedPositions.push(shot.position);
           await refundCredits(
             userId,
             GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
@@ -7013,6 +7015,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       creditsConsumedCount = 0;
+
+      if (results.length === 0) {
+        return res.status(503).json({
+          error:
+            "No images could be extracted from this preview. Credits for failed extractions were refunded. Please regenerate the preview or adjust the brief and try again.",
+          failedPositions,
+          totalRequested: uniqueSortedPositions.length,
+          totalExtracted: 0,
+          creditsCharged: 0,
+        });
+      }
+
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
 
       return res.json({
@@ -7021,6 +7035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalExtracted: results.length,
         creditsCharged: totalCost - creditsFailed,
         creditsRemaining: updatedUser?.credits ?? 0,
+        failedPositions,
       });
     } catch (error) {
       if (creditsConsumedCount > 0) {

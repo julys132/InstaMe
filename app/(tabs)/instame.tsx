@@ -1943,7 +1943,20 @@ export default function InstaMeScreen() {
         positions,
         portrait,
       });
-      setPipelineRenderResults([...result.images].sort((a, b) => a.position - b.position));
+
+      const extracted = [...result.images].sort((a, b) => a.position - b.position);
+      if (extracted.length === 0) {
+        throw new Error(
+          "No images could be extracted from this preview. Credits for failed extractions were refunded. Try regenerating the preview or adjusting your brief.",
+        );
+      }
+
+      setPipelineRenderResults(extracted);
+      if (extracted.length < positions.length) {
+        setPackGridError(
+          `Extracted ${extracted.length}/${positions.length} images. Some shots failed and their credits were refunded automatically.`,
+        );
+      }
       await refreshCredits();
     } catch (error: any) {
       setPackGridError(error?.message || "Failed to extract selected grid images. Please try again.");
@@ -1985,14 +1998,25 @@ export default function InstaMeScreen() {
       `Cost: ${shotsToRender.length} credit${shotsToRender.length === 1 ? "" : "s"}.`,
     ].join("\n");
 
+    const startExtraction = () => {
+      void renderSelectedGridPackShots(orderedShots);
+    };
+
+    if (Platform.OS === "web") {
+      const confirmFn = (globalThis as { confirm?: (message?: string) => boolean }).confirm;
+      const accepted = confirmFn ? confirmFn(`${title}\n\n${message}`) : true;
+      if (accepted) {
+        startExtraction();
+      }
+      return;
+    }
+
     Alert.alert(title, message, [
       { text: "Cancel", style: "cancel" },
       {
         text: "Generate",
         style: "default",
-        onPress: () => {
-          void renderSelectedGridPackShots(orderedShots);
-        },
+        onPress: startExtraction,
       },
     ]);
   }, [activePhotoPack, pipelinePlan, renderSelectedGridPackShots, selectedPipelineShotPositions, packGridPreviewBase64]);

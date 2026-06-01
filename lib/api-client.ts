@@ -1055,6 +1055,7 @@ class ApiClient {
       totalExtracted: number;
       creditsCharged: number;
       creditsRemaining: number;
+      failedPositions?: number[];
     }>(
       "/instame/grid-pipeline/extract-shots",
       { method: "POST", body: JSON.stringify(payload) },
