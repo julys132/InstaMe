@@ -6674,7 +6674,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const results: Array<{ position: number; label: string; type: string; imageBase64: string }> = [];
       let creditsFailed = 0;
-      const failedPositions: number[] = [];
 
       for (const shot of plan.shots as Array<{ position: number; label: string; type: string; imagePrompt: string }>) {
         const shotPrompt = typeof shot.imagePrompt === "string" ? shot.imagePrompt : "";
@@ -6957,6 +6956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const results: Array<{ position: number; label: string; type: string; imageBase64: string }> = [];
       let creditsFailed = 0;
+      const failedPositions: number[] = [];
 
       const shotsToExtract = (
         plan.shots as Array<{ position: number; label: string; hairstyle: string | null; angle: string | null; type: string }>

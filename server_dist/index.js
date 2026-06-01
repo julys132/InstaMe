@@ -6920,7 +6920,6 @@ async function registerRoutes(app2) {
     try {
       const results = [];
       let creditsFailed = 0;
-      const failedPositions2 = [];
       for (const shot of plan.shots) {
         const shotPrompt = typeof shot.imagePrompt === "string" ? shot.imagePrompt : "";
         const safeShotPrompt = sanitizeGridPromptText(shotPrompt);
@@ -7129,6 +7128,7 @@ async function registerRoutes(app2) {
     try {
       const results = [];
       let creditsFailed = 0;
+      const failedPositions = [];
       const shotsToExtract = plan.shots.filter((shot) => uniqueSortedPositions.includes(shot.position));
       for (const shot of shotsToExtract) {
         try {
