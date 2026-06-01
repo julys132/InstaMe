@@ -1876,7 +1876,12 @@ export default function InstaMeScreen() {
         hasPortraitReference: Boolean(photo),
         portrait: photo.base64,
       });
-      setPackGridPreviewBase64(result.gridImageBase64);
+      const previewBase64 = typeof result.gridImageBase64 === "string" ? result.gridImageBase64.trim() : "";
+      if (!previewBase64) {
+        throw new Error("Preview image was not returned. Please try again.");
+      }
+
+      setPackGridPreviewBase64(previewBase64);
       setPipelinePlan(result.plan);
       setPipelineContinuityContext(result.continuityContext);
       await refreshCredits();
@@ -3294,25 +3299,27 @@ export default function InstaMeScreen() {
                             </View>
                           </>
                         ) : null}
-                        <Pressable
-                          onPress={handleRenderGridPack}
-                          disabled={packGridRenderLoading || selectedPipelineShotCount === 0}
-                          style={({ pressed }) => [
-                            styles.packPlannerRenderButton,
-                            (packGridRenderLoading || selectedPipelineShotCount === 0 || pressed) && { opacity: 0.7 },
-                          ]}
-                        >
-                          {packGridRenderLoading ? (
-                            <ActivityIndicator size="small" color="#FFF" />
-                          ) : (
-                            <Ionicons name="images-outline" size={14} color="#FFF" />
-                          )}
-                          <Text style={styles.packPlannerRenderButtonText}>
-                            {packGridRenderLoading
-                              ? "Extracting images..."
-                              : `Extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
-                          </Text>
-                        </Pressable>
+                        {packGridPreviewBase64 ? (
+                          <Pressable
+                            onPress={handleRenderGridPack}
+                            disabled={packGridRenderLoading || selectedPipelineShotCount === 0}
+                            style={({ pressed }) => [
+                              styles.packPlannerRenderButton,
+                              (packGridRenderLoading || selectedPipelineShotCount === 0 || pressed) && { opacity: 0.7 },
+                            ]}
+                          >
+                            {packGridRenderLoading ? (
+                              <ActivityIndicator size="small" color="#FFF" />
+                            ) : (
+                              <Ionicons name="images-outline" size={14} color="#FFF" />
+                            )}
+                            <Text style={styles.packPlannerRenderButtonText}>
+                              {packGridRenderLoading
+                                ? "Extracting images..."
+                                : `Extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
+                            </Text>
+                          </Pressable>
+                        ) : null}
                       </View>
                     ) : null}
 

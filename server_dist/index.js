@@ -6905,7 +6905,7 @@ async function registerRoutes(app2) {
           if (portrait) {
             images.push({ base64: portrait, mimeType: "image/jpeg" });
           }
-          const generated = await generateOpenAiImage({
+          const generatedImageBase64 = await generateOpenAiImage({
             model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
             prompt: shotPrompt,
             images: images.length > 0 ? images : void 0,
@@ -6916,7 +6916,7 @@ async function registerRoutes(app2) {
             position: shot.position,
             label: shot.label,
             type: shot.type,
-            imageBase64: generated.imageBase64
+            imageBase64: generatedImageBase64
           });
         } catch (shotError) {
           console.error(`InstaMe grid-pipeline/render shot ${shot.position} error:`, shotError);
@@ -7027,7 +7027,7 @@ async function registerRoutes(app2) {
       if (portrait) {
         compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
       }
-      const composite = await generateOpenAiImage({
+      const compositeImageBase64 = await generateOpenAiImage({
         model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
         prompt: compositePrompt,
         images: compositeImages.length > 0 ? compositeImages : void 0,
@@ -7037,7 +7037,7 @@ async function registerRoutes(app2) {
       consumed = false;
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       return res.json({
-        gridImageBase64: composite.imageBase64,
+        gridImageBase64: compositeImageBase64,
         plan,
         continuityContext,
         imageCount,
@@ -7102,7 +7102,7 @@ async function registerRoutes(app2) {
           if (portrait) {
             images.push({ base64: portrait, mimeType: "image/jpeg" });
           }
-          const generated = await generateOpenAiImage({
+          const generatedImageBase64 = await generateOpenAiImage({
             model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
             prompt: extractPrompt,
             images,
@@ -7113,7 +7113,7 @@ async function registerRoutes(app2) {
             position: shot.position,
             label: shot.label,
             type: shot.type,
-            imageBase64: generated.imageBase64
+            imageBase64: generatedImageBase64
           });
         } catch (shotError) {
           console.error(`InstaMe grid-pipeline/extract-shots position ${shot.position} error:`, shotError);
