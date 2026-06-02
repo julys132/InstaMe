@@ -284,6 +284,8 @@ const PACK_BRIEF_NOTES_MAX_LENGTH = 220;
 
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
 const PACK_CUSTOM_PALETTE_ID = "custom-palette";
+const GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT = 3;
+const GRID_EXTRACT_WAIT_NOTE = "Extragerea completa poate dura cateva minute, in functie de numarul de imagini.";
 
 const PACK_COLOR_PALETTES = [
   {
@@ -692,6 +694,8 @@ export default function InstaMeScreen() {
   const [packGridPreviewLoading, setPackGridPreviewLoading] = useState(false);
   const [packGridRenderImages, setPackGridRenderImages] = useState<Array<{ shotIndex: number; shotLabel: string; imageBase64: string }>>([]);
   const [packGridRenderLoading, setPackGridRenderLoading] = useState(false);
+  const [packGridExtractProgress, setPackGridExtractProgress] = useState<{ done: number; total: number } | null>(null);
+  const [packGridExtractNotice, setPackGridExtractNotice] = useState<string | null>(null);
   const [packGridError, setPackGridError] = useState<string | null>(null);
   const [packImagePreviewId, setPackImagePreviewId] = useState<string | null>(null);
   const [packImagePreviewIndex, setPackImagePreviewIndex] = useState(0);
@@ -1866,6 +1870,8 @@ export default function InstaMeScreen() {
     setPipelinePlan(null);
     setPipelineRenderResults([]);
     setPipelineError(null);
+    setPackGridExtractProgress(null);
+    setPackGridExtractNotice(null);
     try {
       const result = await apiClient.generateInstaMeGridCompositePreview({
         imageCount: selectedPackImageCount,
@@ -1918,49 +1924,119 @@ export default function InstaMeScreen() {
 
     const orderedShots = [...shotsToRender].sort((a, b) => a.position - b.position);
     const positions = orderedShots.map((shot) => shot.position);
-
+    const positionOrder = new Map<number, number>(orderedShots.map((shot, index) => [shot.position, index]));
     const portrait = photo.base64;
+    const planPayload = {
+      aesthetic: pipelinePlan.aesthetic,
+      palette: pipelinePlan.palette,
+      lightType: pipelinePlan.lightType,
+      shots: pipelinePlan.shots.map((shot) => ({
+        position: shot.position,
+        label: shot.label,
+        hairstyle: shot.hairstyle,
+        angle: shot.angle,
+        type: shot.type,
+      })),
+    };
 
     setPackGridRenderLoading(true);
     setPackGridError(null);
     setPipelineError(null);
     setPipelineRenderResults([]);
+    setPackGridExtractProgress({ done: 0, total: positions.length });
+    setPackGridExtractNotice(GRID_EXTRACT_WAIT_NOTE);
     try {
-      const result = await apiClient.generateInstaMeGridExtractShots({
-        gridImageBase64: packGridPreviewBase64,
-        plan: {
-          aesthetic: pipelinePlan.aesthetic,
-          palette: pipelinePlan.palette,
-          lightType: pipelinePlan.lightType,
-          shots: pipelinePlan.shots.map((shot) => ({
-            position: shot.position,
-            label: shot.label,
-            hairstyle: shot.hairstyle,
-            angle: shot.angle,
-            type: shot.type,
-          })),
-        },
-        positions,
-        portrait,
+      const extractedByPosition = new Map<number, { position: number; label: string; type: string; imageBase64: string }>();
+      let pendingPositions = [...positions];
+
+      for (let attempt = 1; attempt <= GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT && pendingPositions.length > 0; attempt += 1) {
+        const positionsThisRound = [...pendingPositions];
+        pendingPositions = [];
+
+        for (const position of positionsThisRound) {
+          const completedCount = extractedByPosition.size;
+          setPackGridExtractProgress({ done: completedCount, total: positions.length });
+          setPackGridExtractNotice(
+            `Extracting image ${Math.min(completedCount + 1, positions.length)}/${positions.length}. ${GRID_EXTRACT_WAIT_NOTE}`,
+          );
+
+          try {
+            const result = await apiClient.generateInstaMeGridExtractShots({
+              gridImageBase64: packGridPreviewBase64,
+              plan: planPayload,
+              positions: [position],
+              portrait,
+            });
+
+            const extractedImages = Array.isArray(result.images) ? result.images : [];
+            const failedPositions = Array.isArray(result.failedPositions)
+              ? result.failedPositions.filter((value): value is number => typeof value === "number")
+              : [];
+
+            let extractedRequestedPosition = false;
+            for (const image of extractedImages) {
+              if (!image || typeof image.position !== "number" || !image.imageBase64) {
+                continue;
+              }
+              extractedByPosition.set(image.position, image);
+              if (image.position === position) {
+                extractedRequestedPosition = true;
+              }
+            }
+
+            const orderedExtracted = Array.from(extractedByPosition.values()).sort((a, b) => {
+              return (positionOrder.get(a.position) ?? Number.MAX_SAFE_INTEGER) -
+                (positionOrder.get(b.position) ?? Number.MAX_SAFE_INTEGER);
+            });
+            setPipelineRenderResults(orderedExtracted);
+            setPackGridExtractProgress({ done: orderedExtracted.length, total: positions.length });
+
+            if (!extractedRequestedPosition || failedPositions.includes(position)) {
+              pendingPositions.push(position);
+            }
+          } catch (error: any) {
+            if (error?.status === 401 || error?.status === 402 || error?.status === 403) {
+              throw error;
+            }
+            pendingPositions.push(position);
+          }
+        }
+
+        pendingPositions = [...new Set(pendingPositions)].sort((a, b) => a - b);
+        if (pendingPositions.length > 0 && attempt < GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT) {
+          setPackGridExtractNotice(
+            `Extracted ${extractedByPosition.size}/${positions.length}. Retrying ${pendingPositions.length} remaining image${pendingPositions.length === 1 ? "" : "s"}. ${GRID_EXTRACT_WAIT_NOTE}`,
+          );
+        }
+      }
+
+      const extracted = Array.from(extractedByPosition.values()).sort((a, b) => {
+        return (positionOrder.get(a.position) ?? Number.MAX_SAFE_INTEGER) -
+          (positionOrder.get(b.position) ?? Number.MAX_SAFE_INTEGER);
       });
 
-      const extracted = [...result.images].sort((a, b) => a.position - b.position);
       if (extracted.length === 0) {
         throw new Error(
           "No images could be extracted from this preview. Credits for failed extractions were refunded. Try regenerating the preview or adjusting your brief.",
         );
       }
 
-      setPipelineRenderResults(extracted);
-      if (extracted.length < positions.length) {
+      if (pendingPositions.length > 0) {
         setPackGridError(
-          `Extracted ${extracted.length}/${positions.length} images. Some shots failed and their credits were refunded automatically.`,
+          `Extracted ${extracted.length}/${positions.length} images. Remaining positions: ${pendingPositions.join(", ")}. You can tap Extract again to continue from where it stopped.`,
         );
       }
-      await refreshCredits();
+
+      try {
+        await refreshCredits();
+      } catch {
+        // Keep extracted images visible even if credits refresh fails temporarily.
+      }
     } catch (error: any) {
       setPackGridError(error?.message || "Failed to extract selected grid images. Please try again.");
     } finally {
+      setPackGridExtractNotice(null);
+      setPackGridExtractProgress(null);
       setPackGridRenderLoading(false);
     }
   }, [activePhotoPack, pipelinePlan, photo, refreshCredits, packGridPreviewBase64]);
@@ -3247,6 +3323,12 @@ export default function InstaMeScreen() {
                       </View>
                     ) : null}
 
+                    {packGridRenderLoading && packGridExtractNotice ? (
+                      <View style={styles.packPlannerInfoCard}>
+                        <Text style={styles.packPlannerInfoText}>{packGridExtractNotice}</Text>
+                      </View>
+                    ) : null}
+
                     {pipelinePlan ? (
                       <View style={styles.packPlannerPreviewCard}>
                         {packGridPreviewBase64 ? (
@@ -3339,7 +3421,9 @@ export default function InstaMeScreen() {
                             )}
                             <Text style={styles.packPlannerRenderButtonText}>
                               {packGridRenderLoading
-                                ? "Extracting images..."
+                                ? packGridExtractProgress
+                                  ? `Extracting ${packGridExtractProgress.done}/${packGridExtractProgress.total}...`
+                                  : "Extracting images..."
                                 : `Extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
                             </Text>
                           </Pressable>
@@ -3408,6 +3492,8 @@ export default function InstaMeScreen() {
                           setPipelineError(null);
                           setPackGridError(null);
                           setPackGridPreviewBase64(null);
+                          setPackGridExtractProgress(null);
+                          setPackGridExtractNotice(null);
                         }}
                         style={styles.packPlannerResetButton}
                       >
@@ -5740,6 +5826,20 @@ const styles = StyleSheet.create({
   },
   packPlannerErrorText: {
     color: "#FF7A9E",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  packPlannerInfoCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.30)",
+    backgroundColor: "rgba(126,243,255,0.10)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  packPlannerInfoText: {
+    color: "rgba(223,255,255,0.86)",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     lineHeight: 18,
