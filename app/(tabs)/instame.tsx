@@ -2022,6 +2022,7 @@ export default function InstaMeScreen() {
       }
 
       if (pendingPositions.length > 0) {
+        setSelectedPipelineShotPositions(pendingPositions);
         setPackGridError(
           `Extracted ${extracted.length}/${positions.length} images. Remaining positions: ${pendingPositions.join(", ")}. You can tap Extract again to continue from where it stopped.`,
         );
