@@ -688,7 +688,7 @@ export default function InstaMeScreen() {
   const [packBriefRequiredElementIds, setPackBriefRequiredElementIds] = useState<string[]>([]);
   const [packBriefNotes, setPackBriefNotes] = useState("");
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
-  const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string>(PACK_COLOR_PALETTES[0].id);
+  const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string | null>(null);
   const [customPackPaletteText, setCustomPackPaletteText] = useState("");
   const [packGridPreviewBase64, setPackGridPreviewBase64] = useState<string | null>(null);
   const [packGridPreviewLoading, setPackGridPreviewLoading] = useState(false);
@@ -931,13 +931,17 @@ export default function InstaMeScreen() {
   const isPhoneViewport = viewportWidth <= 430;
   const selectedPackBriefVibe = useMemo(() => getStyleVibeById(selectedPackBriefVibeId), [selectedPackBriefVibeId]);
   const selectedPackPalette = useMemo(
-    () => PACK_COLOR_PALETTES.find((palette) => palette.id === selectedPackPaletteId) || PACK_COLOR_PALETTES[0],
+    () => (selectedPackPaletteId ? PACK_COLOR_PALETTES.find((palette) => palette.id === selectedPackPaletteId) || null : null),
     [selectedPackPaletteId],
   );
   const isCustomPackPalette = selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID;
   const selectedPackPalettePrompt = useMemo(
-    () => (isCustomPackPalette ? customPackPaletteText.trim() : selectedPackPalette.paletteText),
-    [customPackPaletteText, isCustomPackPalette, selectedPackPalette],
+    () => {
+      if (!selectedPackPaletteId) return "";
+      if (isCustomPackPalette) return customPackPaletteText.trim();
+      return selectedPackPalette?.paletteText ?? "";
+    },
+    [customPackPaletteText, isCustomPackPalette, selectedPackPalette, selectedPackPaletteId],
   );
   const selectedPackRequiredLabels = useMemo(
     () =>
@@ -1804,7 +1808,12 @@ export default function InstaMeScreen() {
     setSelectedPhotoPackId(pack.id);
     setSelectedStyleVibeId(pack.vibeId);
     setSelectedPackBriefVibeId(pack.vibeId);
-    // Reset pipeline state when switching aesthetics
+    // Reset brief settings when switching packs
+    setSelectedPackPaletteId(null);
+    setCustomPackPaletteText("");
+    setPackBriefRequiredElementIds([]);
+    setPackBriefNotes("");
+    // Reset pipeline state when switching packs
     setPipelinePlan(null);
     setPipelineContinuityContext(null);
     setPipelineRenderResults([]);
@@ -3169,36 +3178,6 @@ export default function InstaMeScreen() {
                     </View>
 
                     <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Style direction</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.packPlannerVibeRail}
-                      >
-                        {packBriefVibeOptions.map((vibe) => {
-                          const active = selectedPackBriefVibeId === vibe.id;
-                          return (
-                            <Pressable
-                              key={`pack-vibe-${vibe.id}`}
-                              onPress={() => {
-                                setSelectedPackBriefVibeId(vibe.id);
-                                void Haptics.selectionAsync();
-                              }}
-                              style={({ pressed }) => [
-                                styles.packPlannerVibeChip,
-                                active && styles.packPlannerVibeChipActive,
-                                pressed ? { opacity: 0.9 } : undefined,
-                              ]}
-                            >
-                              <Ionicons name={vibe.icon as keyof typeof Ionicons.glyphMap} size={12} color={active ? vibe.accent : "rgba(255,255,255,0.75)"} />
-                              <Text style={[styles.packPlannerVibeChipText, active && { color: "#FFF" }]}>{vibe.shortLabel}</Text>
-                            </Pressable>
-                          );
-                        })}
-                      </ScrollView>
-                    </View>
-
-                    <View style={styles.packPlannerBlock}>
                       <Text style={styles.packPlannerLabel}>Color palette direction</Text>
                       <ScrollView
                         horizontal
@@ -3303,19 +3282,6 @@ export default function InstaMeScreen() {
                         maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
                         style={styles.packPlannerNotesInput}
                       />
-                    </View>
-
-                    <View style={styles.packPlannerDraftSummary}>
-                      <Text style={styles.packPlannerDraftSummaryTitle}>Draft brief</Text>
-                      <Text style={styles.packPlannerDraftSummaryText}>
-                        Vibe: {selectedPackBriefVibe.label}
-                        {"\n"}
-                        Palette: {isCustomPackPalette ? (selectedPackPalettePrompt || "Custom palette (not set)") : selectedPackPalette.label}
-                        {"\n"}
-                        Selected tags: {selectedPackRequiredLabels.length > 0 ? selectedPackRequiredLabels.join(", ") : "Not selected yet"}
-                        {"\n"}
-                        Must-have details: {packBriefNotes.trim() ? packBriefNotes.trim() : "No extra constraints"}
-                      </Text>
                     </View>
 
                     {(packGridError || pipelineError) ? (
