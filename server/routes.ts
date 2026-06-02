@@ -1153,23 +1153,81 @@ function normalizeStringValue(input: unknown): string {
 }
 
 const GRID_PROMPT_TERM_REPLACEMENTS: Array<[RegExp, string]> = [
+  // Nudity / body
   [/\bnudity\b/gi, "fully covered styling"],
   [/\bnude tones?\b/gi, "skin-tone neutrals"],
   [/\bnude\b/gi, "skin-tone beige"],
-  [/\bsexual\b/gi, "intimate editorial"],
-  [/\bsex\b/gi, "intimate editorial"],
+  [/\btopless\b/gi, "covered styling"],
+  [/\bcleavage\b/gi, "deep neckline"],
+  [/\bbikini\b/gi, "swimwear"],
+  [/\bunderwear\b/gi, "styled set"],
+  [/\blingerie\b/gi, "tailored fashion set"],
+  [/\bboudoir\b/gi, "private-suite editorial"],
+  [/\bnaked\b/gi, "styled"],
+  [/\bbare skin\b/gi, "tonal skin"],
+  [/\bbare\b/gi, "minimal"],
+  // Sexual / erotic
+  [/\bsexual\b/gi, "fashion editorial"],
+  [/\bsex\b/gi, "fashion editorial"],
   [/\bsexy\b/gi, "glamorous"],
   [/\bseductive\b/gi, "refined"],
   [/\berotic\b/gi, "artistic"],
-  [/\blingerie\b/gi, "tailored fashion set"],
-  [/\bboudoir\b/gi, "private-suite editorial"],
-  [/\bnsfw\b/gi, "safe style"],
+  [/\bsensual\b/gi, "elegant"],
+  [/\balluring\b/gi, "captivating"],
+  [/\bintimate\b/gi, "close editorial"],
+  [/\bpassionate\b/gi, "emotional"],
+  [/\bflirty\b/gi, "playful"],
+  // Content policy misc
+  [/\bnsfw\b/gi, "fashion-safe"],
   [/\bprovocative\b/gi, "confident"],
   [/\bexplicit\b/gi, "detailed"],
-  [/\btopless\b/gi, "covered styling"],
   [/\brevealing\b/gi, "fashion-forward"],
-  [/\bcleavage\b/gi, "deep neckline"],
+  [/\brisqué\b/gi, "bold editorial"],
 ];
+
+/**
+ * Builds a minimal, moderation-safe fallback extraction prompt that avoids
+ * all user/AI-generated scene labels when the primary prompt was blocked.
+ */
+function buildModerationSafeFallbackExtractionPrompt(params: {
+  position: number;
+  imageCount: number;
+  type: string;
+  aesthetic: string;
+  palette: string;
+  lightType: string;
+  hasPortrait: boolean;
+}): string {
+  const { position, imageCount, type, aesthetic, palette, lightType, hasPortrait } = params;
+  const GRID_COLS = 3;
+  const totalRows = Math.ceil(imageCount / GRID_COLS);
+  const row = Math.ceil(position / GRID_COLS);
+  const col = ((position - 1) % GRID_COLS) + 1;
+
+  const typeDesc =
+    type === "SIMPLE"
+      ? "minimalist flat-lay or object detail — no person in frame"
+      : type === "MEDIUM"
+      ? "tight portrait, face and shoulders, calm and refined"
+      : "full or medium body in a styled fashion scene";
+
+  const portraitInstruction = hasPortrait
+    ? "\nCRITICAL IDENTITY RULE: Preserve the face and identity of the person in the provided reference portrait exactly."
+    : "";
+
+  return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
+
+EXACT POSITION: row ${row}, column ${col} (counting left to right, top to bottom).
+
+SHOT TYPE: ${typeDesc}
+
+OUTPUT REQUIREMENTS:
+- Output ONLY this single standalone photo — no grid lines, no other cells, no borders
+- 100% faithful to the composition, colors, lighting, and background of that exact cell
+- ${aesthetic} aesthetic, palette (${palette}), ${lightType} lighting
+- Ultra-detailed photorealistic portrait, shot with a professional camera
+- Vertical portrait format (4:5 ratio)${portraitInstruction}`;
+}
 
 function sanitizeGridPromptText(input: string): string {
   if (!input) return "";
@@ -6963,47 +7021,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ).filter((shot) => uniqueSortedPositions.includes(shot.position));
 
       for (const shot of shotsToExtract) {
+        const images: import("./lib/instame-image").RuntimeImageInput[] = [
+          { base64: gridImageBase64, mimeType: "image/png" },
+        ];
+        if (portrait) {
+          images.push({ base64: portrait, mimeType: "image/jpeg" });
+        }
+
+        const safeShot = {
+          ...shot,
+          label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
+          hairstyle: shot.hairstyle ? sanitizeGridPromptText(normalizeStringValue(shot.hairstyle)) : null,
+          angle: shot.angle ? sanitizeGridPromptText(normalizeStringValue(shot.angle)) : null,
+        };
+
+        const primaryPrompt = sanitizeGridPromptText(buildExtractionPrompt({
+          position: shot.position,
+          imageCount,
+          shot: safeShot,
+          hasPortrait: Boolean(portrait),
+          aesthetic,
+          palette,
+          lightType,
+        }));
+
+        let generatedImageBase64: string | null = null;
+        let shotFailed = false;
+
+        // Attempt 1: primary prompt
         try {
-          const safeShot = {
-            ...shot,
-            label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
-            hairstyle: shot.hairstyle ? sanitizeGridPromptText(normalizeStringValue(shot.hairstyle)) : null,
-            angle: shot.angle ? sanitizeGridPromptText(normalizeStringValue(shot.angle)) : null,
-          };
-
-          const extractPrompt = sanitizeGridPromptText(buildExtractionPrompt({
-            position: shot.position,
-            imageCount,
-            shot: safeShot,
-            hasPortrait: Boolean(portrait),
-            aesthetic,
-            palette,
-            lightType,
-          }));
-
-          const images: import("./lib/instame-image").RuntimeImageInput[] = [
-            { base64: gridImageBase64, mimeType: "image/png" },
-          ];
-          if (portrait) {
-            images.push({ base64: portrait, mimeType: "image/jpeg" });
-          }
-
-          const generatedImageBase64 = await generateOpenAiImage({
+          generatedImageBase64 = await generateOpenAiImage({
             model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
-            prompt: extractPrompt,
+            prompt: primaryPrompt,
             images,
             size: "1024x1536",
             quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
           });
+        } catch (primaryError: unknown) {
+          const isModerationBlock =
+            (primaryError instanceof Error &&
+              (primaryError.message.includes("moderation_blocked") ||
+                primaryError.message.includes("safety") ||
+                primaryError.message.includes("safety_violations") ||
+                primaryError.message.includes("Your request was rejected"))) ||
+            ((primaryError as { code?: string })?.code === "moderation_blocked");
 
+          if (isModerationBlock) {
+            // Attempt 2: minimal safe fallback prompt (strips all Gemini-generated labels)
+            console.warn(
+              `InstaMe grid-pipeline/extract-shots position ${shot.position}: moderation blocked, retrying with safe fallback prompt.`,
+            );
+            try {
+              const fallbackPrompt = buildModerationSafeFallbackExtractionPrompt({
+                position: shot.position,
+                imageCount,
+                type: shot.type,
+                aesthetic,
+                palette,
+                lightType,
+                hasPortrait: Boolean(portrait),
+              });
+              generatedImageBase64 = await generateOpenAiImage({
+                model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+                prompt: fallbackPrompt,
+                images,
+                size: "1024x1536",
+                quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
+              });
+            } catch (fallbackError) {
+              console.error(
+                `InstaMe grid-pipeline/extract-shots position ${shot.position} fallback error:`,
+                fallbackError,
+              );
+              shotFailed = true;
+            }
+          } else {
+            console.error(
+              `InstaMe grid-pipeline/extract-shots position ${shot.position} error:`,
+              primaryError,
+            );
+            shotFailed = true;
+          }
+        }
+
+        if (generatedImageBase64) {
           results.push({
             position: shot.position,
             label: shot.label,
             type: shot.type,
             imageBase64: generatedImageBase64,
           });
-        } catch (shotError) {
-          console.error(`InstaMe grid-pipeline/extract-shots position ${shot.position} error:`, shotError);
+        } else if (shotFailed) {
           creditsFailed += GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
           failedPositions.push(shot.position);
           await refundCredits(
