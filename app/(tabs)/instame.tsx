@@ -687,6 +687,7 @@ export default function InstaMeScreen() {
   const [selectedPackBriefVibeId, setSelectedPackBriefVibeId] = useState("all");
   const [packBriefRequiredElementIds, setPackBriefRequiredElementIds] = useState<string[]>([]);
   const [packBriefNotes, setPackBriefNotes] = useState("");
+  const [packBriefShowMore, setPackBriefShowMore] = useState(false);
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
   const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string | null>(null);
   const [customPackPaletteText, setCustomPackPaletteText] = useState("");
@@ -3091,24 +3092,25 @@ export default function InstaMeScreen() {
 
                       {/* Bottom gradient overlay with text */}
                       <LinearGradient
-                        colors={["transparent", "transparent", "rgba(0,0,0,0.68)", "rgba(0,0,0,0.96)"]}
-                        locations={[0, 0.38, 0.70, 1]}
+                        colors={["transparent", "transparent", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.92)"]}
+                        locations={[0, 0.45, 0.74, 1]}
                         style={styles.packCardOverlay}
                       >
                         <View style={styles.packCardTopRow}>
-                          <Text style={styles.packCardCount}>6-12 IMAGES</Text>
+                          {active ? (
+                            <View style={styles.packCardActivePill}>
+                              <Ionicons name="checkmark" size={11} color="#0a0a0f" />
+                            </View>
+                          ) : <View />}
                           {hasImages ? (
                             <View style={styles.packCardExpandHint}>
-                              <Ionicons name="expand-outline" size={11} color="rgba(255,255,255,0.72)" />
+                              <Ionicons name="expand-outline" size={11} color="rgba(255,255,255,0.82)" />
                             </View>
                           ) : (
                             <Ionicons name={pack.icon as keyof typeof Ionicons.glyphMap} size={13} color={pack.accent} />
                           )}
                         </View>
-                        <View style={styles.packCardBottomCopy}>
-                          <Text style={styles.packCardTitle}>{pack.label}</Text>
-                          <Text numberOfLines={2} style={styles.packCardSubtitle}>{pack.subtitle}</Text>
-                        </View>
+                        <Text numberOfLines={2} style={styles.packCardTitle}>{pack.label}</Text>
                       </LinearGradient>
                     </Pressable>
                   );
@@ -3209,8 +3211,7 @@ export default function InstaMeScreen() {
                                   <View key={`${palette.id}-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
                                 ))}
                               </View>
-                              <Text style={styles.packPlannerPaletteTitle}>{palette.label}</Text>
-                              <Text numberOfLines={1} style={styles.packPlannerPaletteSubtitle}>{palette.paletteText}</Text>
+                              <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>{palette.label}</Text>
                             </Pressable>
                           );
                         })}
@@ -3227,11 +3228,9 @@ export default function InstaMeScreen() {
                           ]}
                         >
                           <View style={styles.packPlannerPaletteCustomIconWrap}>
-                            <Ionicons name="color-palette-outline" size={14} color="rgba(255,255,255,0.82)" />
-                            <Ionicons name="create-outline" size={12} color="rgba(255,255,255,0.82)" />
+                            <Ionicons name="color-palette-outline" size={16} color="rgba(255,255,255,0.82)" />
                           </View>
-                          <Text style={styles.packPlannerPaletteTitle}>Custom palette</Text>
-                          <Text numberOfLines={2} style={styles.packPlannerPaletteSubtitle}>Type your own color direction</Text>
+                          <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Custom</Text>
                         </Pressable>
                       </ScrollView>
                       {selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID ? (
@@ -3252,42 +3251,66 @@ export default function InstaMeScreen() {
                       ) : null}
                     </View>
 
-                    <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Add a few details</Text>
-                      <View style={styles.packPlannerElementWrap}>
-                        {PACK_BRIEF_REQUIRED_ELEMENTS.map((element) => {
-                          const active = packBriefRequiredElementIds.includes(element.id);
-                          return (
-                            <Pressable
-                              key={element.id}
-                              onPress={() => togglePackBriefRequiredElement(element.id)}
-                              style={({ pressed }) => [
-                                styles.packPlannerElementChip,
-                                active && styles.packPlannerElementChipActive,
-                                pressed ? { opacity: 0.88 } : undefined,
-                              ]}
-                            >
-                              <Text style={[styles.packPlannerElementChipText, active && styles.packPlannerElementChipTextActive]}>
-                                {element.label}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </View>
-
-                    <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Anything else? (optional)</Text>
-                      <TextInput
-                        value={packBriefNotes}
-                        onChangeText={setPackBriefNotes}
-                        placeholder="Ex: white blazer, marble stairs, no sunglasses, include watch close-up"
-                        placeholderTextColor="rgba(255,255,255,0.40)"
-                        multiline
-                        maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
-                        style={styles.packPlannerNotesInput}
+                    <Pressable
+                      onPress={() => {
+                        setPackBriefShowMore((prev) => !prev);
+                        void Haptics.selectionAsync();
+                      }}
+                      style={({ pressed }) => [styles.packPlannerMoreToggle, pressed ? { opacity: 0.8 } : undefined]}
+                    >
+                      <Text style={styles.packPlannerMoreToggleText}>
+                        {packBriefShowMore ? "Hide extra options" : "Fine-tune details"}
+                        {!packBriefShowMore && packBriefRequiredElementIds.length > 0
+                          ? ` · ${packBriefRequiredElementIds.length}`
+                          : ""}
+                      </Text>
+                      <Ionicons
+                        name={packBriefShowMore ? "chevron-up" : "chevron-down"}
+                        size={15}
+                        color="rgba(255,255,255,0.62)"
                       />
-                    </View>
+                    </Pressable>
+
+                    {packBriefShowMore ? (
+                      <>
+                        <View style={styles.packPlannerBlock}>
+                          <Text style={styles.packPlannerLabel}>Add a few details</Text>
+                          <View style={styles.packPlannerElementWrap}>
+                            {PACK_BRIEF_REQUIRED_ELEMENTS.map((element) => {
+                              const active = packBriefRequiredElementIds.includes(element.id);
+                              return (
+                                <Pressable
+                                  key={element.id}
+                                  onPress={() => togglePackBriefRequiredElement(element.id)}
+                                  style={({ pressed }) => [
+                                    styles.packPlannerElementChip,
+                                    active && styles.packPlannerElementChipActive,
+                                    pressed ? { opacity: 0.88 } : undefined,
+                                  ]}
+                                >
+                                  <Text style={[styles.packPlannerElementChipText, active && styles.packPlannerElementChipTextActive]}>
+                                    {element.label}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        </View>
+
+                        <View style={styles.packPlannerBlock}>
+                          <Text style={styles.packPlannerLabel}>Anything else?</Text>
+                          <TextInput
+                            value={packBriefNotes}
+                            onChangeText={setPackBriefNotes}
+                            placeholder="Ex: white blazer, marble stairs, watch close-up"
+                            placeholderTextColor="rgba(255,255,255,0.40)"
+                            multiline
+                            maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
+                            style={styles.packPlannerNotesInput}
+                          />
+                        </View>
+                      </>
+                    ) : null}
 
                     {(packGridError || pipelineError) ? (
                       <View style={styles.packPlannerErrorCard}>
@@ -5196,8 +5219,16 @@ const styles = StyleSheet.create({
   packCardExpandHint: {
     width: 22,
     height: 22,
-    borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.14)",
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  packCardActivePill: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#7EF3FF",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -5289,8 +5320,8 @@ const styles = StyleSheet.create({
   packCardTitle: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 16,
+    lineHeight: 20,
   },
   packCardSubtitle: {
     color: "rgba(255,255,255,0.74)",
@@ -5539,6 +5570,18 @@ const styles = StyleSheet.create({
   packPlannerBlock: {
     gap: 10,
   },
+  packPlannerMoreToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 6,
+  },
+  packPlannerMoreToggleText: {
+    color: "rgba(255,255,255,0.62)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12.5,
+  },
   packPlannerLabel: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
@@ -5598,13 +5641,13 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   packPlannerPaletteCard: {
-    width: 156,
-    borderRadius: 12,
+    width: 96,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 10,
-    gap: 6,
+    padding: 9,
+    gap: 8,
   },
   packPlannerPaletteCustomCard: {
     borderStyle: "dashed",
@@ -5616,6 +5659,8 @@ const styles = StyleSheet.create({
   packPlannerPaletteCustomIconWrap: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    height: 22,
     gap: 6,
   },
   packPlannerPaletteSwatches: {
@@ -5624,7 +5669,7 @@ const styles = StyleSheet.create({
   },
   packPlannerPaletteSwatch: {
     flex: 1,
-    height: 18,
+    height: 22,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.24)",
