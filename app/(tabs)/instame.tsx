@@ -710,7 +710,7 @@ export default function InstaMeScreen() {
   const [pipelinePlan, setPipelinePlan] = useState<PipelinePlanState | null>(null);
   const [selectedPipelineShotPositions, setSelectedPipelineShotPositions] = useState<number[]>([]);
   const [pipelineContinuityContext, setPipelineContinuityContext] = useState<null | {
-    aesthetic: string; palette: string; lightType: string; usedScenes: string[]; usedHairstyles: string[];
+    aesthetic: string; palette: string; lightType: string; usedScenes: string[]; usedHairstyles: string[]; usedAngles: string[];
   }>(null);
   const [pipelineRenderResults, setPipelineRenderResults] = useState<Array<{ position: number; label: string; type: string; imageBase64: string }>>([]);
   const [pipelineError, setPipelineError] = useState<string | null>(null);
@@ -1855,7 +1855,7 @@ export default function InstaMeScreen() {
     void Haptics.selectionAsync();
   }, []);
 
-  const handleGenerateGridPreview = useCallback(async () => {
+  const handleGenerateGridPreview = useCallback(async (options?: { extend?: boolean }) => {
     if (!activePhotoPack) return;
     if (!photo) {
       Alert.alert("Portrait required", "Add a portrait above before generating this pack.");
@@ -1865,6 +1865,7 @@ export default function InstaMeScreen() {
       Alert.alert("Custom palette required", "Enter your custom color palette before generating the visual grid.");
       return;
     }
+    const extend = options?.extend === true && Boolean(pipelineContinuityContext);
     const aesthetic = GRID_PIPELINE_AESTHETICS.find((a) => a.id === activePhotoPack.id);
     const elementsNote =
       packBriefRequiredElementIds.length > 0
@@ -1893,6 +1894,7 @@ export default function InstaMeScreen() {
         extraNotes: extraNotes || undefined,
         hasPortraitReference: Boolean(photo),
         portrait: photo.base64,
+        continuityContext: extend && pipelineContinuityContext ? pipelineContinuityContext : undefined,
       });
       const previewBase64 = typeof result.gridImageBase64 === "string" ? result.gridImageBase64.trim() : "";
       if (!previewBase64) {
@@ -1917,6 +1919,7 @@ export default function InstaMeScreen() {
     isCustomPackPalette,
     selectedPackImageCount,
     selectedPackPalettePrompt,
+    pipelineContinuityContext,
   ]);
 
   const renderSelectedGridPackShots = useCallback(async (shotsToRender: PipelineShotPlanItem[]) => {
@@ -3458,12 +3461,31 @@ export default function InstaMeScreen() {
                             </Pressable>
                           ))}
                         </View>
+                        <Pressable
+                          onPress={() => void handleGenerateGridPreview({ extend: true })}
+                          disabled={packGridPreviewLoading || packGridRenderLoading}
+                          style={({ pressed }) => [
+                            styles.packPlannerPreviewButton,
+                            (packGridPreviewLoading || packGridRenderLoading || pressed) && { opacity: 0.6 },
+                          ]}
+                        >
+                          {packGridPreviewLoading ? (
+                            <ActivityIndicator size="small" color="#000" />
+                          ) : (
+                            <Ionicons name="add-circle-outline" size={14} color="#000" />
+                          )}
+                          <Text style={styles.packPlannerPreviewButtonText}>
+                            {packGridPreviewLoading
+                              ? "Building more for this pack\u2026"
+                              : `Get ${selectedPackImageCount} more \u2014 fresh & unique \u2014 ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
+                          </Text>
+                        </Pressable>
                       </View>
                     ) : null}
 
                     {!pipelinePlan ? (
                       <Pressable
-                        onPress={handleGenerateGridPreview}
+                        onPress={() => void handleGenerateGridPreview()}
                         disabled={packGridPreviewLoading}
                         style={({ pressed }) => [
                           styles.packPlannerPreviewButton,

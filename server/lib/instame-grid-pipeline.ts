@@ -79,6 +79,8 @@ export type GridContinuityContext = {
   usedScenes: string[];
   /** Condensed list of hairstyles already used */
   usedHairstyles: string[];
+  /** Condensed list of camera angles already used */
+  usedAngles: string[];
 };
 
 // ─── Aesthetic vocabulary (mirrors constants/gridPipelineAesthetics.ts) ──────
@@ -215,8 +217,8 @@ export function buildMasterGridSystemPrompt(inputs: GridPipelineUserInputs): str
   const vocabularyLine = getAestheticVocabularyLine(aesthetic);
 
   const portraitInstruction = hasPortraitReference
-    ? "A portrait reference image of the model WILL be passed to GPT Image 2 alongside each prompt. Each imagePrompt MUST include the instruction: 'Preserve the model's face and identity exactly from the provided reference image.'"
-    : "No portrait reference is available. Each imagePrompt should describe the model generically in a way that is consistent across all shots (same apparent age, skin tone, body type).";
+    ? "A portrait reference image of the model WILL be passed to GPT Image 2 alongside each prompt. Each imagePrompt MUST include the instruction: 'Preserve the model's face and identity exactly from the provided reference image.' IDENTITY IS LOCKED, EVERYTHING ELSE VARIES: keep the SAME face/identity across all shots, but every position with the model must show a DISTINCT outfit, pose, and expression. Never reuse the same wardrobe piece, pose, or facial expression twice, and never repeat the same look from a different angle."
+    : "No portrait reference is available. Each imagePrompt should describe the model generically in a way that is consistent across all shots (same apparent age, skin tone, body type), while still giving every shot a distinct outfit, pose, and expression.";
 
   return `You are an expert Instagram content strategist and AI photo director.
 Your ONLY task is to generate a structured JSON shot plan for a ${imageCount}-image Instagram grid.
@@ -251,6 +253,8 @@ Every position where the model appears MUST have:
   3. A different location or scene context
 
 NO two adjacent positions may share the same hairstyle OR the same angle.
+
+SUBJECT VARIETY (MANDATORY): every position must depict a DISTINCT subject/object/location. Never show the same object, prop, garment, or place twice — not even from a different distance, crop, or angle. Spread SIMPLE/object positions across different subject categories (e.g. accessory, food/drink, architecture detail, interior texture, outdoor element, wardrobe flat-lay) so the grid tells a varied story instead of repeating one motif.
 
 ═══════════════════════════════════════════════
 PORTRAIT REFERENCE
@@ -299,10 +303,12 @@ export function buildContinuityGridSystemPrompt(
 
   const usedScenesList = context.usedScenes.length > 0 ? context.usedScenes.join(", ") : "none";
   const usedHairstylesList = context.usedHairstyles.length > 0 ? context.usedHairstyles.join(", ") : "none";
+  const usedAnglesList =
+    Array.isArray(context.usedAngles) && context.usedAngles.length > 0 ? context.usedAngles.join(", ") : "none";
 
   const portraitInstruction = hasPortraitReference
-    ? "Portrait reference IS available. Include in each imagePrompt: 'Preserve the model's face and identity exactly from the provided reference image.'"
-    : "No portrait reference. Describe the model generically but consistently across all shots.";
+    ? "Portrait reference IS available. Include in each imagePrompt: 'Preserve the model's face and identity exactly from the provided reference image.' IDENTITY IS LOCKED, EVERYTHING ELSE VARIES: keep the SAME face/identity, but every new shot must show a DIFFERENT outfit, pose, expression, and styling than any previous image. Do NOT reuse a wardrobe piece, pose, or facial expression already used in earlier images of this pack. Never repeat the same look from a new angle — change the actual outfit and pose."
+    : "No portrait reference. Describe the model generically but consistently across all shots (same apparent age, skin tone, body type), while still varying outfit, pose, and expression in every shot.";
 
   return `You are an expert Instagram content strategist and AI photo director.
 You are continuing an existing Instagram grid. Your ONLY task is to generate a JSON shot plan for ${newImageCount} NEW images that extend the grid seamlessly.
@@ -316,6 +322,7 @@ Color palette: ${context.palette}
 Light type: ${context.lightType}
 ${vocabularyLine ? vocabularyLine + "\n" : ""}Already-used scenes (AVOID repeating these): ${usedScenesList}
 Already-used hairstyles (AVOID repeating these): ${usedHairstylesList}
+Already-used camera angles (AVOID repeating these): ${usedAnglesList}
 
 ═══════════════════════════════════════════════
 NEW GRID PARAMETERS
@@ -334,8 +341,10 @@ CONTINUITY RULES (MANDATORY)
 1. Keep IDENTICAL: palette (${context.palette}), light type (${context.lightType}), aesthetic mood.
 2. Use FRESH scenes — none of the already-used scenes above.
 3. Use FRESH hairstyles — none of the already-used hairstyles above. Choose from: ${HAIRSTYLE_BANK.join(", ")}.
-4. Use FRESH camera angles — vary from: ${ANGLE_BANK.join(", ")}.
+4. Use FRESH camera angles — none of the already-used angles above. Choose from: ${ANGLE_BANK.join(", ")}.
 5. SIMPLE positions must be pure minimalist object/texture shots — no model.
+6. NO RE-SHOOTING SUBJECTS (CRITICAL): treat the already-used scenes above as subjects/objects/props/locations that are now OFF-LIMITS. Do NOT re-depict any of them from a different distance, crop, zoom, or angle. Example: if a previous image already featured a wristwatch, this extension must NOT contain ANY watch — not closer, not farther, not from another angle. Pick entirely different objects and locations.
+7. EXPAND THE STORY: each new image must ADD a genuinely new narrative beat to the pack (new prop category, new wardrobe piece, new setting, new lifestyle moment, new texture). Across the whole extension, vary the subject categories (e.g. accessories, food/drink, architecture, interior detail, outdoor scene, wardrobe flat-lay) so the grid feels like the next chapter — never a re-run of the same motifs in new framing.
 
 ═══════════════════════════════════════════════
 PORTRAIT REFERENCE
@@ -547,10 +556,12 @@ export function parseGridPlan(rawJson: string, expectedCount: number): GridPlan 
 export function extractContinuityContext(plan: GridPlan): GridContinuityContext {
   const usedScenes: string[] = [];
   const usedHairstyles: string[] = [];
+  const usedAngles: string[] = [];
 
   for (const shot of plan.shots) {
     if (shot.label) usedScenes.push(shot.label);
     if (shot.hairstyle) usedHairstyles.push(shot.hairstyle);
+    if (shot.angle) usedAngles.push(shot.angle);
   }
 
   return {
@@ -559,6 +570,7 @@ export function extractContinuityContext(plan: GridPlan): GridContinuityContext 
     lightType: plan.lightType,
     usedScenes: [...new Set(usedScenes)],
     usedHairstyles: [...new Set(usedHairstyles)],
+    usedAngles: [...new Set(usedAngles)],
   };
 }
 

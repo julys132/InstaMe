@@ -6824,6 +6824,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             .map((hairstyle) => sanitizeGridPromptText(normalizeStringValue(hairstyle)))
             .filter(Boolean)
         : [],
+      usedAngles: Array.isArray(rawCtx.usedAngles)
+        ? rawCtx.usedAngles
+            .map((angle) => sanitizeGridPromptText(normalizeStringValue(angle)))
+            .filter(Boolean)
+        : [],
     };
     if (!ctx.aesthetic) {
       return res.status(400).json({ error: "continuityContext.aesthetic is required." });
@@ -6863,6 +6868,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .values(),
       ]
         .map((hairstyle) => sanitizeGridPromptText(hairstyle))
+        .filter(Boolean);
+      nextContinuityContext.usedAngles = [
+        ...new Set([...(ctx.usedAngles || []), ...nextContinuityContext.usedAngles])
+          .values(),
+      ]
+        .map((angle) => sanitizeGridPromptText(angle))
         .filter(Boolean);
 
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
@@ -6908,6 +6919,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const portrait: string | undefined =
       typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : undefined;
 
+    // Optional continuity context: when present, this preview is an EXTENSION of an
+    // existing pack. We plan FRESH shots that avoid every already-used scene/hairstyle
+    // and accumulate them so repeated extensions (xN) never duplicate content.
+    const rawCtx = body.continuityContext as GridContinuityContext | undefined;
+    const priorContext: GridContinuityContext | null =
+      rawCtx && typeof rawCtx === "object" && normalizeStringValue(rawCtx.aesthetic)
+        ? {
+            aesthetic: sanitizeGridPromptText(normalizeStringValue(rawCtx.aesthetic)),
+            palette: sanitizeGridPromptText(normalizeStringValue(rawCtx.palette)),
+            lightType: sanitizeGridPromptText(normalizeStringValue(rawCtx.lightType)),
+            usedScenes: Array.isArray(rawCtx.usedScenes)
+              ? rawCtx.usedScenes
+                  .map((scene) => sanitizeGridPromptText(normalizeStringValue(scene)))
+                  .filter(Boolean)
+              : [],
+            usedHairstyles: Array.isArray(rawCtx.usedHairstyles)
+              ? rawCtx.usedHairstyles
+                  .map((hairstyle) => sanitizeGridPromptText(normalizeStringValue(hairstyle)))
+                  .filter(Boolean)
+              : [],
+            usedAngles: Array.isArray(rawCtx.usedAngles)
+              ? rawCtx.usedAngles
+                  .map((angle) => sanitizeGridPromptText(normalizeStringValue(angle)))
+                  .filter(Boolean)
+              : [],
+          }
+        : null;
+
     const inputs: GridPipelineUserInputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
 
     await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
@@ -6920,7 +6959,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         process.env.AI_INTEGRATIONS_GEMINI_API_BASE_URL ||
         "https://generativelanguage.googleapis.com/v1beta";
 
-      const systemPrompt = buildMasterGridSystemPrompt(inputs);
+      // Use the continuity prompt when extending an existing pack so the new shots
+      // avoid all previously-used scenes/hairstyles; otherwise plan a fresh master grid.
+      const systemPrompt = priorContext
+        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, extraNotes)
+        : buildMasterGridSystemPrompt(inputs);
       const rawPlan = await callGeminiFlashText({
         systemPrompt,
         geminiApiBaseUrl,
@@ -6928,7 +6971,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         model: DEFAULT_STYLE_TEXT_MODEL,
       });
       const plan = parseGridPlan(rawPlan, imageCount);
-      const continuityContext = extractContinuityContext(plan);
+
+      // Accumulate prior + new used scenes/hairstyles so the NEXT extension stays unique.
+      const planContext = extractContinuityContext(plan);
+      const continuityContext: GridContinuityContext = priorContext
+        ? {
+            aesthetic: sanitizeGridPromptText(planContext.aesthetic) || priorContext.aesthetic,
+            palette: sanitizeGridPromptText(planContext.palette) || priorContext.palette,
+            lightType: sanitizeGridPromptText(planContext.lightType) || priorContext.lightType,
+            usedScenes: [...new Set([...priorContext.usedScenes, ...planContext.usedScenes])]
+              .map((scene) => sanitizeGridPromptText(scene))
+              .filter(Boolean),
+            usedHairstyles: [...new Set([...priorContext.usedHairstyles, ...planContext.usedHairstyles])]
+              .map((hairstyle) => sanitizeGridPromptText(hairstyle))
+              .filter(Boolean),
+            usedAngles: [...new Set([...priorContext.usedAngles, ...planContext.usedAngles])]
+              .map((angle) => sanitizeGridPromptText(angle))
+              .filter(Boolean),
+          }
+        : planContext;
 
       const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference));
 

@@ -891,6 +891,7 @@ class ApiClient {
         lightType: string;
         usedScenes: string[];
         usedHairstyles: string[];
+        usedAngles: string[];
       };
       creditsCharged: number;
       creditsRemaining: number;
@@ -940,6 +941,7 @@ class ApiClient {
       lightType: string;
       usedScenes: string[];
       usedHairstyles: string[];
+      usedAngles: string[];
     };
     hasPortraitReference?: boolean;
     extraNotes?: string;
@@ -965,6 +967,7 @@ class ApiClient {
         lightType: string;
         usedScenes: string[];
         usedHairstyles: string[];
+        usedAngles: string[];
       };
       creditsCharged: number;
       creditsRemaining: number;
@@ -988,6 +991,15 @@ class ApiClient {
     extraNotes?: string;
     hasPortraitReference?: boolean;
     portrait?: string; // base64
+    /** When present, this preview extends an existing pack and avoids prior scenes/hairstyles. */
+    continuityContext?: {
+      aesthetic: string;
+      palette: string;
+      lightType: string;
+      usedScenes: string[];
+      usedHairstyles: string[];
+      usedAngles: string[];
+    };
   }) {
     return this.request<{
       gridImageBase64: string;
@@ -1011,6 +1023,7 @@ class ApiClient {
         lightType: string;
         usedScenes: string[];
         usedHairstyles: string[];
+        usedAngles: string[];
       };
       imageCount: number;
       creditsCharged: number;
