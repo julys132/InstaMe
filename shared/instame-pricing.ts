@@ -175,6 +175,31 @@ export function toPublicInstaMePortraitEnhanceTier(
 
 export const INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS = 1;
 
+// ─── Instagram grid pipeline (content packs) pricing ─────────────────────────
+// Credits are aligned to the model's quality tier so packs are priced
+// consistently with standalone generations (no underpriced deliverables).
+
+/** GPT Image 2 is a premium-class model. */
+export const INSTAME_GRID_PIPELINE_RENDER_QUALITY_TIER: InstaMeQualityTier = "premium";
+
+/** Credits per rendered/extracted image, aligned to the model's quality tier. */
+export const INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST =
+  INSTAME_QUALITY_TIER_CREDITS[INSTAME_GRID_PIPELINE_RENDER_QUALITY_TIER];
+
+/** Gemini Flash planning step (master or continuity). */
+export const INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST = 1;
+
+/**
+ * Composite preview = Gemini plan + one premium composite render,
+ * so the preview at least covers its own model cost.
+ */
+export const INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST =
+  INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST + INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
+
+/** Credits per image extracted from the composite. */
+export const INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE =
+  INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
+
 export const INSTAME_GENERATION_TIERS: InstaMeGenerationTier[] = [
   {
     id: "good",

@@ -64,6 +64,8 @@ import {
 import {
   INSTAME_EDIT_TIERS,
   INSTAME_GENERATION_TIERS,
+  INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST,
+  INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
   INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS,
   INSTAME_PORTRAIT_ENHANCE_TIER,
   getInstaMeCreditsForQualityTier,
@@ -2082,7 +2084,7 @@ export default function InstaMeScreen() {
       excludedCount > 0 ? `Excluded: ${excludedCount} image${excludedCount === 1 ? "" : "s"}.` : "All pack images are selected.",
       "Order is strict: row 1 left-to-right, then row 2, then row 3.",
       `Extraction sequence: ${extractionOrder}.`,
-      `Cost: ${shotsToRender.length} credit${shotsToRender.length === 1 ? "" : "s"}.`,
+      `Cost: ${shotsToRender.length * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit${shotsToRender.length * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"}.`,
     ].join("\n");
 
     const startExtraction = () => {
@@ -3419,7 +3421,11 @@ export default function InstaMeScreen() {
                                 ? packGridExtractProgress
                                   ? `Extracting ${packGridExtractProgress.done}/${packGridExtractProgress.total}...`
                                   : "Extracting images..."
-                                : `Extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${selectedPipelineShotCount} credit${selectedPipelineShotCount === 1 ? "" : "s"}`}
+                                : (() => {
+                                    const extractCredits =
+                                      selectedPipelineShotCount * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+                                    return `Extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${extractCredits} credit${extractCredits === 1 ? "" : "s"}`;
+                                  })()}
                             </Text>
                           </Pressable>
                         ) : null}
@@ -3475,7 +3481,7 @@ export default function InstaMeScreen() {
                         <Text style={styles.packPlannerPreviewButtonText}>
                           {packGridPreviewLoading
                             ? "Generating visual grid preview\u2026"
-                            : "Generate visual grid preview \u2014 2 credits"}
+                            : `Generate visual grid preview \u2014 ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
                         </Text>
                       </Pressable>
                     ) : (

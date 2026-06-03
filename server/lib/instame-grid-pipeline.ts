@@ -13,6 +13,14 @@
  * maintaining palette + light + identity coherence.
  */
 
+import {
+  INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST,
+  INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
+  INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST,
+  INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST,
+  INSTAME_GRID_PIPELINE_RENDER_QUALITY_TIER,
+} from "../../shared/instame-pricing";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type GridPositionType = "COMPLEX" | "SIMPLE" | "MEDIUM";
@@ -556,17 +564,31 @@ export function extractContinuityContext(plan: GridPlan): GridContinuityContext 
 
 // ─── Credit constants ─────────────────────────────────────────────────────────
 
+/**
+ * Quality tier of the image model used by the grid pipeline render step.
+ * GPT Image 2 is a premium-class model, so each rendered image is priced the
+ * same as a premium standalone generation (see INSTAME_QUALITY_TIER_CREDITS).
+ */
+export const GRID_PIPELINE_RENDER_QUALITY_TIER = INSTAME_GRID_PIPELINE_RENDER_QUALITY_TIER;
+
+/** Credits per rendered/extracted image, aligned to the model's quality tier. */
+export const GRID_PIPELINE_IMAGE_CREDIT_COST = INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
+
 /** 1 credit for the Gemini Flash planning step (master or continuity) */
-export const GRID_PIPELINE_PLAN_CREDIT_COST = 1;
+export const GRID_PIPELINE_PLAN_CREDIT_COST = INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST;
 
-/** 1 credit per rendered image in Step 2 */
-export const GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = 1;
+/** Per-image render cost in Step 2, aligned to the premium quality tier */
+export const GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
 
-/** 2 credits for composite preview (Gemini plan + GPT composite render) */
-export const GRID_PIPELINE_COMPOSITE_CREDIT_COST = 2;
+/**
+ * Composite preview = Gemini plan (1) + one premium composite render.
+ * Priced so the preview at least covers its own model cost.
+ */
+export const GRID_PIPELINE_COMPOSITE_CREDIT_COST = INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST;
 
-/** 1 credit per image extracted from the composite */
-export const GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = 1;
+/** Credits per image extracted from the composite, aligned to the premium tier */
+export const GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE =
+  INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
 
 // ─── Grid position helpers ────────────────────────────────────────────────────
 

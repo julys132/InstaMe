@@ -1,6 +1,11 @@
 // Instagram Grid Pack — prompt building service
 // Handles brief → shot plan → individual prompts for preview and render.
 
+import {
+  INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST,
+  INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST,
+} from "../../shared/instame-pricing";
+
 export type GridPackIdentityMode = "portrait_reference" | "inspired_muse" | "fictional_muse";
 
 export type GridPackRequiredElementId =
@@ -459,10 +464,12 @@ export function buildGridShotRenderPrompt(options: {
 
 /**
  * Credits charged for a grid preview call (flat rate).
+ * Aligned to the premium quality tier (Gemini plan + composite render).
  */
-export const GRID_PREVIEW_CREDIT_COST = 2;
+export const GRID_PREVIEW_CREDIT_COST = INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST;
 
 /**
  * Credits per image for a grid render call.
+ * Aligned to the premium quality tier of the GPT Image model.
  */
-export const GRID_RENDER_CREDIT_COST_PER_IMAGE = 1;
+export const GRID_RENDER_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
