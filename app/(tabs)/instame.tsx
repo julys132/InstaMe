@@ -683,7 +683,7 @@ export default function InstaMeScreen() {
   );
   const [selectedStyleId, setSelectedStyleId] = useState<string>("");
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
-  const [styleSectionTab, setStyleSectionTab] = useState<"main" | "own" | "art">("main");
+  const [styleSectionTab, setStyleSectionTab] = useState<"main" | "packs" | "own" | "art">("main");
   const [selectedStyleVibeId, setSelectedStyleVibeId] = useState("all");
   const [selectedPhotoPackId, setSelectedPhotoPackId] = useState<string | null>(null);
   const [selectedPackBriefVibeId, setSelectedPackBriefVibeId] = useState("all");
@@ -2952,9 +2952,10 @@ export default function InstaMeScreen() {
         <View style={styles.sectionTabBarOuter}>
           <View style={styles.sectionTabBar}>
           {([  
-              { key: "main" as const, label: "Main Styles", icon: "sparkles" as const },
-              { key: "own" as const, label: "Clone Aesthetic", icon: "copy-outline" as const },
-              { key: "art" as const, label: "Art Styles", icon: "color-palette-outline" as const },
+              { key: "main" as const, label: "Styles", icon: "sparkles" as const },
+              { key: "packs" as const, label: "Packs", icon: "albums-outline" as const },
+              { key: "own" as const, label: "Clone", icon: "copy-outline" as const },
+              { key: "art" as const, label: "Art", icon: "color-palette-outline" as const },
             ]).map((tab) => {
               const active = styleSectionTab === tab.key;
               return (
@@ -3003,14 +3004,6 @@ export default function InstaMeScreen() {
                   </View>
                 </View>
                 <Text style={styles.vibeFeatureTagline}>{selectedStyleVibe.tagline}</Text>
-                {activePhotoPack ? (
-                  <View style={styles.vibeActivePackStrip}>
-                    <Ionicons name={activePhotoPack.icon as keyof typeof Ionicons.glyphMap} size={14} color={activePhotoPack.accent} />
-                    <Text style={styles.vibeActivePackText}>
-                      {activePhotoPack.label}: {activePhotoPack.example}
-                    </Text>
-                  </View>
-                ) : null}
               </LinearGradient>
 
               <ScrollView
@@ -3048,7 +3041,11 @@ export default function InstaMeScreen() {
                 })}
               </ScrollView>
             </View>
+          </>
+        ) : null}
 
+        {styleSectionTab === "packs" ? (
+          <>
             <View style={styles.packSection}>
               <View style={styles.packHeaderRow}>
                 <View style={{ flex: 1 }}>
@@ -3513,12 +3510,8 @@ export default function InstaMeScreen() {
           <View style={styles.collageSection}>
             <View style={styles.collageSectionHeader}>
               <View style={styles.collageSectionTitleWrap}>
-                <Text style={styles.collageSectionEyebrow}>
-                  {activePhotoPack ? `${selectedPackImageCount}-image direction` : "Style wall"}
-                </Text>
-                <Text style={styles.collageSectionTitle}>
-                  {activePhotoPack ? activePhotoPack.label : selectedStyleVibe.label}
-                </Text>
+                <Text style={styles.collageSectionEyebrow}>Style wall</Text>
+                <Text style={styles.collageSectionTitle}>{selectedStyleVibe.label}</Text>
               </View>
               <Text style={styles.collageSectionMeta}>{mainOnlyStylePresets.length} styles</Text>
             </View>
@@ -3778,7 +3771,7 @@ export default function InstaMeScreen() {
           </View>
         ) : null}
 
-        {styleSectionTab !== "main" ? (
+        {styleSectionTab === "own" || styleSectionTab === "art" ? (
           <View style={styles.studioSection}>
             <View style={styles.studioPortraitStrip}>
               <Text style={styles.studioPortraitLabel}>Add your portrait</Text>
@@ -4246,7 +4239,7 @@ export default function InstaMeScreen() {
           </View>
         ) : null}
 
-        {resultBase64 && styleSectionTab !== "main" ? (
+        {resultBase64 && (styleSectionTab === "own" || styleSectionTab === "art") ? (
           <View ref={resultCardRef} style={styles.card}>
             <Text style={styles.cardTitle}>Your result</Text>
             <Image
