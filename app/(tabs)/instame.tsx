@@ -279,7 +279,7 @@ const PACK_BRIEF_REQUIRED_ELEMENTS = [
   { id: "detail", label: "Detail crop" },
 ] as const;
 
-const PACK_BRIEF_FLOW_STEPS = ["Preset", "Brief", "Visual Grid", "Extract"] as const;
+const PACK_BRIEF_FLOW_STEPS = ["Pick a look", "Make it yours", "Preview", "Save"] as const;
 const PACK_BRIEF_NOTES_MAX_LENGTH = 220;
 
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
@@ -3048,13 +3048,15 @@ export default function InstaMeScreen() {
 
             <View style={styles.packSection}>
               <View style={styles.packHeaderRow}>
-                <View>
-                  <Text style={styles.packEyebrow}>Instagram content packs</Text>
-                  <Text style={styles.packTitle}>Build a coordinated pack brief</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.packEyebrow}>Content packs</Text>
+                  <Text style={styles.packTitle}>Create your photo pack ✨</Text>
                 </View>
-                <Text style={styles.packMetaText}>
-                  Step {packPlannerCurrentStep} of {PACK_BRIEF_FLOW_STEPS.length}
-                </Text>
+                <View style={styles.packStepBadge}>
+                  <Text style={styles.packStepBadgeText}>
+                    {packPlannerCurrentStep}/{PACK_BRIEF_FLOW_STEPS.length}
+                  </Text>
+                </View>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
                 {PHOTO_PACK_PRESETS.map((pack) => {
@@ -3114,29 +3116,33 @@ export default function InstaMeScreen() {
               </ScrollView>
 
               <View style={styles.packPlannerCard}>
-                <View style={styles.packPlannerStepsRow}>
-                  {PACK_BRIEF_FLOW_STEPS.map((stepLabel, index) => {
-                    const stepNumber = index + 1;
-                    return (
-                      <Text
-                        key={stepLabel}
-                        style={[
-                          styles.packPlannerStepText,
-                          stepNumber <= packPlannerCurrentStep && styles.packPlannerStepTextActive,
-                        ]}
-                      >
-                        {stepNumber}. {stepLabel}
-                      </Text>
-                    );
-                  })}
+                <View style={styles.packPlannerProgress}>
+                  <View style={styles.packPlannerProgressTrack}>
+                    {PACK_BRIEF_FLOW_STEPS.map((stepLabel, index) => {
+                      const stepNumber = index + 1;
+                      const reached = stepNumber <= packPlannerCurrentStep;
+                      return (
+                        <View
+                          key={stepLabel}
+                          style={[
+                            styles.packPlannerProgressSegment,
+                            reached && styles.packPlannerProgressSegmentActive,
+                          ]}
+                        />
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.packPlannerProgressLabel}>
+                    {PACK_BRIEF_FLOW_STEPS[packPlannerCurrentStep - 1]}
+                  </Text>
                 </View>
 
                 {!activePhotoPack ? (
                   <View style={styles.packPlannerEmptyState}>
-                    <Ionicons name="albums-outline" size={18} color="rgba(255,255,255,0.56)" />
-                    <Text style={styles.packPlannerEmptyTitle}>Choose a pack preset to begin</Text>
+                    <Ionicons name="sparkles-outline" size={20} color={Colors.accentLight} />
+                    <Text style={styles.packPlannerEmptyTitle}>Pick a pack to get started</Text>
                     <Text style={styles.packPlannerEmptySubtitle}>
-                      Select a preset, then choose 6, 9, or 12 images before preview.
+                      Tap a look above, then choose how many photos you want.
                     </Text>
                   </View>
                 ) : (
@@ -3149,7 +3155,7 @@ export default function InstaMeScreen() {
                     </View>
 
                     <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Image count (pack + extension)</Text>
+                      <Text style={styles.packPlannerLabel}>How many photos?</Text>
                       <View style={styles.packPlannerCountRow}>
                         {PACK_IMAGE_COUNT_OPTIONS.map((count) => {
                           const active = selectedPackImageCount === count;
@@ -3174,11 +3180,10 @@ export default function InstaMeScreen() {
                           );
                         })}
                       </View>
-                      <Text style={styles.packPlannerSelectionHint}>Applied to preview generation and continuity extension.</Text>
                     </View>
 
                     <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Color palette direction</Text>
+                      <Text style={styles.packPlannerLabel}>Choose your colors</Text>
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -3248,7 +3253,7 @@ export default function InstaMeScreen() {
                     </View>
 
                     <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Quick element tags</Text>
+                      <Text style={styles.packPlannerLabel}>Add a few details</Text>
                       <View style={styles.packPlannerElementWrap}>
                         {PACK_BRIEF_REQUIRED_ELEMENTS.map((element) => {
                           const active = packBriefRequiredElementIds.includes(element.id);
@@ -3272,7 +3277,7 @@ export default function InstaMeScreen() {
                     </View>
 
                     <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Must-have elements (optional)</Text>
+                      <Text style={styles.packPlannerLabel}>Anything else? (optional)</Text>
                       <TextInput
                         value={packBriefNotes}
                         onChangeText={setPackBriefNotes}
@@ -5097,13 +5102,26 @@ const styles = StyleSheet.create({
     marginTop: 3,
     color: "#FFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 20,
+    lineHeight: 25,
   },
   packMetaText: {
     color: "rgba(255,255,255,0.48)",
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
+  },
+  packStepBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    backgroundColor: "rgba(126,243,255,0.14)",
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.32)",
+  },
+  packStepBadgeText: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
   },
   packRail: {
     paddingHorizontal: 16,
@@ -5312,12 +5330,33 @@ const styles = StyleSheet.create({
   },
   packPlannerCard: {
     marginHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(12,12,16,0.95)",
-    padding: 12,
-    gap: 12,
+    padding: 16,
+    gap: 16,
+  },
+  packPlannerProgress: {
+    gap: 8,
+  },
+  packPlannerProgressTrack: {
+    flexDirection: "row",
+    gap: 5,
+  },
+  packPlannerProgressSegment: {
+    flex: 1,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+  packPlannerProgressSegmentActive: {
+    backgroundColor: "#7EF3FF",
+  },
+  packPlannerProgressLabel: {
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
   packPlannerStepsRow: {
     flexDirection: "row",
@@ -5341,24 +5380,26 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(126,243,255,0.15)",
   },
   packPlannerEmptyState: {
-    borderRadius: 14,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(255,255,255,0.03)",
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 22,
+    gap: 7,
+    alignItems: "center",
   },
   packPlannerEmptyTitle: {
     color: "#FFF",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
   },
   packPlannerEmptySubtitle: {
-    color: "rgba(255,255,255,0.66)",
+    color: "rgba(255,255,255,0.62)",
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     lineHeight: 18,
+    textAlign: "center",
   },
   packPlannerSummaryCard: {
     borderRadius: 14,
@@ -5496,12 +5537,12 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
   },
   packPlannerBlock: {
-    gap: 8,
+    gap: 10,
   },
   packPlannerLabel: {
     color: "#FFF",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
   },
   packPlannerVibeRail: {
     gap: 8,
@@ -5533,12 +5574,12 @@ const styles = StyleSheet.create({
   },
   packPlannerCountChip: {
     flex: 1,
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "rgba(255,255,255,0.04)",
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   packPlannerCountChipActive: {
     borderColor: "rgba(126,243,255,0.44)",
@@ -5547,7 +5588,7 @@ const styles = StyleSheet.create({
   packPlannerCountChipText: {
     color: "rgba(255,255,255,0.78)",
     fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontSize: 15,
   },
   packPlannerCountChipTextActive: {
     color: "#DFFFFF",
@@ -5625,8 +5666,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
   packPlannerElementChipActive: {
     borderColor: "rgba(255,79,125,0.52)",
@@ -5635,7 +5676,7 @@ const styles = StyleSheet.create({
   packPlannerElementChipText: {
     color: "rgba(255,255,255,0.72)",
     fontFamily: "Inter_500Medium",
-    fontSize: 11,
+    fontSize: 12,
   },
   packPlannerElementChipTextActive: {
     color: "#FFF",
