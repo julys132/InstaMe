@@ -2991,7 +2991,7 @@ export default function InstaMeScreen() {
               <View style={styles.vibeFeatureCard}>
                 <View style={styles.vibeFeatureTopRow}>
                   <View style={styles.vibeFeatureIcon}>
-                    <Ionicons name={selectedStyleVibe.icon as keyof typeof Ionicons.glyphMap} size={18} color="rgba(255,255,255,0.9)" />
+                    <Ionicons name={selectedStyleVibe.icon as keyof typeof Ionicons.glyphMap} size={16} color="rgba(255,255,255,0.9)" />
                   </View>
                   <View style={styles.vibeFeatureCopy}>
                     <Text style={styles.vibeFeatureEyebrow}>Curated style map</Text>
@@ -3001,7 +3001,7 @@ export default function InstaMeScreen() {
                     <Text style={styles.vibeFeatureCountText}>{selectedStyleVibeCount} looks</Text>
                   </View>
                 </View>
-                <Text style={styles.vibeFeatureTagline}>{selectedStyleVibe.tagline}</Text>
+                <Text numberOfLines={1} style={styles.vibeFeatureTagline}>{selectedStyleVibe.tagline}</Text>
               </View>
 
               <ScrollView
@@ -3026,7 +3026,7 @@ export default function InstaMeScreen() {
                         <View style={styles.vibeRailCardTop}>
                           <Ionicons
                             name={vibe.icon as keyof typeof Ionicons.glyphMap}
-                            size={15}
+                            size={13}
                             color={active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.5)"}
                           />
                           <Text style={[styles.vibeRailCount, active && styles.vibeRailCountActive]}>{count}</Text>
@@ -5001,13 +5001,14 @@ const styles = StyleSheet.create({
   libraryHint: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 },
   libraryHintMuted: { color: Colors.textDim, fontFamily: "Inter_400Regular", fontSize: 11 },
   vibeSection: {
-    marginTop: 14,
-    gap: 12,
+    marginTop: 8,
+    gap: 8,
   },
   vibeFeatureCard: {
     marginHorizontal: 16,
-    borderRadius: 24,
-    padding: 14,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(255,255,255,0.04)",
@@ -5016,12 +5017,12 @@ const styles = StyleSheet.create({
   vibeFeatureTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   vibeFeatureIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "rgba(255,255,255,0.04)",
@@ -5030,24 +5031,24 @@ const styles = StyleSheet.create({
   },
   vibeFeatureCopy: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   vibeFeatureEyebrow: {
     color: "rgba(255,255,255,0.52)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
+    fontSize: 9,
     textTransform: "uppercase",
-    letterSpacing: 1.2,
+    letterSpacing: 1,
   },
   vibeFeatureTitle: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 18,
+    lineHeight: 22,
   },
   vibeFeatureCountPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
@@ -5056,14 +5057,14 @@ const styles = StyleSheet.create({
   vibeFeatureCountText: {
     color: "rgba(255,255,255,0.82)",
     fontFamily: "Inter_700Bold",
-    fontSize: 11,
+    fontSize: 10,
   },
   vibeFeatureTagline: {
-    marginTop: 12,
-    color: "rgba(255,255,255,0.76)",
+    marginTop: 6,
+    color: "rgba(255,255,255,0.68)",
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: 12,
+    lineHeight: 15,
   },
   vibeActivePackStrip: {
     marginTop: 12,
@@ -5086,11 +5087,11 @@ const styles = StyleSheet.create({
   },
   vibeRail: {
     paddingHorizontal: 16,
-    gap: 10,
+    gap: 8,
   },
   vibeRailCard: {
-    width: 104,
-    borderRadius: 18,
+    width: 88,
+    borderRadius: 14,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.07)",
@@ -5101,8 +5102,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.07)",
   },
   vibeRailCardFill: {
-    minHeight: 82,
-    padding: 10,
+    minHeight: 66,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
     justifyContent: "space-between",
   },
   vibeRailCardTop: {
@@ -5113,7 +5115,7 @@ const styles = StyleSheet.create({
   vibeRailCount: {
     color: "rgba(255,255,255,0.45)",
     fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontSize: 11,
   },
   vibeRailCountActive: {
     color: "rgba(255,255,255,0.92)",
@@ -5121,8 +5123,8 @@ const styles = StyleSheet.create({
   vibeRailLabel: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 13,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 15,
   },
   vibeRailLabelInactive: {
     color: "rgba(255,255,255,0.7)",
