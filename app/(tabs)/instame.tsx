@@ -2988,15 +2988,10 @@ export default function InstaMeScreen() {
         {styleSectionTab === "main" ? (
           <>
             <View style={styles.vibeSection}>
-              <LinearGradient
-                colors={selectedStyleVibe.gradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.vibeFeatureCard}
-              >
+              <View style={styles.vibeFeatureCard}>
                 <View style={styles.vibeFeatureTopRow}>
-                  <View style={[styles.vibeFeatureIcon, { borderColor: selectedStyleVibe.accent }]}>
-                    <Ionicons name={selectedStyleVibe.icon as keyof typeof Ionicons.glyphMap} size={18} color={selectedStyleVibe.accent} />
+                  <View style={styles.vibeFeatureIcon}>
+                    <Ionicons name={selectedStyleVibe.icon as keyof typeof Ionicons.glyphMap} size={18} color="rgba(255,255,255,0.9)" />
                   </View>
                   <View style={styles.vibeFeatureCopy}>
                     <Text style={styles.vibeFeatureEyebrow}>Curated style map</Text>
@@ -3007,7 +3002,7 @@ export default function InstaMeScreen() {
                   </View>
                 </View>
                 <Text style={styles.vibeFeatureTagline}>{selectedStyleVibe.tagline}</Text>
-              </LinearGradient>
+              </View>
 
               <ScrollView
                 horizontal
@@ -3027,18 +3022,17 @@ export default function InstaMeScreen() {
                         pressed ? { opacity: 0.9, transform: [{ scale: 0.98 }] } : undefined,
                       ]}
                     >
-                      <LinearGradient
-                        colors={vibe.gradient}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.vibeRailCardFill}
-                      >
+                      <View style={styles.vibeRailCardFill}>
                         <View style={styles.vibeRailCardTop}>
-                          <Ionicons name={vibe.icon as keyof typeof Ionicons.glyphMap} size={15} color={vibe.accent} />
-                          <Text style={[styles.vibeRailCount, active && { color: vibe.accent }]}>{count}</Text>
+                          <Ionicons
+                            name={vibe.icon as keyof typeof Ionicons.glyphMap}
+                            size={15}
+                            color={active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.5)"}
+                          />
+                          <Text style={[styles.vibeRailCount, active && styles.vibeRailCountActive]}>{count}</Text>
                         </View>
-                        <Text numberOfLines={1} style={styles.vibeRailLabel}>{vibe.shortLabel}</Text>
-                      </LinearGradient>
+                        <Text numberOfLines={1} style={[styles.vibeRailLabel, !active && styles.vibeRailLabelInactive]}>{vibe.shortLabel}</Text>
+                      </View>
                     </Pressable>
                   );
                 })}
@@ -5015,7 +5009,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     overflow: "hidden",
   },
   vibeFeatureTopRow: {
@@ -5028,7 +5023,8 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     borderWidth: 1,
-    backgroundColor: "rgba(0,0,0,0.34)",
+    borderColor: "rgba(255,255,255,0.14)",
+    backgroundColor: "rgba(255,255,255,0.04)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -5053,9 +5049,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.34)",
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
+    borderColor: "rgba(255,255,255,0.1)",
   },
   vibeFeatureCountText: {
     color: "rgba(255,255,255,0.82)",
@@ -5097,11 +5093,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.07)",
+    backgroundColor: "rgba(255,255,255,0.03)",
   },
   vibeRailCardActive: {
-    borderColor: "rgba(255,255,255,0.42)",
+    borderColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(255,255,255,0.07)",
   },
   vibeRailCardFill: {
     minHeight: 82,
@@ -5114,15 +5111,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   vibeRailCount: {
-    color: "rgba(255,255,255,0.54)",
+    color: "rgba(255,255,255,0.45)",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
+  },
+  vibeRailCountActive: {
+    color: "rgba(255,255,255,0.92)",
   },
   vibeRailLabel: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
     fontSize: 13,
     lineHeight: 17,
+  },
+  vibeRailLabelInactive: {
+    color: "rgba(255,255,255,0.7)",
   },
   packSection: {
     marginTop: 18,
