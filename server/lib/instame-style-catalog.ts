@@ -120,6 +120,7 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
   const representativeImage =
     typeof record?.representativeImage === "string" ? record.representativeImage : "";
   const cover = typeof record?.cover === "string" ? record.cover : undefined;
+  const sourcePortrait = typeof record?.sourcePortrait === "string" ? record.sourcePortrait : undefined;
   const promptFile = typeof record?.promptFile === "string" ? record.promptFile : undefined;
   const promptFileFallbackText = readPromptFileText(promptFile);
   const examples = Array.isArray(record?.examples)
@@ -157,6 +158,7 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
     promptHint,
     cover,
     representativeImage,
+    sourcePortrait,
     examples,
     promptFile,
     promptVariants,

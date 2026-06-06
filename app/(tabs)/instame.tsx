@@ -4527,6 +4527,18 @@ export default function InstaMeScreen() {
                     <Text style={styles.modalFavoriteButtonText}>{isCurrentStyleFavorite ? "Favorited" : "Favorite"}</Text>
                   </Pressable>
                 ) : null}
+                {!isEnhancePreviewActive &&
+                previewStyleId !== INSTAME_OWN_STYLE_ID &&
+                previewStyle?.sourcePortrait &&
+                previewPanelImageUri ? (
+                  <View style={styles.modalHeroPortraitBadge}>
+                    <Image
+                      source={{ uri: previewStyle.sourcePortrait }}
+                      style={styles.modalHeroPortraitImage}
+                      contentFit="cover"
+                    />
+                  </View>
+                ) : null}
               </View>
 
               {!isEnhancePreviewActive ? (
@@ -8582,6 +8594,26 @@ const styles = StyleSheet.create({
   },
   modalHeroOverlay: {
     ...StyleSheet.absoluteFillObject,
+  },
+  modalHeroPortraitBadge: {
+    position: "absolute",
+    top: 14,
+    left: 14,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: "#FFC2DA",
+    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    shadowColor: "#FFC2DA",
+    shadowOpacity: 0.55,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  modalHeroPortraitImage: {
+    width: "100%",
+    height: "100%",
   },
   modalOwnStyleUploadCard: {
     ...StyleSheet.absoluteFillObject,

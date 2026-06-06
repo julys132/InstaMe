@@ -25,6 +25,8 @@ export type InstaMeStylePreset = {
   cover?: string;
   representativeImage: string;
   examples: string[];
+  /** Optional portrait reference that was used to generate the (newly added) representative image. */
+  sourcePortrait?: string;
   promptFile?: string;
   promptVariants?: InstaMePromptVariant[];
   promptOnlyAfterFirstUse?: boolean;

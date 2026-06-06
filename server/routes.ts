@@ -2514,6 +2514,7 @@ function toPublicStylePreset(req: Request, preset: InstaMeStylePreset): InstaMeS
     promptHint: preset.promptHint,
     cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
     representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
+    sourcePortrait: preset.sourcePortrait ? toCatalogAssetUrl(req, preset.sourcePortrait) : undefined,
     examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
     promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse,
     category: preset.category,
