@@ -302,6 +302,11 @@ function toPublicInstaMePortraitEnhanceTier(tier) {
   };
 }
 var INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS = 1;
+var INSTAME_GRID_PIPELINE_RENDER_QUALITY_TIER = "premium";
+var INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST = INSTAME_QUALITY_TIER_CREDITS[INSTAME_GRID_PIPELINE_RENDER_QUALITY_TIER];
+var INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST = 1;
+var INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST = INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST + INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
+var INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
 var INSTAME_GENERATION_TIERS = [
   {
     id: "good",
@@ -792,6 +797,7 @@ function normalizePreset(input) {
   const promptHint = typeof record?.promptHint === "string" ? record.promptHint : "";
   const representativeImage = typeof record?.representativeImage === "string" ? record.representativeImage : "";
   const cover = typeof record?.cover === "string" ? record.cover : void 0;
+  const sourcePortrait = typeof record?.sourcePortrait === "string" ? record.sourcePortrait : void 0;
   const promptFile = typeof record?.promptFile === "string" ? record.promptFile : void 0;
   const promptFileFallbackText = readPromptFileText(promptFile);
   const examples = Array.isArray(record?.examples) ? record.examples.filter((entry) => typeof entry === "string") : [];
@@ -818,6 +824,7 @@ function normalizePreset(input) {
     promptHint,
     cover,
     representativeImage,
+    sourcePortrait,
     examples,
     promptFile,
     promptVariants,
@@ -1663,8 +1670,8 @@ function buildGridShotRenderPrompt(options) {
     "Vertical 4:5 Instagram format. Photorealistic, natural iPhone or editorial photography. No AI artifacts. Premium but authentic feed image. Ready to post on Instagram."
   ].filter(Boolean).join(" ");
 }
-var GRID_PREVIEW_CREDIT_COST = 2;
-var GRID_RENDER_CREDIT_COST_PER_IMAGE = 1;
+var GRID_PREVIEW_CREDIT_COST = INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST;
+var GRID_RENDER_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
 
 // server/lib/instame-grid-pipeline.ts
 var PIPELINE_AESTHETIC_VOCABULARY = {
@@ -1776,7 +1783,7 @@ function buildMasterGridSystemPrompt(inputs) {
   const hairstyleList = HAIRSTYLE_BANK.join(", ");
   const angleList = ANGLE_BANK.join(", ");
   const vocabularyLine = getAestheticVocabularyLine(aesthetic);
-  const portraitInstruction = hasPortraitReference ? "A portrait reference image of the model WILL be passed to GPT Image 2 alongside each prompt. Each imagePrompt MUST include the instruction: 'Preserve the model's face and identity exactly from the provided reference image.'" : "No portrait reference is available. Each imagePrompt should describe the model generically in a way that is consistent across all shots (same apparent age, skin tone, body type).";
+  const portraitInstruction = hasPortraitReference ? "A portrait reference image of the model WILL be passed to GPT Image 2 alongside each prompt. Each imagePrompt MUST include the instruction: 'Preserve the model's face and identity exactly from the provided reference image.' IDENTITY IS LOCKED, EVERYTHING ELSE VARIES: keep the SAME face/identity across all shots, but every position with the model must show a DISTINCT outfit, pose, and expression. Never reuse the same wardrobe piece, pose, or facial expression twice, and never repeat the same look from a different angle." : "No portrait reference is available. Each imagePrompt should describe the model generically in a way that is consistent across all shots (same apparent age, skin tone, body type), while still giving every shot a distinct outfit, pose, and expression.";
   return `You are an expert Instagram content strategist and AI photo director.
 Your ONLY task is to generate a structured JSON shot plan for a ${imageCount}-image Instagram grid.
 You must output VALID JSON and NOTHING else \u2014 no markdown, no explanation, no code fences.
@@ -1811,6 +1818,8 @@ Every position where the model appears MUST have:
 
 NO two adjacent positions may share the same hairstyle OR the same angle.
 
+SUBJECT VARIETY (MANDATORY): every position must depict a DISTINCT subject/object/location. Never show the same object, prop, garment, or place twice \u2014 not even from a different distance, crop, or angle. Spread SIMPLE/object positions across different subject categories (e.g. accessory, food/drink, architecture detail, interior texture, outdoor element, wardrobe flat-lay) so the grid tells a varied story instead of repeating one motif.
+
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 PORTRAIT REFERENCE
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -1843,7 +1852,8 @@ function buildContinuityGridSystemPrompt(context, newImageCount, hasPortraitRefe
   const vocabularyLine = getAestheticVocabularyLine(context.aesthetic);
   const usedScenesList = context.usedScenes.length > 0 ? context.usedScenes.join(", ") : "none";
   const usedHairstylesList = context.usedHairstyles.length > 0 ? context.usedHairstyles.join(", ") : "none";
-  const portraitInstruction = hasPortraitReference ? "Portrait reference IS available. Include in each imagePrompt: 'Preserve the model's face and identity exactly from the provided reference image.'" : "No portrait reference. Describe the model generically but consistently across all shots.";
+  const usedAnglesList = Array.isArray(context.usedAngles) && context.usedAngles.length > 0 ? context.usedAngles.join(", ") : "none";
+  const portraitInstruction = hasPortraitReference ? "Portrait reference IS available. Include in each imagePrompt: 'Preserve the model's face and identity exactly from the provided reference image.' IDENTITY IS LOCKED, EVERYTHING ELSE VARIES: keep the SAME face/identity, but every new shot must show a DIFFERENT outfit, pose, expression, and styling than any previous image. Do NOT reuse a wardrobe piece, pose, or facial expression already used in earlier images of this pack. Never repeat the same look from a new angle \u2014 change the actual outfit and pose." : "No portrait reference. Describe the model generically but consistently across all shots (same apparent age, skin tone, body type), while still varying outfit, pose, and expression in every shot.";
   return `You are an expert Instagram content strategist and AI photo director.
 You are continuing an existing Instagram grid. Your ONLY task is to generate a JSON shot plan for ${newImageCount} NEW images that extend the grid seamlessly.
 Output VALID JSON and NOTHING else.
@@ -1856,6 +1866,7 @@ Color palette: ${context.palette}
 Light type: ${context.lightType}
 ${vocabularyLine ? vocabularyLine + "\n" : ""}Already-used scenes (AVOID repeating these): ${usedScenesList}
 Already-used hairstyles (AVOID repeating these): ${usedHairstylesList}
+Already-used camera angles (AVOID repeating these): ${usedAnglesList}
 
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 NEW GRID PARAMETERS
@@ -1874,8 +1885,10 @@ CONTINUITY RULES (MANDATORY)
 1. Keep IDENTICAL: palette (${context.palette}), light type (${context.lightType}), aesthetic mood.
 2. Use FRESH scenes \u2014 none of the already-used scenes above.
 3. Use FRESH hairstyles \u2014 none of the already-used hairstyles above. Choose from: ${HAIRSTYLE_BANK.join(", ")}.
-4. Use FRESH camera angles \u2014 vary from: ${ANGLE_BANK.join(", ")}.
+4. Use FRESH camera angles \u2014 none of the already-used angles above. Choose from: ${ANGLE_BANK.join(", ")}.
 5. SIMPLE positions must be pure minimalist object/texture shots \u2014 no model.
+6. NO RE-SHOOTING SUBJECTS (CRITICAL): treat the already-used scenes above as subjects/objects/props/locations that are now OFF-LIMITS. Do NOT re-depict any of them from a different distance, crop, zoom, or angle. Example: if a previous image already featured a wristwatch, this extension must NOT contain ANY watch \u2014 not closer, not farther, not from another angle. Pick entirely different objects and locations.
+7. EXPAND THE STORY: each new image must ADD a genuinely new narrative beat to the pack (new prop category, new wardrobe piece, new setting, new lifestyle moment, new texture). Across the whole extension, vary the subject categories (e.g. accessories, food/drink, architecture, interior detail, outdoor scene, wardrobe flat-lay) so the grid feels like the next chapter \u2014 never a re-run of the same motifs in new framing.
 
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 PORTRAIT REFERENCE
@@ -2019,22 +2032,25 @@ function parseGridPlan(rawJson, expectedCount) {
 function extractContinuityContext(plan) {
   const usedScenes = [];
   const usedHairstyles = [];
+  const usedAngles = [];
   for (const shot of plan.shots) {
     if (shot.label) usedScenes.push(shot.label);
     if (shot.hairstyle) usedHairstyles.push(shot.hairstyle);
+    if (shot.angle) usedAngles.push(shot.angle);
   }
   return {
     aesthetic: plan.aesthetic,
     palette: plan.palette,
     lightType: plan.lightType,
     usedScenes: [...new Set(usedScenes)],
-    usedHairstyles: [...new Set(usedHairstyles)]
+    usedHairstyles: [...new Set(usedHairstyles)],
+    usedAngles: [...new Set(usedAngles)]
   };
 }
-var GRID_PIPELINE_PLAN_CREDIT_COST = 1;
-var GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = 1;
-var GRID_PIPELINE_COMPOSITE_CREDIT_COST = 2;
-var GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = 1;
+var GRID_PIPELINE_PLAN_CREDIT_COST = INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST;
+var GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
+var GRID_PIPELINE_COMPOSITE_CREDIT_COST = INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST;
+var GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
 var GRID_COLS = 3;
 function buildCompositeGridPrompt(plan, hasPortraitReference) {
   const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
@@ -3745,6 +3761,7 @@ function toPublicStylePreset(req, preset) {
     promptHint: preset.promptHint,
     cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
     representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
+    sourcePortrait: preset.sourcePortrait ? toCatalogAssetUrl(req, preset.sourcePortrait) : void 0,
     examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
     promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse,
     category: preset.category
@@ -7026,7 +7043,8 @@ async function registerRoutes(app2) {
       palette: sanitizeGridPromptText(normalizeStringValue(rawCtx.palette)),
       lightType: sanitizeGridPromptText(normalizeStringValue(rawCtx.lightType)),
       usedScenes: Array.isArray(rawCtx.usedScenes) ? rawCtx.usedScenes.map((scene) => sanitizeGridPromptText(normalizeStringValue(scene))).filter(Boolean) : [],
-      usedHairstyles: Array.isArray(rawCtx.usedHairstyles) ? rawCtx.usedHairstyles.map((hairstyle) => sanitizeGridPromptText(normalizeStringValue(hairstyle))).filter(Boolean) : []
+      usedHairstyles: Array.isArray(rawCtx.usedHairstyles) ? rawCtx.usedHairstyles.map((hairstyle) => sanitizeGridPromptText(normalizeStringValue(hairstyle))).filter(Boolean) : [],
+      usedAngles: Array.isArray(rawCtx.usedAngles) ? rawCtx.usedAngles.map((angle) => sanitizeGridPromptText(normalizeStringValue(angle))).filter(Boolean) : []
     };
     if (!ctx.aesthetic) {
       return res.status(400).json({ error: "continuityContext.aesthetic is required." });
@@ -7055,6 +7073,9 @@ async function registerRoutes(app2) {
       nextContinuityContext.usedHairstyles = [
         ...(/* @__PURE__ */ new Set([...ctx.usedHairstyles || [], ...nextContinuityContext.usedHairstyles])).values()
       ].map((hairstyle) => sanitizeGridPromptText(hairstyle)).filter(Boolean);
+      nextContinuityContext.usedAngles = [
+        ...(/* @__PURE__ */ new Set([...ctx.usedAngles || [], ...nextContinuityContext.usedAngles])).values()
+      ].map((angle) => sanitizeGridPromptText(angle)).filter(Boolean);
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       planConsumed = false;
       return res.json({
@@ -7086,13 +7107,22 @@ async function registerRoutes(app2) {
     const extraNotes = sanitizeGridPromptText(normalizeStringValue(body.extraNotes) || "");
     const hasPortraitReference = body.hasPortraitReference === true;
     const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const rawCtx = body.continuityContext;
+    const priorContext = rawCtx && typeof rawCtx === "object" && normalizeStringValue(rawCtx.aesthetic) ? {
+      aesthetic: sanitizeGridPromptText(normalizeStringValue(rawCtx.aesthetic)),
+      palette: sanitizeGridPromptText(normalizeStringValue(rawCtx.palette)),
+      lightType: sanitizeGridPromptText(normalizeStringValue(rawCtx.lightType)),
+      usedScenes: Array.isArray(rawCtx.usedScenes) ? rawCtx.usedScenes.map((scene) => sanitizeGridPromptText(normalizeStringValue(scene))).filter(Boolean) : [],
+      usedHairstyles: Array.isArray(rawCtx.usedHairstyles) ? rawCtx.usedHairstyles.map((hairstyle) => sanitizeGridPromptText(normalizeStringValue(hairstyle))).filter(Boolean) : [],
+      usedAngles: Array.isArray(rawCtx.usedAngles) ? rawCtx.usedAngles.map((angle) => sanitizeGridPromptText(normalizeStringValue(angle))).filter(Boolean) : []
+    } : null;
     const inputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
     await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
     let consumed = true;
     try {
       const geminiApiKey = getGeminiApiKey();
       const geminiApiBaseUrl = process.env.GEMINI_API_BASE_URL || process.env.AI_INTEGRATIONS_GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
-      const systemPrompt = buildMasterGridSystemPrompt(inputs);
+      const systemPrompt = priorContext ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, extraNotes) : buildMasterGridSystemPrompt(inputs);
       const rawPlan = await callGeminiFlashText({
         systemPrompt,
         geminiApiBaseUrl,
@@ -7100,7 +7130,15 @@ async function registerRoutes(app2) {
         model: DEFAULT_STYLE_TEXT_MODEL
       });
       const plan = parseGridPlan(rawPlan, imageCount);
-      const continuityContext = extractContinuityContext(plan);
+      const planContext = extractContinuityContext(plan);
+      const continuityContext = priorContext ? {
+        aesthetic: sanitizeGridPromptText(planContext.aesthetic) || priorContext.aesthetic,
+        palette: sanitizeGridPromptText(planContext.palette) || priorContext.palette,
+        lightType: sanitizeGridPromptText(planContext.lightType) || priorContext.lightType,
+        usedScenes: [.../* @__PURE__ */ new Set([...priorContext.usedScenes, ...planContext.usedScenes])].map((scene) => sanitizeGridPromptText(scene)).filter(Boolean),
+        usedHairstyles: [.../* @__PURE__ */ new Set([...priorContext.usedHairstyles, ...planContext.usedHairstyles])].map((hairstyle) => sanitizeGridPromptText(hairstyle)).filter(Boolean),
+        usedAngles: [.../* @__PURE__ */ new Set([...priorContext.usedAngles, ...planContext.usedAngles])].map((angle) => sanitizeGridPromptText(angle)).filter(Boolean)
+      } : planContext;
       const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference));
       const compositeImages = [];
       if (portrait) {
