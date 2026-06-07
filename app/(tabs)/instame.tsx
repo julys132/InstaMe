@@ -685,6 +685,7 @@ export default function InstaMeScreen() {
   const [selectedArtStyleId, setSelectedArtStyleId] = useState<string>("");
   const [styleSectionTab, setStyleSectionTab] = useState<"main" | "packs" | "own" | "art">("main");
   const [selectedStyleVibeId, setSelectedStyleVibeId] = useState("all");
+  const [vibeMenuOpen, setVibeMenuOpen] = useState(false);
   const [selectedPhotoPackId, setSelectedPhotoPackId] = useState<string | null>(null);
   const [selectedPackBriefVibeId, setSelectedPackBriefVibeId] = useState("all");
   const [packBriefRequiredElementIds, setPackBriefRequiredElementIds] = useState<string[]>([]);
@@ -732,6 +733,7 @@ export default function InstaMeScreen() {
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
   const [isRetouchDrawerOpen, setIsRetouchDrawerOpen] = useState(false);
+  const [isPortraitDrawerOpen, setIsPortraitDrawerOpen] = useState(false);
   const [portraitEnhanceCandidate, setPortraitEnhanceCandidate] = useState<UploadedPhoto | null>(null);
   const [portraitEnhanceLoading, setPortraitEnhanceLoading] = useState(false);
   const [usingEnhancedPortrait, setUsingEnhancedPortrait] = useState(false);
@@ -1795,6 +1797,7 @@ export default function InstaMeScreen() {
 
   const handleStyleVibePress = useCallback((vibeId: string) => {
     setSelectedStyleVibeId(vibeId);
+    setVibeMenuOpen(false);
     setSelectedPhotoPackId((currentPackId) => {
       const currentPack = PHOTO_PACK_PRESETS.find((pack) => pack.id === currentPackId);
       return currentPack && currentPack.vibeId === vibeId ? currentPackId : null;
@@ -2986,29 +2989,37 @@ export default function InstaMeScreen() {
         </View>
 
         {styleSectionTab === "main" ? (
-          <>
-            <View style={styles.vibeSection}>
-              <View style={styles.vibeFeatureCard}>
-                <View style={styles.vibeFeatureTopRow}>
-                  <View style={styles.vibeFeatureIcon}>
-                    <Ionicons name={selectedStyleVibe.icon as keyof typeof Ionicons.glyphMap} size={16} color="rgba(255,255,255,0.9)" />
-                  </View>
-                  <View style={styles.vibeFeatureCopy}>
-                    <Text style={styles.vibeFeatureEyebrow}>Curated style map</Text>
-                    <Text style={styles.vibeFeatureTitle}>{selectedStyleVibe.label}</Text>
-                  </View>
-                  <View style={styles.vibeFeatureCountPill}>
-                    <Text style={styles.vibeFeatureCountText}>{selectedStyleVibeCount} looks</Text>
-                  </View>
-                </View>
-                <Text numberOfLines={1} style={styles.vibeFeatureTagline}>{selectedStyleVibe.tagline}</Text>
+          <View style={styles.vibeSection}>
+            <Pressable
+              onPress={() => {
+                setVibeMenuOpen((open) => !open);
+                void Haptics.selectionAsync();
+              }}
+              style={({ pressed }) => [
+                styles.vibeSelector,
+                vibeMenuOpen && styles.vibeSelectorOpen,
+                pressed ? { opacity: 0.92 } : undefined,
+              ]}
+            >
+              <View style={styles.vibeSelectorIcon}>
+                <Ionicons name={selectedStyleVibe.icon as keyof typeof Ionicons.glyphMap} size={14} color="rgba(255,255,255,0.9)" />
               </View>
+              <View style={styles.vibeSelectorCopy}>
+                <Text style={styles.vibeSelectorEyebrow}>Category</Text>
+                <Text numberOfLines={1} style={styles.vibeSelectorTitle}>{selectedStyleVibe.label}</Text>
+              </View>
+              <View style={styles.vibeSelectorCountPill}>
+                <Text style={styles.vibeSelectorCountText}>{selectedStyleVibeCount}</Text>
+              </View>
+              <Ionicons
+                name={vibeMenuOpen ? "chevron-up" : "chevron-down"}
+                size={16}
+                color="rgba(255,255,255,0.6)"
+              />
+            </Pressable>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.vibeRail}
-              >
+            {vibeMenuOpen ? (
+              <View style={styles.vibeMenu}>
                 {STYLE_VIBE_CATEGORIES.map((vibe) => {
                   const active = selectedStyleVibeId === vibe.id;
                   const count = styleVibeCounts[vibe.id] ?? 0;
@@ -3017,28 +3028,25 @@ export default function InstaMeScreen() {
                       key={vibe.id}
                       onPress={() => handleStyleVibePress(vibe.id)}
                       style={({ pressed }) => [
-                        styles.vibeRailCard,
-                        active && styles.vibeRailCardActive,
-                        pressed ? { opacity: 0.9, transform: [{ scale: 0.98 }] } : undefined,
+                        styles.vibeMenuRow,
+                        active && styles.vibeMenuRowActive,
+                        pressed ? { opacity: 0.9 } : undefined,
                       ]}
                     >
-                      <View style={styles.vibeRailCardFill}>
-                        <View style={styles.vibeRailCardTop}>
-                          <Ionicons
-                            name={vibe.icon as keyof typeof Ionicons.glyphMap}
-                            size={13}
-                            color={active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.5)"}
-                          />
-                          <Text style={[styles.vibeRailCount, active && styles.vibeRailCountActive]}>{count}</Text>
-                        </View>
-                        <Text numberOfLines={1} style={[styles.vibeRailLabel, !active && styles.vibeRailLabelInactive]}>{vibe.shortLabel}</Text>
-                      </View>
+                      <Ionicons
+                        name={vibe.icon as keyof typeof Ionicons.glyphMap}
+                        size={14}
+                        color={active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.5)"}
+                      />
+                      <Text numberOfLines={1} style={[styles.vibeMenuRowLabel, !active && styles.vibeMenuRowLabelInactive]}>{vibe.label}</Text>
+                      <Text style={[styles.vibeMenuRowCount, active && styles.vibeMenuRowCountActive]}>{count}</Text>
+                      {active ? <Ionicons name="checkmark" size={14} color={Colors.accent} /> : null}
                     </Pressable>
                   );
                 })}
-              </ScrollView>
-            </View>
-          </>
+              </View>
+            ) : null}
+          </View>
         ) : null}
 
         {styleSectionTab === "packs" ? (
@@ -3665,9 +3673,6 @@ export default function InstaMeScreen() {
                                     },
                                   ]}
                                 />
-                                <View pointerEvents="none" style={styles.collageTileCaption}>
-                                  <Text numberOfLines={2} style={styles.collageTileCaptionText}>{item.label}</Text>
-                                </View>
                               </View>
                             </View>
                           </Pressable>
@@ -3770,9 +3775,6 @@ export default function InstaMeScreen() {
                                       },
                                     ]}
                                   />
-                                  <View pointerEvents="none" style={styles.collageTileCaption}>
-                                    <Text numberOfLines={2} style={styles.collageTileCaptionText}>{item.label}</Text>
-                                  </View>
                                 </>
                               )}
                             </View>
@@ -4187,9 +4189,6 @@ export default function InstaMeScreen() {
                                         },
                                       ]}
                                     />
-                                    <View pointerEvents="none" style={styles.collageTileCaption}>
-                                      <Text numberOfLines={2} style={styles.collageTileCaptionText}>{item.label}</Text>
-                                    </View>
                                   </View>
                                 </View>
                               </Pressable>
@@ -4598,8 +4597,31 @@ export default function InstaMeScreen() {
               ) : null}
 
               <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Add your portrait</Text>
-                <View style={styles.portraitButtonGrid}>
+                <Pressable
+                  onPress={() => setIsPortraitDrawerOpen((prev) => !prev)}
+                  style={({ pressed }) => [
+                    styles.modalRetouchToggle,
+                    pressed ? { opacity: 0.9 } : undefined,
+                  ]}
+                >
+                  <View style={styles.modalRetouchToggleCopy}>
+                    <Text style={styles.modalRetouchToggleTitle}>Add your portrait</Text>
+                    <Text style={styles.modalRetouchToggleSubtitle}>
+                      Upload, pick a saved portrait, or enhance your base.
+                    </Text>
+                  </View>
+                  <View style={styles.modalRetouchToggleIconWrap}>
+                    <Ionicons
+                      name={isPortraitDrawerOpen ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      color={Colors.accentPale}
+                    />
+                  </View>
+                </Pressable>
+
+                {isPortraitDrawerOpen ? (
+                  <View style={styles.modalRetouchDrawer}>
+                    <View style={styles.portraitButtonGrid}>
                   <Pressable onPress={pickImage} style={styles.portraitSourceCard}>
                     <Ionicons name="cloud-upload-outline" size={16} color={Colors.accentPale} />
                     <Text numberOfLines={1} style={styles.portraitSourceCardText}>Upload</Text>
@@ -4695,6 +4717,8 @@ export default function InstaMeScreen() {
                   </View>
                 ) : null}
                 {usingEnhancedPortrait ? <Text style={styles.editorInlineHint}>Enhanced portrait active.</Text> : null}
+                  </View>
+                ) : null}
               </View>
 
               {isEnhancePreviewActive ? (
@@ -5016,68 +5040,100 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 8,
   },
-  vibeFeatureCard: {
+  vibeSelector: {
     marginHorizontal: 16,
-    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(255,255,255,0.04)",
-    overflow: "hidden",
   },
-  vibeFeatureTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  vibeSelectorOpen: {
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  vibeFeatureIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  vibeSelectorIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
     backgroundColor: "rgba(255,255,255,0.04)",
     alignItems: "center",
     justifyContent: "center",
   },
-  vibeFeatureCopy: {
+  vibeSelectorCopy: {
     flex: 1,
     gap: 1,
   },
-  vibeFeatureEyebrow: {
+  vibeSelectorEyebrow: {
     color: "rgba(255,255,255,0.52)",
     fontFamily: "Inter_600SemiBold",
     fontSize: 9,
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  vibeFeatureTitle: {
+  vibeSelectorTitle: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 14,
+    lineHeight: 17,
   },
-  vibeFeatureCountPill: {
+  vibeSelectorCountPill: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.1)",
   },
-  vibeFeatureCountText: {
+  vibeSelectorCountText: {
     color: "rgba(255,255,255,0.82)",
     fontFamily: "Inter_700Bold",
     fontSize: 10,
   },
-  vibeFeatureTagline: {
-    marginTop: 6,
-    color: "rgba(255,255,255,0.68)",
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    lineHeight: 15,
+  vibeMenu: {
+    marginHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    overflow: "hidden",
   },
+  vibeMenuRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  vibeMenuRowActive: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  vibeMenuRowLabel: {
+    flex: 1,
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  vibeMenuRowLabelInactive: {
+    color: "rgba(255,255,255,0.7)",
+  },
+  vibeMenuRowCount: {
+    color: "rgba(255,255,255,0.45)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  vibeMenuRowCountActive: {
+    color: "rgba(255,255,255,0.92)",
+  },
+
   vibeActivePackStrip: {
     marginTop: 12,
     flexDirection: "row",
@@ -8597,11 +8653,11 @@ const styles = StyleSheet.create({
   },
   modalHeroPortraitBadge: {
     position: "absolute",
-    top: 8,
-    left: 8,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    top: 0,
+    left: 0,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 3,
     borderColor: "#FFC2DA",
     overflow: "hidden",
@@ -8685,7 +8741,7 @@ const styles = StyleSheet.create({
   modalFavoriteButton: {
     position: "absolute",
     top: 56,
-    right: 8,
+    right: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
