@@ -6919,6 +6919,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const hasPortraitReference = body.hasPortraitReference === true;
     const portrait: string | undefined =
       typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : undefined;
+    const referenceImages: import("./lib/instame-image").RuntimeImageInput[] = Array.isArray(body.referenceImages)
+      ? (body.referenceImages as unknown[])
+          .slice(0, 3)
+          .flatMap((image: unknown): import("./lib/instame-image").RuntimeImageInput[] => {
+            if (!image || typeof image !== "object") return [];
+            const candidate = image as { base64?: unknown; mimeType?: unknown };
+            const base64 = typeof candidate.base64 === "string" ? candidate.base64.trim() : "";
+            if (!base64) return [];
+            const mimeType = typeof candidate.mimeType === "string" && candidate.mimeType.trim()
+              ? candidate.mimeType.trim()
+              : "image/jpeg";
+            return [{ base64, mimeType }];
+          })
+      : [];
 
     // Optional continuity context: when present, this preview is an EXTENSION of an
     // existing pack. We plan FRESH shots that avoid every already-used scene/hairstyle
@@ -6948,7 +6962,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         : null;
 
-    const inputs: GridPipelineUserInputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
+    const referenceImageNote = referenceImages.length > 0
+      ? `Use the attached product/scene reference image${referenceImages.length > 1 ? "s" : ""} as must-include visual material. Keep the items recognizable and naturally integrated across the grid; do not replace the portrait subject with the product references.`
+      : "";
+    const mergedExtraNotes = [extraNotes, referenceImageNote].filter(Boolean).join(" ");
+    const inputs: GridPipelineUserInputs = {
+      imageCount,
+      aesthetic,
+      palette,
+      lightType,
+      extraNotes: mergedExtraNotes,
+      hasPortraitReference,
+    };
 
     await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
     let consumed = true;
@@ -6963,7 +6988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use the continuity prompt when extending an existing pack so the new shots
       // avoid all previously-used scenes/hairstyles; otherwise plan a fresh master grid.
       const systemPrompt = priorContext
-        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, extraNotes)
+        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes)
         : buildMasterGridSystemPrompt(inputs);
       const rawPlan = await callGeminiFlashText({
         systemPrompt,
@@ -6998,6 +7023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (portrait) {
         compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
       }
+      compositeImages.push(...referenceImages);
 
       const compositeImageBase64 = await generateOpenAiImage({
         model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
@@ -7063,6 +7089,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const portrait: string | undefined =
       typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : undefined;
+    const referenceImages: import("./lib/instame-image").RuntimeImageInput[] = Array.isArray(body.referenceImages)
+        ? (body.referenceImages as unknown[])
+          .slice(0, 3)
+          .flatMap((image: unknown): import("./lib/instame-image").RuntimeImageInput[] => {
+            if (!image || typeof image !== "object") return [];
+            const candidate = image as { base64?: unknown; mimeType?: unknown };
+            const base64 = typeof candidate.base64 === "string" ? candidate.base64.trim() : "";
+            if (!base64) return [];
+            const mimeType = typeof candidate.mimeType === "string" && candidate.mimeType.trim()
+              ? candidate.mimeType.trim()
+              : "image/jpeg";
+            return [{ base64, mimeType }];
+          })
+      : [];
 
     const imageCount: number = plan.shots.length;
     const aesthetic = sanitizeGridPromptText(normalizeStringValue(plan.aesthetic) || "");
@@ -7089,6 +7129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (portrait) {
           images.push({ base64: portrait, mimeType: "image/jpeg" });
         }
+        images.push(...referenceImages);
 
         const safeShot = {
           ...shot,
@@ -7097,6 +7138,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           angle: shot.angle ? sanitizeGridPromptText(normalizeStringValue(shot.angle)) : null,
         };
 
+        const referenceImagePromptNote = referenceImages.length > 0
+          ? ` Attached product/scene reference image${referenceImages.length > 1 ? "s" : ""} must remain recognizable and naturally integrated if visible in this shot.`
+          : "";
         const primaryPrompt = sanitizeGridPromptText(buildExtractionPrompt({
           position: shot.position,
           imageCount,
@@ -7105,7 +7149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           aesthetic,
           palette,
           lightType,
-        }));
+        }) + referenceImagePromptNote);
 
         let generatedImageBase64: string | null = null;
         let shotFailed = false;

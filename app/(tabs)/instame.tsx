@@ -283,6 +283,7 @@ const PACK_BRIEF_REQUIRED_ELEMENTS = [
 
 const PACK_BRIEF_FLOW_STEPS = ["Pick a look", "Make it yours", "Preview", "Save"] as const;
 const PACK_BRIEF_NOTES_MAX_LENGTH = 220;
+const PACK_BRIEF_SCENE_IMAGES_MAX = 3;
 
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
 const PACK_CUSTOM_PALETTE_ID = "custom-palette";
@@ -690,6 +691,7 @@ export default function InstaMeScreen() {
   const [selectedPackBriefVibeId, setSelectedPackBriefVibeId] = useState("all");
   const [packBriefRequiredElementIds, setPackBriefRequiredElementIds] = useState<string[]>([]);
   const [packBriefNotes, setPackBriefNotes] = useState("");
+  const [packBriefSceneImages, setPackBriefSceneImages] = useState<Array<{ id: string; uri: string; base64: string; mimeType: string }>>([]);
   const [packBriefShowMore, setPackBriefShowMore] = useState(false);
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
   const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string | null>(null);
@@ -1837,6 +1839,39 @@ export default function InstaMeScreen() {
     void Haptics.selectionAsync();
   }, []);
 
+  const addPackBriefSceneImage = useCallback(async () => {
+    if (packBriefSceneImages.length >= PACK_BRIEF_SCENE_IMAGES_MAX) {
+      Alert.alert("Limit reached", `You can add up to ${PACK_BRIEF_SCENE_IMAGES_MAX} scene images.`);
+      return;
+    }
+    const asset = await pickRawImage();
+    if (!asset) return;
+
+    let prepared: PreparedUploadImage;
+    try {
+      prepared = await optimizeImageAsset(asset);
+    } catch (error: any) {
+      Alert.alert("Image error", error?.message || "Could not optimize this image.");
+      return;
+    }
+
+    setPackBriefSceneImages((current) => [
+      ...current,
+      {
+        id: `scene-${Date.now()}-${current.length}`,
+        uri: prepared.uri,
+        base64: prepared.base64,
+        mimeType: prepared.mimeType,
+      },
+    ]);
+    await Haptics.selectionAsync();
+  }, [packBriefSceneImages.length, pickRawImage]);
+
+  const removePackBriefSceneImage = useCallback((imageId: string) => {
+    setPackBriefSceneImages((current) => current.filter((image) => image.id !== imageId));
+    void Haptics.selectionAsync();
+  }, []);
+
   const togglePipelineShotSelection = useCallback((position: number) => {
     setSelectedPipelineShotPositions((current) =>
       current.includes(position) ? current.filter((item) => item !== position) : [...current, position],
@@ -1880,6 +1915,10 @@ export default function InstaMeScreen() {
     const extraNotes = [elementsNote, packBriefNotes.trim() ? `Must-have details: ${packBriefNotes.trim()}` : ""]
       .filter(Boolean)
       .join(" ");
+    const referenceImages = packBriefSceneImages.map((image) => ({
+      base64: image.base64,
+      mimeType: image.mimeType,
+    }));
     setPackGridPreviewLoading(true);
     setPackGridError(null);
     setPackGridPreviewBase64(null);
@@ -1897,6 +1936,7 @@ export default function InstaMeScreen() {
         extraNotes: extraNotes || undefined,
         hasPortraitReference: Boolean(photo),
         portrait: photo.base64,
+        referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
         continuityContext: extend && pipelineContinuityContext ? pipelineContinuityContext : undefined,
       });
       const previewBase64 = typeof result.gridImageBase64 === "string" ? result.gridImageBase64.trim() : "";
@@ -1915,6 +1955,7 @@ export default function InstaMeScreen() {
     }
   }, [
     activePhotoPack,
+    packBriefSceneImages,
     packBriefRequiredElementIds,
     packBriefNotes,
     photo,
@@ -1944,6 +1985,10 @@ export default function InstaMeScreen() {
     const positions = orderedShots.map((shot) => shot.position);
     const positionOrder = new Map<number, number>(orderedShots.map((shot, index) => [shot.position, index]));
     const portrait = photo.base64;
+    const referenceImages = packBriefSceneImages.map((image) => ({
+      base64: image.base64,
+      mimeType: image.mimeType,
+    }));
     const planPayload = {
       aesthetic: pipelinePlan.aesthetic,
       palette: pipelinePlan.palette,
@@ -1984,6 +2029,7 @@ export default function InstaMeScreen() {
               plan: planPayload,
               positions: [position],
               portrait,
+              referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
             });
 
             const extractedImages = Array.isArray(result.images) ? result.images : [];
@@ -2058,7 +2104,7 @@ export default function InstaMeScreen() {
       setPackGridExtractProgress(null);
       setPackGridRenderLoading(false);
     }
-  }, [activePhotoPack, pipelinePlan, photo, refreshCredits, packGridPreviewBase64]);
+  }, [activePhotoPack, pipelinePlan, photo, refreshCredits, packGridPreviewBase64, packBriefSceneImages]);
 
   const handleRenderGridPack = useCallback(() => {
     if (!activePhotoPack || !pipelinePlan) return;
@@ -3028,19 +3074,18 @@ export default function InstaMeScreen() {
                       key={vibe.id}
                       onPress={() => handleStyleVibePress(vibe.id)}
                       style={({ pressed }) => [
-                        styles.vibeMenuRow,
-                        active && styles.vibeMenuRowActive,
+                        styles.vibeMenuChip,
+                        active && styles.vibeMenuChipActive,
                         pressed ? { opacity: 0.9 } : undefined,
                       ]}
                     >
                       <Ionicons
                         name={vibe.icon as keyof typeof Ionicons.glyphMap}
-                        size={14}
+                        size={13}
                         color={active ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.5)"}
                       />
-                      <Text numberOfLines={1} style={[styles.vibeMenuRowLabel, !active && styles.vibeMenuRowLabelInactive]}>{vibe.label}</Text>
-                      <Text style={[styles.vibeMenuRowCount, active && styles.vibeMenuRowCountActive]}>{count}</Text>
-                      {active ? <Ionicons name="checkmark" size={14} color={Colors.accent} /> : null}
+                      <Text numberOfLines={1} style={[styles.vibeMenuChipLabel, !active && styles.vibeMenuChipLabelInactive]}>{vibe.label}</Text>
+                      <Text style={[styles.vibeMenuChipCount, active && styles.vibeMenuChipCountActive]}>{count}</Text>
                     </Pressable>
                   );
                 })}
@@ -3087,9 +3132,9 @@ export default function InstaMeScreen() {
                     >
                       {/* Background: diptych if 2+ images, single contain, or gradient fallback */}
                       {imgCount >= 2 ? (
-                        <Image source={pack.previewImages![0]} style={StyleSheet.absoluteFillObject as any} contentFit="contain" />
+                        <Image source={pack.previewImages![0] as any} style={StyleSheet.absoluteFillObject as any} contentFit="contain" />
                       ) : hasImages ? (
-                        <Image source={pack.previewImages![0]} style={StyleSheet.absoluteFillObject as any} contentFit="contain" />
+                        <Image source={pack.previewImages![0] as any} style={StyleSheet.absoluteFillObject as any} contentFit="contain" />
                       ) : (
                         <LinearGradient colors={pack.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject as any} />
                       )}
@@ -3312,6 +3357,36 @@ export default function InstaMeScreen() {
                             maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
                             style={styles.packPlannerNotesInput}
                           />
+                        </View>
+
+                        <View style={styles.packPlannerBlock}>
+                          <Text style={styles.packPlannerLabel}>Scene elements / products</Text>
+                          <Text style={styles.packPlannerHint}>
+                            Add photos of items you want featured in the shots - a product, outfit, or prop. We keep them faithful across the scenes.
+                          </Text>
+                          <View style={styles.packPlannerSceneWrap}>
+                            {packBriefSceneImages.map((image) => (
+                              <View key={image.id} style={styles.packPlannerSceneThumb}>
+                                <Image source={{ uri: image.uri }} style={StyleSheet.absoluteFillObject as any} contentFit="cover" />
+                                <Pressable
+                                  onPress={() => removePackBriefSceneImage(image.id)}
+                                  hitSlop={8}
+                                  style={styles.packPlannerSceneRemove}
+                                >
+                                  <Ionicons name="close" size={12} color="#FFF" />
+                                </Pressable>
+                              </View>
+                            ))}
+                            {packBriefSceneImages.length < PACK_BRIEF_SCENE_IMAGES_MAX ? (
+                              <Pressable
+                                onPress={() => void addPackBriefSceneImage()}
+                                style={({ pressed }) => [styles.packPlannerSceneAdd, pressed ? { opacity: 0.85 } : undefined]}
+                              >
+                                <Ionicons name="add" size={20} color="rgba(255,255,255,0.7)" />
+                                <Text style={styles.packPlannerSceneAddText}>Add</Text>
+                              </Pressable>
+                            ) : null}
+                          </View>
                         </View>
                       </>
                     ) : null}
@@ -4426,7 +4501,7 @@ export default function InstaMeScreen() {
               >
                 {images.map((src, i) => (
                   <View key={i} style={[styles.packLightboxPage, { width: viewportWidth }]}>
-                    <Image source={src} style={styles.packLightboxImage} contentFit="contain" />
+                    <Image source={src as any} style={styles.packLightboxImage} contentFit="contain" />
                   </View>
                 ))}
               </ScrollView>
@@ -5098,39 +5173,45 @@ const styles = StyleSheet.create({
   },
   vibeMenu: {
     marginHorizontal: 16,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(255,255,255,0.03)",
-    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
-  vibeMenuRow: {
+  vibeMenuChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(255,255,255,0.06)",
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
-  vibeMenuRowActive: {
-    backgroundColor: "rgba(255,255,255,0.06)",
+  vibeMenuChipActive: {
+    borderColor: "rgba(255,255,255,0.45)",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
-  vibeMenuRowLabel: {
-    flex: 1,
+  vibeMenuChipLabel: {
     color: "#FFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
   },
-  vibeMenuRowLabelInactive: {
+  vibeMenuChipLabelInactive: {
     color: "rgba(255,255,255,0.7)",
   },
-  vibeMenuRowCount: {
+  vibeMenuChipCount: {
     color: "rgba(255,255,255,0.45)",
     fontFamily: "Inter_700Bold",
-    fontSize: 11,
+    fontSize: 10,
   },
-  vibeMenuRowCountActive: {
+  vibeMenuChipCountActive: {
     color: "rgba(255,255,255,0.92)",
   },
 
@@ -5681,6 +5762,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 14,
   },
+  packPlannerHint: {
+    color: "rgba(255,255,255,0.56)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+  },
   packPlannerVibeRail: {
     gap: 8,
     paddingRight: 8,
@@ -5866,6 +5953,50 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     textAlignVertical: "top",
+  },
+  packPlannerSceneWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  packPlannerSceneThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  packPlannerSceneRemove: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.62)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+  packPlannerSceneAdd: {
+    width: 72,
+    height: 72,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+  },
+  packPlannerSceneAddText: {
+    color: "rgba(255,255,255,0.68)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   packPlannerDraftSummary: {
     borderRadius: 12,
@@ -8740,14 +8871,15 @@ const styles = StyleSheet.create({
   },
   modalFavoriteButton: {
     position: "absolute",
-    top: 56,
-    right: 16,
+    top: 16,
+    right: 56,
+    minHeight: 32,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     borderRadius: 999,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 6,
     backgroundColor: "rgba(0,0,0,0.42)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.10)",

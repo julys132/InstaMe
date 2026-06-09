@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-06T09:03:31.952746+01:00",
+    "generatedAt":  "2026-06-09T10:12:38.393Z",
     "sourceFolder":  "C:\\Users\\stiul\\OneDrive\\Pictures\\Screenshots\\Styles\\Styles Representative Image\\Instagramable Styles\\04.05.26",
     "presetCount":  208,
     "presets":  [
@@ -221,9 +221,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman in cinema with popcorn",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_008/Woman_in_cinema_with_popcorn_202605041927.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_008/Woman_in_cinema_with_popcorn_202605041927.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_008/Woman_in_cinema_with_popcorn_202606090910.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_008/Woman_in_cinema_with_popcorn_202606090910.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_008/Woman_in_cinema_with_popcorn_202606090910.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_008/Woman_in_cinema_with_popcorn_202605041927.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_008/prompt.txt",
@@ -241,7 +242,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_008/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_009",
@@ -249,9 +251,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman running on cliff",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_009/Woman_running_on_cliff_202605041927.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_009/Woman_running_on_cliff_202605041927.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_009/Woman_running_on_cliff_202606090914 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_009/Woman_running_on_cliff_202606090914 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_009/Woman_running_on_cliff_202606090914 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_009/Woman_running_on_cliff_202606090914.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_009/Woman_running_on_cliff_202605041927.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_009/prompt.txt",
@@ -269,7 +273,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_009/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_010",
@@ -305,9 +310,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Black and white portrait collage…",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_011/Black-and-white_portrait_collage…_202605041928.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_011/Black-and-white_portrait_collage…_202605041928.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_011/Black-and-white_portrait_collage…_202606090915 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_011/Black-and-white_portrait_collage…_202606090915 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_011/Black-and-white_portrait_collage…_202606090915 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_011/Black-and-white_portrait_collage…_202606090915.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_011/Black-and-white_portrait_collage…_202605041928.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_011/prompt.txt",
@@ -325,7 +332,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_011/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_012",
@@ -333,9 +341,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Девушка смотрит через сакуру",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_012/Девушка_смотрит_через_сакуру_202605041929.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_012/Девушка_смотрит_через_сакуру_202605041929.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_012/Девушка_смотрит_через_сакуру_202606090918 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_012/Девушка_смотрит_через_сакуру_202606090918 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_012/Девушка_смотрит_через_сакуру_202606090918 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_012/Девушка_смотрит_через_сакуру_202606090918.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_012/Девушка_смотрит_через_сакуру_202605041929.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_012/prompt.txt",
@@ -353,7 +363,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_012/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_013",
@@ -361,9 +372,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman in Mercedes with jewelry",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_013/Woman_in_Mercedes_with_jewelry_202605041930.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_013/Woman_in_Mercedes_with_jewelry_202605041930.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_013/Woman_in_Mercedes_with_jewelry_202606090920 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_013/Woman_in_Mercedes_with_jewelry_202606090920 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_013/Woman_in_Mercedes_with_jewelry_202606090920 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_013/Woman_in_Mercedes_with_jewelry_202606090920.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_013/Woman_in_Mercedes_with_jewelry_202605041930.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_013/prompt.txt",
@@ -381,7 +394,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_013/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_014",
@@ -389,9 +403,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Girl standing by wall",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_014/Girl_standing_by_wall_202605041931.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_014/Girl_standing_by_wall_202605041931.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_014/Girl_standing_by_wall_202606090921.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_014/Girl_standing_by_wall_202606090921.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_014/Girl_standing_by_wall_202606090921.jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_014/Girl_standing_by_wall_202606090922.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_014/Girl_standing_by_wall_202605041931.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_014/prompt.txt",
@@ -409,7 +425,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_014/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_015",
@@ -417,9 +434,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Girl holding wine on roof",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_015/Girl_holding_wine_on_roof_202605041931.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_015/Girl_holding_wine_on_roof_202605041931.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_015/Girl_holding_wine_on_roof_202606090921 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_015/Girl_holding_wine_on_roof_202606090921 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_015/Girl_holding_wine_on_roof_202606090921 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_015/Girl_holding_wine_on_roof_202606090921.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_015/Girl_holding_wine_on_roof_202605041931.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_015/prompt.txt",
@@ -437,7 +456,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_015/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_016",
@@ -445,9 +465,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman holding ranunculus flower",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_016/Woman_holding_ranunculus_flower_202605041932.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_016/Woman_holding_ranunculus_flower_202605041932.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_016/Woman_holding_ranunculus_flower_202606090924 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_016/Woman_holding_ranunculus_flower_202606090924 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_016/Woman_holding_ranunculus_flower_202606090924 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_016/Woman_holding_ranunculus_flower_202606090924.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_016/Woman_holding_ranunculus_flower_202605041932.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_016/prompt.txt",
@@ -465,7 +487,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_016/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_017",
@@ -473,9 +496,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "use my reference photo, transfer",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_017/use_my_reference_photo,_transfer_202605041933.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_017/use_my_reference_photo,_transfer_202605041933.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_017/Woman_seated_at_outdoor_cafe_202606090923 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_017/Woman_seated_at_outdoor_cafe_202606090923 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_017/Woman_seated_at_outdoor_cafe_202606090923 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_017/Woman_seated_at_outdoor_cafe_202606090923.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_017/use_my_reference_photo,_transfer_202605041933.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_017/prompt.txt",
@@ -493,7 +518,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_017/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_018",
@@ -501,9 +527,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman taking overhead selfie",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_018/Woman_taking_overhead_selfie_202605041933.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_018/Woman_taking_overhead_selfie_202605041933.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_018/Woman_wearing_corset_top_jeans_202606090924.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_018/Woman_wearing_corset_top_jeans_202606090924.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_018/Woman_wearing_corset_top_jeans_202606090924.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_018/Woman_taking_overhead_selfie_202605041933.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_018/prompt.txt",
@@ -521,7 +548,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_018/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_019",
@@ -529,9 +557,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman walking city night",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_019/Woman_walking_city_night_202605041934.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_019/Woman_walking_city_night_202605041934.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_019/Woman_walking_city_night_202606090926 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_019/Woman_walking_city_night_202606090926 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_019/Woman_walking_city_night_202606090926 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_019/Woman_walking_city_night_202606090926.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_019/Woman_walking_city_night_202605041934.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_019/prompt.txt",
@@ -549,7 +579,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_019/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_020",
@@ -557,9 +588,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Девушка в черном топе",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_020/Девушка_в_черном_топе_202605041935.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_020/Девушка_в_черном_топе_202605041935.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_020/Девушка_в_черном_топе_202606090926.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_020/Девушка_в_черном_топе_202606090926.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_020/Девушка_в_черном_топе_202606090926.jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_020/Девушка_в_черном_топе_202606090927.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_020/Девушка_в_черном_топе_202605041935.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_020/prompt.txt",
@@ -577,7 +610,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_020/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_021",
@@ -585,9 +619,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman leaning on retro scooter",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_021/Woman_leaning_on_retro_scooter_202605041935.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_021/Woman_leaning_on_retro_scooter_202605041935.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_021/Woman_leaning_on_retro_scooter_202606090927.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_021/Woman_leaning_on_retro_scooter_202606090927.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_021/Woman_leaning_on_retro_scooter_202606090927.jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_021/Woman_leaning_on_retro_scooter_202606090928.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_021/Woman_leaning_on_retro_scooter_202605041935.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_021/prompt.txt",
@@ -605,7 +641,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_021/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_022",
@@ -613,9 +650,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman sitting on sidewalk with",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_022/Woman_sitting_on_sidewalk_with_202605041936.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_022/Woman_sitting_on_sidewalk_with_202605041936.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_022/Woman_sitting_on_sidewalk_with_202606090935.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_022/Woman_sitting_on_sidewalk_with_202606090935.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_022/Woman_sitting_on_sidewalk_with_202606090935.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_022/Woman_sitting_on_sidewalk_with_202605041936.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_022/prompt.txt",
@@ -633,7 +671,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_022/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_023",
@@ -641,9 +680,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman in doorway luxury hotel",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_023/Woman_in_doorway_luxury_hotel_202605041936.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_023/Woman_in_doorway_luxury_hotel_202605041936.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_023/Woman_in_doorway_luxury_hotel_202606090938 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_023/Woman_in_doorway_luxury_hotel_202606090938 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_023/Woman_in_doorway_luxury_hotel_202606090938 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_023/Woman_in_doorway_luxury_hotel_202606090938.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_023/Woman_in_doorway_luxury_hotel_202605041936.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_023/prompt.txt",
@@ -661,7 +702,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_023/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_024",
@@ -669,9 +711,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "use my reference photo, transfer",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_024/use_my_reference_photo,_transfer_202605041937.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_024/use_my_reference_photo,_transfer_202605041937.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_024/Woman_taking_selfie_night_202606090939 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_024/Woman_taking_selfie_night_202606090939 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_024/Woman_taking_selfie_night_202606090939 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_024/Woman_taking_selfie_night_202606090939.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_024/use_my_reference_photo,_transfer_202605041937.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_024/prompt.txt",
@@ -689,7 +733,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_024/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_025",
@@ -697,9 +742,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Девушка среди цветущей магнолии",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_025/Девушка_среди_цветущей_магнолии_202605041938.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_025/Девушка_среди_цветущей_магнолии_202605041938.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_025/Девушка_среди_цветущей_магнолии_202606090940.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_025/Девушка_среди_цветущей_магнолии_202606090940.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_025/Девушка_среди_цветущей_магнолии_202606090940.jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_025/Девушка_среди_цветущей_магнолии_202606090941.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_025/Девушка_среди_цветущей_магнолии_202605041938.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_025/prompt.txt",
@@ -717,7 +764,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_025/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_026",
@@ -725,9 +773,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman drinking on stone ledge",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_026/Woman_drinking_on_stone_ledge_202605041938.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_026/Woman_drinking_on_stone_ledge_202605041938.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_026/Woman_drinking_on_stone_ledge_202606090943 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_026/Woman_drinking_on_stone_ledge_202606090943 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_026/Woman_drinking_on_stone_ledge_202606090943 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_026/Woman_drinking_on_stone_ledge_202606090943.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_026/Woman_drinking_on_stone_ledge_202605041938.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_026/prompt.txt",
@@ -745,7 +795,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_026/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_027",
@@ -753,9 +804,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Девушка сидит в машине",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_027/Девушка_сидит_в_машине_202605041939.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_027/Девушка_сидит_в_машине_202605041939.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_027/Девушка_сидит_в_машине_202606090942.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_027/Девушка_сидит_в_машине_202606090942.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_027/Девушка_сидит_в_машине_202606090942.jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_027/Девушка_сидит_в_машине_202606090943.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_027/Девушка_сидит_в_машине_202605041939.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_027/prompt.txt",
@@ -773,7 +826,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_027/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_028",
@@ -781,9 +835,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman sitting on sofa",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_028/Woman_sitting_on_sofa_202605041940.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_028/Woman_sitting_on_sofa_202605041940.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_028/Woman_sitting_on_sofa_202606090945 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_028/Woman_sitting_on_sofa_202606090945 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_028/Woman_sitting_on_sofa_202606090945 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_028/Woman_sitting_on_sofa_202606090945.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_028/Woman_sitting_on_sofa_202605041940.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_028/prompt.txt",
@@ -801,7 +857,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_028/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_029",
@@ -809,9 +866,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman sitting at table",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_029/Woman_sitting_at_table_202605041940.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_029/Woman_sitting_at_table_202605041940.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_029/Woman_sitting_at_table_202606090947 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_029/Woman_sitting_at_table_202606090947 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_029/Woman_sitting_at_table_202606090947 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_029/Woman_sitting_at_table_202606090947.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_029/Woman_sitting_at_table_202605041940.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_029/prompt.txt",
@@ -829,7 +888,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_029/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_030",
@@ -837,9 +897,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "используй мою фотографию в качестве",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_030/используй_мою_фотографию_в_качестве_202605041941.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_030/используй_мою_фотографию_в_качестве_202605041941.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_030/Девушка_с_пионами_в_квартире_202606090946.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_030/Девушка_с_пионами_в_квартире_202606090946.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_030/Девушка_с_пионами_в_квартире_202606090946.jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_030/Девушка_сидит_в_квартире_202606090950.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_030/используй_мою_фотографию_в_качестве_202605041941.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_030/prompt.txt",
@@ -857,7 +919,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_030/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_031",
@@ -865,9 +928,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Ultra realistic studio editorial photo, 9 16",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_031/Ultra-realistic_studio_editorial_photo,_9_16_202605041941.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_031/Ultra-realistic_studio_editorial_photo,_9_16_202605041941.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_031/Woman_sitting_on_sofa_motion_202606090952 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_031/Woman_sitting_on_sofa_motion_202606090952 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_031/Woman_sitting_on_sofa_motion_202606090952 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_031/Woman_sitting_on_sofa_motion_202606090952.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_031/Ultra-realistic_studio_editorial_photo,_9_16_202605041941.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_031/prompt.txt",
@@ -885,7 +950,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_031/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_032",
@@ -893,9 +959,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Фотореалистичный интимный портрет крупным планом",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_032/Фотореалистичный_интимный_портрет_крупным_планом__202605041942.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_032/Фотореалистичный_интимный_портрет_крупным_планом__202605041942.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_032/Мужчина_и_женщина_голубое_небо_202606090954 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_032/Мужчина_и_женщина_голубое_небо_202606090954 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_032/Мужчина_и_женщина_голубое_небо_202606090954 (1).jpeg",
                                          "assets/instame-style-presets/styles/women_040526_032/Фотореалистичный_интимный_портрет_крупным_планом__202605041942.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_032/prompt.txt",
@@ -913,7 +980,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_032/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_033",
@@ -921,9 +989,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman with Y2K makeup and",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_033/Woman_with_Y2K_makeup_and_202605041943.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_033/Woman_with_Y2K_makeup_and_202605041943.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_033/Woman_with_Y2K_makeup_and_202606090957 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_033/Woman_with_Y2K_makeup_and_202606090957 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_033/Woman_with_Y2K_makeup_and_202606090957 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_033/Woman_with_Y2K_makeup_and_202606090957.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_033/Woman_with_Y2K_makeup_and_202605041943.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_033/prompt.txt",
@@ -941,7 +1011,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_033/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_034",
@@ -949,9 +1020,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Фото девушки в стиле высокой",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_034/Фото_девушки_в_стиле_высокой_202605041943.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_034/Фото_девушки_в_стиле_высокой_202605041943.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_034/Девушка_в_стиле_высокой_моды_202606090956 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_034/Девушка_в_стиле_высокой_моды_202606090956 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_034/Девушка_в_стиле_высокой_моды_202606090956 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_034/Девушка_в_стиле_высокой_моды_202606090956.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_034/Фото_девушки_в_стиле_высокой_202605041943.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_034/prompt.txt",
@@ -969,7 +1042,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_034/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_035",
@@ -977,9 +1051,12 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Девушка в пиджаке смотрит камеру",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_035/Девушка_в_пиджаке_смотрит_камеру_202605041944.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_035/Девушка_в_пиджаке_смотрит_камеру_202605041944.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_035/Девушка_в_пиджаке_смотрит_камеру_202606090958 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_035/Девушка_в_пиджаке_смотрит_камеру_202606090958 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_035/Девушка_в_пиджаке_смотрит_камеру_202606090958 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_035/Девушка_в_пиджаке_смотрит_камеру_202606090958 (2).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_035/Девушка_в_пиджаке_смотрит_камеру_202606090958.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_035/Девушка_в_пиджаке_смотрит_камеру_202605041944.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_035/prompt.txt",
@@ -997,7 +1074,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_035/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_036",
@@ -1005,9 +1083,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Девушка сидит на террасе",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_036/Девушка_сидит_на_террасе_202605041944.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_036/Девушка_сидит_на_террасе_202605041944.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_036/Девушка_сидит_на_террасе_202606091002 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_036/Девушка_сидит_на_террасе_202606091002 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_036/Девушка_сидит_на_террасе_202606091002 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_036/Девушка_сидит_на_террасе_202606091002.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_036/Девушка_сидит_на_террасе_202605041944.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_036/prompt.txt",
@@ -1025,7 +1105,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_036/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_037",
@@ -1033,9 +1114,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "фото с прямой вспышкой, съёмка",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_037/фото_с_прямой_вспышкой,_съёмка_202605041945.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_037/фото_с_прямой_вспышкой,_съёмка_202605041945.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_037/Woman_in_black_top_jeans_202606091000.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_037/Woman_in_black_top_jeans_202606091000.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_037/Woman_in_black_top_jeans_202606091000.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_037/фото_с_прямой_вспышкой,_съёмка_202605041945.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_037/prompt.txt",
@@ -1053,7 +1135,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_037/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_038",
@@ -1061,9 +1144,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman sitting on steps",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_038/Woman_sitting_on_steps_202605041946.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_038/Woman_sitting_on_steps_202605041946.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_038/Woman_sitting_on_steps_evening_202606091002.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_038/Woman_sitting_on_steps_evening_202606091002.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_038/Woman_sitting_on_steps_evening_202606091002.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_038/Woman_sitting_on_steps_202605041946.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_038/prompt.txt",
@@ -1081,7 +1165,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_038/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_039",
@@ -1089,9 +1174,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Used uploaded photo, don’t change",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_039/Used_uploaded_photo,_don’t_change_202605041946.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_039/Used_uploaded_photo,_don’t_change_202605041946.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_039/Young_woman_on_black_sand_202606091004 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_039/Young_woman_on_black_sand_202606091004 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_039/Young_woman_on_black_sand_202606091004 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_039/Young_woman_on_black_sand_202606091004.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_039/Used_uploaded_photo,_don’t_change_202605041946.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_039/prompt.txt",
@@ -1109,7 +1196,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_039/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_040",
@@ -1117,9 +1205,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Используй загруженное изображение как СТРОГИЙ",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_040/Используй_загруженное_изображение_как_СТРОГИЙ_202605041947.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_040/Используй_загруженное_изображение_как_СТРОГИЙ_202605041947.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_040/Girl_wearing_cat_mask_202606091006.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_040/Girl_wearing_cat_mask_202606091006.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_040/Girl_wearing_cat_mask_202606091006.jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_040/Girl_wearing_cat_mask_202606091007.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_040/Используй_загруженное_изображение_как_СТРОГИЙ_202605041947.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_040/prompt.txt",
@@ -1137,7 +1227,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_040/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_041",
@@ -1145,9 +1236,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman crouching looking back",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_041/Woman_crouching_looking_back_202605041947.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_041/Woman_crouching_looking_back_202605041947.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_041/Woman_crouching_looking_back_202606091005 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_041/Woman_crouching_looking_back_202606091005 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_041/Woman_crouching_looking_back_202606091005 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_041/Woman_crouching_looking_back_202606091005.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_041/Woman_crouching_looking_back_202605041947.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_041/prompt.txt",
@@ -1165,7 +1258,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_041/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_042",
@@ -1173,9 +1267,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Girl selfie with flash",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_042/Girl_selfie_with_flash_202605041554.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_042/Girl_selfie_with_flash_202605041554.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_042/Woman_selfie_with_flash_202606091007.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_042/Woman_selfie_with_flash_202606091007.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_042/Woman_selfie_with_flash_202606091007.jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_042/Woman_selfie_with_flash_202606091008.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_042/Girl_selfie_with_flash_202605041554.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_042/prompt.txt",
@@ -1193,7 +1289,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_042/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_043",
@@ -1201,9 +1298,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman lying on bed",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_043/Woman_lying_on_bed_202605041949.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_043/Woman_lying_on_bed_202605041949.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_043/Woman_lying_on_bed_202606091010 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_043/Woman_lying_on_bed_202606091010 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_043/Woman_lying_on_bed_202606091010 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_043/Woman_lying_on_bed_202606091010.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_043/Woman_lying_on_bed_202605041949.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_043/prompt.txt",
@@ -1221,7 +1320,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_043/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_044",
@@ -1229,9 +1329,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman behind horse",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_044/Woman_behind_horse_202605041950.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_044/Woman_behind_horse_202605041950.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_044/Woman_behind_horse_202606091012 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_044/Woman_behind_horse_202606091012 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_044/Woman_behind_horse_202606091012 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_044/Woman_behind_horse_202606091012.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_044/Woman_behind_horse_202605041950.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_044/prompt.txt",
@@ -1249,7 +1351,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_044/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_045",
@@ -1257,9 +1360,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Girl with long hair sky",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_045/Girl_with_long_hair_sky_202605041950.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_045/Girl_with_long_hair_sky_202605041950.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_045/Girl_with_long_hair_sky_202606091015 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_045/Girl_with_long_hair_sky_202606091015 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_045/Girl_with_long_hair_sky_202606091015 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_045/Girl_with_long_hair_sky_202606091015.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_045/Girl_with_long_hair_sky_202605041950.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_045/prompt.txt",
@@ -1277,7 +1382,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_045/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_046",
@@ -1285,9 +1391,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman\u0027s face wet profile",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_046/Woman\u0027s_face_wet_profile_202605041951.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_046/Woman\u0027s_face_wet_profile_202605041951.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_046/Woman\u0027s_face_wet_profile_202606091018.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_046/Woman\u0027s_face_wet_profile_202606091018.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_046/Woman\u0027s_face_wet_profile_202606091018.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_046/Woman\u0027s_face_wet_profile_202605041951.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_046/prompt.txt",
@@ -1305,7 +1412,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_046/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_047",
@@ -1313,9 +1421,11 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman on crosswalk confident",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_047/Woman_on_crosswalk_confident_202605041951.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_047/Woman_on_crosswalk_confident_202605041951.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_047/Woman_on_crosswalk_confident_202606091020 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_047/Woman_on_crosswalk_confident_202606091020 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_047/Woman_on_crosswalk_confident_202606091020 (1).jpeg",
+                                         "assets/instame-style-presets/styles/women_040526_047/Woman_on_crosswalk_confident_202606091020.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_047/Woman_on_crosswalk_confident_202605041951.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_047/prompt.txt",
@@ -1333,7 +1443,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_047/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_048",
@@ -1341,9 +1452,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Red dress collage extreme close up",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_048/Red_dress_collage_extreme_close-up_202605041952.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_048/Red_dress_collage_extreme_close-up_202605041952.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_048/Woman\u0027s_face_collage_details_202606091023.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_048/Woman\u0027s_face_collage_details_202606091023.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_048/Woman\u0027s_face_collage_details_202606091023.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_048/Red_dress_collage_extreme_close-up_202605041952.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_048/prompt.txt",
@@ -1361,7 +1473,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_048/__source_portrait.png"
                     },
                     {
                         "id":  "women_040526_049",
@@ -1369,9 +1482,10 @@
                         "subtitle":  "Instagramable style preset",
                         "category":  "women",
                         "promptHint":  "Woman lying on fabric",
-                        "cover":  "assets/instame-style-presets/styles/women_040526_049/Woman_lying_on_fabric_202605041952.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_049/Woman_lying_on_fabric_202605041952.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/women_040526_049/Woman_lying_on_fabric_202606091026.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/women_040526_049/Woman_lying_on_fabric_202606091026.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/women_040526_049/Woman_lying_on_fabric_202606091026.jpeg",
                                          "assets/instame-style-presets/styles/women_040526_049/Woman_lying_on_fabric_202605041952.jpeg"
                                      ],
                         "promptFile":  "assets/instame-style-presets/styles/women_040526_049/prompt.txt",
@@ -1389,7 +1503,8 @@
                                                                        ]
                                                }
                                            ],
-                        "promptOnlyAfterFirstUse":  false
+                        "promptOnlyAfterFirstUse":  false,
+                        "sourcePortrait":  "assets/instame-style-presets/styles/women_040526_049/__source_portrait.png"
                     },
                     {
                         "id":  "flash_glove_closeup",

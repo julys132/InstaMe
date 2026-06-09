@@ -991,6 +991,7 @@ class ApiClient {
     extraNotes?: string;
     hasPortraitReference?: boolean;
     portrait?: string; // base64
+    referenceImages?: Array<{ base64: string; mimeType?: string }>;
     /** When present, this preview extends an existing pack and avoids prior scenes/hairstyles. */
     continuityContext?: {
       aesthetic: string;
@@ -1056,6 +1057,7 @@ class ApiClient {
     };
     positions: number[];
     portrait?: string; // base64
+    referenceImages?: Array<{ base64: string; mimeType?: string }>;
   }) {
     return this.request<{
       images: Array<{
