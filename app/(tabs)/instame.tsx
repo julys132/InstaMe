@@ -747,6 +747,7 @@ export default function InstaMeScreen() {
   const [editLoading, setEditLoading] = useState(false);
   const [collageTileAspectRatios, setCollageTileAspectRatios] = useState<Record<string, number>>({});
   const [collageTileImageOverrides, setCollageTileImageOverrides] = useState<Record<string, string>>({});
+  const [collageRotationTick, setCollageRotationTick] = useState(0);
   const [inlineGalleryType, setInlineGalleryType] = useState<"uploaded" | "enhanced" | null>(null);
   const [inlineGalleryImages, setInlineGalleryImages] = useState<InstaMeUploadedImage[]>([]);
   const [inlineGalleryLoading, setInlineGalleryLoading] = useState(false);
@@ -1566,7 +1567,9 @@ export default function InstaMeScreen() {
 
     const nextAspectRatio = width / height;
     setCollageTileAspectRatios((current) => {
-      if (current[styleId] && Math.abs(current[styleId] - nextAspectRatio) < 0.01) {
+      // Lock the tile aspect ratio to the first image that loads so the card does
+      // not jump in height while the representative images rotate.
+      if (current[styleId]) {
         return current;
       }
 
@@ -1575,6 +1578,14 @@ export default function InstaMeScreen() {
         [styleId]: nextAspectRatio,
       };
     });
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCollageRotationTick((tick) => tick + 1);
+    }, 3500);
+
+    return () => clearInterval(interval);
   }, []);
 
   const persistFavoriteKeys = useCallback(async (nextKeys: FavoriteStyleKey[]) => {
@@ -2246,6 +2257,7 @@ export default function InstaMeScreen() {
       id: ENHANCE_PREVIEW_CARD_ID,
       label: "Enhance your portrait",
       imageCandidates: getImageCandidates(portraitEnhanceCandidate?.uri, photo?.uri, ...fallbackPresetImageCandidates),
+      sourcePortrait: undefined as string | undefined,
       theme: getStyleCardTheme(INSTAME_OWN_STYLE_ID),
       active: isEnhancePreviewActive,
       onPress: handleEnhancePreviewPress,
@@ -2258,6 +2270,7 @@ export default function InstaMeScreen() {
       id: preset.id,
       label: preset.label,
       imageCandidates: getPresetImageCandidates(preset),
+      sourcePortrait: preset.sourcePortrait,
       theme: getStyleCardTheme(preset.id),
       active: selectedStyleId === preset.id,
       onPress: () => handleStylePresetPress(preset),
@@ -3636,7 +3649,12 @@ export default function InstaMeScreen() {
                       ]}
                     >
                       {column.map((item) => {
-                        const collageImageUri = collageTileImageOverrides[item.id] || item.imageCandidates[0] || "";
+                        const rotationCandidates = item.imageCandidates;
+                        const rotatedImageUri =
+                          rotationCandidates.length > 1
+                            ? rotationCandidates[collageRotationTick % rotationCandidates.length]
+                            : rotationCandidates[0];
+                        const collageImageUri = collageTileImageOverrides[item.id] || rotatedImageUri || "";
 
                         return (
                           <Pressable
@@ -3734,6 +3752,15 @@ export default function InstaMeScreen() {
                                   locations={[0, 0.32, 1]}
                                   style={styles.collageTileOverlay}
                                 />
+                                {item.sourcePortrait && collageImageUri ? (
+                                  <View style={styles.collageTilePortraitBadge}>
+                                    <Image
+                                      source={{ uri: item.sourcePortrait }}
+                                      style={styles.collageTilePortraitImage}
+                                      contentFit="cover"
+                                    />
+                                  </View>
+                                ) : null}
                                 <View
                                   style={[
                                     styles.collageTileGlow,
@@ -6726,6 +6753,26 @@ const styles = StyleSheet.create({
   },
   collageTileOverlay: {
     ...StyleSheet.absoluteFillObject,
+  },
+  collageTilePortraitBadge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    borderColor: "#FFC2DA",
+    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    shadowColor: "#FFC2DA",
+    shadowOpacity: 0.55,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  collageTilePortraitImage: {
+    width: "100%",
+    height: "100%",
   },
   collageHeroBadge: {
     position: "absolute",

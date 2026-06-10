@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-06-09T10:12:38.393Z",
+    "generatedAt":  "2026-06-10T08:36:05.899Z",
     "sourceFolder":  "C:\\Users\\stiul\\OneDrive\\Pictures\\Screenshots\\Styles\\Styles Representative Image\\Instagramable Styles\\04.05.26",
     "presetCount":  208,
     "presets":  [
@@ -1511,9 +1511,11 @@
                         "label":  "Flash Glove Closeup",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Flash Glove Closeup",
-                        "cover":  "assets/instame-style-presets/styles/flash_glove_closeup/Face_transfer_with_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/flash_glove_closeup/Face_transfer_with_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/flash_glove_closeup/Face_transfer_with_parameters_202606092240.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/flash_glove_closeup/Face_transfer_with_parameters_202606092240.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/flash_glove_closeup/Face_transfer_with_parameters_202606092240.jpeg",
+                                         "assets/instame-style-presets/styles/flash_glove_closeup/Face_transfer_with_parameters_202606092241.jpeg",
                                          "assets/instame-style-presets/styles/flash_glove_closeup/Face_transfer_with_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/flash_glove_closeup/Face_transfer_with_202604181110_2.jpeg"
                                      ],
@@ -1533,16 +1535,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/flash_glove_closeup/__source_portrait.png"
                     },
                     {
                         "id":  "night_corridor_fashion",
                         "label":  "Night Corridor Fashion",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Night Corridor Fashion",
-                        "cover":  "assets/instame-style-presets/styles/night_corridor_fashion/Fashion_lifestyle_shoot_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/night_corridor_fashion/Fashion_lifestyle_shoot_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/night_corridor_fashion/Fashion_lifestyle_shoot_dark_cor…_202606092241 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/night_corridor_fashion/Fashion_lifestyle_shoot_dark_cor…_202606092241 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/night_corridor_fashion/Fashion_lifestyle_shoot_dark_cor…_202606092241 (1).jpeg",
+                                         "assets/instame-style-presets/styles/night_corridor_fashion/Fashion_lifestyle_shoot_dark_cor…_202606092241.jpeg",
                                          "assets/instame-style-presets/styles/night_corridor_fashion/Fashion_lifestyle_shoot_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/night_corridor_fashion/Fashion_lifestyle_shoot_202604181110_2.jpeg"
                                      ],
@@ -1562,16 +1567,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/night_corridor_fashion/__source_portrait.png"
                     },
                     {
                         "id":  "fashion_portrait_lacquer",
                         "label":  "Fashion Portrait Lacquer",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Fashion Portrait Lacquer",
-                        "cover":  "assets/instame-style-presets/styles/fashion_portrait_lacquer/Fashion_portrait_woman_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/fashion_portrait_lacquer/Fashion_portrait_woman_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/fashion_portrait_lacquer/Fashion_portrait_woman_white_outfit_202606092242 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/fashion_portrait_lacquer/Fashion_portrait_woman_white_outfit_202606092242 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/fashion_portrait_lacquer/Fashion_portrait_woman_white_outfit_202606092242 (1).jpeg",
+                                         "assets/instame-style-presets/styles/fashion_portrait_lacquer/Fashion_portrait_woman_white_outfit_202606092242.jpeg",
                                          "assets/instame-style-presets/styles/fashion_portrait_lacquer/Fashion_portrait_woman_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/fashion_portrait_lacquer/Fashion_portrait_woman_202604181110_2.jpeg"
                                      ],
@@ -1591,16 +1599,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/fashion_portrait_lacquer/__source_portrait.png"
                     },
                     {
                         "id":  "mountain_selfie",
                         "label":  "Mountain Selfie",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Mountain Selfie",
-                        "cover":  "assets/instame-style-presets/styles/mountain_selfie/Girl_enjoying_mountain_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/mountain_selfie/Girl_enjoying_mountain_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/mountain_selfie/Girl_enjoying_mountain_view_202606092243.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/mountain_selfie/Girl_enjoying_mountain_view_202606092243.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/mountain_selfie/Girl_enjoying_mountain_view_202606092243.jpeg",
                                          "assets/instame-style-presets/styles/mountain_selfie/Girl_enjoying_mountain_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/mountain_selfie/Girl_enjoying_mountain_202604181110_2.jpeg"
                                      ],
@@ -1620,16 +1630,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/mountain_selfie/__source_portrait.png"
                     },
                     {
                         "id":  "car_selfie_khaki",
                         "label":  "Car Selfie Khaki",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Car Selfie Khaki",
-                        "cover":  "assets/instame-style-presets/styles/car_selfie_khaki/Girl_in_car_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/car_selfie_khaki/Girl_in_car_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/car_selfie_khaki/Girl_in_car_selfie_202606092244 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/car_selfie_khaki/Girl_in_car_selfie_202606092244 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/car_selfie_khaki/Girl_in_car_selfie_202606092244 (1).jpeg",
+                                         "assets/instame-style-presets/styles/car_selfie_khaki/Girl_in_car_selfie_202606092244.jpeg",
                                          "assets/instame-style-presets/styles/car_selfie_khaki/Girl_in_car_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/car_selfie_khaki/Girl_in_car_202604181110_2.jpeg"
                                      ],
@@ -1649,16 +1662,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/car_selfie_khaki/__source_portrait.png"
                     },
                     {
                         "id":  "girl_red_dress",
                         "label":  "Girl Red Dress",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Girl Red Dress",
-                        "cover":  "assets/instame-style-presets/styles/girl_red_dress/Girl_in_red_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/girl_red_dress/Girl_in_red_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/girl_red_dress/Girl_in_red_corset_top_202606092245 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/girl_red_dress/Girl_in_red_corset_top_202606092245 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/girl_red_dress/Girl_in_red_corset_top_202606092245 (1).jpeg",
+                                         "assets/instame-style-presets/styles/girl_red_dress/Girl_in_red_corset_top_202606092245.jpeg",
                                          "assets/instame-style-presets/styles/girl_red_dress/Girl_in_red_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/girl_red_dress/Girl_in_red_202604181110_2.jpeg"
                                      ],
@@ -1678,16 +1694,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/girl_red_dress/__source_portrait.png"
                     },
                     {
                         "id":  "street_back_denim",
                         "label":  "Street Back Denim",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Street Back Denim",
-                        "cover":  "assets/instame-style-presets/styles/street_back_denim/Girl_in_street_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/street_back_denim/Girl_in_street_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/street_back_denim/Girl_in_street_fashion_202606092245.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/street_back_denim/Girl_in_street_fashion_202606092245.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/street_back_denim/Girl_in_street_fashion_202606092245.jpeg",
                                          "assets/instame-style-presets/styles/street_back_denim/Girl_in_street_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/street_back_denim/Girl_in_street_202604181110_2.jpeg"
                                      ],
@@ -1707,16 +1725,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/street_back_denim/__source_portrait.png"
                     },
                     {
                         "id":  "bed_lying_cozy",
                         "label":  "Bed Lying Cozy",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Bed Lying Cozy",
-                        "cover":  "assets/instame-style-presets/styles/bed_lying_cozy/Girl_lying_in_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/bed_lying_cozy/Girl_lying_in_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/bed_lying_cozy/Girl_lying_in_bed_202606092246 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/bed_lying_cozy/Girl_lying_in_bed_202606092246 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/bed_lying_cozy/Girl_lying_in_bed_202606092246 (1).jpeg",
+                                         "assets/instame-style-presets/styles/bed_lying_cozy/Girl_lying_in_bed_202606092246.jpeg",
                                          "assets/instame-style-presets/styles/bed_lying_cozy/Girl_lying_in_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/bed_lying_cozy/Girl_lying_in_202604181110_2.jpeg"
                                      ],
@@ -1736,16 +1757,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/bed_lying_cozy/__source_portrait.png"
                     },
                     {
                         "id":  "embankment_night",
                         "label":  "Embankment Night",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Embankment Night",
-                        "cover":  "assets/instame-style-presets/styles/embankment_night/Girl_on_embankment_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/embankment_night/Girl_on_embankment_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/embankment_night/Girl_on_embankment_at_night_202606092247 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/embankment_night/Girl_on_embankment_at_night_202606092247 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/embankment_night/Girl_on_embankment_at_night_202606092247 (1).jpeg",
+                                         "assets/instame-style-presets/styles/embankment_night/Girl_on_embankment_at_night_202606092247.jpeg",
                                          "assets/instame-style-presets/styles/embankment_night/Girl_on_embankment_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/embankment_night/Girl_on_embankment_202604181110_2.jpeg"
                                      ],
@@ -1765,16 +1789,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/embankment_night/__source_portrait.png"
                     },
                     {
                         "id":  "standing_sunglasses",
                         "label":  "Standing Sunglasses",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Standing Sunglasses",
-                        "cover":  "assets/instame-style-presets/styles/standing_sunglasses/Girl_standing_with_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/standing_sunglasses/Girl_standing_with_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/standing_sunglasses/Girl_standing_with_back_camera_202606092247 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/standing_sunglasses/Girl_standing_with_back_camera_202606092247 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/standing_sunglasses/Girl_standing_with_back_camera_202606092247 (1).jpeg",
+                                         "assets/instame-style-presets/styles/standing_sunglasses/Girl_standing_with_back_camera_202606092247.jpeg",
                                          "assets/instame-style-presets/styles/standing_sunglasses/Girl_standing_with_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/standing_sunglasses/Girl_standing_with_202604181110_2.jpeg"
                                      ],
@@ -1794,16 +1821,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/standing_sunglasses/__source_portrait.png"
                     },
                     {
                         "id":  "selfie_taking_mirror",
                         "label":  "Selfie Taking Mirror",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Selfie Taking Mirror",
-                        "cover":  "assets/instame-style-presets/styles/selfie_taking_mirror/Girl_taking_selfie_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/selfie_taking_mirror/Girl_taking_selfie_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/selfie_taking_mirror/Girl_taking_selfie_in_mirror_202606092248.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/selfie_taking_mirror/Girl_taking_selfie_in_mirror_202606092248.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/selfie_taking_mirror/Girl_taking_selfie_in_mirror_202606092248.jpeg",
                                          "assets/instame-style-presets/styles/selfie_taking_mirror/Girl_taking_selfie_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/selfie_taking_mirror/Girl_taking_selfie_202604181110_2.jpeg"
                                      ],
@@ -1823,16 +1852,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/selfie_taking_mirror/__source_portrait.png"
                     },
                     {
                         "id":  "curlers_bed_room",
                         "label":  "Curlers Bed Room",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Curlers Bed Room",
-                        "cover":  "assets/instame-style-presets/styles/curlers_bed_room/Girl_with_curlers_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/curlers_bed_room/Girl_with_curlers_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/curlers_bed_room/Girl_with_curlers_preparing_202606092248 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/curlers_bed_room/Girl_with_curlers_preparing_202606092248 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/curlers_bed_room/Girl_with_curlers_preparing_202606092248 (1).jpeg",
+                                         "assets/instame-style-presets/styles/curlers_bed_room/Girl_with_curlers_preparing_202606092248.jpeg",
                                          "assets/instame-style-presets/styles/curlers_bed_room/Girl_with_curlers_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/curlers_bed_room/Girl_with_curlers_202604181110_2.jpeg"
                                      ],
@@ -1852,16 +1884,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/curlers_bed_room/__source_portrait.png"
                     },
                     {
                         "id":  "long_hair_night",
                         "label":  "Long Hair Night",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Long Hair Night",
-                        "cover":  "assets/instame-style-presets/styles/long_hair_night/Girl_with_long_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/long_hair_night/Girl_with_long_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/long_hair_night/Girl_with_long_hair_car_202606092250 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/long_hair_night/Girl_with_long_hair_car_202606092250 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/long_hair_night/Girl_with_long_hair_car_202606092250 (1).jpeg",
+                                         "assets/instame-style-presets/styles/long_hair_night/Girl_with_long_hair_car_202606092250.jpeg",
                                          "assets/instame-style-presets/styles/long_hair_night/Girl_with_long_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/long_hair_night/Girl_with_long_202604181110_2.jpeg"
                                      ],
@@ -1881,16 +1916,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/long_hair_night/__source_portrait.png"
                     },
                     {
                         "id":  "street_selfie_casual",
                         "label":  "Street Selfie Casual",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Street Selfie Casual",
-                        "cover":  "assets/instame-style-presets/styles/street_selfie_casual/Girl\u0027s_street_selfie_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/street_selfie_casual/Girl\u0027s_street_selfie_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/street_selfie_casual/Girl\u0027s_street_selfie_from_above_202606092250 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/street_selfie_casual/Girl\u0027s_street_selfie_from_above_202606092250 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/street_selfie_casual/Girl\u0027s_street_selfie_from_above_202606092250 (1).jpeg",
+                                         "assets/instame-style-presets/styles/street_selfie_casual/Girl\u0027s_street_selfie_from_above_202606092250.jpeg",
                                          "assets/instame-style-presets/styles/street_selfie_casual/Girl\u0027s_street_selfie_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/street_selfie_casual/Girl\u0027s_street_selfie_202604181110_2.jpeg"
                                      ],
@@ -1910,16 +1948,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/street_selfie_casual/__source_portrait.png"
                     },
                     {
                         "id":  "couple_fitting_room",
                         "label":  "Couple Fitting Room",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Couple Fitting Room",
-                        "cover":  "assets/instame-style-presets/styles/couple_fitting_room/Man_and_woman_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/couple_fitting_room/Man_and_woman_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/couple_fitting_room/Man_and_woman_in_fitting_202606092251 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/couple_fitting_room/Man_and_woman_in_fitting_202606092251 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/couple_fitting_room/Man_and_woman_in_fitting_202606092251 (1).jpeg",
+                                         "assets/instame-style-presets/styles/couple_fitting_room/Man_and_woman_in_fitting_202606092251.jpeg",
                                          "assets/instame-style-presets/styles/couple_fitting_room/Man_and_woman_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/couple_fitting_room/Man_and_woman_202604181110_2.jpeg"
                                      ],
@@ -1939,16 +1980,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/couple_fitting_room/__source_portrait.png"
                     },
                     {
                         "id":  "couple_mixed_style",
                         "label":  "Couple Mixed Style",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Couple Mixed Style",
-                        "cover":  "assets/instame-style-presets/styles/couple_mixed_style/Man_and_woman_202604181110_3.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/couple_mixed_style/Man_and_woman_202604181110_3.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/couple_mixed_style/Man_and_woman_embracing_202606092252 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/couple_mixed_style/Man_and_woman_embracing_202606092252 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/couple_mixed_style/Man_and_woman_embracing_202606092252 (1).jpeg",
+                                         "assets/instame-style-presets/styles/couple_mixed_style/Man_and_woman_embracing_202606092252.jpeg",
                                          "assets/instame-style-presets/styles/couple_mixed_style/Man_and_woman_202604181110_3.jpeg",
                                          "assets/instame-style-presets/styles/couple_mixed_style/Man_and_woman_202604181110_4.jpeg"
                                      ],
@@ -1968,16 +2012,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/couple_mixed_style/__source_portrait.png"
                     },
                     {
                         "id":  "woman_and_dog",
                         "label":  "Woman And Dog",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Woman And Dog",
-                        "cover":  "assets/instame-style-presets/styles/woman_and_dog/Woman_and_dog_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/woman_and_dog/Woman_and_dog_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/woman_and_dog/Woman_and_dog_photo_booth_202606092252 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/woman_and_dog/Woman_and_dog_photo_booth_202606092252 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/woman_and_dog/Woman_and_dog_photo_booth_202606092252 (1).jpeg",
+                                         "assets/instame-style-presets/styles/woman_and_dog/Woman_and_dog_photo_booth_202606092252.jpeg",
                                          "assets/instame-style-presets/styles/woman_and_dog/Woman_and_dog_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/woman_and_dog/Woman_and_dog_202604181110_2.jpeg"
                                      ],
@@ -1997,16 +2044,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/woman_and_dog/__source_portrait.png"
                     },
                     {
                         "id":  "blowing_kiss_selfie",
                         "label":  "Blowing Kiss Selfie",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Blowing Kiss Selfie",
-                        "cover":  "assets/instame-style-presets/styles/blowing_kiss_selfie/Woman_blowing_kiss_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/blowing_kiss_selfie/Woman_blowing_kiss_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/blowing_kiss_selfie/Woman_blowing_kiss_elevator_202606092253.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/blowing_kiss_selfie/Woman_blowing_kiss_elevator_202606092253.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/blowing_kiss_selfie/Woman_blowing_kiss_elevator_202606092253.jpeg",
                                          "assets/instame-style-presets/styles/blowing_kiss_selfie/Woman_blowing_kiss_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/blowing_kiss_selfie/Woman_blowing_kiss_202604181110_2.jpeg",
                                          "assets/instame-style-presets/styles/blowing_kiss_selfie/Woman_blowing_kiss_202604181110_3.jpeg",
@@ -2028,16 +2077,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/blowing_kiss_selfie/__source_portrait.png"
                     },
                     {
                         "id":  "bmw_night_drive",
                         "label":  "BMW Night Drive",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "BMW Night Drive",
-                        "cover":  "assets/instame-style-presets/styles/bmw_night_drive/Woman_driving_BMW_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/bmw_night_drive/Woman_driving_BMW_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/bmw_night_drive/Woman_driving_BMW_fast_202606092253.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/bmw_night_drive/Woman_driving_BMW_fast_202606092253.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/bmw_night_drive/Woman_driving_BMW_fast_202606092253.jpeg",
+                                         "assets/instame-style-presets/styles/bmw_night_drive/Woman_driving_BMW_fast_202606092254.jpeg",
                                          "assets/instame-style-presets/styles/bmw_night_drive/Woman_driving_BMW_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/bmw_night_drive/Woman_driving_BMW_202604181110_2.jpeg"
                                      ],
@@ -2057,16 +2109,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/bmw_night_drive/__source_portrait.png"
                     },
                     {
                         "id":  "face_closeup_flash",
                         "label":  "Face Closeup Flash",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Face Closeup Flash",
-                        "cover":  "assets/instame-style-presets/styles/face_closeup_flash/Woman_face_with_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/face_closeup_flash/Woman_face_with_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/face_closeup_flash/Woman_face_with_hand_202606092254.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/face_closeup_flash/Woman_face_with_hand_202606092254.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/face_closeup_flash/Woman_face_with_hand_202606092254.jpeg",
+                                         "assets/instame-style-presets/styles/face_closeup_flash/Woman_face_with_hand_202606092255.jpeg",
                                          "assets/instame-style-presets/styles/face_closeup_flash/Woman_face_with_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/face_closeup_flash/Woman_face_with_202604181110_2.jpeg"
                                      ],
@@ -2086,16 +2141,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/face_closeup_flash/__source_portrait.png"
                     },
                     {
                         "id":  "coffee_street_selfie",
                         "label":  "Coffee Street Selfie",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Coffee Street Selfie",
-                        "cover":  "assets/instame-style-presets/styles/coffee_street_selfie/Woman_holding_coffee_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/coffee_street_selfie/Woman_holding_coffee_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/coffee_street_selfie/Woman_holding_coffee_cup_202606092255 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/coffee_street_selfie/Woman_holding_coffee_cup_202606092255 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/coffee_street_selfie/Woman_holding_coffee_cup_202606092255 (1).jpeg",
+                                         "assets/instame-style-presets/styles/coffee_street_selfie/Woman_holding_coffee_cup_202606092255.jpeg",
                                          "assets/instame-style-presets/styles/coffee_street_selfie/Woman_holding_coffee_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/coffee_street_selfie/Woman_holding_coffee_202604181110_2.jpeg"
                                      ],
@@ -2115,16 +2173,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/coffee_street_selfie/__source_portrait.png"
                     },
                     {
                         "id":  "white_bag_street",
                         "label":  "White Bag Street",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "White Bag Street",
-                        "cover":  "assets/instame-style-presets/styles/white_bag_street/Woman_holding_white_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/white_bag_street/Woman_holding_white_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/white_bag_street/Woman_holding_white_peonies_birt…_202606100844 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/white_bag_street/Woman_holding_white_peonies_birt…_202606100844 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/white_bag_street/Woman_holding_white_peonies_birt…_202606100844 (1).jpeg",
+                                         "assets/instame-style-presets/styles/white_bag_street/Woman_holding_white_peonies_birt…_202606100844.jpeg",
                                          "assets/instame-style-presets/styles/white_bag_street/Woman_holding_white_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/white_bag_street/Woman_holding_white_202604181110_2.jpeg"
                                      ],
@@ -2144,16 +2205,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/white_bag_street/__source_portrait.png"
                     },
                     {
                         "id":  "black_outfit_night",
                         "label":  "Black Outfit Night",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Black Outfit Night",
-                        "cover":  "assets/instame-style-presets/styles/black_outfit_night/Woman_in_black_202604181110_2.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/black_outfit_night/Woman_in_black_202604181110_2.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/black_outfit_night/Woman_in_black_dress_boots_202606100844 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/black_outfit_night/Woman_in_black_dress_boots_202606100844 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/black_outfit_night/Woman_in_black_dress_boots_202606100844 (1).jpeg",
+                                         "assets/instame-style-presets/styles/black_outfit_night/Woman_in_black_dress_boots_202606100844.jpeg",
                                          "assets/instame-style-presets/styles/black_outfit_night/Woman_in_black_202604181110_2.jpeg",
                                          "assets/instame-style-presets/styles/black_outfit_night/Woman_in_black_202604181110_3.jpeg"
                                      ],
@@ -2173,16 +2237,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/black_outfit_night/__source_portrait.png"
                     },
                     {
                         "id":  "car_selfie_elegant",
                         "label":  "Car Selfie Elegant",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Car Selfie Elegant",
-                        "cover":  "assets/instame-style-presets/styles/car_selfie_elegant/Woman_in_car_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/car_selfie_elegant/Woman_in_car_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/car_selfie_elegant/Woman_in_car_with_coffee_202606100844.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/car_selfie_elegant/Woman_in_car_with_coffee_202606100844.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/car_selfie_elegant/Woman_in_car_with_coffee_202606100844.jpeg",
+                                         "assets/instame-style-presets/styles/car_selfie_elegant/Woman_in_car_with_coffee_202606100845.jpeg",
                                          "assets/instame-style-presets/styles/car_selfie_elegant/Woman_in_car_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/car_selfie_elegant/Woman_in_car_202604181110_2.jpeg"
                                      ],
@@ -2202,16 +2269,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/car_selfie_elegant/__source_portrait.png"
                     },
                     {
                         "id":  "car_ride_casual",
                         "label":  "Car Ride Casual",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Car Ride Casual",
-                        "cover":  "assets/instame-style-presets/styles/car_ride_casual/Woman_in_car_202604181110_3.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/car_ride_casual/Woman_in_car_202604181110_3.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/car_ride_casual/Woman_in_car_with_sunglasses_202606100846.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/car_ride_casual/Woman_in_car_with_sunglasses_202606100846.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/car_ride_casual/Woman_in_car_with_sunglasses_202606100846.jpeg",
+                                         "assets/instame-style-presets/styles/car_ride_casual/Woman_in_car_with_sunglasses_202606100847.jpeg",
                                          "assets/instame-style-presets/styles/car_ride_casual/Woman_in_car_202604181110_3.jpeg",
                                          "assets/instame-style-presets/styles/car_ride_casual/Woman_in_car_202604181110_4.jpeg"
                                      ],
@@ -2231,16 +2301,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/car_ride_casual/__source_portrait.png"
                     },
                     {
                         "id":  "black_elegant_room",
                         "label":  "Black Elegant Room",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Black Elegant Room",
-                        "cover":  "assets/instame-style-presets/styles/black_elegant_room/Woman_in_black_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/black_elegant_room/Woman_in_black_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/black_elegant_room/Woman_in_black_top_portrait_202606100847.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/black_elegant_room/Woman_in_black_top_portrait_202606100847.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/black_elegant_room/Woman_in_black_top_portrait_202606100847.jpeg",
+                                         "assets/instame-style-presets/styles/black_elegant_room/Woman_in_black_top_portrait_202606100848.jpeg",
                                          "assets/instame-style-presets/styles/black_elegant_room/Woman_in_black_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/black_elegant_room/Woman_in_black_202604181110_4.jpeg"
                                      ],
@@ -2260,16 +2333,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/black_elegant_room/__source_portrait.png"
                     },
                     {
                         "id":  "leather_outfit_street",
                         "label":  "Leather Outfit Street",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Leather Outfit Street",
-                        "cover":  "assets/instame-style-presets/styles/leather_outfit_street/Woman_in_leather_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/leather_outfit_street/Woman_in_leather_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/leather_outfit_street/Woman_in_leather_jacket_red_202606100848 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/leather_outfit_street/Woman_in_leather_jacket_red_202606100848 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/leather_outfit_street/Woman_in_leather_jacket_red_202606100848 (1).jpeg",
+                                         "assets/instame-style-presets/styles/leather_outfit_street/Woman_in_leather_jacket_red_202606100848.jpeg",
                                          "assets/instame-style-presets/styles/leather_outfit_street/Woman_in_leather_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/leather_outfit_street/Woman_in_leather_202604181110_2.jpeg"
                                      ],
@@ -2289,16 +2365,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/leather_outfit_street/__source_portrait.png"
                     },
                     {
                         "id":  "pink_outfit_room",
                         "label":  "Pink Outfit Room",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Pink Outfit Room",
-                        "cover":  "assets/instame-style-presets/styles/pink_outfit_room/Woman_in_pink_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/pink_outfit_room/Woman_in_pink_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/pink_outfit_room/Woman_in_pink_dress_posing_202606100855 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/pink_outfit_room/Woman_in_pink_dress_posing_202606100855 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/pink_outfit_room/Woman_in_pink_dress_posing_202606100855 (1).jpeg",
+                                         "assets/instame-style-presets/styles/pink_outfit_room/Woman_in_pink_dress_posing_202606100855.jpeg",
                                          "assets/instame-style-presets/styles/pink_outfit_room/Woman_in_pink_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/pink_outfit_room/Woman_in_pink_202604181110_2.jpeg"
                                      ],
@@ -2318,16 +2397,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/pink_outfit_room/__source_portrait.png"
                     },
                     {
                         "id":  "milk_bath_portrait",
                         "label":  "Milk Bath Portrait",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Milk Bath Portrait",
-                        "cover":  "assets/instame-style-presets/styles/milk_bath_portrait/Woman_in_milk_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/milk_bath_portrait/Woman_in_milk_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/milk_bath_portrait/Woman_in_milk_suit_coffee_202606100855 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/milk_bath_portrait/Woman_in_milk_suit_coffee_202606100855 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/milk_bath_portrait/Woman_in_milk_suit_coffee_202606100855 (1).jpeg",
+                                         "assets/instame-style-presets/styles/milk_bath_portrait/Woman_in_milk_suit_coffee_202606100855.jpeg",
                                          "assets/instame-style-presets/styles/milk_bath_portrait/Woman_in_milk_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/milk_bath_portrait/Woman_in_milk_202604181110_2.jpeg"
                                      ],
@@ -2347,16 +2429,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/milk_bath_portrait/__source_portrait.png"
                     },
                     {
                         "id":  "wide_pants_street",
                         "label":  "Wide Pants Street",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Wide Pants Street",
-                        "cover":  "assets/instame-style-presets/styles/wide_pants_street/Woman_in_wide_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/wide_pants_street/Woman_in_wide_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/wide_pants_street/Woman_in_wide_jeans_studio_202606100855 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/wide_pants_street/Woman_in_wide_jeans_studio_202606100855 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/wide_pants_street/Woman_in_wide_jeans_studio_202606100855 (1).jpeg",
+                                         "assets/instame-style-presets/styles/wide_pants_street/Woman_in_wide_jeans_studio_202606100855.jpeg",
                                          "assets/instame-style-presets/styles/wide_pants_street/Woman_in_wide_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/wide_pants_street/Woman_in_wide_202604181110_2.jpeg"
                                      ],
@@ -2376,16 +2461,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/wide_pants_street/__source_portrait.png"
                     },
                     {
                         "id":  "modern_outfit_room",
                         "label":  "Modern Outfit Room",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Modern Outfit Room",
-                        "cover":  "assets/instame-style-presets/styles/modern_outfit_room/Woman_in_modern_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/modern_outfit_room/Woman_in_modern_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/modern_outfit_room/Woman_in_modern_chair_202606100857 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/modern_outfit_room/Woman_in_modern_chair_202606100857 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/modern_outfit_room/Woman_in_modern_chair_202606100857 (1).jpeg",
+                                         "assets/instame-style-presets/styles/modern_outfit_room/Woman_in_modern_chair_202606100857.jpeg",
                                          "assets/instame-style-presets/styles/modern_outfit_room/Woman_in_modern_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/modern_outfit_room/Woman_in_modern_202604181110_2.jpeg"
                                      ],
@@ -2405,16 +2493,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/modern_outfit_room/__source_portrait.png"
                     },
                     {
                         "id":  "lying_bed_dark",
                         "label":  "Lying Bed Dark",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Lying Bed Dark",
-                        "cover":  "assets/instame-style-presets/styles/lying_bed_dark/Woman_lying_on_202604181110_3.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/lying_bed_dark/Woman_lying_on_202604181110_3.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/lying_bed_dark/Woman_lying_on_sofa_at_202606100857 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/lying_bed_dark/Woman_lying_on_sofa_at_202606100857 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/lying_bed_dark/Woman_lying_on_sofa_at_202606100857 (1).jpeg",
+                                         "assets/instame-style-presets/styles/lying_bed_dark/Woman_lying_on_sofa_at_202606100857.jpeg",
                                          "assets/instame-style-presets/styles/lying_bed_dark/Woman_lying_on_202604181110_3.jpeg",
                                          "assets/instame-style-presets/styles/lying_bed_dark/Woman_lying_on_202604181110_5.jpeg"
                                      ],
@@ -2434,16 +2525,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/lying_bed_dark/__source_portrait.png"
                     },
                     {
                         "id":  "lying_sofa_cozy",
                         "label":  "Lying Sofa Cozy",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Lying Sofa Cozy",
-                        "cover":  "assets/instame-style-presets/styles/lying_sofa_cozy/Woman_lying_on_202604181110_2.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/lying_sofa_cozy/Woman_lying_on_202604181110_2.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/lying_sofa_cozy/Woman_lying_on_floor_relaxed_202606100858 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/lying_sofa_cozy/Woman_lying_on_floor_relaxed_202606100858 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/lying_sofa_cozy/Woman_lying_on_floor_relaxed_202606100858 (1).jpeg",
+                                         "assets/instame-style-presets/styles/lying_sofa_cozy/Woman_lying_on_floor_relaxed_202606100858.jpeg",
                                          "assets/instame-style-presets/styles/lying_sofa_cozy/Woman_lying_on_202604181110_2.jpeg",
                                          "assets/instame-style-presets/styles/lying_sofa_cozy/Woman_lying_on_202604181110_6.jpeg"
                                      ],
@@ -2463,16 +2557,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/lying_sofa_cozy/__source_portrait.png"
                     },
                     {
                         "id":  "lying_bed_bright",
                         "label":  "Lying Bed Bright",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Lying Bed Bright",
-                        "cover":  "assets/instame-style-presets/styles/lying_bed_bright/Woman_lying_on_202604181110_7.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/lying_bed_bright/Woman_lying_on_202604181110_7.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/lying_bed_bright/Woman_lying_on_bed_202606100859 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/lying_bed_bright/Woman_lying_on_bed_202606100859 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/lying_bed_bright/Woman_lying_on_bed_202606100859 (1).jpeg",
+                                         "assets/instame-style-presets/styles/lying_bed_bright/Woman_lying_on_bed_202606100859.jpeg",
                                          "assets/instame-style-presets/styles/lying_bed_bright/Woman_lying_on_202604181110_7.jpeg",
                                          "assets/instame-style-presets/styles/lying_bed_bright/Woman_lying_on_202604181110_8.jpeg"
                                      ],
@@ -2492,16 +2589,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/lying_bed_bright/__source_portrait.png"
                     },
                     {
                         "id":  "mirror_selfie_dark",
                         "label":  "Mirror Selfie Dark",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Mirror Selfie Dark",
-                        "cover":  "assets/instame-style-presets/styles/mirror_selfie_dark/Woman_mirror_selfie_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/mirror_selfie_dark/Woman_mirror_selfie_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/mirror_selfie_dark/Woman_mirror_selfie_bathroom_202606100859 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/mirror_selfie_dark/Woman_mirror_selfie_bathroom_202606100859 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/mirror_selfie_dark/Woman_mirror_selfie_bathroom_202606100859 (1).jpeg",
+                                         "assets/instame-style-presets/styles/mirror_selfie_dark/Woman_mirror_selfie_bathroom_202606100859.jpeg",
                                          "assets/instame-style-presets/styles/mirror_selfie_dark/Woman_mirror_selfie_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/mirror_selfie_dark/Woman_mirror_selfie_202604181110_2.jpeg"
                                      ],
@@ -2521,16 +2621,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/mirror_selfie_dark/__source_portrait.png"
                     },
                     {
                         "id":  "fashion_portrait_studio",
                         "label":  "Fashion Portrait Studio",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Fashion Portrait Studio",
-                        "cover":  "assets/instame-style-presets/styles/fashion_portrait_studio/Woman_portrait_fashion_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/fashion_portrait_studio/Woman_portrait_fashion_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/fashion_portrait_studio/Woman_portrait_fashion_editorial_202606100859.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/fashion_portrait_studio/Woman_portrait_fashion_editorial_202606100859.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/fashion_portrait_studio/Woman_portrait_fashion_editorial_202606100859.jpeg",
+                                         "assets/instame-style-presets/styles/fashion_portrait_studio/Woman_portrait_fashion_editorial_202606100900.jpeg",
                                          "assets/instame-style-presets/styles/fashion_portrait_studio/Woman_portrait_fashion_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/fashion_portrait_studio/Woman_portrait_fashion_202604181110_2.jpeg"
                                      ],
@@ -2550,16 +2653,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/fashion_portrait_studio/__source_portrait.png"
                     },
                     {
                         "id":  "sitting_chair_room",
                         "label":  "Sitting Chair Room",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Sitting Chair Room",
-                        "cover":  "assets/instame-style-presets/styles/sitting_chair_room/Woman_sitting_in_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/sitting_chair_room/Woman_sitting_in_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/sitting_chair_room/Woman_sitting_in_cinema_202606100901.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/sitting_chair_room/Woman_sitting_in_cinema_202606100901.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/sitting_chair_room/Woman_sitting_in_cinema_202606100901.jpeg",
                                          "assets/instame-style-presets/styles/sitting_chair_room/Woman_sitting_in_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/sitting_chair_room/Woman_sitting_in_202604181110_3.jpeg"
                                      ],
@@ -2579,16 +2684,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/sitting_chair_room/__source_portrait.png"
                     },
                     {
                         "id":  "sitting_cafe_style",
                         "label":  "Sitting Cafe Style",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Sitting Cafe Style",
-                        "cover":  "assets/instame-style-presets/styles/sitting_cafe_style/Woman_sitting_in_202604181110_2.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/sitting_cafe_style/Woman_sitting_in_202604181110_2.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/sitting_cafe_style/Woman_sitting_in_cafe_chair_202606100900.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/sitting_cafe_style/Woman_sitting_in_cafe_chair_202606100900.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/sitting_cafe_style/Woman_sitting_in_cafe_chair_202606100900.jpeg",
+                                         "assets/instame-style-presets/styles/sitting_cafe_style/Woman_sitting_in_cafe_chair_202606100901.jpeg",
                                          "assets/instame-style-presets/styles/sitting_cafe_style/Woman_sitting_in_202604181110_2.jpeg",
                                          "assets/instame-style-presets/styles/sitting_cafe_style/Woman_sitting_in_202604181110_4.jpeg"
                                      ],
@@ -2608,16 +2716,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/sitting_cafe_style/__source_portrait.png"
                     },
                     {
                         "id":  "sitting_steps_street",
                         "label":  "Sitting Steps Street",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Sitting Steps Street",
-                        "cover":  "assets/instame-style-presets/styles/sitting_steps_street/Woman_sitting_on_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/sitting_steps_street/Woman_sitting_on_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/sitting_steps_street/Woman_sitting_on_chair_202606100901 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/sitting_steps_street/Woman_sitting_on_chair_202606100901 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/sitting_steps_street/Woman_sitting_on_chair_202606100901 (1).jpeg",
+                                         "assets/instame-style-presets/styles/sitting_steps_street/Woman_sitting_on_chair_202606100901.jpeg",
                                          "assets/instame-style-presets/styles/sitting_steps_street/Woman_sitting_on_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/sitting_steps_street/Woman_sitting_on_202604181110_2.jpeg"
                                      ],
@@ -2637,16 +2748,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/sitting_steps_street/__source_portrait.png"
                     },
                     {
                         "id":  "sitting_bench_park",
                         "label":  "Sitting Bench Park",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Sitting Bench Park",
-                        "cover":  "assets/instame-style-presets/styles/sitting_bench_park/Woman_sitting_on_202604181110_3.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/sitting_bench_park/Woman_sitting_on_202604181110_3.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/sitting_bench_park/Woman_sitting_on_stone_steps_202606100902 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/sitting_bench_park/Woman_sitting_on_stone_steps_202606100902 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/sitting_bench_park/Woman_sitting_on_stone_steps_202606100902 (1).jpeg",
+                                         "assets/instame-style-presets/styles/sitting_bench_park/Woman_sitting_on_stone_steps_202606100902.jpeg",
                                          "assets/instame-style-presets/styles/sitting_bench_park/Woman_sitting_on_202604181110_3.jpeg",
                                          "assets/instame-style-presets/styles/sitting_bench_park/Woman_sitting_on_202604181110_4.jpeg"
                                      ],
@@ -2666,16 +2780,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/sitting_bench_park/__source_portrait.png"
                     },
                     {
                         "id":  "sitting_floor_room",
                         "label":  "Sitting Floor Room",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Sitting Floor Room",
-                        "cover":  "assets/instame-style-presets/styles/sitting_floor_room/Woman_sitting_on_202604181110_5.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/sitting_floor_room/Woman_sitting_on_202604181110_5.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/sitting_floor_room/Woman_sitting_on_steps_with_202606100903 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/sitting_floor_room/Woman_sitting_on_steps_with_202606100903 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/sitting_floor_room/Woman_sitting_on_steps_with_202606100903 (1).jpeg",
+                                         "assets/instame-style-presets/styles/sitting_floor_room/Woman_sitting_on_steps_with_202606100903.jpeg",
                                          "assets/instame-style-presets/styles/sitting_floor_room/Woman_sitting_on_202604181110_5.jpeg",
                                          "assets/instame-style-presets/styles/sitting_floor_room/Woman_sitting_on_202604181110_6.jpeg"
                                      ],
@@ -2695,16 +2812,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/sitting_floor_room/__source_portrait.png"
                     },
                     {
                         "id":  "standing_near_wall",
                         "label":  "Standing Near Wall",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Standing Near Wall",
-                        "cover":  "assets/instame-style-presets/styles/standing_near_wall/Woman_standing_near_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/standing_near_wall/Woman_standing_near_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/standing_near_wall/Woman_standing_near_church_202606100904.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/standing_near_wall/Woman_standing_near_church_202606100904.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/standing_near_wall/Woman_standing_near_church_202606100904.jpeg",
                                          "assets/instame-style-presets/styles/standing_near_wall/Woman_standing_near_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/standing_near_wall/Woman_standing_near_202604181110_2.jpeg"
                                      ],
@@ -2724,16 +2843,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/standing_near_wall/__source_portrait.png"
                     },
                     {
                         "id":  "mirror_selfie_store",
                         "label":  "Mirror Selfie Store",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Mirror Selfie Store",
-                        "cover":  "assets/instame-style-presets/styles/mirror_selfie_store/Woman_taking_mirror_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/mirror_selfie_store/Woman_taking_mirror_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/mirror_selfie_store/Woman_taking_mirror_selfie_wardrobe_202606100908 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/mirror_selfie_store/Woman_taking_mirror_selfie_wardrobe_202606100908 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/mirror_selfie_store/Woman_taking_mirror_selfie_wardrobe_202606100908 (1).jpeg",
+                                         "assets/instame-style-presets/styles/mirror_selfie_store/Woman_taking_mirror_selfie_wardrobe_202606100908.jpeg",
                                          "assets/instame-style-presets/styles/mirror_selfie_store/Woman_taking_mirror_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/mirror_selfie_store/Woman_taking_mirror_202604181110_2.jpeg"
                                      ],
@@ -2753,16 +2875,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/mirror_selfie_store/__source_portrait.png"
                     },
                     {
                         "id":  "young_sitting_street",
                         "label":  "Young Sitting Street",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Young Sitting Street",
-                        "cover":  "assets/instame-style-presets/styles/young_sitting_street/Young_woman_sitting_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/young_sitting_street/Young_woman_sitting_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/young_sitting_street/Young_woman_sitting_on_floor_202606100905.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/young_sitting_street/Young_woman_sitting_on_floor_202606100905.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/young_sitting_street/Young_woman_sitting_on_floor_202606100905.jpeg",
+                                         "assets/instame-style-presets/styles/young_sitting_street/Young_woman_sitting_on_floor_202606100906.jpeg",
                                          "assets/instame-style-presets/styles/young_sitting_street/Young_woman_sitting_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/young_sitting_street/Young_woman_sitting_202604181110_2.jpeg"
                                      ],
@@ -2782,16 +2907,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/young_sitting_street/__source_portrait.png"
                     },
                     {
                         "id":  "airport_selfie",
                         "label":  "Airport Selfie",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Airport Selfie",
-                        "cover":  "assets/instame-style-presets/styles/airport_selfie/Девушка_в_аэропорту_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/airport_selfie/Девушка_в_аэропорту_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/airport_selfie/Девушка_в_аэропорту_с_чемоданом_202606100910 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/airport_selfie/Девушка_в_аэропорту_с_чемоданом_202606100910 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/airport_selfie/Девушка_в_аэропорту_с_чемоданом_202606100910 (1).jpeg",
+                                         "assets/instame-style-presets/styles/airport_selfie/Девушка_в_аэропорту_с_чемоданом_202606100910.jpeg",
                                          "assets/instame-style-presets/styles/airport_selfie/Девушка_в_аэропорту_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/airport_selfie/Девушка_в_аэропорту_202604181110_2.jpeg"
                                      ],
@@ -2811,16 +2939,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/airport_selfie/__source_portrait.png"
                     },
                     {
                         "id":  "bathroom_selfie",
                         "label":  "Bathroom Selfie",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Bathroom Selfie",
-                        "cover":  "assets/instame-style-presets/styles/bathroom_selfie/Девушка_в_ванной_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/bathroom_selfie/Девушка_в_ванной_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/bathroom_selfie/Девушка_в_ванной_комнате_вспышка_202606100907.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/bathroom_selfie/Девушка_в_ванной_комнате_вспышка_202606100907.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/bathroom_selfie/Девушка_в_ванной_комнате_вспышка_202606100907.jpeg",
+                                         "assets/instame-style-presets/styles/bathroom_selfie/Девушка_в_ванной_комнате_вспышка_202606100908.jpeg",
                                          "assets/instame-style-presets/styles/bathroom_selfie/Девушка_в_ванной_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/bathroom_selfie/Девушка_в_ванной_202604181110_2.jpeg"
                                      ],
@@ -2840,16 +2971,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/bathroom_selfie/__source_portrait.png"
                     },
                     {
                         "id":  "selfie_night_flash",
                         "label":  "Selfie Night Flash",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Selfie Night Flash",
-                        "cover":  "assets/instame-style-presets/styles/selfie_night_flash/Девушка_делает_селфи_202604181110_3.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/selfie_night_flash/Девушка_делает_селфи_202604181110_3.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/selfie_night_flash/Девушка_делает_селфи_в_машине_202606100909 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/selfie_night_flash/Девушка_делает_селфи_в_машине_202606100909 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/selfie_night_flash/Девушка_делает_селфи_в_машине_202606100909 (1).jpeg",
+                                         "assets/instame-style-presets/styles/selfie_night_flash/Девушка_делает_селфи_в_машине_202606100909.jpeg",
                                          "assets/instame-style-presets/styles/selfie_night_flash/Девушка_делает_селфи_202604181110_3.jpeg",
                                          "assets/instame-style-presets/styles/selfie_night_flash/Девушка_делает_селфи_202604181110_4.jpeg"
                                      ],
@@ -2869,16 +3003,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/selfie_night_flash/__source_portrait.png"
                     },
                     {
                         "id":  "sitting_bag_street",
                         "label":  "Sitting Bag Street",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Sitting Bag Street",
-                        "cover":  "assets/instame-style-presets/styles/sitting_bag_street/Девушка_сидит_с_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/sitting_bag_street/Девушка_сидит_с_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/sitting_bag_street/Девушка_сидит_с_сигаретой_202606100910 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/sitting_bag_street/Девушка_сидит_с_сигаретой_202606100910 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/sitting_bag_street/Девушка_сидит_с_сигаретой_202606100910 (1).jpeg",
+                                         "assets/instame-style-presets/styles/sitting_bag_street/Девушка_сидит_с_сигаретой_202606100910.jpeg",
                                          "assets/instame-style-presets/styles/sitting_bag_street/Девушка_сидит_с_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/sitting_bag_street/Девушка_сидит_с_202604181110_2.jpeg"
                                      ],
@@ -2898,16 +3035,20 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/sitting_bag_street/__source_portrait.png"
                     },
                     {
                         "id":  "street_woman_walk",
                         "label":  "Street Woman Walk",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Street Woman Walk",
-                        "cover":  "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_городском_здании_202606100912 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_городском_здании_202606100912 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_городском_здании_202606100912 (1).jpeg",
+                                         "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_городском_здании_202606100912.jpeg",
+                                         "assets/instame-style-presets/styles/street_woman_walk/Женщина_с_тюльпанами_и_пиджаком_202606100915 (1).jpeg",
                                          "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_202604181110_2.jpeg",
                                          "assets/instame-style-presets/styles/street_woman_walk/Женщина_на_улице_202604181110_3.jpeg"
@@ -2928,16 +3069,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/street_woman_walk/__source_portrait.png"
                     },
                     {
                         "id":  "sitting_outdoor_cafe",
                         "label":  "Sitting Outdoor Cafe",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Sitting Outdoor Cafe",
-                        "cover":  "assets/instame-style-presets/styles/sitting_outdoor_cafe/Женщина_сидит_на_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/sitting_outdoor_cafe/Женщина_сидит_на_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/sitting_outdoor_cafe/Женщина_сидит_на_тротуаре_202606100913.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/sitting_outdoor_cafe/Женщина_сидит_на_тротуаре_202606100913.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/sitting_outdoor_cafe/Женщина_сидит_на_тротуаре_202606100913.jpeg",
                                          "assets/instame-style-presets/styles/sitting_outdoor_cafe/Женщина_сидит_на_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/sitting_outdoor_cafe/Женщина_сидит_на_202604181110_2.jpeg"
                                      ],
@@ -2957,16 +3100,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/sitting_outdoor_cafe/__source_portrait.png"
                     },
                     {
                         "id":  "tulips_portrait",
                         "label":  "Tulips Portrait",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Tulips Portrait",
-                        "cover":  "assets/instame-style-presets/styles/tulips_portrait/Женщина_с_тюльпанами_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/tulips_portrait/Женщина_с_тюльпанами_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/tulips_portrait/Женщина_с_тюльпанами_и_пиджаком_202606100915.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/tulips_portrait/Женщина_с_тюльпанами_и_пиджаком_202606100915.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/tulips_portrait/Женщина_с_тюльпанами_и_пиджаком_202606100915.jpeg",
+                                         "assets/instame-style-presets/styles/tulips_portrait/Женщина_с_тюльпанами_и_пиджаком_202606100916.jpeg",
                                          "assets/instame-style-presets/styles/tulips_portrait/Женщина_с_тюльпанами_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/tulips_portrait/Женщина_с_тюльпанами_202604181110_2.jpeg"
                                      ],
@@ -2986,16 +3132,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/tulips_portrait/__source_portrait.png"
                     },
                     {
                         "id":  "mom_two_kids",
                         "label":  "Mom Two Kids",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Mom Two Kids",
-                        "cover":  "assets/instame-style-presets/styles/mom_two_kids/Мама_и_два_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/mom_two_kids/Мама_и_два_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/mom_two_kids/Мама_и_два_сына_202606100917 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/mom_two_kids/Мама_и_два_сына_202606100917 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/mom_two_kids/Мама_и_два_сына_202606100917 (1).jpeg",
+                                         "assets/instame-style-presets/styles/mom_two_kids/Мама_и_два_сына_202606100917.jpeg",
                                          "assets/instame-style-presets/styles/mom_two_kids/Мама_и_два_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/mom_two_kids/Мама_и_два_202604181110_2.jpeg"
                                      ],
@@ -3015,16 +3164,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/mom_two_kids/__source_portrait.png"
                     },
                     {
                         "id":  "young_girl_sitting",
                         "label":  "Young Girl Sitting",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Young Girl Sitting",
-                        "cover":  "assets/instame-style-presets/styles/young_girl_sitting/Молодая_девушка_сидит_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/young_girl_sitting/Молодая_девушка_сидит_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/young_girl_sitting/Молодая_девушка_сидит_на_улице_202606100917 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/young_girl_sitting/Молодая_девушка_сидит_на_улице_202606100917 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/young_girl_sitting/Молодая_девушка_сидит_на_улице_202606100917 (1).jpeg",
+                                         "assets/instame-style-presets/styles/young_girl_sitting/Молодая_девушка_сидит_на_улице_202606100917.jpeg",
                                          "assets/instame-style-presets/styles/young_girl_sitting/Молодая_девушка_сидит_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/young_girl_sitting/Молодая_девушка_сидит_202604181110_2.jpeg"
                                      ],
@@ -3044,16 +3196,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/young_girl_sitting/__source_portrait.png"
                     },
                     {
                         "id":  "mom_hugging_son",
                         "label":  "Mom Hugging Son",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Mom Hugging Son",
-                        "cover":  "assets/instame-style-presets/styles/mom_hugging_son/Мама_обнимает_сына_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/mom_hugging_son/Мама_обнимает_сына_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/mom_hugging_son/Мама_обнимает_сына_на_скамье_202606100918.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/mom_hugging_son/Мама_обнимает_сына_на_скамье_202606100918.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/mom_hugging_son/Мама_обнимает_сына_на_скамье_202606100918.jpeg",
+                                         "assets/instame-style-presets/styles/mom_hugging_son/Мама_обнимает_сына_на_скамье_202606100920.jpeg",
                                          "assets/instame-style-presets/styles/mom_hugging_son/Мама_обнимает_сына_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/mom_hugging_son/Мама_обнимает_сына_202604181110_2.jpeg"
                                      ],
@@ -3073,16 +3228,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/mom_hugging_son/__source_portrait.png"
                     },
                     {
                         "id":  "standing_bridge_night",
                         "label":  "Standing Bridge Night",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Standing Bridge Night",
-                        "cover":  "assets/instame-style-presets/styles/standing_bridge_night/Девушка_стоит_на_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/standing_bridge_night/Девушка_стоит_на_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/standing_bridge_night/Девушка_стоит_на_тропе_202606100919.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/standing_bridge_night/Девушка_стоит_на_тропе_202606100919.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/standing_bridge_night/Девушка_стоит_на_тропе_202606100919.jpeg",
+                                         "assets/instame-style-presets/styles/standing_bridge_night/Девушка_стоит_на_тропе_202606100920 (1).jpeg",
                                          "assets/instame-style-presets/styles/standing_bridge_night/Девушка_стоит_на_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/standing_bridge_night/Девушка_стоит_на_202604181110_2.jpeg"
                                      ],
@@ -3102,16 +3260,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/standing_bridge_night/__source_portrait.png"
                     },
                     {
                         "id":  "breakfast_selfie",
                         "label":  "Breakfast Selfie",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Breakfast Selfie",
-                        "cover":  "assets/instame-style-presets/styles/breakfast_selfie/Девушка_селфи_завтрак_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/breakfast_selfie/Девушка_селфи_завтрак_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/breakfast_selfie/Девушка_селфи_завтрак_косметика_…_202606100919.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/breakfast_selfie/Девушка_селфи_завтрак_косметика_…_202606100919.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/breakfast_selfie/Девушка_селфи_завтрак_косметика_…_202606100919.jpeg",
                                          "assets/instame-style-presets/styles/breakfast_selfie/Девушка_селфи_завтрак_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/breakfast_selfie/Девушка_селфи_завтрак_202604181110_2.jpeg"
                                      ],
@@ -3131,16 +3291,19 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/breakfast_selfie/__source_portrait.png"
                     },
                     {
                         "id":  "selfie_room_mirror",
                         "label":  "Selfie Room Mirror",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Selfie Room Mirror",
-                        "cover":  "assets/instame-style-presets/styles/selfie_room_mirror/Девушка_селфи_в_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/selfie_room_mirror/Девушка_селфи_в_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/selfie_room_mirror/Девушка_селфи_в_ванной_202606100922 (1).jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/selfie_room_mirror/Девушка_селфи_в_ванной_202606100922 (1).jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/selfie_room_mirror/Девушка_селфи_в_ванной_202606100922 (1).jpeg",
+                                         "assets/instame-style-presets/styles/selfie_room_mirror/Девушка_селфи_в_ванной_202606100922.jpeg",
                                          "assets/instame-style-presets/styles/selfie_room_mirror/Девушка_селфи_в_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/selfie_room_mirror/Девушка_селфи_в_202604181110_2.jpeg"
                                      ],
@@ -3160,16 +3323,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/selfie_room_mirror/__source_portrait.png"
                     },
                     {
                         "id":  "foam_bath_selfie",
                         "label":  "Foam Bath Selfie",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Foam Bath Selfie",
-                        "cover":  "assets/instame-style-presets/styles/foam_bath_selfie/Девушка_с_пеной_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/foam_bath_selfie/Девушка_с_пеной_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/foam_bath_selfie/Девушка_с_пеной_на_машине_202606100923.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/foam_bath_selfie/Девушка_с_пеной_на_машине_202606100923.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/foam_bath_selfie/Девушка_с_пеной_на_машине_202606100923.jpeg",
                                          "assets/instame-style-presets/styles/foam_bath_selfie/Девушка_с_пеной_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/foam_bath_selfie/Девушка_с_пеной_202604181110_2.jpeg"
                                      ],
@@ -3189,16 +3354,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/foam_bath_selfie/__source_portrait.png"
                     },
                     {
                         "id":  "long_hair_closeup",
                         "label":  "Long Hair Closeup",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Long Hair Closeup",
-                        "cover":  "assets/instame-style-presets/styles/long_hair_closeup/Девушка_с_длинными_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/long_hair_closeup/Девушка_с_длинными_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/long_hair_closeup/Девушка_с_длинными_волнистыми_во…_202606100922.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/long_hair_closeup/Девушка_с_длинными_волнистыми_во…_202606100922.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/long_hair_closeup/Девушка_с_длинными_волнистыми_во…_202606100922.jpeg",
                                          "assets/instame-style-presets/styles/long_hair_closeup/Девушка_с_длинными_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/long_hair_closeup/Девушка_с_длинными_202604181110_2.jpeg"
                                      ],
@@ -3218,16 +3385,18 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/long_hair_closeup/__source_portrait.png"
                     },
                     {
                         "id":  "selfie_mirror_casual",
                         "label":  "Selfie Mirror Casual",
                         "subtitle":  "Instagramable style preset",
                         "promptHint":  "Selfie Mirror Casual",
-                        "cover":  "assets/instame-style-presets/styles/selfie_mirror_casual/Девушка_делает_селфи_202604181110.jpeg",
-                        "representativeImage":  "assets/instame-style-presets/styles/selfie_mirror_casual/Девушка_делает_селфи_202604181110.jpeg",
+                        "cover":  "assets/instame-style-presets/styles/selfie_mirror_casual/Девушка_делает_селфи_в_зеркало_202606100924.jpeg",
+                        "representativeImage":  "assets/instame-style-presets/styles/selfie_mirror_casual/Девушка_делает_селфи_в_зеркало_202606100924.jpeg",
                         "examples":  [
+                                         "assets/instame-style-presets/styles/selfie_mirror_casual/Девушка_делает_селфи_в_зеркало_202606100924.jpeg",
                                          "assets/instame-style-presets/styles/selfie_mirror_casual/Девушка_делает_селфи_202604181110.jpeg",
                                          "assets/instame-style-presets/styles/selfie_mirror_casual/Девушка_делает_селфи_202604181110_2.jpeg"
                                      ],
@@ -3247,7 +3416,8 @@
                                                }
                                            ],
                         "promptOnlyAfterFirstUse":  false,
-                        "category":  "women"
+                        "category":  "women",
+                        "sourcePortrait":  "assets/instame-style-presets/styles/selfie_mirror_casual/__source_portrait.png"
                     },
                     {
                         "id":  "fur_coat_night",
