@@ -931,6 +931,7 @@ export default function InstaMeScreen() {
   const [pipelineError, setPipelineError] = useState<string | null>(null);
   // ──────────────────────────────────────────────────────────────────────────
   const [previewStyleId, setPreviewStyleId] = useState<string | null>(null);
+  const [previewHeroIndex, setPreviewHeroIndex] = useState(0);
   const [ownStylePhoto, setOwnStylePhoto] = useState<UploadedPhoto | null>(null);
   const [savedOwnStyles, setSavedOwnStyles] = useState<InstaMeOwnStyle[]>([]);
   const [ownStylesLoaded, setOwnStylesLoaded] = useState(false);
@@ -1315,23 +1316,23 @@ export default function InstaMeScreen() {
     [resultBase64, resultMeta?.imageMimeType],
   );
 
-  const previewPanelImageUri = useMemo(() => {
+  const previewPanelImageCandidates = useMemo(() => {
     if (isEnhancePreviewActive) {
-      return getImageCandidates(portraitEnhanceCandidate?.uri, photo?.uri, ...fallbackPresetImageCandidates)[0] || "";
+      return getImageCandidates(portraitEnhanceCandidate?.uri, photo?.uri, ...fallbackPresetImageCandidates).slice(0, 1);
     }
 
     if (previewStyleId === INSTAME_OWN_STYLE_ID) {
       return getImageCandidates(
         selectedOwnStyleId ? selectedSavedOwnStyle?.previewUri : ownStylePhoto?.uri,
-      )[0] || "";
+      ).slice(0, 1);
     }
 
-    return (
-      getImageCandidates(
-        ...getPresetImageCandidates(previewStyle || selectedStylePreset || defaultStylePreset),
-        ...fallbackPresetImageCandidates,
-      )[0] || ""
+    const candidates = getImageCandidates(
+      ...getPresetImageCandidates(previewStyle || selectedStylePreset || defaultStylePreset),
     );
+    return candidates.length > 0
+      ? candidates
+      : getImageCandidates(...fallbackPresetImageCandidates).slice(0, 1);
   }, [
     defaultStylePreset,
     fallbackPresetImageCandidates,
@@ -1345,6 +1346,21 @@ export default function InstaMeScreen() {
     selectedSavedOwnStyle?.previewUri,
     selectedStylePreset,
   ]);
+
+  const previewHeroCount = previewPanelImageCandidates.length;
+  const previewPanelImageUri = previewHeroCount > 0
+    ? previewPanelImageCandidates[previewHeroIndex % previewHeroCount]
+    : "";
+
+  useEffect(() => {
+    setPreviewHeroIndex(0);
+  }, [previewStyleId]);
+
+  const handlePreviewHeroSwipe = useCallback((delta: number) => {
+    if (previewHeroCount <= 1) return;
+    setPreviewHeroIndex((current) => (((current + delta) % previewHeroCount) + previewHeroCount) % previewHeroCount);
+    void Haptics.selectionAsync();
+  }, [previewHeroCount]);
 
   const closePreviewPanel = useCallback(() => {
     if (previewStyleId === INSTAME_OWN_STYLE_ID && ownStylePhoto && !selectedOwnStyleId) {
@@ -4322,13 +4338,10 @@ export default function InstaMeScreen() {
                                   locations={[0, 0.62, 1]}
                                   style={styles.collageTileOverlay}
                                 />
-                                {collageImageUri ? (
-                                  <View pointerEvents="none" style={styles.collageTileFooter}>
-                                    <Text style={styles.collageTileLabel} numberOfLines={1}>
-                                      {item.label}
-                                    </Text>
-                                    {swipeCount > 1 ? (
-                                      swipeCount <= 6 ? (
+                                {collageImageUri && swipeCount > 1 ? (
+                                  <>
+                                    <View pointerEvents="none" style={styles.collageTileFooter}>
+                                      {swipeCount <= 6 ? (
                                         <View style={styles.collageTileDots}>
                                           {swipeCandidates.map((_, dotIndex) => (
                                             <View
@@ -4344,9 +4357,12 @@ export default function InstaMeScreen() {
                                         <Text style={styles.collageTileDotCounterText}>
                                           {swipeIndex + 1}/{swipeCount}
                                         </Text>
-                                      )
-                                    ) : null}
-                                  </View>
+                                      )}
+                                    </View>
+                                    <View pointerEvents="none" style={styles.collageTileSwipeHint}>
+                                      <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.85)" />
+                                    </View>
+                                  </>
                                 ) : null}
                                 {item.active ? (
                                   <View pointerEvents="none" style={styles.collageTileActiveCheck}>
@@ -4437,13 +4453,10 @@ export default function InstaMeScreen() {
                                     locations={[0, 0.62, 1]}
                                     style={styles.collageTileOverlay}
                                   />
-                                  {collageImageUri ? (
-                                    <View pointerEvents="none" style={styles.collageTileFooter}>
-                                      <Text style={styles.collageTileLabel} numberOfLines={1}>
-                                        {item.label}
-                                      </Text>
-                                      {swipeCount > 1 ? (
-                                        swipeCount <= 6 ? (
+                                  {collageImageUri && swipeCount > 1 ? (
+                                    <>
+                                      <View pointerEvents="none" style={styles.collageTileFooter}>
+                                        {swipeCount <= 6 ? (
                                           <View style={styles.collageTileDots}>
                                             {swipeCandidates.map((_, dotIndex) => (
                                               <View
@@ -4459,9 +4472,12 @@ export default function InstaMeScreen() {
                                           <Text style={styles.collageTileDotCounterText}>
                                             {swipeIndex + 1}/{swipeCount}
                                           </Text>
-                                        )
-                                      ) : null}
-                                    </View>
+                                        )}
+                                      </View>
+                                      <View pointerEvents="none" style={styles.collageTileSwipeHint}>
+                                        <Ionicons name="chevron-forward" size={12} color="rgba(255,255,255,0.85)" />
+                                      </View>
+                                    </>
                                   ) : null}
                                   {item.active ? (
                                     <View pointerEvents="none" style={styles.collageTileActiveCheck}>
@@ -4866,13 +4882,6 @@ export default function InstaMeScreen() {
                                         style={styles.collageTileOverlay}
                                       />
                                     ) : null}
-                                    {item.id !== ART_STYLE_NONE_ID ? (
-                                      <View pointerEvents="none" style={styles.collageTileFooter}>
-                                        <Text style={styles.collageTileLabel} numberOfLines={1}>
-                                          {item.label}
-                                        </Text>
-                                      </View>
-                                    ) : null}
                                     {item.active ? (
                                       <View pointerEvents="none" style={styles.collageTileActiveCheck}>
                                         <Ionicons name="checkmark" size={12} color="#08110F" />
@@ -5190,7 +5199,11 @@ export default function InstaMeScreen() {
               <Ionicons name="close" size={20} color="#FFF" />
             </Pressable>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
-              <View style={styles.modalHero}>
+              <TileSwipe
+                enabled={previewHeroCount > 1}
+                onSwipe={handlePreviewHeroSwipe}
+                style={styles.modalHero}
+              >
                 {previewStyleId === INSTAME_OWN_STYLE_ID && !selectedOwnStyleId && !ownStylePhoto ? (
                   <Pressable
                     onPress={() => {
@@ -5250,7 +5263,42 @@ export default function InstaMeScreen() {
                     />
                   </View>
                 ) : null}
-              </View>
+                {previewHeroCount > 1 ? (
+                  <>
+                    <Pressable
+                      onPress={() => handlePreviewHeroSwipe(-1)}
+                      style={[styles.modalHeroNavButton, styles.modalHeroNavLeft]}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="chevron-back" size={18} color="rgba(255,255,255,0.92)" />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handlePreviewHeroSwipe(1)}
+                      style={[styles.modalHeroNavButton, styles.modalHeroNavRight]}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.92)" />
+                    </Pressable>
+                    <View pointerEvents="none" style={styles.modalHeroDots}>
+                      {previewHeroCount <= 6 ? (
+                        previewPanelImageCandidates.map((_, dotIndex) => (
+                          <View
+                            key={`hero-dot-${dotIndex}`}
+                            style={[
+                              styles.collageTileDot,
+                              dotIndex === previewHeroIndex % previewHeroCount && styles.collageTileDotActive,
+                            ]}
+                          />
+                        ))
+                      ) : (
+                        <Text style={styles.collageTileDotCounterText}>
+                          {(previewHeroIndex % previewHeroCount) + 1}/{previewHeroCount}
+                        </Text>
+                      )}
+                    </View>
+                  </>
+                ) : null}
+              </TileSwipe>
 
               {!isEnhancePreviewActive && isCurrentStyleFavorite ? (
                 <View style={styles.modalSection}>
@@ -7603,14 +7651,19 @@ const styles = StyleSheet.create({
     bottom: 8,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
   },
-  collageTileLabel: {
-    flex: 1,
-    color: "rgba(255,255,255,0.92)",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
-    lineHeight: 14,
+  collageTileSwipeHint: {
+    position: "absolute",
+    right: 6,
+    top: "50%",
+    marginTop: -11,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   collageTileDots: {
     flexDirection: "row",
@@ -9687,6 +9740,33 @@ const styles = StyleSheet.create({
   },
   modalHeroOverlay: {
     ...StyleSheet.absoluteFillObject,
+  },
+  modalHeroNavButton: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalHeroNavLeft: {
+    left: 10,
+  },
+  modalHeroNavRight: {
+    right: 10,
+  },
+  modalHeroDots: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
   },
   modalHeroPortraitBadge: {
     position: "absolute",
