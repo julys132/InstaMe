@@ -120,12 +120,16 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
   const representativeImage =
     typeof record?.representativeImage === "string" ? record.representativeImage : "";
   const cover = typeof record?.cover === "string" ? record.cover : undefined;
+  const coverThumb = typeof record?.coverThumb === "string" ? record.coverThumb : undefined;
   const sourcePortrait = typeof record?.sourcePortrait === "string" ? record.sourcePortrait : undefined;
   const promptFile = typeof record?.promptFile === "string" ? record.promptFile : undefined;
   const promptFileFallbackText = readPromptFileText(promptFile);
   const examples = Array.isArray(record?.examples)
     ? record.examples.filter((entry): entry is string => typeof entry === "string")
     : [];
+  const examplesThumbs = Array.isArray(record?.examplesThumbs)
+    ? record.examplesThumbs.filter((entry): entry is string => typeof entry === "string")
+    : undefined;
   const promptVariants = Array.isArray(record?.promptVariants)
     ? record.promptVariants
         .map((entry) => normalizePromptVariant(entry))
@@ -145,6 +149,7 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
   const rawCategory = typeof record?.category === "string" ? record.category : "";
   const category: InstaMeStyleCategory | undefined =
     rawCategory === "men" ? "men" : rawCategory === "couple" ? "couple" : rawCategory === "women" ? "women" : undefined;
+  const vibeId = typeof record?.vibeId === "string" && record.vibeId ? record.vibeId : undefined;
 
   if (!id || !label || !subtitle || !promptHint || !representativeImage || examples.length === 0) {
     return null;
@@ -155,11 +160,14 @@ function normalizePreset(input: unknown): InstaMeStylePreset | null {
     label,
     subtitle,
     category,
+    vibeId,
     promptHint,
     cover,
+    coverThumb,
     representativeImage,
     sourcePortrait,
     examples,
+    examplesThumbs,
     promptFile,
     promptVariants,
     promptOnlyAfterFirstUse,

@@ -502,6 +502,12 @@ export function matchStyleVibe(preset: InstaMeStylePreset, vibeId: string): bool
     return true;
   }
 
+  // Catalog presets carry an explicit, curated category. Prefer it over the
+  // legacy keyword matching so every style lives in exactly one clear vibe.
+  if (preset.vibeId) {
+    return preset.vibeId === vibe.id;
+  }
+
   const audience = vibe.audience || "women";
   if (!audienceMatches(preset, audience)) {
     return false;
@@ -516,8 +522,24 @@ export function getStyleVibeById(vibeId: string | null | undefined): StyleVibeCa
 }
 
 export function getPrimaryStyleVibeId(preset: InstaMeStylePreset): string {
+  if (preset.vibeId && STYLE_VIBE_CATEGORIES.some((vibe) => vibe.id === preset.vibeId)) {
+    return preset.vibeId;
+  }
+
   const match = STYLE_VIBE_CATEGORIES.find((vibe) => vibe.id !== "all" && matchStyleVibe(preset, vibe.id));
   return match?.id || "all";
+}
+
+export function matchStylePresetSearch(preset: InstaMeStylePreset, query: string): boolean {
+  const normalizedQuery = normalizeSearchText(query.trim());
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  const text = getPresetSearchText(preset);
+  return normalizedQuery
+    .split(/\s+/)
+    .every((token) => text.includes(token));
 }
 
 export function getStylePresetPreviewImages(preset: InstaMeStylePreset | null | undefined): string[] {

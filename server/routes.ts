@@ -704,8 +704,12 @@ const MAX_IMAGE_BASE64_LENGTH = 2_500_000;
 const MAX_INSTAME_UPLOADED_IMAGES = 10;
 const MAX_INSTAME_ENHANCED_IMAGES = 10;
 const MAX_INSTAME_OWN_STYLES = 12;
+const MAX_INSTAME_GENERATION_HISTORY_IMAGES = 20;
 const MAX_INSTAME_LIBRARY_IMAGES_TOTAL =
-  MAX_INSTAME_UPLOADED_IMAGES + MAX_INSTAME_ENHANCED_IMAGES + MAX_INSTAME_OWN_STYLES;
+  MAX_INSTAME_UPLOADED_IMAGES +
+  MAX_INSTAME_ENHANCED_IMAGES +
+  MAX_INSTAME_OWN_STYLES +
+  MAX_INSTAME_GENERATION_HISTORY_IMAGES;
 const MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1_000_000;
 const MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 const MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 220_000;
@@ -1634,7 +1638,9 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
           ? "enhanced"
           : candidate.kind === "own_style"
             ? "own_style"
-            : "uploaded";
+            : candidate.kind === "generation"
+              ? "generation"
+              : "uploaded";
       const analyzedPromptRaw = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
       const analyzedPrompt =
         kind === "own_style"
@@ -1657,6 +1663,14 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
         kind === "own_style"
           ? (typeof firstUseSurchargeChargedRaw === "boolean" ? firstUseSurchargeChargedRaw : true)
           : undefined;
+
+      const styleLabel = normalizeStringValue(candidate.styleLabel).slice(0, 120);
+      const stylePresetId = normalizeStringValue(candidate.stylePresetId).slice(0, 80);
+      const ownStyleId = normalizeStringValue(candidate.ownStyleId).slice(0, 80);
+      const artStyleId = normalizeStringValue(candidate.artStyleId).slice(0, 80);
+      const customPrompt = normalizeStringValue(candidate.customPrompt).slice(0, 2000);
+      const creditsChargedRaw = Number(candidate.creditsCharged);
+      const generationSource = normalizeStringValue(candidate.generationSource).slice(0, 40);
 
       if (!id || !base64 || !previewBase64) return null;
       if (!Number.isFinite(width) || width <= 0) return null;
@@ -1681,6 +1695,16 @@ function normalizeStoredInstaMeUploadedImages(input: unknown): InstaMeUploadedIm
           Number.isInteger(analysisVersion) && analysisVersion > 0 ? analysisVersion : undefined,
         imageHash: imageHash || undefined,
         firstUseSurchargeCharged,
+        styleLabel: kind === "generation" && styleLabel ? styleLabel : undefined,
+        stylePresetId: kind === "generation" && stylePresetId ? stylePresetId : undefined,
+        ownStyleId: kind === "generation" && ownStyleId ? ownStyleId : undefined,
+        artStyleId: kind === "generation" && artStyleId ? artStyleId : undefined,
+        customPrompt: kind === "generation" && customPrompt ? customPrompt : undefined,
+        creditsCharged:
+          kind === "generation" && Number.isFinite(creditsChargedRaw) && creditsChargedRaw > 0
+            ? Math.round(creditsChargedRaw)
+            : undefined,
+        generationSource: kind === "generation" && generationSource ? generationSource : undefined,
         createdAt: createdAt || new Date().toISOString(),
       };
     })
@@ -1699,6 +1723,13 @@ function toInstaMeUploadedImageSummary(image: InstaMeUploadedImageRecord) {
     fileSizeBytes: image.fileSizeBytes,
     createdAt: image.createdAt,
     previewUri: `data:${image.mimeType};base64,${image.previewBase64}`,
+    styleLabel: image.styleLabel,
+    stylePresetId: image.stylePresetId,
+    ownStyleId: image.ownStyleId,
+    artStyleId: image.artStyleId,
+    customPrompt: image.customPrompt,
+    creditsCharged: image.creditsCharged,
+    generationSource: image.generationSource,
   };
 }
 
@@ -2513,11 +2544,16 @@ function toPublicStylePreset(req: Request, preset: InstaMeStylePreset): InstaMeS
     qualityTier: resolveStylePresetQualityTier(preset),
     promptHint: preset.promptHint,
     cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
+    coverThumb: preset.coverThumb ? toCatalogAssetUrl(req, preset.coverThumb) : undefined,
     representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
     sourcePortrait: preset.sourcePortrait ? toCatalogAssetUrl(req, preset.sourcePortrait) : undefined,
     examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
+    examplesThumbs: preset.examplesThumbs
+      ? preset.examplesThumbs.map((imagePath) => toCatalogAssetUrl(req, imagePath))
+      : undefined,
     promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse,
     category: preset.category,
+    vibeId: preset.vibeId,
   };
 }
 
@@ -5718,7 +5754,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/instame/uploaded-images", authMiddleware, async (req, res) => {
     const requestedKind = normalizeStringValue(req.query.kind);
-    const imageKind = requestedKind === "enhanced" ? "enhanced" : requestedKind === "uploaded" ? "uploaded" : "";
+    const imageKind =
+      requestedKind === "enhanced"
+        ? "enhanced"
+        : requestedKind === "uploaded"
+          ? "uploaded"
+          : requestedKind === "generation"
+            ? "generation"
+            : "";
 
     const [user] = await db
       .select({ instameUploadedImages: users.instameUploadedImages })
@@ -5761,7 +5804,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const body = req.body || {};
     const input = body.image && typeof body.image === "object" ? body.image : {};
     const name = normalizeStringValue((input as { name?: unknown }).name) || "Portrait";
-    const kind = normalizeStringValue((input as { kind?: unknown }).kind) === "enhanced" ? "enhanced" : "uploaded";
+    const requestedSaveKind = normalizeStringValue((input as { kind?: unknown }).kind);
+    const kind =
+      requestedSaveKind === "enhanced"
+        ? "enhanced"
+        : requestedSaveKind === "generation"
+          ? "generation"
+          : "uploaded";
     const mimeType =
       typeof (input as { mimeType?: unknown }).mimeType === "string" &&
       String((input as { mimeType?: unknown }).mimeType).startsWith("image/")
@@ -5805,13 +5854,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(eq(users.id, req.user!.id));
 
     const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
-    const existingKindCount = existingImages.filter((entry) => (entry.kind || "uploaded") === kind).length;
-    const kindLimit = kind === "enhanced" ? MAX_INSTAME_ENHANCED_IMAGES : MAX_INSTAME_UPLOADED_IMAGES;
-    if (existingKindCount >= kindLimit) {
-      return res.status(409).json({
-        error: `You can save up to ${kindLimit} ${kind === "enhanced" ? "enhanced portraits" : "uploaded images"}.`,
-      });
+    let retainedImages = existingImages;
+
+    if (kind === "generation") {
+      // History semantics: keep a rolling window instead of rejecting new entries.
+      const generationEntries = existingImages
+        .filter((entry) => entry.kind === "generation")
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+      const evictedIds = new Set(
+        generationEntries.slice(MAX_INSTAME_GENERATION_HISTORY_IMAGES - 1).map((entry) => entry.id),
+      );
+      retainedImages = existingImages.filter((entry) => !evictedIds.has(entry.id));
+    } else {
+      const existingKindCount = existingImages.filter((entry) => (entry.kind || "uploaded") === kind).length;
+      const kindLimit = kind === "enhanced" ? MAX_INSTAME_ENHANCED_IMAGES : MAX_INSTAME_UPLOADED_IMAGES;
+      if (existingKindCount >= kindLimit) {
+        return res.status(409).json({
+          error: `You can save up to ${kindLimit} ${kind === "enhanced" ? "enhanced portraits" : "uploaded images"}.`,
+        });
+      }
     }
+
+    const generationMetadata =
+      kind === "generation"
+        ? {
+            styleLabel: normalizeStringValue((input as { styleLabel?: unknown }).styleLabel).slice(0, 120) || undefined,
+            stylePresetId: normalizeStringValue((input as { stylePresetId?: unknown }).stylePresetId).slice(0, 80) || undefined,
+            ownStyleId: normalizeStringValue((input as { ownStyleId?: unknown }).ownStyleId).slice(0, 80) || undefined,
+            artStyleId: normalizeStringValue((input as { artStyleId?: unknown }).artStyleId).slice(0, 80) || undefined,
+            customPrompt: normalizeStringValue((input as { customPrompt?: unknown }).customPrompt).slice(0, 2000) || undefined,
+            creditsCharged:
+              Number.isFinite(Number((input as { creditsCharged?: unknown }).creditsCharged)) &&
+              Number((input as { creditsCharged?: unknown }).creditsCharged) > 0
+                ? Math.round(Number((input as { creditsCharged?: unknown }).creditsCharged))
+                : undefined,
+            generationSource:
+              normalizeStringValue((input as { generationSource?: unknown }).generationSource).slice(0, 40) || undefined,
+          }
+        : {};
 
     const savedImage: InstaMeUploadedImageRecord = {
       id: randomUUID(),
@@ -5824,12 +5904,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       height: Math.round(height),
       fileSizeBytes: normalizedFileSize,
       createdAt: new Date().toISOString(),
+      ...generationMetadata,
     };
 
     await db
       .update(users)
       .set({
-        instameUploadedImages: [savedImage, ...existingImages],
+        instameUploadedImages: [savedImage, ...retainedImages],
         updatedAt: new Date(),
       })
       .where(eq(users.id, req.user!.id));

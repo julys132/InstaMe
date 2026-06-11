@@ -20,11 +20,17 @@ export type InstaMeStylePreset = {
   label: string;
   subtitle: string;
   category?: InstaMeStyleCategory;
+  /** Explicit style wall category (see constants/instameStyleTaxonomy.ts vibe ids). */
+  vibeId?: string;
   qualityTier?: InstaMeQualityTier;
   promptHint: string;
   cover?: string;
   representativeImage: string;
   examples: string[];
+  /** Optimized ~480px thumbnails parallel to `examples` (fall back to originals when absent). */
+  examplesThumbs?: string[];
+  /** Optimized thumbnail for `cover`/`representativeImage`. */
+  coverThumb?: string;
   /** Optional portrait reference that was used to generate the (newly added) representative image. */
   sourcePortrait?: string;
   promptFile?: string;

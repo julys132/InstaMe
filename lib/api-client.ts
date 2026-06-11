@@ -17,13 +17,20 @@ export const STORAGE_KEYS = {
 export type InstaMeUploadedImage = {
   id: string;
   name: string;
-  kind?: "uploaded" | "enhanced" | "own_style";
+  kind?: "uploaded" | "enhanced" | "own_style" | "generation";
   mimeType: string;
   width: number;
   height: number;
   fileSizeBytes: number;
   createdAt: string;
   previewUri: string;
+  styleLabel?: string;
+  stylePresetId?: string;
+  ownStyleId?: string;
+  artStyleId?: string;
+  customPrompt?: string;
+  creditsCharged?: number;
+  generationSource?: string;
 };
 
 export type InstaMeOwnStyle = {
@@ -639,7 +646,7 @@ class ApiClient {
     );
   }
 
-  async getInstaMeUploadedImages(kind?: "uploaded" | "enhanced") {
+  async getInstaMeUploadedImages(kind?: "uploaded" | "enhanced" | "generation") {
     return this.request<{
       images: InstaMeUploadedImage[];
     }>(`/instame/uploaded-images${kind ? `?kind=${encodeURIComponent(kind)}` : ""}`, {}, true);
@@ -654,13 +661,20 @@ class ApiClient {
   async saveInstaMeUploadedImage(payload: {
     image: {
       name?: string;
-      kind?: "uploaded" | "enhanced";
+      kind?: "uploaded" | "enhanced" | "generation";
       mimeType?: string;
       base64: string;
       previewBase64: string;
       width: number;
       height: number;
       fileSizeBytes: number;
+      styleLabel?: string;
+      stylePresetId?: string;
+      ownStyleId?: string;
+      artStyleId?: string;
+      customPrompt?: string;
+      creditsCharged?: number;
+      generationSource?: string;
     };
   }) {
     return this.request<{

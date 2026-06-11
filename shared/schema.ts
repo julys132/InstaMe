@@ -16,7 +16,7 @@ import { z } from "zod";
 export type InstaMeUploadedImageRecord = {
   id: string;
   name: string;
-  kind?: "uploaded" | "enhanced" | "own_style";
+  kind?: "uploaded" | "enhanced" | "own_style" | "generation";
   mimeType: string;
   base64: string;
   previewBase64: string;
@@ -28,6 +28,14 @@ export type InstaMeUploadedImageRecord = {
   analysisVersion?: number;
   imageHash?: string;
   firstUseSurchargeCharged?: boolean;
+  /** Generation history metadata (kind === "generation"). */
+  styleLabel?: string;
+  stylePresetId?: string;
+  ownStyleId?: string;
+  artStyleId?: string;
+  customPrompt?: string;
+  creditsCharged?: number;
+  generationSource?: string;
   createdAt: string;
 };
 
