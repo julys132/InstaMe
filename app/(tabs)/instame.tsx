@@ -5400,6 +5400,9 @@ export default function InstaMeScreen() {
                       pressed ? { opacity: 0.9 } : undefined,
                     ]}
                   >
+                    <View style={styles.modalToggleIconChip}>
+                      <Ionicons name="color-wand-outline" size={16} color={Colors.accentPale} />
+                    </View>
                     <View style={styles.modalRetouchToggleCopy}>
                       <Text style={styles.modalRetouchToggleTitle}>Retouch</Text>
                       <Text style={styles.modalRetouchToggleSubtitle}>
@@ -5455,6 +5458,9 @@ export default function InstaMeScreen() {
                     pressed ? { opacity: 0.9 } : undefined,
                   ]}
                 >
+                  <View style={styles.modalToggleIconChip}>
+                    <Ionicons name="person-circle-outline" size={16} color={Colors.accentPale} />
+                  </View>
                   <View style={styles.modalRetouchToggleCopy}>
                     <Text style={styles.modalRetouchToggleTitle}>Add your portrait</Text>
                     <Text style={styles.modalRetouchToggleSubtitle}>
@@ -5667,7 +5673,7 @@ export default function InstaMeScreen() {
                     </View>
                   </View>
 
-                  <View style={styles.modalSection}>
+                  <View style={[styles.modalSection, styles.modalSectionPlain]}>
                     <Pressable
                       onPress={handleTransform}
                       disabled={!canGenerate}
@@ -5681,11 +5687,15 @@ export default function InstaMeScreen() {
                         {loading ? (
                           <ActivityIndicator color="#FF7FB1" />
                         ) : (
-                          <Text style={styles.generateButtonText}>Restyle</Text>
+                          <>
+                            <Text style={styles.generateButtonText}>Restyle</Text>
+                            <View style={styles.generateButtonCostPill}>
+                              <Text style={styles.generateButtonCostText}>{transformCost} credits</Text>
+                            </View>
+                          </>
                         )}
                       </View>
                     </Pressable>
-                    <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
                     <Text style={styles.generateActionHint}>Generates a new image</Text>
                     {!canGenerate && generateBlockedReason ? <Text style={styles.generateBlockedHintText}>{generateBlockedReason}</Text> : null}
                     {loading ? <GenerationProgress /> : null}
@@ -9384,6 +9394,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
   },
   generateButtonText: { color: "rgba(255,255,255,0.9)", fontFamily: "Inter_600SemiBold", fontSize: 16, letterSpacing: 0.3 },
+  generateButtonCostPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,127,177,0.42)",
+    backgroundColor: "rgba(255,79,125,0.14)",
+  },
+  generateButtonCostText: {
+    color: "#FF9CC0",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
   generateCostLabel: {
     textAlign: "center",
     color: "rgba(255,255,255,0.55)",
@@ -9396,7 +9420,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.48)",
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    marginTop: -2,
+    marginTop: 2,
   },
   generateBlockedHintText: {
     textAlign: "center",
@@ -9945,6 +9969,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  modalToggleIconChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,127,177,0.30)",
+    backgroundColor: "rgba(255,79,125,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSectionPlain: {
+    borderColor: "transparent",
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingVertical: 6,
+    gap: 8,
+  },
   modalRetouchDrawer: {
     gap: 12,
   },
@@ -10043,22 +10084,28 @@ const styles = StyleSheet.create({
   },
   modalQualityButton: {
     flex: 1,
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     backgroundColor: "rgba(0,0,0,0.26)",
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
+    gap: 4,
+    alignItems: "center",
   },
   modalQualityButtonActive: {
     borderColor: "rgba(255,122,176,0.72)",
     backgroundColor: "rgba(255,79,125,0.14)",
+    shadowColor: "#FF4F7D",
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
   },
   modalQualityButtonLabel: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    fontSize: 14,
   },
   modalQualityButtonLabelActive: {
     color: Colors.accentPale,
@@ -10068,6 +10115,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 11,
     lineHeight: 15,
+    textAlign: "center",
   },
   modalQualityButtonMetaActive: {
     color: "rgba(255,255,255,0.86)",
