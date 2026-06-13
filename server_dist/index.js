@@ -797,10 +797,12 @@ function normalizePreset(input) {
   const promptHint = typeof record?.promptHint === "string" ? record.promptHint : "";
   const representativeImage = typeof record?.representativeImage === "string" ? record.representativeImage : "";
   const cover = typeof record?.cover === "string" ? record.cover : void 0;
+  const coverThumb = typeof record?.coverThumb === "string" ? record.coverThumb : void 0;
   const sourcePortrait = typeof record?.sourcePortrait === "string" ? record.sourcePortrait : void 0;
   const promptFile = typeof record?.promptFile === "string" ? record.promptFile : void 0;
   const promptFileFallbackText = readPromptFileText(promptFile);
   const examples = Array.isArray(record?.examples) ? record.examples.filter((entry) => typeof entry === "string") : [];
+  const examplesThumbs = Array.isArray(record?.examplesThumbs) ? record.examplesThumbs.filter((entry) => typeof entry === "string") : void 0;
   const promptVariants = Array.isArray(record?.promptVariants) ? record.promptVariants.map((entry) => normalizePromptVariant(entry)).filter((entry) => Boolean(entry)).map((entry) => {
     if (!promptFileFallbackText || !isLikelyCorruptedPrompt(entry.prompt)) {
       return entry;
@@ -813,6 +815,7 @@ function normalizePreset(input) {
   const promptOnlyAfterFirstUse = record?.promptOnlyAfterFirstUse === true;
   const rawCategory = typeof record?.category === "string" ? record.category : "";
   const category = rawCategory === "men" ? "men" : rawCategory === "couple" ? "couple" : rawCategory === "women" ? "women" : void 0;
+  const vibeId = typeof record?.vibeId === "string" && record.vibeId ? record.vibeId : void 0;
   if (!id || !label || !subtitle || !promptHint || !representativeImage || examples.length === 0) {
     return null;
   }
@@ -821,11 +824,14 @@ function normalizePreset(input) {
     label,
     subtitle,
     category,
+    vibeId,
     promptHint,
     cover,
+    coverThumb,
     representativeImage,
     sourcePortrait,
     examples,
+    examplesThumbs,
     promptFile,
     promptVariants,
     promptOnlyAfterFirstUse
@@ -2449,7 +2455,7 @@ var INSTAME_TRANSFORM_COST = Number.parseInt(
   process.env.INSTAME_TRANSFORM_COST || String(getLiveInstaMeGenerationTier().credits),
   10
 );
-var DEFAULT_INITIAL_CREDITS = Number.parseInt(process.env.DEFAULT_INITIAL_CREDITS || "3", 10);
+var DEFAULT_INITIAL_CREDITS = Number.parseInt(process.env.DEFAULT_INITIAL_CREDITS || "6", 10);
 var DEFAULT_DEV_CREDIT_GRANT = Number.parseInt(process.env.DEV_CREDIT_GRANT_AMOUNT || "50", 10);
 var MAX_DEV_CREDIT_GRANT = 500;
 var DEFAULT_ALLOWED_DEV_CREDIT_EMAILS = ["iuliastarcean@gmail.com"];
@@ -2490,7 +2496,8 @@ var MAX_IMAGE_BASE64_LENGTH = 25e5;
 var MAX_INSTAME_UPLOADED_IMAGES = 10;
 var MAX_INSTAME_ENHANCED_IMAGES = 10;
 var MAX_INSTAME_OWN_STYLES = 12;
-var MAX_INSTAME_LIBRARY_IMAGES_TOTAL = MAX_INSTAME_UPLOADED_IMAGES + MAX_INSTAME_ENHANCED_IMAGES + MAX_INSTAME_OWN_STYLES;
+var MAX_INSTAME_GENERATION_HISTORY_IMAGES = 20;
+var MAX_INSTAME_LIBRARY_IMAGES_TOTAL = MAX_INSTAME_UPLOADED_IMAGES + MAX_INSTAME_ENHANCED_IMAGES + MAX_INSTAME_OWN_STYLES + MAX_INSTAME_GENERATION_HISTORY_IMAGES;
 var MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1e6;
 var MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 var MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 22e4;
@@ -2737,7 +2744,7 @@ function getInitialCredits() {
   if (Number.isInteger(DEFAULT_INITIAL_CREDITS) && DEFAULT_INITIAL_CREDITS > 0) {
     return DEFAULT_INITIAL_CREDITS;
   }
-  return 3;
+  return 6;
 }
 function normalizeEmail(email) {
   return email.trim().toLowerCase();
@@ -3150,7 +3157,7 @@ function normalizeStoredInstaMeUploadedImages(input) {
     const previewBase64 = stripDataUriPrefix(
       normalizeStringValue(candidate.previewBase64) || base64
     ).replace(/\s+/g, "");
-    const kind = candidate.kind === "enhanced" ? "enhanced" : candidate.kind === "own_style" ? "own_style" : "uploaded";
+    const kind = candidate.kind === "enhanced" ? "enhanced" : candidate.kind === "own_style" ? "own_style" : candidate.kind === "generation" ? "generation" : "uploaded";
     const analyzedPromptRaw = normalizeStringValue(candidate.analyzedPrompt).slice(0, MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH);
     const analyzedPrompt = kind === "own_style" ? analyzedPromptRaw || buildOwnStyleFallbackAnalysisPrompt() : analyzedPromptRaw;
     const analysisMode = candidate.analysisMode === "creative_prompt" || candidate.analysisMode === "reference_locked" ? candidate.analysisMode : void 0;
@@ -3163,6 +3170,13 @@ function normalizeStoredInstaMeUploadedImages(input) {
     const fileSizeBytes = Number(candidate.fileSizeBytes);
     const createdAt = normalizeStringValue(candidate.createdAt);
     const firstUseSurchargeCharged = kind === "own_style" ? typeof firstUseSurchargeChargedRaw === "boolean" ? firstUseSurchargeChargedRaw : true : void 0;
+    const styleLabel = normalizeStringValue(candidate.styleLabel).slice(0, 120);
+    const stylePresetId = normalizeStringValue(candidate.stylePresetId).slice(0, 80);
+    const ownStyleId = normalizeStringValue(candidate.ownStyleId).slice(0, 80);
+    const artStyleId = normalizeStringValue(candidate.artStyleId).slice(0, 80);
+    const customPrompt = normalizeStringValue(candidate.customPrompt).slice(0, 2e3);
+    const creditsChargedRaw = Number(candidate.creditsCharged);
+    const generationSource = normalizeStringValue(candidate.generationSource).slice(0, 40);
     if (!id || !base64 || !previewBase64) return null;
     if (!Number.isFinite(width) || width <= 0) return null;
     if (!Number.isFinite(height) || height <= 0) return null;
@@ -3181,6 +3195,13 @@ function normalizeStoredInstaMeUploadedImages(input) {
       analysisVersion: Number.isInteger(analysisVersion) && analysisVersion > 0 ? analysisVersion : void 0,
       imageHash: imageHash || void 0,
       firstUseSurchargeCharged,
+      styleLabel: kind === "generation" && styleLabel ? styleLabel : void 0,
+      stylePresetId: kind === "generation" && stylePresetId ? stylePresetId : void 0,
+      ownStyleId: kind === "generation" && ownStyleId ? ownStyleId : void 0,
+      artStyleId: kind === "generation" && artStyleId ? artStyleId : void 0,
+      customPrompt: kind === "generation" && customPrompt ? customPrompt : void 0,
+      creditsCharged: kind === "generation" && Number.isFinite(creditsChargedRaw) && creditsChargedRaw > 0 ? Math.round(creditsChargedRaw) : void 0,
+      generationSource: kind === "generation" && generationSource ? generationSource : void 0,
       createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
     };
   }).filter((entry) => Boolean(entry)).slice(0, MAX_INSTAME_LIBRARY_IMAGES_TOTAL);
@@ -3195,7 +3216,14 @@ function toInstaMeUploadedImageSummary(image) {
     height: image.height,
     fileSizeBytes: image.fileSizeBytes,
     createdAt: image.createdAt,
-    previewUri: `data:${image.mimeType};base64,${image.previewBase64}`
+    previewUri: `data:${image.mimeType};base64,${image.previewBase64}`,
+    styleLabel: image.styleLabel,
+    stylePresetId: image.stylePresetId,
+    ownStyleId: image.ownStyleId,
+    artStyleId: image.artStyleId,
+    customPrompt: image.customPrompt,
+    creditsCharged: image.creditsCharged,
+    generationSource: image.generationSource
   };
 }
 function toInstaMeOwnStyleSummary(image) {
@@ -3760,11 +3788,14 @@ function toPublicStylePreset(req, preset) {
     qualityTier: resolveStylePresetQualityTier(preset),
     promptHint: preset.promptHint,
     cover: preset.cover ? toCatalogAssetUrl(req, preset.cover) : preset.cover,
+    coverThumb: preset.coverThumb ? toCatalogAssetUrl(req, preset.coverThumb) : void 0,
     representativeImage: toCatalogAssetUrl(req, preset.representativeImage),
     sourcePortrait: preset.sourcePortrait ? toCatalogAssetUrl(req, preset.sourcePortrait) : void 0,
     examples: preset.examples.map((imagePath) => toCatalogAssetUrl(req, imagePath)),
+    examplesThumbs: preset.examplesThumbs ? preset.examplesThumbs.map((imagePath) => toCatalogAssetUrl(req, imagePath)) : void 0,
     promptOnlyAfterFirstUse: preset.promptOnlyAfterFirstUse,
-    category: preset.category
+    category: preset.category,
+    vibeId: preset.vibeId
   };
 }
 function hasOpenAiImageConfig() {
@@ -6171,7 +6202,7 @@ async function registerRoutes(app2) {
   });
   app2.get("/api/instame/uploaded-images", authMiddleware, async (req, res) => {
     const requestedKind = normalizeStringValue(req.query.kind);
-    const imageKind = requestedKind === "enhanced" ? "enhanced" : requestedKind === "uploaded" ? "uploaded" : "";
+    const imageKind = requestedKind === "enhanced" ? "enhanced" : requestedKind === "uploaded" ? "uploaded" : requestedKind === "generation" ? "generation" : "";
     const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
     const images = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
     return res.json({
@@ -6197,7 +6228,8 @@ async function registerRoutes(app2) {
     const body = req.body || {};
     const input = body.image && typeof body.image === "object" ? body.image : {};
     const name = normalizeStringValue(input.name) || "Portrait";
-    const kind = normalizeStringValue(input.kind) === "enhanced" ? "enhanced" : "uploaded";
+    const requestedSaveKind = normalizeStringValue(input.kind);
+    const kind = requestedSaveKind === "enhanced" ? "enhanced" : requestedSaveKind === "generation" ? "generation" : "uploaded";
     const mimeType = typeof input.mimeType === "string" && String(input.mimeType).startsWith("image/") ? String(input.mimeType) : "image/jpeg";
     const base64 = stripDataUriPrefix(
       normalizeStringValue(input.base64)
@@ -6226,13 +6258,31 @@ async function registerRoutes(app2) {
     }
     const [user] = await db.select({ instameUploadedImages: users.instameUploadedImages }).from(users).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
     const existingImages = normalizeStoredInstaMeUploadedImages(user?.instameUploadedImages);
-    const existingKindCount = existingImages.filter((entry) => (entry.kind || "uploaded") === kind).length;
-    const kindLimit = kind === "enhanced" ? MAX_INSTAME_ENHANCED_IMAGES : MAX_INSTAME_UPLOADED_IMAGES;
-    if (existingKindCount >= kindLimit) {
-      return res.status(409).json({
-        error: `You can save up to ${kindLimit} ${kind === "enhanced" ? "enhanced portraits" : "uploaded images"}.`
-      });
+    let retainedImages = existingImages;
+    if (kind === "generation") {
+      const generationEntries = existingImages.filter((entry) => entry.kind === "generation").sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+      const evictedIds = new Set(
+        generationEntries.slice(MAX_INSTAME_GENERATION_HISTORY_IMAGES - 1).map((entry) => entry.id)
+      );
+      retainedImages = existingImages.filter((entry) => !evictedIds.has(entry.id));
+    } else {
+      const existingKindCount = existingImages.filter((entry) => (entry.kind || "uploaded") === kind).length;
+      const kindLimit = kind === "enhanced" ? MAX_INSTAME_ENHANCED_IMAGES : MAX_INSTAME_UPLOADED_IMAGES;
+      if (existingKindCount >= kindLimit) {
+        return res.status(409).json({
+          error: `You can save up to ${kindLimit} ${kind === "enhanced" ? "enhanced portraits" : "uploaded images"}.`
+        });
+      }
     }
+    const generationMetadata = kind === "generation" ? {
+      styleLabel: normalizeStringValue(input.styleLabel).slice(0, 120) || void 0,
+      stylePresetId: normalizeStringValue(input.stylePresetId).slice(0, 80) || void 0,
+      ownStyleId: normalizeStringValue(input.ownStyleId).slice(0, 80) || void 0,
+      artStyleId: normalizeStringValue(input.artStyleId).slice(0, 80) || void 0,
+      customPrompt: normalizeStringValue(input.customPrompt).slice(0, 2e3) || void 0,
+      creditsCharged: Number.isFinite(Number(input.creditsCharged)) && Number(input.creditsCharged) > 0 ? Math.round(Number(input.creditsCharged)) : void 0,
+      generationSource: normalizeStringValue(input.generationSource).slice(0, 40) || void 0
+    } : {};
     const savedImage = {
       id: (0, import_node_crypto2.randomUUID)(),
       name,
@@ -6243,10 +6293,11 @@ async function registerRoutes(app2) {
       width: Math.round(width),
       height: Math.round(height),
       fileSizeBytes: normalizedFileSize,
-      createdAt: (/* @__PURE__ */ new Date()).toISOString()
+      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+      ...generationMetadata
     };
     await db.update(users).set({
-      instameUploadedImages: [savedImage, ...existingImages],
+      instameUploadedImages: [savedImage, ...retainedImages],
       updatedAt: /* @__PURE__ */ new Date()
     }).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
     return res.status(201).json({
@@ -7107,6 +7158,14 @@ async function registerRoutes(app2) {
     const extraNotes = sanitizeGridPromptText(normalizeStringValue(body.extraNotes) || "");
     const hasPortraitReference = body.hasPortraitReference === true;
     const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const referenceImages = Array.isArray(body.referenceImages) ? body.referenceImages.slice(0, 3).flatMap((image) => {
+      if (!image || typeof image !== "object") return [];
+      const candidate = image;
+      const base64 = typeof candidate.base64 === "string" ? candidate.base64.trim() : "";
+      if (!base64) return [];
+      const mimeType = typeof candidate.mimeType === "string" && candidate.mimeType.trim() ? candidate.mimeType.trim() : "image/jpeg";
+      return [{ base64, mimeType }];
+    }) : [];
     const rawCtx = body.continuityContext;
     const priorContext = rawCtx && typeof rawCtx === "object" && normalizeStringValue(rawCtx.aesthetic) ? {
       aesthetic: sanitizeGridPromptText(normalizeStringValue(rawCtx.aesthetic)),
@@ -7116,13 +7175,22 @@ async function registerRoutes(app2) {
       usedHairstyles: Array.isArray(rawCtx.usedHairstyles) ? rawCtx.usedHairstyles.map((hairstyle) => sanitizeGridPromptText(normalizeStringValue(hairstyle))).filter(Boolean) : [],
       usedAngles: Array.isArray(rawCtx.usedAngles) ? rawCtx.usedAngles.map((angle) => sanitizeGridPromptText(normalizeStringValue(angle))).filter(Boolean) : []
     } : null;
-    const inputs = { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference };
+    const referenceImageNote = referenceImages.length > 0 ? `Use the attached product/scene reference image${referenceImages.length > 1 ? "s" : ""} as must-include visual material. Keep the items recognizable and naturally integrated across the grid; do not replace the portrait subject with the product references.` : "";
+    const mergedExtraNotes = [extraNotes, referenceImageNote].filter(Boolean).join(" ");
+    const inputs = {
+      imageCount,
+      aesthetic,
+      palette,
+      lightType,
+      extraNotes: mergedExtraNotes,
+      hasPortraitReference
+    };
     await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
     let consumed = true;
     try {
       const geminiApiKey = getGeminiApiKey();
       const geminiApiBaseUrl = process.env.GEMINI_API_BASE_URL || process.env.AI_INTEGRATIONS_GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
-      const systemPrompt = priorContext ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, extraNotes) : buildMasterGridSystemPrompt(inputs);
+      const systemPrompt = priorContext ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes) : buildMasterGridSystemPrompt(inputs);
       const rawPlan = await callGeminiFlashText({
         systemPrompt,
         geminiApiBaseUrl,
@@ -7144,6 +7212,7 @@ async function registerRoutes(app2) {
       if (portrait) {
         compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
       }
+      compositeImages.push(...referenceImages);
       const compositeImageBase64 = await generateOpenAiImage({
         model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
         prompt: compositePrompt,
@@ -7191,6 +7260,14 @@ async function registerRoutes(app2) {
       return res.status(400).json({ error: "At least one position must be selected." });
     }
     const portrait = typeof body.portrait === "string" && body.portrait.length > 0 ? body.portrait : void 0;
+    const referenceImages = Array.isArray(body.referenceImages) ? body.referenceImages.slice(0, 3).flatMap((image) => {
+      if (!image || typeof image !== "object") return [];
+      const candidate = image;
+      const base64 = typeof candidate.base64 === "string" ? candidate.base64.trim() : "";
+      if (!base64) return [];
+      const mimeType = typeof candidate.mimeType === "string" && candidate.mimeType.trim() ? candidate.mimeType.trim() : "image/jpeg";
+      return [{ base64, mimeType }];
+    }) : [];
     const imageCount = plan.shots.length;
     const aesthetic = sanitizeGridPromptText(normalizeStringValue(plan.aesthetic) || "");
     const palette = sanitizeGridPromptText(normalizeStringValue(plan.palette) || "");
@@ -7210,12 +7287,14 @@ async function registerRoutes(app2) {
         if (portrait) {
           images.push({ base64: portrait, mimeType: "image/jpeg" });
         }
+        images.push(...referenceImages);
         const safeShot = {
           ...shot,
           label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
           hairstyle: shot.hairstyle ? sanitizeGridPromptText(normalizeStringValue(shot.hairstyle)) : null,
           angle: shot.angle ? sanitizeGridPromptText(normalizeStringValue(shot.angle)) : null
         };
+        const referenceImagePromptNote = referenceImages.length > 0 ? ` Attached product/scene reference image${referenceImages.length > 1 ? "s" : ""} must remain recognizable and naturally integrated if visible in this shot.` : "";
         const primaryPrompt = sanitizeGridPromptText(buildExtractionPrompt({
           position: shot.position,
           imageCount,
@@ -7224,7 +7303,7 @@ async function registerRoutes(app2) {
           aesthetic,
           palette,
           lightType
-        }));
+        }) + referenceImagePromptNote);
         let generatedImageBase64 = null;
         let shotFailed = false;
         try {

@@ -33,7 +33,7 @@ import * as MediaLibrary from "expo-media-library";
 import * as Notifications from "expo-notifications";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCredits } from "@/contexts/CreditsContext";
+import { CREDIT_PACKAGES, useCredits } from "@/contexts/CreditsContext";
 import {
   apiClient,
   type InstaMeOwnStyle,
@@ -75,8 +75,8 @@ import {
   INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
   INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS,
   INSTAME_PORTRAIT_ENHANCE_TIER,
-  getInstaMeCreditsForQualityTier,
-  getInstaMeQualityTierLabel,
+  getInstaMeCreditsForQualityTier,  getInstaMeQualityTierLabel,
+  getInstaMePackBundleCreditCost,
   type InstaMeQualityTier,
   type PublicInstaMeEditTier,
   type PublicInstaMeGenerationTier,
@@ -3043,6 +3043,33 @@ export default function InstaMeScreen() {
     }
   }, [appendGenerationHistory, photo, selectedArtStyleId, user?.id]);
 
+  const promptInsufficientCredits = useCallback(
+    (needed: number, actionLabel: string) => {
+      const missing = Math.max(0, needed - credits);
+      const recommendedPack =
+        CREDIT_PACKAGES.find((pack) => pack.credits >= missing) ||
+        CREDIT_PACKAGES[CREDIT_PACKAGES.length - 1];
+      const recommendationLine = recommendedPack
+        ? `\n\nQuickest top-up: ${recommendedPack.name} for $${recommendedPack.price.toFixed(2)}.`
+        : "";
+      Alert.alert(
+        "You're a little short on credits",
+        `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} costs ${needed} credits and you have ${credits}. You need ${missing} more.${recommendationLine}`,
+        [
+          { text: "Not now", style: "cancel" },
+          {
+            text: "Get credits",
+            onPress: () => {
+              void Haptics.selectionAsync();
+              router.push("/(tabs)/credits" as any);
+            },
+          },
+        ],
+      );
+    },
+    [credits],
+  );
+
   const handleEnhancePortrait = useCallback(async () => {
     if (!photo) {
       Alert.alert("Missing image", "Upload one portrait before enhancing it.");
@@ -3050,10 +3077,7 @@ export default function InstaMeScreen() {
     }
 
     if (credits < portraitEnhanceCost) {
-      Alert.alert(
-        "Not enough credits",
-        `Portrait Enhance costs ${portraitEnhanceCost} credits.`,
-      );
+      promptInsufficientCredits(portraitEnhanceCost, "enhance your portrait");
       return;
     }
 
@@ -3098,7 +3122,7 @@ export default function InstaMeScreen() {
     } finally {
       setPortraitEnhanceLoading(false);
     }
-  }, [credits, persistHistoryResult, photo, portraitEnhanceCost, refreshCredits]);
+  }, [credits, persistHistoryResult, photo, portraitEnhanceCost, promptInsufficientCredits, refreshCredits]);
 
   const handleKeepEnhancedPortrait = useCallback(async () => {
     if (!portraitEnhanceCandidate) {
@@ -3170,7 +3194,7 @@ export default function InstaMeScreen() {
       return;
     }
     if (credits < transformCost) {
-      Alert.alert("Not enough credits", `This transform costs ${transformCost} credits.`);
+      promptInsufficientCredits(transformCost, "this restyle");
       return;
     }
 
@@ -3292,6 +3316,7 @@ export default function InstaMeScreen() {
     selectedGenerationTierId,
     selectedStyleId,
     stylePresets,
+    promptInsufficientCredits,
   ]);
 
   const handleRegenerateHistoryEntry = useCallback(async (entry: InstaMeHistoryEntry) => {
@@ -3315,10 +3340,7 @@ export default function InstaMeScreen() {
       return;
     }
     if (credits < (selectedEditTier?.credits ?? 0)) {
-      Alert.alert(
-        "Not enough credits",
-        `This edit costs ${selectedEditTier?.credits ?? 0} credits.`,
-      );
+      promptInsufficientCredits(selectedEditTier?.credits ?? 0, "this edit");
       return;
     }
 
@@ -3388,6 +3410,7 @@ export default function InstaMeScreen() {
     selectedStyleId,
     selectedStylePreset?.label,
     selectedOwnStyleId,
+    promptInsufficientCredits,
   ]);
 
   const exportBase64Image = useCallback(async (
@@ -3762,6 +3785,12 @@ export default function InstaMeScreen() {
                           )}
                         </View>
                         <Text numberOfLines={2} style={styles.packCardTitle}>{pack.label}</Text>
+                        <View style={styles.packCardPriceRow}>
+                          <Ionicons name="diamond-outline" size={10} color="rgba(255,255,255,0.92)" />
+                          <Text style={styles.packCardPriceText}>
+                            {getInstaMePackBundleCreditCost(pack.count)} cr · {pack.count} photos
+                          </Text>
+                        </View>
                       </LinearGradient>
                     </Pressable>
                   );
@@ -3805,6 +3834,12 @@ export default function InstaMeScreen() {
                       <Text style={styles.packPlannerSummaryText}>
                         {selectedPackImageCount} images • {selectedPackBriefVibe.label}
                       </Text>
+                      <View style={styles.packPlannerSummaryPriceRow}>
+                        <Ionicons name="diamond-outline" size={12} color={Colors.accentLight} />
+                        <Text style={styles.packPlannerSummaryPriceText}>
+                          Full pack ≈ {getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
+                        </Text>
+                      </View>
                     </View>
 
                     <View style={styles.packPlannerBlock}>
@@ -6349,6 +6384,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 20,
   },
+  packCardPriceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(0,0,0,0.42)",
+  },
+  packCardPriceText: {
+    color: "rgba(255,255,255,0.92)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10.5,
+    letterSpacing: 0.2,
+  },
   packCardSubtitle: {
     color: "rgba(255,255,255,0.74)",
     fontFamily: "Inter_500Medium",
@@ -6476,6 +6530,25 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.72)",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+  },
+  packPlannerSummaryPriceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.34)",
+    backgroundColor: "rgba(66,214,235,0.10)",
+  },
+  packPlannerSummaryPriceText: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11.5,
+    letterSpacing: 0.2,
   },
   packPlannerDeliverableText: {
     color: "rgba(255,255,255,0.52)",

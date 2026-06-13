@@ -200,6 +200,19 @@ export const INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST =
 export const INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE =
   INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
 
+/**
+ * Full estimated credit cost for a complete pack of `imageCount` photos:
+ * one composite preview (plan + composite render) plus per-image extraction.
+ * Used to show a transparent up-front bundle price on pack cards and the planner.
+ */
+export function getInstaMePackBundleCreditCost(imageCount: number): number {
+  const safeCount = Number.isFinite(imageCount) && imageCount > 0 ? Math.floor(imageCount) : 0;
+  return (
+    INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST +
+    safeCount * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE
+  );
+}
+
 export const INSTAME_GENERATION_TIERS: InstaMeGenerationTier[] = [
   {
     id: "good",

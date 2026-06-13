@@ -649,7 +649,7 @@ const INSTAME_TRANSFORM_COST = Number.parseInt(
   process.env.INSTAME_TRANSFORM_COST || String(getLiveInstaMeGenerationTier().credits),
   10,
 );
-const DEFAULT_INITIAL_CREDITS = Number.parseInt(process.env.DEFAULT_INITIAL_CREDITS || "3", 10);
+const DEFAULT_INITIAL_CREDITS = Number.parseInt(process.env.DEFAULT_INITIAL_CREDITS || "6", 10);
 const DEFAULT_DEV_CREDIT_GRANT = Number.parseInt(process.env.DEV_CREDIT_GRANT_AMOUNT || "50", 10);
 const MAX_DEV_CREDIT_GRANT = 500;
 const DEFAULT_ALLOWED_DEV_CREDIT_EMAILS = ["iuliastarcean@gmail.com"];
@@ -1057,7 +1057,7 @@ function getInitialCredits(): number {
   if (Number.isInteger(DEFAULT_INITIAL_CREDITS) && DEFAULT_INITIAL_CREDITS > 0) {
     return DEFAULT_INITIAL_CREDITS;
   }
-  return 3;
+  return 6;
 }
 
 function normalizeEmail(email: string): string {
