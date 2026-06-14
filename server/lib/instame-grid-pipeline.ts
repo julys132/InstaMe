@@ -407,6 +407,16 @@ function buildPositionMap(count: number): Array<{ position: number; type: GridPo
   return result;
 }
 
+/**
+ * Returns the contrast-matrix type for a single 1-based position.
+ * Mirrors buildPositionMap so the parsed plan can be normalized deterministically.
+ */
+function positionTypeFor(position: number): GridPositionType {
+  if (position % 2 === 0) return "SIMPLE";
+  if (position === 3 || position === 7 || position === 11) return "MEDIUM";
+  return "COMPLEX";
+}
+
 // ─── Gemini Flash text call ───────────────────────────────────────────────────
 
 /**
@@ -523,12 +533,13 @@ export function parseGridPlan(rawJson: string, expectedCount: number): GridPlan 
   const shots: GridShotPlan[] = (root.shots as unknown[]).map((s, idx) => {
     const shot = s as Record<string, unknown>;
     const position = typeof shot.position === "number" ? shot.position : idx + 1;
-    const type = shot.type === "COMPLEX" || shot.type === "SIMPLE" || shot.type === "MEDIUM"
-      ? (shot.type as GridPositionType)
-      : "COMPLEX";
+    // Enforce the contrast matrix deterministically — never trust Gemini's type,
+    // otherwise the model can drift (e.g. put portraits in consecutive cells).
+    const type = positionTypeFor(position);
     const label = typeof shot.label === "string" ? shot.label : `Shot ${position}`;
-    const hairstyle = typeof shot.hairstyle === "string" ? shot.hairstyle : null;
-    const angle = typeof shot.angle === "string" ? shot.angle : null;
+    // Object-only (SIMPLE) cells must never carry a hairstyle/angle (no model in frame).
+    const hairstyle = type === "SIMPLE" ? null : typeof shot.hairstyle === "string" ? shot.hairstyle : null;
+    const angle = type === "SIMPLE" ? null : typeof shot.angle === "string" ? shot.angle : null;
     const imagePrompt = typeof shot.imagePrompt === "string" ? shot.imagePrompt : "";
 
     if (!imagePrompt) {
@@ -638,20 +649,30 @@ export function buildCompositeGridPrompt(plan: GridPlan, hasPortraitReference: b
     .map((shot) => {
       const row = Math.ceil(shot.position / GRID_COLS);
       const col = ((shot.position - 1) % GRID_COLS) + 1;
+      const cellKind =
+        shot.type === "SIMPLE"
+          ? "OBJECT-ONLY (NO person, NO model — flat-lay / accessory / texture detail)"
+          : shot.type === "MEDIUM"
+          ? "PORTRAIT (model present — tight on face/shoulders)"
+          : "PORTRAIT (model present — full or medium body, action/location)";
       const detail = [
+        cellKind,
         shot.label,
         shot.hairstyle ? `hairstyle: ${shot.hairstyle}` : null,
         shot.angle ? `camera angle: ${shot.angle}` : null,
       ]
         .filter(Boolean)
-        .join(", ");
+        .join(" — ");
       return `  Position ${shot.position} (row ${row}, col ${col}): ${detail}`;
     })
     .join("\n");
 
+  const modelPositions = plan.shots.filter((s) => s.type !== "SIMPLE").map((s) => s.position);
+  const objectPositions = plan.shots.filter((s) => s.type === "SIMPLE").map((s) => s.position);
+
   const portraitNote = hasPortraitReference
-    ? "A female model with consistent identity appears in all relevant cells."
-    : "A stylish female model with consistent appearance throughout appears in the relevant cells.";
+    ? "The female model with consistent identity (same face) appears ONLY in the PORTRAIT cells listed below."
+    : "A stylish female model with consistent appearance (same face) appears ONLY in the PORTRAIT cells listed below.";
 
   return `Create a photorealistic Instagram profile grid preview image showing exactly ${plan.imageCount} coordinated editorial photos arranged in a ${GRID_COLS}-column × ${totalRows}-row grid, exactly as they appear on an Instagram profile page.
 
@@ -664,10 +685,21 @@ LIGHT TYPE: ${plan.lightType}
 CELL CONTENTS (left to right, top to bottom — numbering is exact):
 ${shotLines}
 
+CELL-TYPE PLACEMENT (MANDATORY — do NOT deviate):
+- PORTRAIT cells (model visible) are ONLY positions: ${modelPositions.join(", ") || "none"}.
+- OBJECT-ONLY cells (absolutely NO person, NO face, NO body part) are ONLY positions: ${objectPositions.join(", ") || "none"}.
+- The model must NEVER appear in an OBJECT-ONLY cell. Object-only cells show a single hero object/texture with generous negative space — no human anywhere.
+- Do NOT place portrait cells next to each other when an object cell is specified between them — follow the exact placement above so portraits and objects alternate as listed.
+
+OUTFIT & WARDROBE VARIETY (MANDATORY):
+- Every PORTRAIT cell must show the model in a COMPLETELY DIFFERENT outfit — different garment type, cut, and color story in each one.
+- NEVER reuse the same black blazer (or any single garment) across multiple cells. If one cell is a black blazer, the others must be e.g. a knit, a dress, a coat, a blouse, tailored trousers with a different top, etc.
+- Also vary pose, expression, and framing in every portrait cell. Never repeat the same look from a different angle.
+
 RULES:
 - All cells share identical color grading, tonal range, and aesthetic mood
 - Each cell is clearly distinct but visually harmonious with all others
-- VISUAL BALANCE (IMPORTANT): keep object/flat-lay (SIMPLE) cells minimalist and airy — ONE hero subject with generous negative space, never cluttered. Alternate busy and calm cells so the overall grid feels balanced and breathable, not crowded
+- VISUAL BALANCE (IMPORTANT): keep object/flat-lay (OBJECT-ONLY) cells minimalist and airy — ONE hero subject with generous negative space, never cluttered. Alternate busy and calm cells so the overall grid feels balanced and breathable, not crowded
 - ${portraitNote}
 - No extra borders or margins outside the grid — the grid fills the entire image
 - Render photos only: no text, captions, labels, numbers, UI chrome, stickers, logos, watermarks, signs, or readable words anywhere in the image
