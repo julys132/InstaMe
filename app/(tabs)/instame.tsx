@@ -193,7 +193,23 @@ const GENERATION_STAGES: Array<{ atSec: number; message: string }> = [
   { atSec: 70, message: "Final polish - almost there..." },
 ];
 
-function GenerationProgress() {
+const PACK_PREVIEW_STAGES: Array<{ atSec: number; message: string }> = [
+  { atSec: 0, message: "Planning your content pack..." },
+  { atSec: 5, message: "Designing each shot concept..." },
+  { atSec: 14, message: "Composing the grid layout..." },
+  { atSec: 30, message: "Rendering your preview grid..." },
+  { atSec: 50, message: "Final polish - almost there..." },
+];
+
+function GenerationProgress({
+  stages = GENERATION_STAGES,
+  durationSec = 105,
+  determinate = null,
+}: {
+  stages?: Array<{ atSec: number; message: string }>;
+  durationSec?: number;
+  determinate?: { done: number; total: number; label?: string } | null;
+} = {}) {
   const [elapsedSec, setElapsedSec] = useState(0);
 
   useEffect(() => {
@@ -201,14 +217,29 @@ function GenerationProgress() {
     return () => clearInterval(interval);
   }, []);
 
-  let stage = GENERATION_STAGES[0];
-  for (const candidate of GENERATION_STAGES) {
+  if (determinate && determinate.total > 0) {
+    const donePct = Math.min(100, Math.round((determinate.done / determinate.total) * 100));
+    return (
+      <View style={styles.generationProgressWrap}>
+        <View style={styles.generationProgressTrack}>
+          <View style={[styles.generationProgressFill, { width: `${Math.max(4, donePct)}%` }]} />
+        </View>
+        <Text style={styles.generationProgressStage}>
+          {determinate.label || `Extracting ${determinate.done}/${determinate.total}...`}
+        </Text>
+        <Text style={styles.processingHintText}>{GENERATION_WAIT_MESSAGE}</Text>
+      </View>
+    );
+  }
+
+  let stage = stages[0];
+  for (const candidate of stages) {
     if (elapsedSec >= candidate.atSec) {
       stage = candidate;
     }
   }
 
-  const progressPct = Math.min(95, Math.round((elapsedSec / 105) * 100));
+  const progressPct = Math.min(95, Math.round((elapsedSec / durationSec) * 100));
 
   return (
     <View style={styles.generationProgressWrap}>
@@ -3784,12 +3815,14 @@ export default function InstaMeScreen() {
                             <Ionicons name={pack.icon as keyof typeof Ionicons.glyphMap} size={13} color={pack.accent} />
                           )}
                         </View>
-                        <Text numberOfLines={2} style={styles.packCardTitle}>{pack.label}</Text>
-                        <View style={styles.packCardPriceRow}>
-                          <Ionicons name="diamond-outline" size={10} color="rgba(255,255,255,0.92)" />
-                          <Text style={styles.packCardPriceText}>
-                            {getInstaMePackBundleCreditCost(pack.count)} cr · {pack.count} photos
-                          </Text>
+                        <View style={styles.packCardBottomCopy}>
+                          <Text numberOfLines={2} style={styles.packCardTitle}>{pack.label}</Text>
+                          <View style={styles.packCardPriceRow}>
+                            <Ionicons name="diamond-outline" size={10} color="rgba(255,255,255,0.92)" />
+                            <Text style={styles.packCardPriceText}>
+                              {getInstaMePackBundleCreditCost(pack.count)} cr · {pack.count} photos
+                            </Text>
+                          </View>
                         </View>
                       </LinearGradient>
                     </Pressable>
@@ -4038,6 +4071,24 @@ export default function InstaMeScreen() {
                       <View style={styles.packPlannerInfoCard}>
                         <Text style={styles.packPlannerInfoText}>{packGridExtractNotice}</Text>
                       </View>
+                    ) : null}
+
+                    {packGridPreviewLoading && !packGridPreviewBase64 ? (
+                      <GenerationProgress stages={PACK_PREVIEW_STAGES} durationSec={60} />
+                    ) : null}
+
+                    {packGridRenderLoading ? (
+                      <GenerationProgress
+                        determinate={
+                          packGridExtractProgress
+                            ? {
+                                done: packGridExtractProgress.done,
+                                total: packGridExtractProgress.total,
+                                label: `Extracting ${packGridExtractProgress.done}/${packGridExtractProgress.total} images...`,
+                              }
+                            : { done: 0, total: selectedPipelineShotCount || 1, label: "Preparing extraction..." }
+                        }
+                      />
                     ) : null}
 
                     {pipelinePlan ? (
@@ -6388,7 +6439,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 6,
+    marginTop: 2,
     alignSelf: "flex-start",
     paddingHorizontal: 8,
     paddingVertical: 3,
