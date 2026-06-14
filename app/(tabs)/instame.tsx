@@ -7110,7 +7110,7 @@ const styles = StyleSheet.create({
   },
   packPlannerPreviewFrame: {
     width: "100%",
-    aspectRatio: 1,
+    aspectRatio: 1024 / 1536,
     borderRadius: 10,
     overflow: "hidden",
     backgroundColor: "rgba(255,255,255,0.04)",
@@ -7184,7 +7184,7 @@ const styles = StyleSheet.create({
   },
   packPlannerResultThumb: {
     width: "100%",
-    aspectRatio: 4 / 5,
+    aspectRatio: 1024 / 1536,
   },
   packPlannerResultFooter: {
     minHeight: 34,
