@@ -661,6 +661,8 @@ const DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash
 const DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3-pro-image-preview";
 const DEFAULT_OWN_STYLE_IMAGE_MODEL =
   process.env.OWN_STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+const INSTAME_PRIMARY_GEMINI_IMAGE_MODEL =
+  process.env.INSTAME_PRIMARY_GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 const DEFAULT_STYLE_IMAGE_FALLBACK_MODEL =
   process.env.STYLE_IMAGE_FALLBACK_MODEL || DEFAULT_OWN_STYLE_IMAGE_MODEL;
 const DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
@@ -2676,38 +2678,43 @@ async function generatePromptOnlyPresetImage(options: {
   });
 
   if (selectedModel?.provider === "together") {
+    const geminiParts: GeminiPart[] = [
+      { text: prompt },
+      ...toGeminiInlineImageParts(options.uploadedImages),
+    ];
+    const geminiMaxTokens = options.generationMode === "high_res" ? 1200 : 900;
     try {
-      const { width, height } = resolveGenerationResolution(options.generationTierId);
-      const referenceImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
-      const imageBase64 = await generateTogetherImage({
-        model: selectedModel.model,
-        prompt,
-        referenceImages: [referenceImageUrl],
-        width,
-        height,
-        sourceWidth: options.uploadedImages[0]?.width,
-        sourceHeight: options.uploadedImages[0]?.height,
+      return await generateGeminiImageFromParts({
+        model: INSTAME_PRIMARY_GEMINI_IMAGE_MODEL,
+        parts: geminiParts,
+        maxOutputTokens: geminiMaxTokens,
       });
-      return {
-        imageBase64,
-        model: selectedModel.displayName,
-        provider: "Together",
-      };
     } catch (error: unknown) {
-      if (!shouldFallbackTogetherToGemini(error)) {
+      if (!hasTogetherImageConfig()) {
         throw error;
       }
-      console.warn("Prompt-only preset generation fell back from Together to Gemini:", error);
+      console.warn("Prompt-only preset generation fell back from Gemini to Together:", error);
       try {
-        return await generateGeminiImageFromParts({
-          model: DEFAULT_STYLE_IMAGE_MODEL,
-          parts: [{ text: prompt }, ...toGeminiInlineImageParts(options.uploadedImages)],
-          maxOutputTokens: options.generationMode === "high_res" ? 1200 : 900,
+        const { width, height } = resolveGenerationResolution(options.generationTierId);
+        const referenceImageUrl = toRuntimeAssetUrl(options.req, options.uploadedImages[0]);
+        const imageBase64 = await generateTogetherImage({
+          model: selectedModel.model,
+          prompt,
+          referenceImages: [referenceImageUrl],
+          width,
+          height,
+          sourceWidth: options.uploadedImages[0]?.width,
+          sourceHeight: options.uploadedImages[0]?.height,
         });
+        return {
+          imageBase64,
+          model: selectedModel.displayName,
+          provider: "Together",
+        };
       } catch (fallbackError: unknown) {
-        console.error("Prompt-only preset generation Gemini fallback failed:", fallbackError);
+        console.error("Prompt-only preset generation Together fallback failed:", fallbackError);
         throw new Error(
-          `Prompt-only preset generation failed: ${toErrorMessage(error, "Together request failed")}. Gemini fallback failed: ${toErrorMessage(fallbackError, "Gemini request failed")}.`,
+          `Prompt-only preset generation failed: ${toErrorMessage(error, "Gemini request failed")}. Together fallback failed: ${toErrorMessage(fallbackError, "Together request failed")}.`,
         );
       }
     }
