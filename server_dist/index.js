@@ -1811,7 +1811,7 @@ ${positionInstructions}
 
 Position type rules:
 - COMPLEX: medium or full-body frame with action, movement, or location rich in detail.
-- SIMPLE: minimalist flat-lay, accessory macro, geometric shadow, or texture detail \u2014 NO model required.
+- SIMPLE: minimalist flat-lay, accessory macro, geometric shadow, or texture detail \u2014 NO model required. Compose with ONE single hero subject and GENEROUS negative space around it; keep it clean, airy, uncluttered and breathable \u2014 never busy, never crowded, never multiple objects competing for attention.
 - MEDIUM: elegant portrait or mirror selfie \u2014 tight on face/shoulders, calm and refined.
 
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -1892,7 +1892,7 @@ CONTINUITY RULES (MANDATORY)
 2. Use FRESH scenes \u2014 none of the already-used scenes above.
 3. Use FRESH hairstyles \u2014 none of the already-used hairstyles above. Choose from: ${HAIRSTYLE_BANK.join(", ")}.
 4. Use FRESH camera angles \u2014 none of the already-used angles above. Choose from: ${ANGLE_BANK.join(", ")}.
-5. SIMPLE positions must be pure minimalist object/texture shots \u2014 no model.
+5. SIMPLE positions must be pure minimalist object/texture shots \u2014 no model. Compose ONE single hero subject with generous negative space around it: clean, airy, uncluttered, breathable \u2014 never busy or crowded.
 6. NO RE-SHOOTING SUBJECTS (CRITICAL): treat the already-used scenes above as subjects/objects/props/locations that are now OFF-LIMITS. Do NOT re-depict any of them from a different distance, crop, zoom, or angle. Example: if a previous image already featured a wristwatch, this extension must NOT contain ANY watch \u2014 not closer, not farther, not from another angle. Pick entirely different objects and locations.
 7. EXPAND THE STORY: each new image must ADD a genuinely new narrative beat to the pack (new prop category, new wardrobe piece, new setting, new lifestyle moment, new texture). Across the whole extension, vary the subject categories (e.g. accessories, food/drink, architecture, interior detail, outdoor scene, wardrobe flat-lay) so the grid feels like the next chapter \u2014 never a re-run of the same motifs in new framing.
 
@@ -1923,7 +1923,7 @@ OUTPUT FORMAT (output ONLY this JSON)
 }
 var POSITION_TYPE_RULES = {
   COMPLEX: "medium or full-body frame, action, movement, rich location details",
-  SIMPLE: "minimalist flat-lay / accessory macro / geometric shadow / texture \u2014 no model",
+  SIMPLE: "minimalist flat-lay / accessory macro / geometric shadow / texture \u2014 no model. ONE single hero subject only, surrounded by GENEROUS empty negative space; clean, airy, uncluttered, calm and breathable \u2014 never busy or crowded",
   MEDIUM: "elegant tight portrait or mirror selfie \u2014 face/shoulders, calm composition"
 };
 function buildPositionMap(count) {
@@ -2085,6 +2085,7 @@ ${shotLines}
 RULES:
 - All cells share identical color grading, tonal range, and aesthetic mood
 - Each cell is clearly distinct but visually harmonious with all others
+- VISUAL BALANCE (IMPORTANT): keep object/flat-lay (SIMPLE) cells minimalist and airy \u2014 ONE hero subject with generous negative space, never cluttered. Alternate busy and calm cells so the overall grid feels balanced and breathable, not crowded
 - ${portraitNote}
 - No extra borders or margins outside the grid \u2014 the grid fills the entire image
 - Render photos only: no text, captions, labels, numbers, UI chrome, stickers, logos, watermarks, signs, or readable words anywhere in the image
@@ -2098,7 +2099,7 @@ function buildExtractionPrompt(params) {
   const rowLabel = row === 1 ? "top" : row === totalRows ? "bottom" : "center";
   const colLabel = col === 1 ? "left" : col === GRID_COLS ? "right" : "center";
   const corner = rowLabel === "center" && colLabel === "center" ? "center of the grid" : `${rowLabel}-${colLabel} of the grid`;
-  const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
+  const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame. ONE single hero subject with generous empty negative space around it; minimalist, clean, airy, uncluttered and breathable \u2014 never busy or crowded" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
   const portraitInstruction = hasPortrait ? `
 CRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait. Adapt their face naturally to the scene. Never alter their identity.` : "";
   return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).

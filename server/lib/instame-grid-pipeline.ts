@@ -241,7 +241,7 @@ ${positionInstructions}
 
 Position type rules:
 - COMPLEX: medium or full-body frame with action, movement, or location rich in detail.
-- SIMPLE: minimalist flat-lay, accessory macro, geometric shadow, or texture detail — NO model required.
+- SIMPLE: minimalist flat-lay, accessory macro, geometric shadow, or texture detail — NO model required. Compose with ONE single hero subject and GENEROUS negative space around it; keep it clean, airy, uncluttered and breathable — never busy, never crowded, never multiple objects competing for attention.
 - MEDIUM: elegant portrait or mirror selfie — tight on face/shoulders, calm and refined.
 
 ═══════════════════════════════════════════════
@@ -342,7 +342,7 @@ CONTINUITY RULES (MANDATORY)
 2. Use FRESH scenes — none of the already-used scenes above.
 3. Use FRESH hairstyles — none of the already-used hairstyles above. Choose from: ${HAIRSTYLE_BANK.join(", ")}.
 4. Use FRESH camera angles — none of the already-used angles above. Choose from: ${ANGLE_BANK.join(", ")}.
-5. SIMPLE positions must be pure minimalist object/texture shots — no model.
+5. SIMPLE positions must be pure minimalist object/texture shots — no model. Compose ONE single hero subject with generous negative space around it: clean, airy, uncluttered, breathable — never busy or crowded.
 6. NO RE-SHOOTING SUBJECTS (CRITICAL): treat the already-used scenes above as subjects/objects/props/locations that are now OFF-LIMITS. Do NOT re-depict any of them from a different distance, crop, zoom, or angle. Example: if a previous image already featured a wristwatch, this extension must NOT contain ANY watch — not closer, not farther, not from another angle. Pick entirely different objects and locations.
 7. EXPAND THE STORY: each new image must ADD a genuinely new narrative beat to the pack (new prop category, new wardrobe piece, new setting, new lifestyle moment, new texture). Across the whole extension, vary the subject categories (e.g. accessories, food/drink, architecture, interior detail, outdoor scene, wardrobe flat-lay) so the grid feels like the next chapter — never a re-run of the same motifs in new framing.
 
@@ -378,7 +378,7 @@ const POSITION_TYPE_RULES: Record<GridPositionType, string> = {
   COMPLEX:
     "medium or full-body frame, action, movement, rich location details",
   SIMPLE:
-    "minimalist flat-lay / accessory macro / geometric shadow / texture — no model",
+    "minimalist flat-lay / accessory macro / geometric shadow / texture — no model. ONE single hero subject only, surrounded by GENEROUS empty negative space; clean, airy, uncluttered, calm and breathable — never busy or crowded",
   MEDIUM:
     "elegant tight portrait or mirror selfie — face/shoulders, calm composition",
 };
@@ -667,6 +667,7 @@ ${shotLines}
 RULES:
 - All cells share identical color grading, tonal range, and aesthetic mood
 - Each cell is clearly distinct but visually harmonious with all others
+- VISUAL BALANCE (IMPORTANT): keep object/flat-lay (SIMPLE) cells minimalist and airy — ONE hero subject with generous negative space, never cluttered. Alternate busy and calm cells so the overall grid feels balanced and breathable, not crowded
 - ${portraitNote}
 - No extra borders or margins outside the grid — the grid fills the entire image
 - Render photos only: no text, captions, labels, numbers, UI chrome, stickers, logos, watermarks, signs, or readable words anywhere in the image
@@ -701,7 +702,7 @@ export function buildExtractionPrompt(params: {
 
   const typeDesc =
     shot.type === "SIMPLE"
-      ? "Flat-lay / object detail — no person in frame"
+      ? "Flat-lay / object detail — no person in frame. ONE single hero subject with generous empty negative space around it; minimalist, clean, airy, uncluttered and breathable — never busy or crowded"
       : shot.type === "MEDIUM"
       ? "Tight portrait — face and shoulders, calm and refined"
       : "Full or medium body — action, movement, or rich location";
