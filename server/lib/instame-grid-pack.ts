@@ -456,7 +456,7 @@ export function buildGridShotRenderPrompt(options: {
     elementNote,
     identityInstruction,
     notesNote,
-    "Vertical 4:5 Instagram format. Photorealistic, natural iPhone or editorial photography. No AI artifacts. Premium but authentic feed image. Ready to post on Instagram.",
+    "Tall vertical Instagram portrait format, as close to a 9:16 ratio as possible, filling the entire frame edge-to-edge with NO letterboxing, bars, or borders. Photorealistic, natural iPhone or editorial photography. No AI artifacts. Premium but authentic feed image. Ready to post on Instagram.",
   ]
     .filter(Boolean)
     .join(" ");

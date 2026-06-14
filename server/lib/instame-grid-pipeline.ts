@@ -723,5 +723,5 @@ OUTPUT REQUIREMENTS:
 - 100% faithful replica of the composition, subject, colors, lighting, and background from that exact cell
 - Maintain the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting
 - Ultra-detailed, photorealistic, shot with a professional 8K camera
-- Vertical portrait format (4:5 ratio)${portraitInstruction}`;
+- Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene must fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders${portraitInstruction}`;
 }

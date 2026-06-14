@@ -1673,7 +1673,7 @@ function buildGridShotRenderPrompt(options) {
     elementNote,
     identityInstruction,
     notesNote,
-    "Vertical 4:5 Instagram format. Photorealistic, natural iPhone or editorial photography. No AI artifacts. Premium but authentic feed image. Ready to post on Instagram."
+    "Tall vertical Instagram portrait format, as close to a 9:16 ratio as possible, filling the entire frame edge-to-edge with NO letterboxing, bars, or borders. Photorealistic, natural iPhone or editorial photography. No AI artifacts. Premium but authentic feed image. Ready to post on Instagram."
   ].filter(Boolean).join(" ");
 }
 var GRID_PREVIEW_CREDIT_COST = INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST;
@@ -2116,7 +2116,7 @@ OUTPUT REQUIREMENTS:
 - 100% faithful replica of the composition, subject, colors, lighting, and background from that exact cell
 - Maintain the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting
 - Ultra-detailed, photorealistic, shot with a professional 8K camera
-- Vertical portrait format (4:5 ratio)${portraitInstruction}`;
+- Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene must fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders${portraitInstruction}`;
 }
 
 // server/routes.ts
@@ -7248,7 +7248,7 @@ async function registerRoutes(app2) {
         model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
         prompt: compositePrompt,
         images: compositeImages.length > 0 ? compositeImages : void 0,
-        size: "1024x1024",
+        size: "1024x1536",
         quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
       });
       consumed = false;
@@ -7478,7 +7478,7 @@ async function registerRoutes(app2) {
         model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
         prompt,
         images,
-        size: "1024x1024",
+        size: "1024x1536",
         quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
       });
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));

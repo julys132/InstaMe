@@ -7155,7 +7155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
         prompt: compositePrompt,
         images: compositeImages.length > 0 ? compositeImages : undefined,
-        size: "1024x1024",
+        size: "1024x1536",
         quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
       });
 
@@ -7452,7 +7452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
         prompt,
         images,
-        size: "1024x1024",
+        size: "1024x1536",
         quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
       });
 
