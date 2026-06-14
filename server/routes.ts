@@ -663,6 +663,8 @@ const DEFAULT_OWN_STYLE_IMAGE_MODEL =
   process.env.OWN_STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 const INSTAME_PRIMARY_GEMINI_IMAGE_MODEL =
   process.env.INSTAME_PRIMARY_GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+const GEMINI_PRO_IMAGE_MODEL =
+  process.env.INSTAME_GEMINI_PRO_IMAGE_MODEL || "gemini-3-pro-image-preview";
 const DEFAULT_STYLE_IMAGE_FALLBACK_MODEL =
   process.env.STYLE_IMAGE_FALLBACK_MODEL || DEFAULT_OWN_STYLE_IMAGE_MODEL;
 const DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
@@ -1345,6 +1347,22 @@ function resolveGenerationResolution(generationTierId: string): { width: number;
 
 function resolveOpenAiSize(generationTierId: string): "1024x1024" {
   return "1024x1024";
+}
+
+// Maps a generation tier to a Gemini image model + output resolution so the
+// quality tiers (Good/Best/Excellent) actually differ when Gemini is primary.
+function resolveGeminiImageGenerationForTier(generationTierId: string): {
+  model: string;
+  imageSize: "1K" | "2K" | "4K";
+} {
+  if (generationTierId === "excellent") {
+    return { model: GEMINI_PRO_IMAGE_MODEL, imageSize: "4K" };
+  }
+  if (generationTierId === "best") {
+    return { model: GEMINI_PRO_IMAGE_MODEL, imageSize: "2K" };
+  }
+  // "good", "high_res", and any other tier default to fast flash 1K.
+  return { model: INSTAME_PRIMARY_GEMINI_IMAGE_MODEL, imageSize: "1K" };
 }
 
 const OWN_STYLE_ANALYSIS_PROMPT = [
@@ -2339,6 +2357,8 @@ async function generateGeminiContent(options: {
   maxOutputTokens?: number;
   temperature?: number;
   responseModalities?: string[];
+  imageSize?: "1K" | "2K" | "4K";
+  aspectRatio?: string;
 }): Promise<unknown> {
   const apiKey = getGeminiApiKey();
   const rawModelName = normalizeStringValue(options.model);
@@ -2363,6 +2383,16 @@ async function generateGeminiContent(options: {
   }
   if (Array.isArray(options.responseModalities) && options.responseModalities.length > 0) {
     generationConfig.responseModalities = options.responseModalities;
+  }
+  if (options.imageSize || options.aspectRatio) {
+    const imageConfig: Record<string, unknown> = {};
+    if (options.imageSize) {
+      imageConfig.imageSize = options.imageSize;
+    }
+    if (options.aspectRatio) {
+      imageConfig.aspectRatio = options.aspectRatio;
+    }
+    generationConfig.imageConfig = imageConfig;
   }
 
   const payload: Record<string, unknown> = {
@@ -2418,6 +2448,8 @@ async function generateGeminiImageFromParts(options: {
   model?: string;
   parts: GeminiPart[];
   maxOutputTokens?: number;
+  imageSize?: "1K" | "2K" | "4K";
+  aspectRatio?: string;
 }): Promise<{ imageBase64: string; model: string; provider: string }> {
   const model = normalizeStringValue(options.model) || DEFAULT_STYLE_IMAGE_MODEL;
   const fallbackModel = DEFAULT_STYLE_IMAGE_FALLBACK_MODEL;
@@ -2428,6 +2460,8 @@ async function generateGeminiImageFromParts(options: {
       parts: options.parts,
       responseModalities: ["IMAGE", "TEXT"],
       maxOutputTokens: options.maxOutputTokens ?? 1200,
+      imageSize: options.imageSize,
+      aspectRatio: options.aspectRatio,
     });
     const imageBase64 = extractGeminiImageBase64(response);
     if (!imageBase64) {
@@ -2683,11 +2717,15 @@ async function generatePromptOnlyPresetImage(options: {
       ...toGeminiInlineImageParts(options.uploadedImages),
     ];
     const geminiMaxTokens = options.generationMode === "high_res" ? 1200 : 900;
+    const { model: geminiImageModel, imageSize: geminiImageSize } =
+      resolveGeminiImageGenerationForTier(options.generationTierId);
     try {
       return await generateGeminiImageFromParts({
-        model: INSTAME_PRIMARY_GEMINI_IMAGE_MODEL,
+        model: geminiImageModel,
         parts: geminiParts,
         maxOutputTokens: geminiMaxTokens,
+        imageSize: geminiImageSize,
+        aspectRatio: "1:1",
       });
     } catch (error: unknown) {
       if (!hasTogetherImageConfig()) {

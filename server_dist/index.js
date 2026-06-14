@@ -2464,6 +2464,7 @@ var DEFAULT_STYLE_TEXT_MODEL = process.env.STYLE_TEXT_MODEL || "gemini-3-flash-p
 var DEFAULT_STYLE_IMAGE_MODEL = process.env.STYLE_IMAGE_MODEL || "gemini-3-pro-image-preview";
 var DEFAULT_OWN_STYLE_IMAGE_MODEL = process.env.OWN_STYLE_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
 var INSTAME_PRIMARY_GEMINI_IMAGE_MODEL = process.env.INSTAME_PRIMARY_GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image-preview";
+var GEMINI_PRO_IMAGE_MODEL = process.env.INSTAME_GEMINI_PRO_IMAGE_MODEL || "gemini-3-pro-image-preview";
 var DEFAULT_STYLE_IMAGE_FALLBACK_MODEL = process.env.STYLE_IMAGE_FALLBACK_MODEL || DEFAULT_OWN_STYLE_IMAGE_MODEL;
 var DEFAULT_OWN_STYLE_ANALYSIS_MODEL = process.env.OWN_STYLE_ANALYSIS_MODEL || DEFAULT_STYLE_TEXT_MODEL;
 var DEFAULT_CREATIVE_OWN_STYLE_ANALYSIS_MODEL = process.env.CREATIVE_OWN_STYLE_ANALYSIS_MODEL || "gemini-3.1-pro";
@@ -2962,6 +2963,15 @@ function resolveGenerationResolution(generationTierId) {
 }
 function resolveOpenAiSize(generationTierId) {
   return "1024x1024";
+}
+function resolveGeminiImageGenerationForTier(generationTierId) {
+  if (generationTierId === "excellent") {
+    return { model: GEMINI_PRO_IMAGE_MODEL, imageSize: "4K" };
+  }
+  if (generationTierId === "best") {
+    return { model: GEMINI_PRO_IMAGE_MODEL, imageSize: "2K" };
+  }
+  return { model: INSTAME_PRIMARY_GEMINI_IMAGE_MODEL, imageSize: "1K" };
 }
 var OWN_STYLE_ANALYSIS_PROMPT = [
   "Analyze this style-reference image in English from the perspective of an elite-level professional photographer and fashion art director.",
@@ -3657,6 +3667,16 @@ async function generateGeminiContent(options) {
   if (Array.isArray(options.responseModalities) && options.responseModalities.length > 0) {
     generationConfig.responseModalities = options.responseModalities;
   }
+  if (options.imageSize || options.aspectRatio) {
+    const imageConfig = {};
+    if (options.imageSize) {
+      imageConfig.imageSize = options.imageSize;
+    }
+    if (options.aspectRatio) {
+      imageConfig.aspectRatio = options.aspectRatio;
+    }
+    generationConfig.imageConfig = imageConfig;
+  }
   const payload = {
     contents: [
       {
@@ -3703,7 +3723,9 @@ async function generateGeminiImageFromParts(options) {
       model: requestModel,
       parts: options.parts,
       responseModalities: ["IMAGE", "TEXT"],
-      maxOutputTokens: options.maxOutputTokens ?? 1200
+      maxOutputTokens: options.maxOutputTokens ?? 1200,
+      imageSize: options.imageSize,
+      aspectRatio: options.aspectRatio
     });
     const imageBase64 = extractGeminiImageBase64(response);
     if (!imageBase64) {
@@ -3876,11 +3898,14 @@ async function generatePromptOnlyPresetImage(options) {
       ...toGeminiInlineImageParts(options.uploadedImages)
     ];
     const geminiMaxTokens = options.generationMode === "high_res" ? 1200 : 900;
+    const { model: geminiImageModel, imageSize: geminiImageSize } = resolveGeminiImageGenerationForTier(options.generationTierId);
     try {
       return await generateGeminiImageFromParts({
-        model: INSTAME_PRIMARY_GEMINI_IMAGE_MODEL,
+        model: geminiImageModel,
         parts: geminiParts,
-        maxOutputTokens: geminiMaxTokens
+        maxOutputTokens: geminiMaxTokens,
+        imageSize: geminiImageSize,
+        aspectRatio: "1:1"
       });
     } catch (error) {
       if (!hasTogetherImageConfig()) {
