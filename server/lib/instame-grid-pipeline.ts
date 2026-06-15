@@ -234,6 +234,15 @@ Image count: ${imageCount}
 ${vocabularyLine ? vocabularyLine + "\n" : ""}Extra notes from user: ${extraNotes || "none"}
 
 ═══════════════════════════════════════════════
+COLOR PALETTE (DOMINANT — overrides scene-natural colors)
+═══════════════════════════════════════════════
+The color palette "${palette}" is the SINGLE SOURCE OF TRUTH for color in every shot.
+- It OVERRIDES the colors normally associated with the aesthetic, the scenes, the wardrobe, and the props. If the aesthetic or a scene would normally be warm/beige/terracotta but the palette is cool/dark, the final colors MUST follow the palette, NOT the scene's expected colors.
+- Weave the exact palette colors into EVERY single imagePrompt field: name the palette colors explicitly in the wardrobe, set dressing, props, lighting tint, and color grade of each shot.
+- Wardrobe, walls, objects, and ambient light must all read in these palette tones. Do NOT default to the aesthetic's typical color scheme.
+- End every imagePrompt with an explicit color-grade instruction, e.g. "Color grade strictly to the palette: ${palette}."
+
+═══════════════════════════════════════════════
 CONTRAST MATRIX (MANDATORY — do not deviate)
 ═══════════════════════════════════════════════
 You MUST assign the correct type to every position:
@@ -681,6 +690,8 @@ GRID STRUCTURE: ${plan.imageCount} equal cells in ${totalRows} row${totalRows > 
 AESTHETIC: ${plan.aesthetic}
 COLOR PALETTE: ${plan.palette}
 LIGHT TYPE: ${plan.lightType}
+
+COLOR PALETTE IS DOMINANT: every cell — wardrobe, walls, props, set dressing, ambient light, and overall color grade — MUST be rendered strictly in the palette "${plan.palette}". This palette OVERRIDES the colors normally associated with the aesthetic or the scenes. If a scene would normally be warm/beige/terracotta but the palette is cool or dark, render it in the palette colors instead. Do NOT fall back to the aesthetic's typical colors.
 
 CELL CONTENTS (left to right, top to bottom — numbering is exact):
 ${shotLines}
