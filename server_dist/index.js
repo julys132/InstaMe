@@ -82,6 +82,34 @@ var sessions = (0, import_pg_core.pgTable)("sessions", {
   revokedAt: (0, import_pg_core.timestamp)("revoked_at"),
   createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
 });
+var instamePacks = (0, import_pg_core.pgTable)("instame_packs", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: (0, import_pg_core.text)("title").notNull(),
+  aesthetic: (0, import_pg_core.text)("aesthetic"),
+  palette: (0, import_pg_core.text)("palette"),
+  imageCount: (0, import_pg_core.integer)("image_count").notNull().default(0),
+  createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
+});
+var instamePackImages = (0, import_pg_core.pgTable)("instame_pack_images", {
+  id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+  packId: (0, import_pg_core.varchar)("pack_id").notNull().references(() => instamePacks.id, { onDelete: "cascade" }),
+  userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: (0, import_pg_core.text)("role").notNull().default("image"),
+  // "preview" | "image"
+  position: (0, import_pg_core.integer)("position").notNull().default(0),
+  label: (0, import_pg_core.text)("label"),
+  mimeType: (0, import_pg_core.text)("mime_type").notNull().default("image/png"),
+  width: (0, import_pg_core.integer)("width").notNull().default(0),
+  height: (0, import_pg_core.integer)("height").notNull().default(0),
+  // Small thumbnail kept inline for fast gallery rendering (data URI).
+  previewBase64: (0, import_pg_core.text)("preview_base64"),
+  // When the object bucket is configured, the full image bytes live in S3 (storageKey).
+  // Otherwise they are kept inline as base64 so the feature works everywhere.
+  storageKey: (0, import_pg_core.text)("storage_key"),
+  inlineBase64: (0, import_pg_core.text)("inline_base64"),
+  createdAt: (0, import_pg_core.timestamp)("created_at").notNull().defaultNow()
+});
 var creditTransactions = (0, import_pg_core.pgTable)(
   "credit_transactions",
   {
@@ -1376,6 +1404,75 @@ async function getStyleAssetObject(relativePath) {
     throw error;
   }
 }
+function isObjectBucketConfigured() {
+  return Boolean(getBucketClient() && getBucketName());
+}
+async function uploadObject(options) {
+  const client = getBucketClient();
+  const bucketName = getBucketName();
+  if (!client || !bucketName) {
+    throw new Error("Object bucket is not configured.");
+  }
+  await client.send(
+    new import_client_s3.PutObjectCommand({
+      Bucket: bucketName,
+      Key: toBucketKey(options.key),
+      Body: options.body,
+      ContentType: options.contentType,
+      CacheControl: options.cacheControl
+    })
+  );
+}
+async function getObject(key) {
+  const client = getBucketClient();
+  const bucketName = getBucketName();
+  if (!client || !bucketName) {
+    return null;
+  }
+  try {
+    const response = await client.send(
+      new import_client_s3.GetObjectCommand({
+        Bucket: bucketName,
+        Key: toBucketKey(key)
+      })
+    );
+    const body = response.Body;
+    if (!body || typeof body.transformToByteArray !== "function") {
+      return null;
+    }
+    const bytes = await body.transformToByteArray();
+    return {
+      body: Buffer.from(bytes),
+      contentType: typeof response.ContentType === "string" && response.ContentType.trim() ? response.ContentType : "application/octet-stream",
+      cacheControl: typeof response.CacheControl === "string" ? response.CacheControl : void 0
+    };
+  } catch (error) {
+    if (toMissingObject(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+async function deleteObject(key) {
+  const client = getBucketClient();
+  const bucketName = getBucketName();
+  if (!client || !bucketName) {
+    return;
+  }
+  try {
+    await client.send(
+      new import_client_s3.DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: toBucketKey(key)
+      })
+    );
+  } catch (error) {
+    if (toMissingObject(error)) {
+      return;
+    }
+    throw error;
+  }
+}
 
 // server/lib/instame-grid-pack.ts
 var VIBE_PROMPT_HINTS = {
@@ -2536,6 +2633,9 @@ var MAX_INSTAME_LIBRARY_IMAGE_BYTES = 1e6;
 var MAX_INSTAME_LIBRARY_IMAGE_DIMENSION = 1024;
 var MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 22e4;
 var MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8e3;
+var MAX_INSTAME_SAVED_PACKS = 30;
+var MAX_INSTAME_PACK_IMAGES = 16;
+var MAX_INSTAME_PACK_IMAGE_BASE64_LENGTH = 6e6;
 var STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 var INSTAME_HIGH_RES_OUTPUT_DIMENSION = 1024;
 var DEFAULT_IAP_PRODUCT_CREDITS = {
@@ -3248,6 +3348,58 @@ function normalizeStoredInstaMeUploadedImages(input) {
       createdAt: createdAt || (/* @__PURE__ */ new Date()).toISOString()
     };
   }).filter((entry) => Boolean(entry)).slice(0, MAX_INSTAME_LIBRARY_IMAGES_TOTAL);
+}
+function toInstaMePackThumbUri(image) {
+  if (!image) return null;
+  const data = (image.previewBase64 || image.inlineBase64 || "").trim();
+  if (!data) return null;
+  const mimeType = image.mimeType && image.mimeType.startsWith("image/") ? image.mimeType : "image/png";
+  return `data:${mimeType};base64,${data}`;
+}
+async function resolveInstaMePackImageBytes(userId, packId, imageId) {
+  const [image] = await db.select().from(instamePackImages).where(
+    (0, import_drizzle_orm3.and)(
+      (0, import_drizzle_orm3.eq)(instamePackImages.id, imageId),
+      (0, import_drizzle_orm3.eq)(instamePackImages.packId, packId),
+      (0, import_drizzle_orm3.eq)(instamePackImages.userId, userId)
+    )
+  );
+  if (!image) {
+    return null;
+  }
+  let buffer = null;
+  let contentType = image.mimeType || "image/png";
+  if (image.storageKey) {
+    const object = await getObject(image.storageKey);
+    if (object) {
+      buffer = object.body;
+      contentType = object.contentType || contentType;
+    }
+  }
+  if (!buffer && image.inlineBase64) {
+    buffer = Buffer.from(image.inlineBase64, "base64");
+  }
+  if (!buffer && image.previewBase64) {
+    buffer = Buffer.from(image.previewBase64, "base64");
+  }
+  if (!buffer) {
+    return null;
+  }
+  return { buffer, contentType };
+}
+async function deleteInstaMePacks(userId, packIds) {
+  if (packIds.length === 0) return;
+  const images = await db.select({ storageKey: instamePackImages.storageKey }).from(instamePackImages).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(instamePackImages.userId, userId), (0, import_drizzle_orm3.inArray)(instamePackImages.packId, packIds)));
+  for (const image of images) {
+    if (image.storageKey) {
+      try {
+        await deleteObject(image.storageKey);
+      } catch (error) {
+        console.error("[instame-packs] failed to delete bucket object:", error);
+      }
+    }
+  }
+  await db.delete(instamePacks).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(instamePacks.userId, userId), (0, import_drizzle_orm3.inArray)(instamePacks.id, packIds)));
 }
 function toInstaMeUploadedImageSummary(image) {
   return {
@@ -6393,6 +6545,247 @@ async function registerRoutes(app2) {
       instameUploadedImages: nextImages,
       updatedAt: /* @__PURE__ */ new Date()
     }).where((0, import_drizzle_orm3.eq)(users.id, req.user.id));
+    return res.json({ success: true });
+  });
+  app2.get("/api/instame/packs", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const packs = await db.select().from(instamePacks).where((0, import_drizzle_orm3.eq)(instamePacks.userId, userId)).orderBy((0, import_drizzle_orm3.desc)(instamePacks.createdAt));
+    if (packs.length === 0) {
+      return res.json({ packs: [] });
+    }
+    const packIds = packs.map((pack) => pack.id);
+    const images = await db.select().from(instamePackImages).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(instamePackImages.userId, userId), (0, import_drizzle_orm3.inArray)(instamePackImages.packId, packIds)));
+    const previewByPackId = /* @__PURE__ */ new Map();
+    const imageCountByPackId = /* @__PURE__ */ new Map();
+    for (const image of images) {
+      if (image.role === "preview" && !previewByPackId.has(image.packId)) {
+        previewByPackId.set(image.packId, image);
+      }
+      if (image.role !== "preview") {
+        imageCountByPackId.set(image.packId, (imageCountByPackId.get(image.packId) || 0) + 1);
+      }
+    }
+    return res.json({
+      packs: packs.map((pack) => {
+        const preview = previewByPackId.get(pack.id);
+        return {
+          id: pack.id,
+          title: pack.title,
+          aesthetic: pack.aesthetic || null,
+          palette: pack.palette || null,
+          imageCount: imageCountByPackId.get(pack.id) || pack.imageCount,
+          createdAt: pack.createdAt instanceof Date ? pack.createdAt.toISOString() : String(pack.createdAt),
+          previewUri: toInstaMePackThumbUri(preview)
+        };
+      })
+    });
+  });
+  app2.get("/api/instame/packs/:packId", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const packId = normalizeStringValue(req.params.packId);
+    const [pack] = await db.select().from(instamePacks).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(instamePacks.id, packId), (0, import_drizzle_orm3.eq)(instamePacks.userId, userId)));
+    if (!pack) {
+      return res.status(404).json({ error: "Saved pack not found." });
+    }
+    const images = await db.select().from(instamePackImages).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(instamePackImages.packId, packId), (0, import_drizzle_orm3.eq)(instamePackImages.userId, userId))).orderBy(instamePackImages.position);
+    const preview = images.find((image) => image.role === "preview") || null;
+    const individualImages = images.filter((image) => image.role !== "preview").sort((left, right) => left.position - right.position);
+    const origin = getRequestOrigin(req) || "";
+    return res.json({
+      pack: {
+        id: pack.id,
+        title: pack.title,
+        aesthetic: pack.aesthetic || null,
+        palette: pack.palette || null,
+        imageCount: individualImages.length,
+        createdAt: pack.createdAt instanceof Date ? pack.createdAt.toISOString() : String(pack.createdAt),
+        preview: preview ? {
+          id: preview.id,
+          role: "preview",
+          label: preview.label || "Preview",
+          mimeType: preview.mimeType,
+          width: preview.width,
+          height: preview.height,
+          previewUri: toInstaMePackThumbUri(preview),
+          downloadUri: `${origin}/api/instame/packs/${encodeURIComponent(pack.id)}/images/${encodeURIComponent(preview.id)}/raw`
+        } : null,
+        images: individualImages.map((image) => ({
+          id: image.id,
+          role: "image",
+          position: image.position,
+          label: image.label || `Image ${image.position}`,
+          mimeType: image.mimeType,
+          width: image.width,
+          height: image.height,
+          previewUri: toInstaMePackThumbUri(image),
+          downloadUri: `${origin}/api/instame/packs/${encodeURIComponent(pack.id)}/images/${encodeURIComponent(image.id)}/raw`
+        }))
+      }
+    });
+  });
+  app2.get("/api/instame/packs/:packId/images/:imageId/raw", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const packId = normalizeStringValue(req.params.packId);
+    const imageId = normalizeStringValue(req.params.imageId);
+    const resolved = await resolveInstaMePackImageBytes(userId, packId, imageId);
+    if (!resolved) {
+      return res.status(404).json({ error: "Saved pack image not found." });
+    }
+    res.setHeader("Content-Type", resolved.contentType);
+    res.setHeader("Cache-Control", "private, max-age=86400");
+    return res.send(resolved.buffer);
+  });
+  app2.get("/api/instame/packs/:packId/images/:imageId", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const packId = normalizeStringValue(req.params.packId);
+    const imageId = normalizeStringValue(req.params.imageId);
+    const resolved = await resolveInstaMePackImageBytes(userId, packId, imageId);
+    if (!resolved) {
+      return res.status(404).json({ error: "Saved pack image not found." });
+    }
+    const base64 = resolved.buffer.toString("base64");
+    return res.json({
+      image: {
+        id: imageId,
+        mimeType: resolved.contentType,
+        base64,
+        dataUri: `data:${resolved.contentType};base64,${base64}`
+      }
+    });
+  });
+  app2.post("/api/instame/packs", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const body = req.body || {};
+    const title = normalizeStringValue(body.title).slice(0, 120) || "Photo pack";
+    const aesthetic = normalizeStringValue(body.aesthetic).slice(0, 120) || null;
+    const palette = normalizeStringValue(body.palette).slice(0, 400) || null;
+    const previewInput = body.preview && typeof body.preview === "object" ? body.preview : null;
+    const imagesInput = Array.isArray(body.images) ? body.images : [];
+    const parsePackImage = (raw, role, fallbackPosition) => {
+      if (!raw || typeof raw !== "object") return null;
+      const record = raw;
+      const base64 = stripDataUriPrefix(normalizeStringValue(record.base64)).replace(/\s+/g, "");
+      if (!base64) return null;
+      const previewBase64 = stripDataUriPrefix(normalizeStringValue(record.previewBase64)).replace(/\s+/g, "") || base64;
+      const mimeType = typeof record.mimeType === "string" && record.mimeType.startsWith("image/") ? record.mimeType : "image/png";
+      const positionRaw = Number(record.position);
+      const position = Number.isFinite(positionRaw) ? Math.round(positionRaw) : fallbackPosition;
+      const widthRaw = Number(record.width);
+      const heightRaw = Number(record.height);
+      return {
+        role,
+        position,
+        label: normalizeStringValue(record.label).slice(0, 120),
+        mimeType,
+        width: Number.isFinite(widthRaw) && widthRaw > 0 ? Math.round(widthRaw) : 0,
+        height: Number.isFinite(heightRaw) && heightRaw > 0 ? Math.round(heightRaw) : 0,
+        previewBase64: previewBase64.slice(0, MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH),
+        base64
+      };
+    };
+    const parsedImages = [];
+    const parsedPreview = parsePackImage(previewInput, "preview", 0);
+    if (parsedPreview) {
+      parsedImages.push(parsedPreview);
+    }
+    imagesInput.slice(0, MAX_INSTAME_PACK_IMAGES).forEach((raw, index) => {
+      const parsed = parsePackImage(raw, "image", index + 1);
+      if (parsed) {
+        parsedImages.push(parsed);
+      }
+    });
+    const individualCount = parsedImages.filter((image) => image.role === "image").length;
+    if (individualCount === 0) {
+      return res.status(400).json({ error: "At least one pack image is required." });
+    }
+    for (const image of parsedImages) {
+      if (image.base64.length > MAX_INSTAME_PACK_IMAGE_BASE64_LENGTH) {
+        return res.status(400).json({ error: "One of the pack images is too large." });
+      }
+    }
+    const bucketConfigured = isObjectBucketConfigured();
+    const [created] = await db.insert(instamePacks).values({
+      userId,
+      title,
+      aesthetic,
+      palette,
+      imageCount: individualCount
+    }).returning();
+    if (!created) {
+      return res.status(500).json({ error: "Failed to save pack." });
+    }
+    try {
+      const imageRows = [];
+      for (let index = 0; index < parsedImages.length; index += 1) {
+        const image = parsedImages[index];
+        const imageId = (0, import_node_crypto2.randomUUID)();
+        let storageKey = null;
+        let inlineBase64 = image.base64;
+        if (bucketConfigured) {
+          const extension = image.mimeType.includes("jpeg") || image.mimeType.includes("jpg") ? "jpg" : "png";
+          const key = `user-packs/${userId}/${created.id}/${image.role}-${imageId}.${extension}`;
+          try {
+            await uploadObject({
+              key,
+              body: Buffer.from(image.base64, "base64"),
+              contentType: image.mimeType,
+              cacheControl: "private, max-age=86400"
+            });
+            storageKey = key;
+            inlineBase64 = null;
+          } catch (uploadError) {
+            console.error("[instame-packs] bucket upload failed, falling back to inline:", uploadError);
+          }
+        }
+        imageRows.push({
+          id: imageId,
+          packId: created.id,
+          userId,
+          role: image.role,
+          position: image.position,
+          label: image.label || null,
+          mimeType: image.mimeType,
+          width: image.width,
+          height: image.height,
+          previewBase64: image.previewBase64 || null,
+          storageKey,
+          inlineBase64
+        });
+      }
+      await db.insert(instamePackImages).values(imageRows);
+    } catch (error) {
+      await db.delete(instamePacks).where((0, import_drizzle_orm3.eq)(instamePacks.id, created.id));
+      console.error("[instame-packs] failed to persist pack images:", error);
+      return res.status(500).json({ error: "Failed to save pack images." });
+    }
+    try {
+      const allPacks = await db.select({ id: instamePacks.id }).from(instamePacks).where((0, import_drizzle_orm3.eq)(instamePacks.userId, userId)).orderBy((0, import_drizzle_orm3.desc)(instamePacks.createdAt));
+      if (allPacks.length > MAX_INSTAME_SAVED_PACKS) {
+        const evictIds = allPacks.slice(MAX_INSTAME_SAVED_PACKS).map((pack) => pack.id);
+        await deleteInstaMePacks(userId, evictIds);
+      }
+    } catch (error) {
+      console.error("[instame-packs] rolling-window cleanup failed:", error);
+    }
+    return res.status(201).json({
+      pack: {
+        id: created.id,
+        title,
+        aesthetic,
+        palette,
+        imageCount: individualCount,
+        createdAt: created.createdAt instanceof Date ? created.createdAt.toISOString() : String(created.createdAt)
+      }
+    });
+  });
+  app2.delete("/api/instame/packs/:packId", authMiddleware, async (req, res) => {
+    const userId = req.user.id;
+    const packId = normalizeStringValue(req.params.packId);
+    const [pack] = await db.select({ id: instamePacks.id }).from(instamePacks).where((0, import_drizzle_orm3.and)((0, import_drizzle_orm3.eq)(instamePacks.id, packId), (0, import_drizzle_orm3.eq)(instamePacks.userId, userId)));
+    if (!pack) {
+      return res.status(404).json({ error: "Saved pack not found." });
+    }
+    await deleteInstaMePacks(userId, [packId]);
     return res.json({ success: true });
   });
   app2.post("/api/instame/transform", authMiddleware, async (req, res) => {

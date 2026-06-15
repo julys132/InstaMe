@@ -85,6 +85,50 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Saved InstaMe photo packs (composite preview + extracted individual images).
+// Lives in dedicated tables so it never bloats the users row JSON blob.
+export const instamePacks = pgTable("instame_packs", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  aesthetic: text("aesthetic"),
+  palette: text("palette"),
+  imageCount: integer("image_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const instamePackImages = pgTable("instame_pack_images", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  packId: varchar("pack_id")
+    .notNull()
+    .references(() => instamePacks.id, { onDelete: "cascade" }),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("image"), // "preview" | "image"
+  position: integer("position").notNull().default(0),
+  label: text("label"),
+  mimeType: text("mime_type").notNull().default("image/png"),
+  width: integer("width").notNull().default(0),
+  height: integer("height").notNull().default(0),
+  // Small thumbnail kept inline for fast gallery rendering (data URI).
+  previewBase64: text("preview_base64"),
+  // When the object bucket is configured, the full image bytes live in S3 (storageKey).
+  // Otherwise they are kept inline as base64 so the feature works everywhere.
+  storageKey: text("storage_key"),
+  inlineBase64: text("inline_base64"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type InstaMePack = typeof instamePacks.$inferSelect;
+export type InstaMePackImage = typeof instamePackImages.$inferSelect;
+
 export const creditTransactions = pgTable(
   "credit_transactions",
   {

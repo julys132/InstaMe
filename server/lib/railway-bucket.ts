@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -167,4 +168,94 @@ export async function uploadStyleAssetObject(options: {
       CacheControl: options.cacheControl,
     }),
   );
+}
+
+/**
+ * Generic object helpers reused for user-generated assets (e.g. saved photo packs).
+ * They share the same bucket/client as style assets but operate on arbitrary keys.
+ */
+export function isObjectBucketConfigured(): boolean {
+  return Boolean(getBucketClient() && getBucketName());
+}
+
+export async function uploadObject(options: {
+  key: string;
+  body: Buffer;
+  contentType: string;
+  cacheControl?: string;
+}): Promise<void> {
+  const client = getBucketClient();
+  const bucketName = getBucketName();
+  if (!client || !bucketName) {
+    throw new Error("Object bucket is not configured.");
+  }
+
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucketName,
+      Key: toBucketKey(options.key),
+      Body: options.body,
+      ContentType: options.contentType,
+      CacheControl: options.cacheControl,
+    }),
+  );
+}
+
+export async function getObject(key: string): Promise<BucketObject | null> {
+  const client = getBucketClient();
+  const bucketName = getBucketName();
+  if (!client || !bucketName) {
+    return null;
+  }
+
+  try {
+    const response = await client.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: toBucketKey(key),
+      }),
+    );
+
+    const body = response.Body;
+    if (!body || typeof body.transformToByteArray !== "function") {
+      return null;
+    }
+
+    const bytes = await body.transformToByteArray();
+    return {
+      body: Buffer.from(bytes),
+      contentType:
+        typeof response.ContentType === "string" && response.ContentType.trim()
+          ? response.ContentType
+          : "application/octet-stream",
+      cacheControl: typeof response.CacheControl === "string" ? response.CacheControl : undefined,
+    };
+  } catch (error) {
+    if (toMissingObject(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export async function deleteObject(key: string): Promise<void> {
+  const client = getBucketClient();
+  const bucketName = getBucketName();
+  if (!client || !bucketName) {
+    return;
+  }
+
+  try {
+    await client.send(
+      new DeleteObjectCommand({
+        Bucket: bucketName,
+        Key: toBucketKey(key),
+      }),
+    );
+  } catch (error) {
+    if (toMissingObject(error)) {
+      return;
+    }
+    throw error;
+  }
 }

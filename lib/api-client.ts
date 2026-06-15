@@ -49,6 +49,50 @@ export type InstaMeUploadedImageAsset = InstaMeUploadedImage & {
   dataUri: string;
 };
 
+export type InstaMePackImagePayload = {
+  role?: "preview" | "image";
+  position?: number;
+  label?: string;
+  mimeType?: string;
+  width?: number;
+  height?: number;
+  base64: string;
+  previewBase64?: string;
+};
+
+export type InstaMePackSummary = {
+  id: string;
+  title: string;
+  aesthetic: string | null;
+  palette: string | null;
+  imageCount: number;
+  createdAt: string;
+  previewUri?: string | null;
+};
+
+export type InstaMePackImageAsset = {
+  id: string;
+  role: "preview" | "image";
+  position?: number;
+  label: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  previewUri: string | null;
+  downloadUri: string;
+};
+
+export type InstaMePackDetail = {
+  id: string;
+  title: string;
+  aesthetic: string | null;
+  palette: string | null;
+  imageCount: number;
+  createdAt: string;
+  preview: InstaMePackImageAsset | null;
+  images: InstaMePackImageAsset[];
+};
+
 export type SocialLoginPayload =
   | {
       provider: "google";
@@ -698,7 +742,54 @@ class ApiClient {
       true,
     );
   }
+  async getInstaMePacks() {
+    return this.request<{ packs: InstaMePackSummary[] }>("/instame/packs", {}, true);
+  }
 
+  async getInstaMePack(packId: string) {
+    return this.request<{ pack: InstaMePackDetail }>(
+      `/instame/packs/${encodeURIComponent(packId)}`,
+      {},
+      true,
+    );
+  }
+
+  async getInstaMePackImage(packId: string, imageId: string) {
+    return this.request<{
+      image: { id: string; mimeType: string; base64: string; dataUri: string };
+    }>(
+      `/instame/packs/${encodeURIComponent(packId)}/images/${encodeURIComponent(imageId)}`,
+      {},
+      true,
+    );
+  }
+
+  async saveInstaMePack(payload: {
+    title?: string;
+    aesthetic?: string;
+    palette?: string;
+    preview?: InstaMePackImagePayload | null;
+    images: InstaMePackImagePayload[];
+  }) {
+    return this.request<{ pack: InstaMePackSummary }>(
+      "/instame/packs",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      true,
+    );
+  }
+
+  async deleteInstaMePack(packId: string) {
+    return this.request<{ success: boolean }>(
+      `/instame/packs/${encodeURIComponent(packId)}`,
+      {
+        method: "DELETE",
+      },
+      true,
+    );
+  }
   async deleteInstaMeOwnStyle(styleId: string) {
     return this.request<{ success: boolean }>(
       `/instame/own-styles/${encodeURIComponent(styleId)}`,

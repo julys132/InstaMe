@@ -903,8 +903,87 @@ function TileSwipe({
   );
 }
 
+type PersistGeneratedPackParams = {
+  title: string;
+  aesthetic?: string;
+  palette?: string;
+  previewBase64?: string | null;
+  previewMimeType?: string;
+  images: Array<{ position: number; label: string; imageBase64: string }>;
+};
+
+// Best-effort persistence of a generated pack (composite preview + individual images).
+// Failures never interrupt the generation flow — the images stay visible locally.
+async function persistGeneratedPack(params: PersistGeneratedPackParams): Promise<void> {
+  try {
+    const optimizedImages: NonNullable<Parameters<typeof apiClient.saveInstaMePack>[0]["images"]> = [];
+    for (const image of params.images) {
+      const base64 = (image.imageBase64 || "").trim();
+      if (!base64) continue;
+      try {
+        const optimized = await optimizeGeneratedBase64Image({ base64, mimeType: "image/png" });
+        optimizedImages.push({
+          role: "image",
+          position: image.position,
+          label: image.label,
+          mimeType: optimized.mimeType,
+          width: optimized.width,
+          height: optimized.height,
+          base64: optimized.base64,
+          previewBase64: optimized.previewBase64,
+        });
+      } catch {
+        // Skip an image that cannot be optimized rather than failing the whole save.
+      }
+    }
+
+    if (optimizedImages.length === 0) {
+      return;
+    }
+
+    let preview: NonNullable<Parameters<typeof apiClient.saveInstaMePack>[0]>["preview"] = null;
+    const previewSource = (params.previewBase64 || "").trim();
+    if (previewSource) {
+      try {
+        const optimizedPreview = await optimizeGeneratedBase64Image({
+          base64: previewSource,
+          mimeType: params.previewMimeType || "image/png",
+        });
+        preview = {
+          role: "preview",
+          position: 0,
+          label: "Grid preview",
+          mimeType: optimizedPreview.mimeType,
+          width: optimizedPreview.width,
+          height: optimizedPreview.height,
+          base64: optimizedPreview.base64,
+          previewBase64: optimizedPreview.previewBase64,
+        };
+      } catch {
+        preview = null;
+      }
+    }
+
+    await apiClient.saveInstaMePack({
+      title: params.title,
+      aesthetic: params.aesthetic,
+      palette: params.palette,
+      preview,
+      images: optimizedImages,
+    });
+  } catch {
+    // History sync is best-effort.
+  }
+}
+
 export default function InstaMeScreen() {
-  const params = useLocalSearchParams<{ uploadedImageId?: string | string[]; uploadedImageNonce?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    uploadedImageId?: string | string[];
+    uploadedImageNonce?: string | string[];
+    retouchPackId?: string | string[];
+    retouchImageId?: string | string[];
+    retouchNonce?: string | string[];
+  }>();
   const insets = useSafeAreaInsets();
   const { width: viewportWidth } = useWindowDimensions();
   const { user } = useAuth();
@@ -1474,6 +1553,15 @@ export default function InstaMeScreen() {
   const uploadedImageNonce = Array.isArray(params.uploadedImageNonce)
     ? params.uploadedImageNonce[0]
     : params.uploadedImageNonce;
+  const retouchPackIdParam = Array.isArray(params.retouchPackId)
+    ? params.retouchPackId[0]
+    : params.retouchPackId;
+  const retouchImageIdParam = Array.isArray(params.retouchImageId)
+    ? params.retouchImageId[0]
+    : params.retouchImageId;
+  const retouchNonce = Array.isArray(params.retouchNonce)
+    ? params.retouchNonce[0]
+    : params.retouchNonce;
 
   useEffect(() => {
     let mounted = true;
@@ -1653,6 +1741,42 @@ export default function InstaMeScreen() {
       cancelled = true;
     };
   }, [applyBasePhoto, uploadedImageIdParam, uploadedImageNonce, user?.id]);
+
+  // Retouch flow: load a saved pack image into the editor as the working photo.
+  useEffect(() => {
+    if (!retouchPackIdParam || !retouchImageIdParam || !retouchNonce) {
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await apiClient.getInstaMePackImage(retouchPackIdParam, retouchImageIdParam);
+        if (cancelled) return;
+        const image = result.image;
+        if (!image?.base64) return;
+        applyBasePhoto({
+          uri: image.dataUri || buildDataUri(image.base64, image.mimeType || "image/png"),
+          base64: image.base64,
+          previewBase64: image.base64,
+          mimeType: image.mimeType || "image/png",
+          kind: undefined,
+          width: 0,
+          height: 0,
+          fileSizeBytes: 0,
+          name: "Pack image",
+        });
+        setStyleSectionTab("main");
+        mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+      } catch {
+        // Best-effort: if the retouch image can't be loaded, do nothing disruptive.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyBasePhoto, retouchPackIdParam, retouchImageIdParam, retouchNonce]);
 
   useEffect(() => {
     if (!ownStyleDraftReady) {
@@ -2535,6 +2659,21 @@ export default function InstaMeScreen() {
           `Extracted ${extracted.length}/${positions.length} images. Remaining positions: ${pendingPositions.join(", ")}. You can tap Extract again to continue from where it stopped.`,
         );
       }
+
+      // Persist the generated pack so the user can revisit / download / retouch it later.
+      // Fire-and-forget: never blocks or breaks the extraction flow.
+      void persistGeneratedPack({
+        title: activePhotoPack.label,
+        aesthetic: pipelinePlan.aesthetic || activePhotoPack.id,
+        palette: pipelinePlan.palette || undefined,
+        previewBase64: packGridPreviewBase64,
+        previewMimeType: "image/png",
+        images: extracted.map((image) => ({
+          position: image.position,
+          label: image.label,
+          imageBase64: image.imageBase64,
+        })),
+      });
 
       try {
         await refreshCredits();
@@ -3558,6 +3697,15 @@ export default function InstaMeScreen() {
     });
   }, [exportBase64Image]);
 
+  const handleDownloadCompositePreview = useCallback(async () => {
+    if (!packGridPreviewBase64) return;
+    await exportBase64Image(packGridPreviewBase64, {
+      mimeType: "image/png",
+      fileNamePrefix: "chicoo-pack-preview",
+      dialogTitle: "Save Pack Preview",
+    });
+  }, [exportBase64Image, packGridPreviewBase64]);
+
   const selectedStyleVibeCount = styleVibeCounts[selectedStyleVibe.id] ?? mainOnlyStylePresets.length;
 
   return (
@@ -3758,6 +3906,18 @@ export default function InstaMeScreen() {
                   <Text style={styles.packEyebrow}>Content packs</Text>
                   <Text style={styles.packTitle}>Create your photo pack ✨</Text>
                 </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open my saved packs"
+                  onPress={() => {
+                    void Haptics.selectionAsync();
+                    router.push("/saved-packs" as any);
+                  }}
+                  style={({ pressed }) => [styles.myPacksButton, pressed ? { opacity: 0.85 } : undefined]}
+                >
+                  <Ionicons name="folder-open-outline" size={14} color={Colors.accent} />
+                  <Text style={styles.myPacksButtonText}>My Packs</Text>
+                </Pressable>
                 <View style={styles.packStepBadge}>
                   <Text style={styles.packStepBadgeText}>
                     {packPlannerCurrentStep}/{PACK_BRIEF_FLOW_STEPS.length}
@@ -4163,6 +4323,17 @@ export default function InstaMeScreen() {
                                 ]}
                               >
                                 <Ionicons name="close-circle-outline" size={16} color="rgba(255,255,255,0.78)" />
+                              </Pressable>
+                              <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel="Download grid preview"
+                                onPress={handleDownloadCompositePreview}
+                                style={({ pressed }) => [
+                                  styles.packPlannerVisualAction,
+                                  pressed ? { opacity: 0.84 } : undefined,
+                                ]}
+                              >
+                                <Ionicons name="download-outline" size={16} color="rgba(255,255,255,0.78)" />
                               </Pressable>
                             </View>
                           </>
@@ -6252,6 +6423,23 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(126,243,255,0.14)",
     borderWidth: 1,
     borderColor: "rgba(126,243,255,0.32)",
+  },
+  myPacksButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    marginRight: 8,
+    backgroundColor: "rgba(126,243,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.24)",
+  },
+  myPacksButtonText: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
   packStepBadgeText: {
     color: "#DFFFFF",
