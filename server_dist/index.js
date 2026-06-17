@@ -1009,8 +1009,12 @@ function resolveOpenAiImageRequest(model) {
     return { model };
   }
   const aliases = /* @__PURE__ */ new Map([
-    ["gpt-image-2", { model: "gpt-image-2" }],
-    ["gpt image 2", { model: "gpt-image-2" }],
+    // gpt-image-2 family — force high input fidelity so the portrait reference
+    // identity (face) is preserved in the pack composite + extracted images.
+    ["gpt-image-2", { model: "gpt-image-2", inputFidelity: "high" }],
+    ["gpt image 2", { model: "gpt-image-2", inputFidelity: "high" }],
+    ["gpt-image-2-2026-04-21", { model: "gpt-image-2-2026-04-21", inputFidelity: "high" }],
+    ["gpt image 2 2026 04 21", { model: "gpt-image-2-2026-04-21", inputFidelity: "high" }],
     ["gpt-image-1.5", { model: "gpt-image-1.5" }],
     ["gpt image 1.5", { model: "gpt-image-1.5" }],
     ["gpt-image-1", { model: "gpt-image-1" }],
