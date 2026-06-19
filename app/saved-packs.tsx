@@ -146,6 +146,27 @@ export default function SavedPacksScreen() {
     [],
   );
 
+  const handleShareImage = useCallback(
+    async (packId: string, image: InstaMePackImageAsset) => {
+      setActionLoading(true);
+      try {
+        const result = await apiClient.getInstaMePackImage(packId, image.id);
+        await exportBase64Image(result.image.base64, {
+          mimeType: result.image.mimeType || image.mimeType || "image/png",
+          fileNamePrefix:
+            image.role === "preview" ? "chicoo-pack-preview" : `chicoo-pack-${image.position || 0}`,
+          dialogTitle: "Share to Instagram",
+        });
+        await Haptics.selectionAsync();
+      } catch (error: any) {
+        Alert.alert("Share failed", error?.message || "Could not share this image.");
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [],
+  );
+
   const handleRetouchImage = useCallback(
     async (packId: string, image: InstaMePackImageAsset) => {
       await Haptics.selectionAsync();
@@ -225,7 +246,7 @@ export default function SavedPacksScreen() {
             <Text style={styles.headerTitle}>{selectedPack ? selectedPack.title : "My Packs"}</Text>
             <Text style={styles.headerSubtitle}>
               {selectedPack
-                ? "Download the preview, download or retouch individual images."
+                ? "Share or download each photo, or retouch any of them."
                 : "Revisit your generated packs anytime to download or retouch them."}
             </Text>
           </View>
@@ -244,19 +265,33 @@ export default function SavedPacksScreen() {
                 <View style={styles.previewFrame}>
                   {renderImage(selectedPack.preview.previewUri || "", styles.previewImage)}
                 </View>
-                <Pressable
-                  onPress={() => handleDownloadImage(selectedPack.id, selectedPack.preview!)}
-                  disabled={actionLoading}
-                  style={({ pressed }) => [
-                    styles.previewDownloadButton,
-                    pressed ? { opacity: 0.86 } : undefined,
-                  ]}
-                >
-                  <Ionicons name="download-outline" size={16} color="#0A0A0A" />
-                  <Text style={styles.previewDownloadText}>Download preview</Text>
-                </Pressable>
-              </View>
-            ) : null}
+                  <Pressable
+                    onPress={() => handleDownloadImage(selectedPack.id, selectedPack.preview!)}
+                    disabled={actionLoading}
+                    style={({ pressed }) => [
+                      styles.previewDownloadButton,
+                      pressed ? { opacity: 0.86 } : undefined,
+                    ]}
+                  >
+                    <Ionicons name="download-outline" size={16} color="#0A0A0A" />
+                    <Text style={styles.previewDownloadText}>Download preview</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => handleShareImage(selectedPack.id, selectedPack.preview!)}
+                    disabled={actionLoading}
+                    style={({ pressed }) => [
+                      styles.previewShareButton,
+                      pressed ? { opacity: 0.86 } : undefined,
+                    ]}
+                  >
+                    <Ionicons name="share-social-outline" size={16} color="#FFF" />
+                    <Text style={styles.previewShareText}>Share to Instagram</Text>
+                  </Pressable>
+                  <Text style={styles.previewPostTip}>
+                    Tip: post the photos in order (1, 2, 3…) to recreate this grid on your profile.
+                  </Text>
+                </View>
+              ) : null}
 
             <Text style={styles.sectionLabel}>
               {selectedPack.images.length} image{selectedPack.images.length === 1 ? "" : "s"}
@@ -283,6 +318,13 @@ export default function SavedPacksScreen() {
                       style={({ pressed }) => [styles.tileActionBtn, pressed ? { opacity: 0.8 } : undefined]}
                     >
                       <Ionicons name="download-outline" size={15} color="#FFF" />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleShareImage(selectedPack.id, image)}
+                      disabled={actionLoading}
+                      style={({ pressed }) => [styles.tileActionBtn, pressed ? { opacity: 0.8 } : undefined]}
+                    >
+                      <Ionicons name="share-social-outline" size={15} color="#FFF" />
                     </Pressable>
                     <Pressable
                       onPress={() => handleRetouchImage(selectedPack.id, image)}
@@ -464,6 +506,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent,
   },
   previewDownloadText: { color: "#0A0A0A", fontFamily: "Inter_700Bold", fontSize: 14 },
+  previewShareButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 10,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)",
+  },
+  previewShareText: { color: "#FFF", fontFamily: "Inter_700Bold", fontSize: 14 },
+  previewPostTip: {
+    color: "rgba(255,255,255,0.56)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 10,
+    textAlign: "center",
+  },
   sectionLabel: {
     color: Colors.textSecondary,
     fontFamily: "Inter_600SemiBold",

@@ -1158,6 +1158,7 @@ class ApiClient {
         hairstyle: string | null;
         angle: string | null;
         type: string;
+        imagePrompt?: string;
       }>;
     };
     positions: number[];

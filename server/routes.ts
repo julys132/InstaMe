@@ -7515,6 +7515,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ? `Use the attached product/scene reference image${referenceImages.length > 1 ? "s" : ""} as must-include visual material. Keep the items recognizable and naturally integrated across the grid; do not replace the portrait subject with the product references.`
       : "";
     const mergedExtraNotes = [extraNotes, referenceImageNote].filter(Boolean).join(" ");
+    // Per-request variation seed: keeps identity/palette/light/aesthetic locked but
+    // makes the planned scenes/hairstyles/angles/object-subjects/layout differ
+    // between requests (and between users) so grids stop looking the same.
+    const seed = Math.floor(Math.random() * 1_000_000) + 1;
     const inputs: GridPipelineUserInputs = {
       imageCount,
       aesthetic,
@@ -7522,6 +7526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       lightType,
       extraNotes: mergedExtraNotes,
       hasPortraitReference,
+      seed,
     };
 
     await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
@@ -7537,7 +7542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use the continuity prompt when extending an existing pack so the new shots
       // avoid all previously-used scenes/hairstyles; otherwise plan a fresh master grid.
       const systemPrompt = priorContext
-        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes)
+        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes, seed)
         : buildMasterGridSystemPrompt(inputs);
       const rawPlan = await callGeminiFlashText({
         systemPrompt,
@@ -7545,7 +7550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         geminiApiKey,
         model: DEFAULT_STYLE_TEXT_MODEL,
       });
-      const plan = parseGridPlan(rawPlan, imageCount);
+      const plan = parseGridPlan(rawPlan, imageCount, seed);
 
       // Accumulate prior + new used scenes/hairstyles so the NEXT extension stays unique.
       const planContext = extractContinuityContext(plan);
@@ -7668,7 +7673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const failedPositions: number[] = [];
 
       const shotsToExtract = (
-        plan.shots as Array<{ position: number; label: string; hairstyle: string | null; angle: string | null; type: string }>
+        plan.shots as Array<{ position: number; label: string; hairstyle: string | null; angle: string | null; type: string; imagePrompt?: string }>
       ).filter((shot) => uniqueSortedPositions.includes(shot.position));
 
       for (const shot of shotsToExtract) {
@@ -7685,6 +7690,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
           hairstyle: shot.hairstyle ? sanitizeGridPromptText(normalizeStringValue(shot.hairstyle)) : null,
           angle: shot.angle ? sanitizeGridPromptText(normalizeStringValue(shot.angle)) : null,
+          imagePrompt: shot.imagePrompt ? sanitizeGridPromptText(normalizeStringValue(shot.imagePrompt)) : undefined,
         };
 
         const referenceImagePromptNote = referenceImages.length > 0

@@ -1881,15 +1881,76 @@ var HAIRSTYLE_BANK = [
   "voluminous old-money blowout"
 ];
 var ANGLE_BANK = ["front-facing", "side profile", "from behind", "over-the-shoulder", "overhead tilt", "three-quarter turn"];
+var OBJECT_SUBJECT_CATEGORIES = [
+  "a signature fashion accessory (handbag, watch, sunglasses, or fine jewelry)",
+  "a food or drink moment (coffee, cocktail, pastry, or fresh fruit)",
+  "an architectural detail (doorway, column, staircase, window, or railing)",
+  "an interior surface texture (marble, linen, wood grain, ceramic, or velvet)",
+  "an outdoor / nature element (foliage, water, stone, sand, or flowers)",
+  "a wardrobe flat-lay (folded garments, shoes, or layered fabrics)",
+  "a lifestyle still-life (books, stationery, perfume, candle, or keys)"
+];
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function() {
+    a |= 0;
+    a = a + 1831565813 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function shuffleWith(items, rng) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 function buildMasterGridSystemPrompt(inputs) {
-  const { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference } = inputs;
-  const positionMap = buildPositionMap(imageCount);
+  const { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference, seed } = inputs;
+  const positionMap = buildPositionMap(imageCount, seed);
   const positionInstructions = positionMap.map(
     ({ position, type }) => `  - Position ${position}: ${type} \u2014 ${POSITION_TYPE_RULES[type]}`
   ).join("\n");
   const hairstyleList = HAIRSTYLE_BANK.join(", ");
   const angleList = ANGLE_BANK.join(", ");
-  const vocabularyLine = getAestheticVocabularyLine(aesthetic);
+  const rng = mulberry32((seed ?? 0) >>> 0 || 1);
+  const fullVocab = PIPELINE_AESTHETIC_VOCABULARY[aesthetic] ?? [];
+  const shuffledVocab = seed !== void 0 ? shuffleWith(fullVocab, rng) : fullVocab;
+  const shuffledHair = seed !== void 0 ? shuffleWith(HAIRSTYLE_BANK, rng) : HAIRSTYLE_BANK;
+  const shuffledAngles = seed !== void 0 ? shuffleWith(ANGLE_BANK, rng) : ANGLE_BANK;
+  const shuffledCategories = seed !== void 0 ? shuffleWith(OBJECT_SUBJECT_CATEGORIES, rng) : OBJECT_SUBJECT_CATEGORIES;
+  const vocabSubset = fullVocab.length > 0 ? shuffledVocab.slice(
+    0,
+    Math.min(shuffledVocab.length, Math.max(4, Math.ceil(shuffledVocab.length * 0.6)))
+  ) : [];
+  const vocabularyLine = vocabSubset.length > 0 ? `Aesthetic visual vocabulary (use these in imagePrompt fields, favor variety): ${vocabSubset.join(", ")}.` : getAestheticVocabularyLine(aesthetic);
+  let modelIdx = 0;
+  let objectIdx = 0;
+  const assignmentLines = positionMap.map(({ position, type }) => {
+    if (type === "SIMPLE") {
+      const category = shuffledCategories.length > 0 ? shuffledCategories[objectIdx % shuffledCategories.length] : "a distinct hero object";
+      objectIdx++;
+      return `  - Position ${position} (OBJECT, no model): hero subject category = ${category}. Must be a DISTINCT object from every other cell.`;
+    }
+    const hairstyle = shuffledHair[modelIdx % shuffledHair.length];
+    const angle = shuffledAngles[modelIdx % shuffledAngles.length];
+    const sceneAnchor = shuffledVocab.length > 0 ? shuffledVocab[modelIdx % shuffledVocab.length] : "";
+    modelIdx++;
+    const sceneTxt = sceneAnchor ? ` Scene anchor: ${sceneAnchor}.` : "";
+    return `  - Position ${position} (${type}, model present): hairstyle = ${hairstyle}; camera angle = ${angle}.${sceneTxt}`;
+  }).join("\n");
+  const variationDirective = seed !== void 0 ? `
+Variation seed: ${seed}. Use it to make bold, non-obvious creative choices and avoid the single most clich\xE9d interpretation of this aesthetic. Follow the PER-POSITION ASSIGNMENTS section below EXACTLY.` : "";
+  const assignmentSection = seed !== void 0 ? `
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+PER-POSITION ASSIGNMENTS (MANDATORY \u2014 use EXACTLY)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+Use exactly the hairstyle, camera angle, scene anchor and object category assigned to each position below. Do NOT swap them between positions and do NOT reuse one across two positions.
+${assignmentLines}
+` : "";
   const portraitInstruction = hasPortraitReference ? "A portrait reference image of the model WILL be passed to GPT Image 2 alongside each prompt. Each imagePrompt MUST include the instruction: 'Preserve the model's face and identity exactly from the provided reference image.' IDENTITY IS LOCKED, EVERYTHING ELSE VARIES: keep the SAME face/identity across all shots, but every position with the model must show a DISTINCT outfit, pose, and expression. Never reuse the same wardrobe piece, pose, or facial expression twice, and never repeat the same look from a different angle." : "No portrait reference is available. Each imagePrompt should describe the model generically in a way that is consistent across all shots (same apparent age, skin tone, body type), while still giving every shot a distinct outfit, pose, and expression.";
   return `You are an expert Instagram content strategist and AI photo director.
 Your ONLY task is to generate a structured JSON shot plan for a ${imageCount}-image Instagram grid.
@@ -1902,7 +1963,7 @@ Aesthetic: ${aesthetic}
 Color palette: ${palette}
 Light type: ${lightType}
 Image count: ${imageCount}
-${vocabularyLine ? vocabularyLine + "\n" : ""}Extra notes from user: ${extraNotes || "none"}
+${vocabularyLine ? vocabularyLine + "\n" : ""}Extra notes from user: ${extraNotes || "none"}${variationDirective}
 
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 COLOR PALETTE (DOMINANT \u2014 overrides scene-natural colors)
@@ -1935,7 +1996,7 @@ Every position where the model appears MUST have:
 NO two adjacent positions may share the same hairstyle OR the same angle.
 
 SUBJECT VARIETY (MANDATORY): every position must depict a DISTINCT subject/object/location. Never show the same object, prop, garment, or place twice \u2014 not even from a different distance, crop, or angle. Spread SIMPLE/object positions across different subject categories (e.g. accessory, food/drink, architecture detail, interior texture, outdoor element, wardrobe flat-lay) so the grid tells a varied story instead of repeating one motif.
-
+${assignmentSection}
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 PORTRAIT REFERENCE
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -1962,13 +2023,43 @@ OUTPUT FORMAT (strict \u2014 output ONLY this JSON, no extra text)
   ]
 }`;
 }
-function buildContinuityGridSystemPrompt(context, newImageCount, hasPortraitReference, extraNotes = "") {
-  const positionMap = buildPositionMap(newImageCount);
+function buildContinuityGridSystemPrompt(context, newImageCount, hasPortraitReference, extraNotes = "", seed) {
+  const positionMap = buildPositionMap(newImageCount, seed);
   const positionInstructions = positionMap.map(({ position, type }) => `  - Position ${position}: ${type}`).join("\n");
   const vocabularyLine = getAestheticVocabularyLine(context.aesthetic);
   const usedScenesList = context.usedScenes.length > 0 ? context.usedScenes.join(", ") : "none";
   const usedHairstylesList = context.usedHairstyles.length > 0 ? context.usedHairstyles.join(", ") : "none";
   const usedAnglesList = Array.isArray(context.usedAngles) && context.usedAngles.length > 0 ? context.usedAngles.join(", ") : "none";
+  const rng = mulberry32((seed ?? 0) >>> 0 || 1);
+  const usedHairSet = new Set(context.usedHairstyles);
+  const usedAngleSet = new Set(context.usedAngles);
+  const freshHairBank = HAIRSTYLE_BANK.filter((h) => !usedHairSet.has(h));
+  const freshAngleBank = ANGLE_BANK.filter((a) => !usedAngleSet.has(a));
+  const hairPool = freshHairBank.length > 0 ? freshHairBank : HAIRSTYLE_BANK;
+  const anglePool = freshAngleBank.length > 0 ? freshAngleBank : ANGLE_BANK;
+  const shuffledHair = seed !== void 0 ? shuffleWith(hairPool, rng) : hairPool;
+  const shuffledAngles = seed !== void 0 ? shuffleWith(anglePool, rng) : anglePool;
+  const shuffledCategories = seed !== void 0 ? shuffleWith(OBJECT_SUBJECT_CATEGORIES, rng) : OBJECT_SUBJECT_CATEGORIES;
+  let modelIdx = 0;
+  let objectIdx = 0;
+  const assignmentLines = positionMap.map(({ position, type }) => {
+    if (type === "SIMPLE") {
+      const category = shuffledCategories.length > 0 ? shuffledCategories[objectIdx % shuffledCategories.length] : "a distinct hero object";
+      objectIdx++;
+      return `  - Position ${position} (OBJECT, no model): hero subject category = ${category}. Must be DISTINCT from every cell in this pack so far.`;
+    }
+    const hairstyle = shuffledHair[modelIdx % shuffledHair.length];
+    const angle = shuffledAngles[modelIdx % shuffledAngles.length];
+    modelIdx++;
+    return `  - Position ${position} (${type}, model present): hairstyle = ${hairstyle}; camera angle = ${angle}.`;
+  }).join("\n");
+  const assignmentSection = seed !== void 0 ? `
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+PER-POSITION ASSIGNMENTS (MANDATORY \u2014 use EXACTLY)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+Use exactly the hairstyle, camera angle and object category assigned to each position below. They are already chosen to avoid everything used in earlier images of this pack.
+${assignmentLines}
+` : "";
   const portraitInstruction = hasPortraitReference ? "Portrait reference IS available. Include in each imagePrompt: 'Preserve the model's face and identity exactly from the provided reference image.' IDENTITY IS LOCKED, EVERYTHING ELSE VARIES: keep the SAME face/identity, but every new shot must show a DIFFERENT outfit, pose, expression, and styling than any previous image. Do NOT reuse a wardrobe piece, pose, or facial expression already used in earlier images of this pack. Never repeat the same look from a new angle \u2014 change the actual outfit and pose." : "No portrait reference. Describe the model generically but consistently across all shots (same apparent age, skin tone, body type), while still varying outfit, pose, and expression in every shot.";
   return `You are an expert Instagram content strategist and AI photo director.
 You are continuing an existing Instagram grid. Your ONLY task is to generate a JSON shot plan for ${newImageCount} NEW images that extend the grid seamlessly.
@@ -2005,7 +2096,7 @@ CONTINUITY RULES (MANDATORY)
 5. SIMPLE positions must be pure minimalist object/texture shots \u2014 no model. Compose ONE single hero subject with generous negative space around it: clean, airy, uncluttered, breathable \u2014 never busy or crowded.
 6. NO RE-SHOOTING SUBJECTS (CRITICAL): treat the already-used scenes above as subjects/objects/props/locations that are now OFF-LIMITS. Do NOT re-depict any of them from a different distance, crop, zoom, or angle. Example: if a previous image already featured a wristwatch, this extension must NOT contain ANY watch \u2014 not closer, not farther, not from another angle. Pick entirely different objects and locations.
 7. EXPAND THE STORY: each new image must ADD a genuinely new narrative beat to the pack (new prop category, new wardrobe piece, new setting, new lifestyle moment, new texture). Across the whole extension, vary the subject categories (e.g. accessories, food/drink, architecture, interior detail, outdoor scene, wardrobe flat-lay) so the grid feels like the next chapter \u2014 never a re-run of the same motifs in new framing.
-
+${assignmentSection}
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 PORTRAIT REFERENCE
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -2036,13 +2127,35 @@ var POSITION_TYPE_RULES = {
   SIMPLE: "minimalist flat-lay / accessory macro / geometric shadow / texture \u2014 no model. ONE single hero subject only, surrounded by GENEROUS empty negative space; clean, airy, uncluttered, calm and breathable \u2014 never busy or crowded",
   MEDIUM: "elegant tight portrait or mirror selfie \u2014 face/shoulders, calm composition"
 };
-function buildPositionMap(count) {
+function buildPositionMap(count, seed) {
+  if (seed === void 0) {
+    const result2 = [];
+    for (let i = 1; i <= count; i++) {
+      let type;
+      if (i % 2 === 0) {
+        type = "SIMPLE";
+      } else if (i === 3 || i === 7 || i === 11) {
+        type = "MEDIUM";
+      } else {
+        type = "COMPLEX";
+      }
+      result2.push({ position: i, type });
+    }
+    return result2;
+  }
+  const rng = mulberry32(seed >>> 0 || 1);
+  const modelPositions = [];
+  for (let i = 1; i <= count; i++) {
+    if (i % 2 === 1) modelPositions.push(i);
+  }
+  const mediumCount = [3, 7, 11].filter((p) => p <= count).length;
+  const mediumSet = new Set(shuffleWith(modelPositions, rng).slice(0, mediumCount));
   const result = [];
   for (let i = 1; i <= count; i++) {
     let type;
     if (i % 2 === 0) {
       type = "SIMPLE";
-    } else if (i === 3 || i === 7 || i === 11) {
+    } else if (mediumSet.has(i)) {
       type = "MEDIUM";
     } else {
       type = "COMPLEX";
@@ -2069,7 +2182,10 @@ async function callGeminiFlashText(options) {
       }
     ],
     generationConfig: {
-      temperature: 0.7,
+      // Higher temperature + nucleus sampling so plans for the same aesthetic/
+      // palette diverge more between requests (more creative scene variety).
+      temperature: 0.95,
+      topP: 0.95,
       maxOutputTokens: 8192,
       responseMimeType: "application/json"
     }
@@ -2112,7 +2228,7 @@ async function callGeminiFlashText(options) {
   }
   throw new Error("Gemini Flash returned no usable text.");
 }
-function parseGridPlan(rawJson, expectedCount) {
+function parseGridPlan(rawJson, expectedCount, seed) {
   let parsed;
   try {
     const clean = rawJson.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
@@ -2129,10 +2245,13 @@ function parseGridPlan(rawJson, expectedCount) {
       `Grid plan parsing failed: expected ${expectedCount} shots, got ${root.shots.length}.`
     );
   }
+  const typeByPosition = new Map(
+    buildPositionMap(expectedCount, seed).map(({ position, type }) => [position, type])
+  );
   const shots = root.shots.map((s, idx) => {
     const shot = s;
     const position = typeof shot.position === "number" ? shot.position : idx + 1;
-    const type = positionTypeFor(position);
+    const type = typeByPosition.get(position) ?? positionTypeFor(position);
     const label = typeof shot.label === "string" ? shot.label : `Shot ${position}`;
     const hairstyle = type === "SIMPLE" ? null : typeof shot.hairstyle === "string" ? shot.hairstyle : null;
     const angle = type === "SIMPLE" ? null : typeof shot.angle === "string" ? shot.angle : null;
@@ -2232,21 +2351,21 @@ function buildExtractionPrompt(params) {
   const colLabel = col === 1 ? "left" : col === GRID_COLS ? "right" : "center";
   const corner = rowLabel === "center" && colLabel === "center" ? "center of the grid" : `${rowLabel}-${colLabel} of the grid`;
   const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame. ONE single hero subject with generous empty negative space around it; minimalist, clean, airy, uncluttered and breathable \u2014 never busy or crowded" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
+  const brief = shot.imagePrompt && shot.imagePrompt.trim().length > 0 ? shot.imagePrompt.trim() : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
   const portraitInstruction = hasPortrait ? `
 CRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait. Adapt their face naturally to the scene. Never alter their identity.` : "";
-  return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
+  return `Produce a single full-resolution editorial photo that matches cell ${position} of ${imageCount} from the Instagram grid preview (first image provided).
 
-EXACT POSITION: position ${position}, counting left to right, top to bottom \u2014 row ${row}, column ${col} (${corner}).
+REFERENCE CELL: position ${position}, counting left to right, top to bottom \u2014 row ${row}, column ${col} (${corner}). Use this grid cell ONLY as a reference for composition, framing, pose, wardrobe and styling. Do NOT copy its low-resolution pixels; regenerate the photo sharply at full resolution from the detailed brief below.
 
-TARGET CELL DETAILS:
-- Scene: ${shot.label}${shot.hairstyle ? `
-- Hairstyle: ${shot.hairstyle}` : ""}${shot.angle ? `
-- Camera angle: ${shot.angle}` : ""}
-- Shot type: ${typeDesc}
+DETAILED BRIEF (primary instruction \u2014 render this faithfully):
+${brief}
+
+SHOT TYPE: ${typeDesc}
 
 OUTPUT REQUIREMENTS:
 - Output ONLY this single standalone photo \u2014 no grid lines, no other cells, no borders
-- 100% faithful replica of the composition, subject, colors, lighting, and background from that exact cell
+- Match the composition, subject, styling and background of the reference cell, but render it crisp and ultra-detailed at full resolution (do NOT reproduce any blur or softness from the small preview cell)
 - Maintain the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting
 - Ultra-detailed, photorealistic, shot with a professional 8K camera
 - Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene must fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders${portraitInstruction}`;
@@ -7637,27 +7756,29 @@ async function registerRoutes(app2) {
     } : null;
     const referenceImageNote = referenceImages.length > 0 ? `Use the attached product/scene reference image${referenceImages.length > 1 ? "s" : ""} as must-include visual material. Keep the items recognizable and naturally integrated across the grid; do not replace the portrait subject with the product references.` : "";
     const mergedExtraNotes = [extraNotes, referenceImageNote].filter(Boolean).join(" ");
+    const seed = Math.floor(Math.random() * 1e6) + 1;
     const inputs = {
       imageCount,
       aesthetic,
       palette,
       lightType,
       extraNotes: mergedExtraNotes,
-      hasPortraitReference
+      hasPortraitReference,
+      seed
     };
     await consumeCredits(userId, GRID_PIPELINE_COMPOSITE_CREDIT_COST, "instame_grid_pipeline_composite_preview");
     let consumed = true;
     try {
       const geminiApiKey = getGeminiApiKey();
       const geminiApiBaseUrl = process.env.GEMINI_API_BASE_URL || process.env.AI_INTEGRATIONS_GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
-      const systemPrompt = priorContext ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes) : buildMasterGridSystemPrompt(inputs);
+      const systemPrompt = priorContext ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes, seed) : buildMasterGridSystemPrompt(inputs);
       const rawPlan = await callGeminiFlashText({
         systemPrompt,
         geminiApiBaseUrl,
         geminiApiKey,
         model: DEFAULT_STYLE_TEXT_MODEL
       });
-      const plan = parseGridPlan(rawPlan, imageCount);
+      const plan = parseGridPlan(rawPlan, imageCount, seed);
       const planContext = extractContinuityContext(plan);
       const continuityContext = priorContext ? {
         aesthetic: sanitizeGridPromptText(planContext.aesthetic) || priorContext.aesthetic,
@@ -7752,7 +7873,8 @@ async function registerRoutes(app2) {
           ...shot,
           label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
           hairstyle: shot.hairstyle ? sanitizeGridPromptText(normalizeStringValue(shot.hairstyle)) : null,
-          angle: shot.angle ? sanitizeGridPromptText(normalizeStringValue(shot.angle)) : null
+          angle: shot.angle ? sanitizeGridPromptText(normalizeStringValue(shot.angle)) : null,
+          imagePrompt: shot.imagePrompt ? sanitizeGridPromptText(normalizeStringValue(shot.imagePrompt)) : void 0
         };
         const referenceImagePromptNote = referenceImages.length > 0 ? ` Attached product/scene reference image${referenceImages.length > 1 ? "s" : ""} must remain recognizable and naturally integrated if visible in this shot.` : "";
         const primaryPrompt = sanitizeGridPromptText(buildExtractionPrompt({

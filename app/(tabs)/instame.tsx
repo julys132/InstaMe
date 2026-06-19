@@ -420,7 +420,7 @@ const PACK_BRIEF_SCENE_IMAGES_MAX = 3;
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
 const PACK_CUSTOM_PALETTE_ID = "custom-palette";
 const GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT = 3;
-const GRID_EXTRACT_WAIT_NOTE = "Extragerea completa poate dura cateva minute, in functie de numarul de imagini.";
+const GRID_EXTRACT_WAIT_NOTE = "Full extraction can take a couple of minutes, depending on how many photos you picked.";
 
 const PACK_COLOR_PALETTES = [
   {
@@ -2567,6 +2567,7 @@ export default function InstaMeScreen() {
         hairstyle: shot.hairstyle,
         angle: shot.angle,
         type: shot.type,
+        imagePrompt: shot.imagePrompt,
       })),
     };
 
@@ -2588,7 +2589,7 @@ export default function InstaMeScreen() {
           const completedCount = extractedByPosition.size;
           setPackGridExtractProgress({ done: completedCount, total: positions.length });
           setPackGridExtractNotice(
-            `Extracting image ${Math.min(completedCount + 1, positions.length)}/${positions.length}. ${GRID_EXTRACT_WAIT_NOTE}`,
+            `Creating photo ${Math.min(completedCount + 1, positions.length)}/${positions.length}. ${GRID_EXTRACT_WAIT_NOTE}`,
           );
 
           try {
@@ -2637,7 +2638,7 @@ export default function InstaMeScreen() {
         pendingPositions = [...new Set(pendingPositions)].sort((a, b) => a - b);
         if (pendingPositions.length > 0 && attempt < GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT) {
           setPackGridExtractNotice(
-            `Extracted ${extractedByPosition.size}/${positions.length}. Retrying ${pendingPositions.length} remaining image${pendingPositions.length === 1 ? "" : "s"}. ${GRID_EXTRACT_WAIT_NOTE}`,
+            `Created ${extractedByPosition.size}/${positions.length}. Retrying ${pendingPositions.length} remaining photo${pendingPositions.length === 1 ? "" : "s"}. ${GRID_EXTRACT_WAIT_NOTE}`,
           );
         }
       }
@@ -2649,14 +2650,14 @@ export default function InstaMeScreen() {
 
       if (extracted.length === 0) {
         throw new Error(
-          "No images could be extracted from this preview. Credits for failed extractions were refunded. Try regenerating the preview or adjusting your brief.",
+          "We couldn't create any photos from this preview. Your credits were refunded. Try generating a new preview or tweaking your details.",
         );
       }
 
       if (pendingPositions.length > 0) {
         setSelectedPipelineShotPositions(pendingPositions);
         setPackGridError(
-          `Extracted ${extracted.length}/${positions.length} images. Remaining positions: ${pendingPositions.join(", ")}. You can tap Extract again to continue from where it stopped.`,
+          `Created ${extracted.length}/${positions.length} photos. Tap "Get my photos" again to finish the remaining ${pendingPositions.length}.`,
         );
       }
 
@@ -2703,24 +2704,12 @@ export default function InstaMeScreen() {
     }
 
     const orderedShots = [...shotsToRender].sort((a, b) => a.position - b.position);
-    const extractionOrder = orderedShots
-      .map((shot) => {
-        const row = Math.ceil(shot.position / 3);
-        const col = ((shot.position - 1) % 3) + 1;
-        return `${shot.position}(r${row},c${col})`;
-      })
-      .join(", ");
-
-    const excludedCount = pipelinePlan.shots.length - shotsToRender.length;
-    const title = `Extract ${shotsToRender.length} separate image${shotsToRender.length === 1 ? "" : "s"}?`;
+    const cost = shotsToRender.length * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+    const title = `Generate ${shotsToRender.length} final photo${shotsToRender.length === 1 ? "" : "s"}?`;
     const message = [
-      `${activePhotoPack.label} will be extracted from the visual grid with GPT Image at medium quality.`,
-      `Selected: ${shotsToRender.length}/${pipelinePlan.shots.length} image${pipelinePlan.shots.length === 1 ? "" : "s"}.`,
-      excludedCount > 0 ? `Excluded: ${excludedCount} image${excludedCount === 1 ? "" : "s"}.` : "All pack images are selected.",
-      "Order is strict: row 1 left-to-right, then row 2, then row 3.",
-      `Extraction sequence: ${extractionOrder}.`,
-      `Cost: ${shotsToRender.length * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit${shotsToRender.length * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"}.`,
-    ].join("\n");
+      `We'll turn your ${shotsToRender.length} selected frame${shotsToRender.length === 1 ? "" : "s"} into full-resolution photos, ready to post.`,
+      `Cost: ${cost} credit${cost === 1 ? "" : "s"} — you only pay for photos that come out right. Any that fail are refunded automatically.`,
+    ].join("\n\n");
 
     const startExtraction = () => {
       void renderSelectedGridPackShots(orderedShots);
@@ -2738,7 +2727,7 @@ export default function InstaMeScreen() {
     Alert.alert(title, message, [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Generate",
+        text: "Generate photos",
         style: "default",
         onPress: startExtraction,
       },
@@ -3924,6 +3913,9 @@ export default function InstaMeScreen() {
                   </Text>
                 </View>
               </View>
+              <Text style={styles.packIntroText}>
+                A pack is a set of matching AI photos of you in one aesthetic — generated together so they look great as an Instagram grid or carousel.
+              </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
                 {PHOTO_PACK_PRESETS.map((pack) => {
                   const active = activePhotoPack?.id === pack.id;
@@ -4017,7 +4009,7 @@ export default function InstaMeScreen() {
                     <Ionicons name="sparkles-outline" size={20} color={Colors.accentLight} />
                     <Text style={styles.packPlannerEmptyTitle}>Pick a pack to get started</Text>
                     <Text style={styles.packPlannerEmptySubtitle}>
-                      Tap a look above, then choose how many photos you want.
+                      Choose a look above. You'll preview the full grid first and only pay for the photos you keep.
                     </Text>
                   </View>
                 ) : (
@@ -4025,7 +4017,10 @@ export default function InstaMeScreen() {
                     <View style={styles.packPlannerSummaryCard}>
                       <Text style={styles.packPlannerSummaryTitle}>{activePhotoPack.label}</Text>
                       <Text style={styles.packPlannerSummaryText}>
-                        {selectedPackImageCount} images • {selectedPackBriefVibe.label}
+                        {selectedPackImageCount} photos • {selectedPackBriefVibe.label}
+                      </Text>
+                      <Text style={styles.packPlannerSummaryLadder}>
+                        {`Step 1 · Preview the grid — ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits\nStep 2 · Keep your photos — ${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"} each`}
                       </Text>
                       <View style={styles.packPlannerSummaryPriceRow}>
                         <Ionicons name="diamond-outline" size={12} color={Colors.accentLight} />
@@ -4033,10 +4028,16 @@ export default function InstaMeScreen() {
                           Full pack ≈ {getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
                         </Text>
                       </View>
+                      <Text style={styles.packPlannerSummaryFootnote}>
+                        Takes about 1–2 minutes. You only pay for photos that come out right — failed ones are refunded.
+                      </Text>
                     </View>
 
                     <View style={styles.packPlannerBlock}>
                       <Text style={styles.packPlannerLabel}>How many photos?</Text>
+                      <Text style={styles.packPlannerHint}>
+                        Starts at your pack's recommended count — change it anytime.
+                      </Text>
                       <View style={styles.packPlannerCountRow}>
                         {PACK_IMAGE_COUNT_OPTIONS.map((count) => {
                           const active = selectedPackImageCount === count;
@@ -4150,6 +4151,12 @@ export default function InstaMeScreen() {
                       />
                     </Pressable>
 
+                    {!packBriefShowMore ? (
+                      <Text style={styles.packPlannerHint}>
+                        Optional \u2014 skip this and we'll use your pack's recommended styling.
+                      </Text>
+                    ) : null}
+
                     {packBriefShowMore ? (
                       <>
                         <View style={styles.packPlannerBlock}>
@@ -4244,9 +4251,9 @@ export default function InstaMeScreen() {
                             ? {
                                 done: packGridExtractProgress.done,
                                 total: packGridExtractProgress.total,
-                                label: `Extracting ${packGridExtractProgress.done}/${packGridExtractProgress.total} images...`,
+                                label: `Creating photo ${packGridExtractProgress.done}/${packGridExtractProgress.total}...`,
                               }
-                            : { done: 0, total: selectedPipelineShotCount || 1, label: "Preparing extraction..." }
+                            : { done: 0, total: selectedPipelineShotCount || 1, label: "Preparing your photos..." }
                         }
                       />
                     ) : null}
@@ -4255,6 +4262,9 @@ export default function InstaMeScreen() {
                       <View style={styles.packPlannerPreviewCard}>
                         {packGridPreviewBase64 ? (
                           <>
+                            <Text style={styles.packPlannerHint}>
+                              All photos are selected. Tap any frame to exclude it \u2014 you only pay for the ones you keep.
+                            </Text>
                             <View style={styles.packPlannerCompositeCard}>
                               <View style={styles.packPlannerPreviewFrame}>
                                 <NativeImage
@@ -4340,7 +4350,15 @@ export default function InstaMeScreen() {
                         ) : null}
                         {packGridPreviewBase64 ? (
                           <Pressable
-                            onPress={handleRenderGridPack}
+                            onPress={() => {
+                              const extractCredits =
+                                selectedPipelineShotCount * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+                              if (credits < extractCredits) {
+                                promptInsufficientCredits(extractCredits, "these photos");
+                                return;
+                              }
+                              handleRenderGridPack();
+                            }}
                             disabled={packGridRenderLoading || selectedPipelineShotCount === 0}
                             style={({ pressed }) => [
                               styles.packPlannerRenderButton,
@@ -4355,12 +4373,12 @@ export default function InstaMeScreen() {
                             <Text style={styles.packPlannerRenderButtonText}>
                               {packGridRenderLoading
                                 ? packGridExtractProgress
-                                  ? `Extracting ${packGridExtractProgress.done}/${packGridExtractProgress.total}...`
-                                  : "Extracting images..."
+                                  ? `Creating photo ${packGridExtractProgress.done}/${packGridExtractProgress.total}...`
+                                  : "Creating your photos..."
                                 : (() => {
                                     const extractCredits =
                                       selectedPipelineShotCount * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
-                                    return `Extract ${selectedPipelineShotCount} image${selectedPipelineShotCount === 1 ? "" : "s"} - ${extractCredits} credit${extractCredits === 1 ? "" : "s"}`;
+                                    return `Get my ${selectedPipelineShotCount} photo${selectedPipelineShotCount === 1 ? "" : "s"} \u2014 ${extractCredits} credit${extractCredits === 1 ? "" : "s"}`;
                                   })()}
                             </Text>
                           </Pressable>
@@ -4398,7 +4416,13 @@ export default function InstaMeScreen() {
                           ))}
                         </View>
                         <Pressable
-                          onPress={() => void handleGenerateGridPreview({ extend: true })}
+                          onPress={() => {
+                            if (credits < INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST) {
+                              promptInsufficientCredits(INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST, "a new preview");
+                              return;
+                            }
+                            void handleGenerateGridPreview({ extend: true });
+                          }}
                           disabled={packGridPreviewLoading || packGridRenderLoading}
                           style={({ pressed }) => [
                             styles.packPlannerPreviewButton,
@@ -4416,12 +4440,31 @@ export default function InstaMeScreen() {
                               : `Get ${selectedPackImageCount} more \u2014 fresh & unique \u2014 ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
                           </Text>
                         </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            void Haptics.selectionAsync();
+                            router.push("/saved-packs" as any);
+                          }}
+                          style={styles.packPlannerResetButton}
+                        >
+                          <Ionicons name="folder-open-outline" size={13} color="rgba(255,255,255,0.72)" />
+                          <Text style={styles.packPlannerResetButtonText}>Saved to My Packs \u2014 view all</Text>
+                        </Pressable>
+                        <Text style={styles.packPlannerHint}>
+                          Tap a photo to save or share it. Post them in order (1, 2, 3\u2026) to recreate the grid on your profile.
+                        </Text>
                       </View>
                     ) : null}
 
                     {!pipelinePlan ? (
                       <Pressable
-                        onPress={() => void handleGenerateGridPreview()}
+                        onPress={() => {
+                          if (credits < INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST) {
+                            promptInsufficientCredits(INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST, "the grid preview");
+                            return;
+                          }
+                          void handleGenerateGridPreview();
+                        }}
                         disabled={packGridPreviewLoading}
                         style={({ pressed }) => [
                           styles.packPlannerPreviewButton,
@@ -4435,8 +4478,8 @@ export default function InstaMeScreen() {
                         )}
                         <Text style={styles.packPlannerPreviewButtonText}>
                           {packGridPreviewLoading
-                            ? "Generating visual grid preview\u2026"
-                            : `Generate visual grid preview \u2014 ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
+                            ? "Building your grid preview\u2026"
+                            : `Preview your grid \u2014 ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
                         </Text>
                       </Pressable>
                     ) : (
@@ -6788,6 +6831,28 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 11.5,
     letterSpacing: 0.2,
+  },
+  packIntroText: {
+    color: "rgba(255,255,255,0.60)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  packPlannerSummaryLadder: {
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter_500Medium",
+    fontSize: 11.5,
+    lineHeight: 17,
+    marginTop: 6,
+  },
+  packPlannerSummaryFootnote: {
+    color: "rgba(255,255,255,0.55)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 8,
   },
   packPlannerDeliverableText: {
     color: "rgba(255,255,255,0.52)",

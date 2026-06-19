@@ -69,6 +69,13 @@ export type GridPipelineUserInputs = {
   extraNotes: string;
   /** Whether there is a portrait reference uploaded */
   hasPortraitReference: boolean;
+  /**
+   * Per-request variation seed. When provided, the prompt builder pre-allocates
+   * distinct hairstyles/angles/object-categories per position and shuffles the
+   * aesthetic vocabulary so two requests with the same aesthetic/palette still
+   * yield visibly different grids. Identity, palette, light and aesthetic stay locked.
+   */
+  seed?: number;
 };
 
 export type GridContinuityContext = {
@@ -193,6 +200,43 @@ const HAIRSTYLE_BANK = [
 
 const ANGLE_BANK = ["front-facing", "side profile", "from behind", "over-the-shoulder", "overhead tilt", "three-quarter turn"];
 
+// Distinct subject categories for OBJECT-only (SIMPLE) cells. Assigning one per
+// SIMPLE position (seeded) forces object cells to tell a varied story instead of
+// all collapsing into the same flat-lay motif across users.
+const OBJECT_SUBJECT_CATEGORIES = [
+  "a signature fashion accessory (handbag, watch, sunglasses, or fine jewelry)",
+  "a food or drink moment (coffee, cocktail, pastry, or fresh fruit)",
+  "an architectural detail (doorway, column, staircase, window, or railing)",
+  "an interior surface texture (marble, linen, wood grain, ceramic, or velvet)",
+  "an outdoor / nature element (foliage, water, stone, sand, or flowers)",
+  "a wardrobe flat-lay (folded garments, shoes, or layered fabrics)",
+  "a lifestyle still-life (books, stationery, perfume, candle, or keys)",
+];
+
+// ─── Seeded RNG helpers (per-request creative variation) ──────────────────────
+
+/** Deterministic 32-bit PRNG (mulberry32). The same seed yields the same stream. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Returns a shuffled copy of `items` using the provided RNG (Fisher–Yates). */
+function shuffleWith<T>(items: T[], rng: () => number): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 // ─── System Prompt builders ───────────────────────────────────────────────────
 
 /**
@@ -200,10 +244,11 @@ const ANGLE_BANK = ["front-facing", "side profile", "from behind", "over-the-sho
  * The AI MUST output valid JSON matching GridPlan — nothing else.
  */
 export function buildMasterGridSystemPrompt(inputs: GridPipelineUserInputs): string {
-  const { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference } = inputs;
+  const { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference, seed } = inputs;
 
-  // Derive position assignments using the contrast matrix
-  const positionMap = buildPositionMap(imageCount);
+  // Derive position assignments using the contrast matrix (seeded when available
+  // so two identical requests still produce visibly different layouts).
+  const positionMap = buildPositionMap(imageCount, seed);
 
   const positionInstructions = positionMap
     .map(
@@ -214,7 +259,70 @@ export function buildMasterGridSystemPrompt(inputs: GridPipelineUserInputs): str
 
   const hairstyleList = HAIRSTYLE_BANK.join(", ");
   const angleList = ANGLE_BANK.join(", ");
-  const vocabularyLine = getAestheticVocabularyLine(aesthetic);
+
+  // Seeded creative pre-allocation: shuffle the banks + aesthetic vocabulary and
+  // assign a distinct hairstyle/angle/scene-anchor to every model cell and a
+  // distinct object category to every SIMPLE cell. This is the main lever that
+  // makes grids differ between users while keeping identity/palette/light locked.
+  const rng = mulberry32(((seed ?? 0) >>> 0) || 1);
+  const fullVocab = PIPELINE_AESTHETIC_VOCABULARY[aesthetic] ?? [];
+  const shuffledVocab = seed !== undefined ? shuffleWith(fullVocab, rng) : fullVocab;
+  const shuffledHair = seed !== undefined ? shuffleWith(HAIRSTYLE_BANK, rng) : HAIRSTYLE_BANK;
+  const shuffledAngles = seed !== undefined ? shuffleWith(ANGLE_BANK, rng) : ANGLE_BANK;
+  const shuffledCategories =
+    seed !== undefined ? shuffleWith(OBJECT_SUBJECT_CATEGORIES, rng) : OBJECT_SUBJECT_CATEGORIES;
+
+  // A focused vocabulary subset keeps scenes on-brand but stops every grid from
+  // gravitating to the same one or two clichéd interpretations of the aesthetic.
+  const vocabSubset =
+    fullVocab.length > 0
+      ? shuffledVocab.slice(
+          0,
+          Math.min(shuffledVocab.length, Math.max(4, Math.ceil(shuffledVocab.length * 0.6))),
+        )
+      : [];
+  const vocabularyLine =
+    vocabSubset.length > 0
+      ? `Aesthetic visual vocabulary (use these in imagePrompt fields, favor variety): ${vocabSubset.join(", ")}.`
+      : getAestheticVocabularyLine(aesthetic);
+
+  // Per-position creative assignments (only emitted when a seed is supplied).
+  let modelIdx = 0;
+  let objectIdx = 0;
+  const assignmentLines = positionMap
+    .map(({ position, type }) => {
+      if (type === "SIMPLE") {
+        const category =
+          shuffledCategories.length > 0
+            ? shuffledCategories[objectIdx % shuffledCategories.length]
+            : "a distinct hero object";
+        objectIdx++;
+        return `  - Position ${position} (OBJECT, no model): hero subject category = ${category}. Must be a DISTINCT object from every other cell.`;
+      }
+      const hairstyle = shuffledHair[modelIdx % shuffledHair.length];
+      const angle = shuffledAngles[modelIdx % shuffledAngles.length];
+      const sceneAnchor = shuffledVocab.length > 0 ? shuffledVocab[modelIdx % shuffledVocab.length] : "";
+      modelIdx++;
+      const sceneTxt = sceneAnchor ? ` Scene anchor: ${sceneAnchor}.` : "";
+      return `  - Position ${position} (${type}, model present): hairstyle = ${hairstyle}; camera angle = ${angle}.${sceneTxt}`;
+    })
+    .join("\n");
+
+  const variationDirective =
+    seed !== undefined
+      ? `\nVariation seed: ${seed}. Use it to make bold, non-obvious creative choices and avoid the single most clichéd interpretation of this aesthetic. Follow the PER-POSITION ASSIGNMENTS section below EXACTLY.`
+      : "";
+
+  const assignmentSection =
+    seed !== undefined
+      ? `
+═══════════════════════════════════════════════
+PER-POSITION ASSIGNMENTS (MANDATORY — use EXACTLY)
+═══════════════════════════════════════════════
+Use exactly the hairstyle, camera angle, scene anchor and object category assigned to each position below. Do NOT swap them between positions and do NOT reuse one across two positions.
+${assignmentLines}
+`
+      : "";
 
   const portraitInstruction = hasPortraitReference
     ? "A portrait reference image of the model WILL be passed to GPT Image 2 alongside each prompt. Each imagePrompt MUST include the instruction: 'Preserve the model's face and identity exactly from the provided reference image.' IDENTITY IS LOCKED, EVERYTHING ELSE VARIES: keep the SAME face/identity across all shots, but every position with the model must show a DISTINCT outfit, pose, and expression. Never reuse the same wardrobe piece, pose, or facial expression twice, and never repeat the same look from a different angle."
@@ -231,7 +339,7 @@ Aesthetic: ${aesthetic}
 Color palette: ${palette}
 Light type: ${lightType}
 Image count: ${imageCount}
-${vocabularyLine ? vocabularyLine + "\n" : ""}Extra notes from user: ${extraNotes || "none"}
+${vocabularyLine ? vocabularyLine + "\n" : ""}Extra notes from user: ${extraNotes || "none"}${variationDirective}
 
 ═══════════════════════════════════════════════
 COLOR PALETTE (DOMINANT — overrides scene-natural colors)
@@ -264,7 +372,7 @@ Every position where the model appears MUST have:
 NO two adjacent positions may share the same hairstyle OR the same angle.
 
 SUBJECT VARIETY (MANDATORY): every position must depict a DISTINCT subject/object/location. Never show the same object, prop, garment, or place twice — not even from a different distance, crop, or angle. Spread SIMPLE/object positions across different subject categories (e.g. accessory, food/drink, architecture detail, interior texture, outdoor element, wardrobe flat-lay) so the grid tells a varied story instead of repeating one motif.
-
+${assignmentSection}
 ═══════════════════════════════════════════════
 PORTRAIT REFERENCE
 ═══════════════════════════════════════════════
@@ -301,8 +409,9 @@ export function buildContinuityGridSystemPrompt(
   newImageCount: GridPipelineImageCount,
   hasPortraitReference: boolean,
   extraNotes = "",
+  seed?: number,
 ): string {
-  const positionMap = buildPositionMap(newImageCount);
+  const positionMap = buildPositionMap(newImageCount, seed);
 
   const positionInstructions = positionMap
     .map(({ position, type }) => `  - Position ${position}: ${type}`)
@@ -314,6 +423,50 @@ export function buildContinuityGridSystemPrompt(
   const usedHairstylesList = context.usedHairstyles.length > 0 ? context.usedHairstyles.join(", ") : "none";
   const usedAnglesList =
     Array.isArray(context.usedAngles) && context.usedAngles.length > 0 ? context.usedAngles.join(", ") : "none";
+
+  // Seeded per-position assignments drawn from the banks MINUS what the prior
+  // grid already used, so the extension is both fresh and clearly varied.
+  const rng = mulberry32(((seed ?? 0) >>> 0) || 1);
+  const usedHairSet = new Set(context.usedHairstyles);
+  const usedAngleSet = new Set(context.usedAngles);
+  const freshHairBank = HAIRSTYLE_BANK.filter((h) => !usedHairSet.has(h));
+  const freshAngleBank = ANGLE_BANK.filter((a) => !usedAngleSet.has(a));
+  const hairPool = freshHairBank.length > 0 ? freshHairBank : HAIRSTYLE_BANK;
+  const anglePool = freshAngleBank.length > 0 ? freshAngleBank : ANGLE_BANK;
+  const shuffledHair = seed !== undefined ? shuffleWith(hairPool, rng) : hairPool;
+  const shuffledAngles = seed !== undefined ? shuffleWith(anglePool, rng) : anglePool;
+  const shuffledCategories =
+    seed !== undefined ? shuffleWith(OBJECT_SUBJECT_CATEGORIES, rng) : OBJECT_SUBJECT_CATEGORIES;
+
+  let modelIdx = 0;
+  let objectIdx = 0;
+  const assignmentLines = positionMap
+    .map(({ position, type }) => {
+      if (type === "SIMPLE") {
+        const category =
+          shuffledCategories.length > 0
+            ? shuffledCategories[objectIdx % shuffledCategories.length]
+            : "a distinct hero object";
+        objectIdx++;
+        return `  - Position ${position} (OBJECT, no model): hero subject category = ${category}. Must be DISTINCT from every cell in this pack so far.`;
+      }
+      const hairstyle = shuffledHair[modelIdx % shuffledHair.length];
+      const angle = shuffledAngles[modelIdx % shuffledAngles.length];
+      modelIdx++;
+      return `  - Position ${position} (${type}, model present): hairstyle = ${hairstyle}; camera angle = ${angle}.`;
+    })
+    .join("\n");
+
+  const assignmentSection =
+    seed !== undefined
+      ? `
+═══════════════════════════════════════════════
+PER-POSITION ASSIGNMENTS (MANDATORY — use EXACTLY)
+═══════════════════════════════════════════════
+Use exactly the hairstyle, camera angle and object category assigned to each position below. They are already chosen to avoid everything used in earlier images of this pack.
+${assignmentLines}
+`
+      : "";
 
   const portraitInstruction = hasPortraitReference
     ? "Portrait reference IS available. Include in each imagePrompt: 'Preserve the model's face and identity exactly from the provided reference image.' IDENTITY IS LOCKED, EVERYTHING ELSE VARIES: keep the SAME face/identity, but every new shot must show a DIFFERENT outfit, pose, expression, and styling than any previous image. Do NOT reuse a wardrobe piece, pose, or facial expression already used in earlier images of this pack. Never repeat the same look from a new angle — change the actual outfit and pose."
@@ -354,7 +507,7 @@ CONTINUITY RULES (MANDATORY)
 5. SIMPLE positions must be pure minimalist object/texture shots — no model. Compose ONE single hero subject with generous negative space around it: clean, airy, uncluttered, breathable — never busy or crowded.
 6. NO RE-SHOOTING SUBJECTS (CRITICAL): treat the already-used scenes above as subjects/objects/props/locations that are now OFF-LIMITS. Do NOT re-depict any of them from a different distance, crop, zoom, or angle. Example: if a previous image already featured a wristwatch, this extension must NOT contain ANY watch — not closer, not farther, not from another angle. Pick entirely different objects and locations.
 7. EXPAND THE STORY: each new image must ADD a genuinely new narrative beat to the pack (new prop category, new wardrobe piece, new setting, new lifestyle moment, new texture). Across the whole extension, vary the subject categories (e.g. accessories, food/drink, architecture, interior detail, outdoor scene, wardrobe flat-lay) so the grid feels like the next chapter — never a re-run of the same motifs in new framing.
-
+${assignmentSection}
 ═══════════════════════════════════════════════
 PORTRAIT REFERENCE
 ═══════════════════════════════════════════════
@@ -395,18 +548,54 @@ const POSITION_TYPE_RULES: Record<GridPositionType, string> = {
 /**
  * Maps each 1-based position to its required type following the contrast matrix.
  *
- * Matrix rule (repeating pattern):
+ * Default (no seed) matrix rule (repeating pattern):
  *   pos 1, 5, 9, 13 → COMPLEX
  *   pos 2, 4, 6, 8, 10, 12 → SIMPLE
  *   pos 3, 7, 11 → MEDIUM
+ *
+ * When a `seed` is supplied the model/object ALTERNATION is preserved (odd
+ * positions = model, even = object → SIMPLE) and the per-grid COMPLEX/MEDIUM
+ * counts are preserved, but WHICH model positions are MEDIUM vs COMPLEX is
+ * randomized. This varies the layout rhythm between requests without ever
+ * clustering object cells or breaking the visual balance. Passing the same seed
+ * to the parser reproduces the exact same map, so plan normalization stays consistent.
  */
-function buildPositionMap(count: number): Array<{ position: number; type: GridPositionType }> {
+function buildPositionMap(
+  count: number,
+  seed?: number,
+): Array<{ position: number; type: GridPositionType }> {
+  if (seed === undefined) {
+    const result: Array<{ position: number; type: GridPositionType }> = [];
+    for (let i = 1; i <= count; i++) {
+      let type: GridPositionType;
+      if (i % 2 === 0) {
+        type = "SIMPLE";
+      } else if (i === 3 || i === 7 || i === 11) {
+        type = "MEDIUM";
+      } else {
+        type = "COMPLEX";
+      }
+      result.push({ position: i, type });
+    }
+    return result;
+  }
+
+  // Seeded variant: keep odd = model, even = object; randomize which model
+  // positions are MEDIUM (same MEDIUM count as the deterministic layout).
+  const rng = mulberry32((seed >>> 0) || 1);
+  const modelPositions: number[] = [];
+  for (let i = 1; i <= count; i++) {
+    if (i % 2 === 1) modelPositions.push(i);
+  }
+  const mediumCount = [3, 7, 11].filter((p) => p <= count).length;
+  const mediumSet = new Set(shuffleWith(modelPositions, rng).slice(0, mediumCount));
+
   const result: Array<{ position: number; type: GridPositionType }> = [];
   for (let i = 1; i <= count; i++) {
     let type: GridPositionType;
     if (i % 2 === 0) {
       type = "SIMPLE";
-    } else if (i === 3 || i === 7 || i === 11) {
+    } else if (mediumSet.has(i)) {
       type = "MEDIUM";
     } else {
       type = "COMPLEX";
@@ -460,7 +649,10 @@ export async function callGeminiFlashText(options: {
       },
     ],
     generationConfig: {
-      temperature: 0.7,
+      // Higher temperature + nucleus sampling so plans for the same aesthetic/
+      // palette diverge more between requests (more creative scene variety).
+      temperature: 0.95,
+      topP: 0.95,
       maxOutputTokens: 8192,
       responseMimeType: "application/json",
     },
@@ -517,7 +709,7 @@ export async function callGeminiFlashText(options: {
  * Parses the raw Gemini Flash JSON output into a typed GridPlan.
  * Throws if the structure is invalid.
  */
-export function parseGridPlan(rawJson: string, expectedCount: number): GridPlan {
+export function parseGridPlan(rawJson: string, expectedCount: number, seed?: number): GridPlan {
   let parsed: unknown;
   try {
     // Strip any accidental markdown fences Gemini might add despite instructions
@@ -539,12 +731,18 @@ export function parseGridPlan(rawJson: string, expectedCount: number): GridPlan 
     );
   }
 
+  // Rebuild the SAME (seeded) contrast matrix used to build the prompt so we can
+  // normalize each shot's type deterministically — never trust Gemini's type.
+  const typeByPosition = new Map(
+    buildPositionMap(expectedCount, seed).map(({ position, type }) => [position, type] as const),
+  );
+
   const shots: GridShotPlan[] = (root.shots as unknown[]).map((s, idx) => {
     const shot = s as Record<string, unknown>;
     const position = typeof shot.position === "number" ? shot.position : idx + 1;
     // Enforce the contrast matrix deterministically — never trust Gemini's type,
     // otherwise the model can drift (e.g. put portraits in consecutive cells).
-    const type = positionTypeFor(position);
+    const type = typeByPosition.get(position) ?? positionTypeFor(position);
     const label = typeof shot.label === "string" ? shot.label : `Shot ${position}`;
     // Object-only (SIMPLE) cells must never carry a hairstyle/angle (no model in frame).
     const hairstyle = type === "SIMPLE" ? null : typeof shot.hairstyle === "string" ? shot.hairstyle : null;
@@ -726,7 +924,7 @@ RULES:
 export function buildExtractionPrompt(params: {
   position: number;
   imageCount: number;
-  shot: { label: string; hairstyle: string | null; angle: string | null; type: string };
+  shot: { label: string; hairstyle: string | null; angle: string | null; type: string; imagePrompt?: string };
   hasPortrait: boolean;
   aesthetic: string;
   palette: string;
@@ -750,21 +948,30 @@ export function buildExtractionPrompt(params: {
       ? "Tight portrait — face and shoulders, calm and refined"
       : "Full or medium body — action, movement, or rich location";
 
+  // The detailed per-shot brief (imagePrompt) is the PRIMARY instruction. When it
+  // is available we regenerate the cell at full quality from the brief and use the
+  // low-resolution grid cell only as a composition/styling reference — this avoids
+  // inheriting the composite preview's reduced per-cell detail.
+  const brief = (shot.imagePrompt && shot.imagePrompt.trim().length > 0)
+    ? shot.imagePrompt.trim()
+    : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
+
   const portraitInstruction = hasPortrait
     ? `\nCRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait. Adapt their face naturally to the scene. Never alter their identity.`
     : "";
 
-  return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
+  return `Produce a single full-resolution editorial photo that matches cell ${position} of ${imageCount} from the Instagram grid preview (first image provided).
 
-EXACT POSITION: position ${position}, counting left to right, top to bottom — row ${row}, column ${col} (${corner}).
+REFERENCE CELL: position ${position}, counting left to right, top to bottom — row ${row}, column ${col} (${corner}). Use this grid cell ONLY as a reference for composition, framing, pose, wardrobe and styling. Do NOT copy its low-resolution pixels; regenerate the photo sharply at full resolution from the detailed brief below.
 
-TARGET CELL DETAILS:
-- Scene: ${shot.label}${shot.hairstyle ? `\n- Hairstyle: ${shot.hairstyle}` : ""}${shot.angle ? `\n- Camera angle: ${shot.angle}` : ""}
-- Shot type: ${typeDesc}
+DETAILED BRIEF (primary instruction — render this faithfully):
+${brief}
+
+SHOT TYPE: ${typeDesc}
 
 OUTPUT REQUIREMENTS:
 - Output ONLY this single standalone photo — no grid lines, no other cells, no borders
-- 100% faithful replica of the composition, subject, colors, lighting, and background from that exact cell
+- Match the composition, subject, styling and background of the reference cell, but render it crisp and ultra-detailed at full resolution (do NOT reproduce any blur or softness from the small preview cell)
 - Maintain the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting
 - Ultra-detailed, photorealistic, shot with a professional 8K camera
 - Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene must fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders${portraitInstruction}`;
