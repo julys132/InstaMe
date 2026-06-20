@@ -57,8 +57,10 @@ function resolveOpenAiImageRequest(model: string): {
     // identity (face) is preserved in the pack composite + extracted images.
     ["gpt-image-2", { model: "gpt-image-2", inputFidelity: "high" }],
     ["gpt image 2", { model: "gpt-image-2", inputFidelity: "high" }],
-    ["gpt-image-2-2026-04-21", { model: "gpt-image-2-2026-04-21", inputFidelity: "high" }],
-    ["gpt image 2 2026 04 21", { model: "gpt-image-2-2026-04-21", inputFidelity: "high" }],
+    // The dated gpt-image-2 snapshot rejects the `input_fidelity` parameter
+    // (returns 400), so do NOT request it for these model ids.
+    ["gpt-image-2-2026-04-21", { model: "gpt-image-2-2026-04-21" }],
+    ["gpt image 2 2026 04 21", { model: "gpt-image-2-2026-04-21" }],
     ["gpt-image-1.5", { model: "gpt-image-1.5" }],
     ["gpt image 1.5", { model: "gpt-image-1.5" }],
     ["gpt-image-1", { model: "gpt-image-1" }],
@@ -284,7 +286,9 @@ export async function generateOpenAiImage(options: {
       image: files as any,
       size,
       quality,
-      input_fidelity: resolvedRequest.inputFidelity,
+      // Only send input_fidelity when the resolved model actually supports it;
+      // some models (e.g. gpt-image-2-2026-04-21) reject the parameter with a 400.
+      ...(resolvedRequest.inputFidelity ? { input_fidelity: resolvedRequest.inputFidelity } : {}),
     } as any);
 
     const base64 = response.data?.[0]?.b64_json;
