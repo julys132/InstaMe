@@ -695,6 +695,17 @@ const GRID_PIPELINE_ALLOWED_IMAGE_COUNTS = new Set<number>([4, 6, 9, 12]);
 const GRID_PIPELINE_RENDER_OPENAI_MODEL =
   process.env.INSTAME_GRID_PIPELINE_RENDER_MODEL || "gpt-image-2-2026-04-21";
 const GRID_PIPELINE_RENDER_OPENAI_QUALITY = "medium" as const;
+// Composite grid PREVIEW provider. Set INSTAME_GRID_PIPELINE_PREVIEW_PROVIDER=reve
+// to render the single composite preview image with Reve 2.0 (cheaper) instead of
+// GPT Image 2. This ONLY affects the preview render — the per-shot extraction still
+// uses GRID_PIPELINE_RENDER_OPENAI_MODEL. Falls back to OpenAI if REVE_API_KEY is missing.
+const GRID_PIPELINE_PREVIEW_PROVIDER = (
+  process.env.INSTAME_GRID_PIPELINE_PREVIEW_PROVIDER || "openai"
+)
+  .trim()
+  .toLowerCase();
+const GRID_PIPELINE_PREVIEW_REVE_MODEL =
+  process.env.INSTAME_GRID_PIPELINE_PREVIEW_REVE_MODEL || "reve-2.0";
 const INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path.resolve(
   process.cwd(),
   "assets",
@@ -2747,6 +2758,35 @@ function toUploadedReferenceImageFromStoredOwnStyle(image: InstaMeUploadedImageR
 
 function hasReveImageConfig(): boolean {
   return Boolean(process.env.REVE_API_KEY);
+}
+
+// Renders the single composite grid PREVIEW image. Uses Reve 2.0 when configured
+// (INSTAME_GRID_PIPELINE_PREVIEW_PROVIDER=reve + REVE_API_KEY) for a cheaper preview,
+// otherwise renders with GPT Image 2. Reve edit accepts a single reference image, so
+// the portrait (first image) is used as the identity reference when present.
+async function renderGridCompositePreview(options: {
+  prompt: string;
+  images: import("./lib/instame-image").RuntimeImageInput[];
+}): Promise<{ imageBase64: string; provider: string; model: string }> {
+  if (GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig()) {
+    const imageBase64 = await generateReveImage({
+      model: GRID_PIPELINE_PREVIEW_REVE_MODEL,
+      prompt: options.prompt,
+      referenceImage: options.images[0],
+      aspectRatio: "2:3",
+      mode: "preview",
+    });
+    return { imageBase64, provider: "Reve", model: GRID_PIPELINE_PREVIEW_REVE_MODEL };
+  }
+
+  const imageBase64 = await generateOpenAiImage({
+    model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+    prompt: options.prompt,
+    images: options.images.length > 0 ? options.images : undefined,
+    size: "1024x1536",
+    quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
+  });
+  return { imageBase64, provider: "OpenAI", model: GRID_PIPELINE_RENDER_OPENAI_MODEL };
 }
 
 function resolveAvailablePromptOnlyModel(
@@ -7579,12 +7619,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       compositeImages.push(...referenceImages);
 
-      const compositeImageBase64 = await generateOpenAiImage({
-        model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+      const { imageBase64: compositeImageBase64 } = await renderGridCompositePreview({
         prompt: compositePrompt,
-        images: compositeImages.length > 0 ? compositeImages : undefined,
-        size: "1024x1536",
-        quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
+        images: compositeImages,
       });
 
       consumed = false;
