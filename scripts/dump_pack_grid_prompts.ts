@@ -36,6 +36,24 @@ const PACKS: Array<{ id: string; count: GridPipelineImageCount }> = [
 ];
 
 const sections: string[] = [];
+// Each real request uses a fresh random seed; we use one fixed sample seed here
+// so the dump is reproducible and shows the PER-POSITION ASSIGNMENTS section that
+// Gemini actually receives. The assigned hairstyles/angles/scene-anchors/object
+// categories (and which model cells are MEDIUM vs COMPLEX) change with the seed.
+const SAMPLE_SEED = 123456;
+
+sections.push(
+  [
+    "################################################################",
+    "# NOTE",
+    "################################################################",
+    "These are the system prompts sent to Gemini Flash, one per pack.",
+    `Generated with a fixed sample variation seed (${SAMPLE_SEED}).`,
+    "In production each request gets a fresh random seed, so the",
+    "'PER-POSITION ASSIGNMENTS' and the COMPLEX/MEDIUM layout differ every time.",
+  ].join("\n"),
+);
+
 for (const pack of PACKS) {
   const aesthetic = GRID_PIPELINE_AESTHETICS.find((a) => a.id === pack.id);
   const prompt = buildMasterGridSystemPrompt({
@@ -45,6 +63,7 @@ for (const pack of PACKS) {
     lightType: aesthetic?.defaultLightType || "",
     extraNotes: "",
     hasPortraitReference: true,
+    seed: SAMPLE_SEED,
   });
 
   sections.push(
