@@ -948,31 +948,46 @@ export function buildExtractionPrompt(params: {
       ? "Tight portrait — face and shoulders, calm and refined"
       : "Full or medium body — action, movement, or rich location";
 
-  // The detailed per-shot brief (imagePrompt) is the PRIMARY instruction. When it
-  // is available we regenerate the cell at full quality from the brief and use the
-  // low-resolution grid cell only as a composition/styling reference — this avoids
-  // inheriting the composite preview's reduced per-cell detail.
+  // The grid cell shown in the preview is the SOURCE OF TRUTH. The user already
+  // approved that preview, so extraction must FAITHFULLY reproduce that exact cell
+  // (composition, wardrobe, background, props, pose, expression, colors) and ONLY
+  // add resolution / sharpness / fine detail — it must NOT re-invent or change any
+  // element. The per-shot brief is provided purely as descriptive context to help
+  // the model understand what it is enhancing, never to override what is visible.
   const brief = (shot.imagePrompt && shot.imagePrompt.trim().length > 0)
     ? shot.imagePrompt.trim()
     : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
 
   const portraitInstruction = hasPortrait
-    ? `\nCRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait. Adapt their face naturally to the scene. Never alter their identity.`
+    ? `\nCRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait, exactly as they already appear in the reference cell. Never alter their identity.`
     : "";
 
-  return `Produce a single full-resolution editorial photo that matches cell ${position} of ${imageCount} from the Instagram grid preview (first image provided).
+  return `Upscale and enhance cell ${position} of ${imageCount} from the Instagram grid preview (first image provided) into a single full-resolution editorial photo. This is an ENHANCEMENT task, NOT a re-generation: the reference cell is the exact picture the user already approved.
 
-REFERENCE CELL: position ${position}, counting left to right, top to bottom — row ${row}, column ${col} (${corner}). Use this grid cell ONLY as a reference for composition, framing, pose, wardrobe and styling. Do NOT copy its low-resolution pixels; regenerate the photo sharply at full resolution from the detailed brief below.
+REFERENCE CELL: position ${position}, counting left to right, top to bottom — row ${row}, column ${col} (${corner}). Crop to this cell and treat its pixels as the SOURCE OF TRUTH.
 
-DETAILED BRIEF (primary instruction — render this faithfully):
+WHAT TO PRESERVE EXACTLY (do NOT change any of these):
+- The exact same composition, framing, camera angle, and crop
+- The exact same outfit / wardrobe — every garment, color, cut, fabric, and accessory stays identical (do not add, remove, swap, or restyle clothing)
+- The exact same background, location, set dressing, props, and every object in frame
+- The exact same pose, body position, hands, and facial expression
+- The exact same colors, palette, tonal range, and lighting direction
+- For object/flat-lay cells: the exact same hero subject and layout
+
+WHAT TO IMPROVE (this is the ONLY thing you may change):
+- Increase resolution and sharpness; add realistic fine detail and texture (skin, fabric weave, material surfaces, edges)
+- Remove the blur, softness, and compression artifacts of the small preview cell
+- Do NOT introduce new elements, new scenery, or any creative reinterpretation
+
+CONTEXT (describes the approved cell — use only to understand what you are enhancing, never to override what is visible):
 ${brief}
 
 SHOT TYPE: ${typeDesc}
 
 OUTPUT REQUIREMENTS:
 - Output ONLY this single standalone photo — no grid lines, no other cells, no borders
-- Match the composition, subject, styling and background of the reference cell, but render it crisp and ultra-detailed at full resolution (do NOT reproduce any blur or softness from the small preview cell)
-- Maintain the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting
+- The result must look like the SAME photo as the reference cell, just at much higher resolution and clarity
+- Keep the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting consistent with the reference cell — do not re-grade or shift colors
 - Ultra-detailed, photorealistic, shot with a professional 8K camera
 - Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene must fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders${portraitInstruction}`;
 }
