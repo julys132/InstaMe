@@ -199,13 +199,10 @@ function resolveReveVersion(options: {
   const alias = normalizeReveModelEnvKey(options.model);
   const qualityKey = options.mode === "high_res" ? "HIGH_RES" : "PREVIEW";
   const operationKey = options.operation.toUpperCase();
-  const defaultVersion =
-    options.operation === "edit"
-      ? options.mode === "high_res"
-        ? "latest"
-        : "latest-fast"
-      : "latest";
-
+  // The Reve edit endpoint does not expose a "fast" tier, so use "latest" for
+  // both edit modes; create keeps "latest". A "latest-fast" version on edit is
+  // rejected by the API ("One of the request parameters has an invalid value.").
+  const defaultVersion = options.operation === "edit" ? "latest" : "latest";
   return (
     readFirstEnv([
       `REVE_${operationKey}_VERSION_${alias}_${qualityKey}`,
@@ -420,7 +417,10 @@ export async function generateReveImage(options: {
     version,
   };
 
-  if (options.aspectRatio && options.aspectRatio !== "auto") {
+  // The Reve edit endpoint derives the output dimensions from the reference
+  // image and rejects an explicit aspect_ratio ("One of the request parameters
+  // has an invalid value."). Only send aspect_ratio on the create endpoint.
+  if (!isEdit && options.aspectRatio && options.aspectRatio !== "auto") {
     payload.aspect_ratio = options.aspectRatio;
   }
 
@@ -463,13 +463,16 @@ export async function generateReveImage(options: {
   }
 
   if (!response.ok) {
-    const message =
+    const remoteMessage =
       parsed?.message ||
       parsed?.error ||
       parsed?.error_code ||
       responseText ||
       `Reve API returned status ${response.status}`;
-    throw new Error(message);
+    const payloadKeys = Object.keys(payload).sort().join(", ");
+    throw new Error(
+      `Reve API error (${response.status}) on ${endpoint} [version=${version}, payload keys: ${payloadKeys}]: ${remoteMessage}`,
+    );
   }
 
   const base64 = extractReveImageBase64(parsed);

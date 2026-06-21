@@ -1112,7 +1112,7 @@ function resolveReveVersion(options) {
   const alias = normalizeReveModelEnvKey(options.model);
   const qualityKey = options.mode === "high_res" ? "HIGH_RES" : "PREVIEW";
   const operationKey = options.operation.toUpperCase();
-  const defaultVersion = options.operation === "edit" ? options.mode === "high_res" ? "latest" : "latest-fast" : "latest";
+  const defaultVersion = options.operation === "edit" ? "latest" : "latest";
   return readFirstEnv([
     `REVE_${operationKey}_VERSION_${alias}_${qualityKey}`,
     `REVE_${operationKey}_VERSION_${alias}`,
@@ -1270,7 +1270,7 @@ async function generateReveImage(options) {
   const payload = {
     version
   };
-  if (options.aspectRatio && options.aspectRatio !== "auto") {
+  if (!isEdit && options.aspectRatio && options.aspectRatio !== "auto") {
     payload.aspect_ratio = options.aspectRatio;
   }
   if (typeof options.testTimeScaling === "number" && Number.isFinite(options.testTimeScaling) && options.testTimeScaling >= 1 && options.testTimeScaling <= 15) {
@@ -1302,8 +1302,11 @@ async function generateReveImage(options) {
     parsed = null;
   }
   if (!response.ok) {
-    const message = parsed?.message || parsed?.error || parsed?.error_code || responseText || `Reve API returned status ${response.status}`;
-    throw new Error(message);
+    const remoteMessage = parsed?.message || parsed?.error || parsed?.error_code || responseText || `Reve API returned status ${response.status}`;
+    const payloadKeys = Object.keys(payload).sort().join(", ");
+    throw new Error(
+      `Reve API error (${response.status}) on ${endpoint} [version=${version}, payload keys: ${payloadKeys}]: ${remoteMessage}`
+    );
   }
   const base64 = extractReveImageBase64(parsed);
   if (!base64) {
