@@ -2,6 +2,7 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "node:http";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import sharp from "sharp";
 import {
   createHash,
   createHmac,
@@ -717,6 +718,12 @@ const GRID_PIPELINE_EXTRACT_PROVIDER = (
   .toLowerCase();
 const GRID_PIPELINE_EXTRACT_REVE_MODEL =
   process.env.INSTAME_GRID_PIPELINE_EXTRACT_REVE_MODEL || "reve-2.0";
+// OpenAI extraction uses a HIGH input-fidelity model so the approved cell's outfit,
+// colors, background and elements are preserved instead of being re-invented. The
+// dated snapshot (gpt-image-2-2026-04-21) rejects `input_fidelity`, so it cannot lock
+// fidelity — default extraction to plain "gpt-image-2" which sends input_fidelity:high.
+const GRID_PIPELINE_EXTRACT_OPENAI_MODEL =
+  process.env.INSTAME_GRID_PIPELINE_EXTRACT_MODEL || "gpt-image-2";
 const INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path.resolve(
   process.cwd(),
   "assets",
@@ -2820,12 +2827,51 @@ async function renderGridExtractedShot(options: {
   }
 
   return generateOpenAiImage({
-    model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+    model: GRID_PIPELINE_EXTRACT_OPENAI_MODEL,
     prompt: options.prompt,
     images: options.images.length > 0 ? options.images : undefined,
     size: "1024x1536",
     quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
   });
+}
+
+// Crops a single cell out of the composite grid image (server-side, with sharp) so
+// the extraction enhancer receives ONLY that approved cell instead of the whole grid.
+// Instagram grids are always 3 columns; rows are derived from imageCount. This keeps
+// the editor (esp. Reve, which edits the whole reference image rather than locating a
+// sub-cell) faithful to the exact cell the user approved.
+async function cropGridCellFromComposite(
+  gridBase64: string,
+  position: number,
+  imageCount: number,
+): Promise<string> {
+  const cols = 3; // Instagram grids are always 3 columns
+  const rows = Math.max(1, Math.ceil(imageCount / cols));
+  const row = Math.ceil(position / cols);
+  const col = ((position - 1) % cols) + 1;
+
+  const buffer = Buffer.from(gridBase64, "base64");
+  const meta = await sharp(buffer).metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  if (!width || !height) {
+    throw new Error("Could not read composite grid dimensions for cell crop.");
+  }
+
+  const cellWidth = Math.floor(width / cols);
+  const cellHeight = Math.floor(height / rows);
+  if (cellWidth <= 0 || cellHeight <= 0) {
+    throw new Error("Computed an invalid grid cell size for cell crop.");
+  }
+  const left = Math.min(Math.max((col - 1) * cellWidth, 0), width - cellWidth);
+  const top = Math.min(Math.max((row - 1) * cellHeight, 0), height - cellHeight);
+
+  const cropped = await sharp(buffer)
+    .extract({ left, top, width: cellWidth, height: cellHeight })
+    .png()
+    .toBuffer();
+
+  return cropped.toString("base64");
 }
 
 function resolveAvailablePromptOnlyModel(
@@ -7753,8 +7799,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ).filter((shot) => uniqueSortedPositions.includes(shot.position));
 
       for (const shot of shotsToExtract) {
+        const useReveExtraction =
+          GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig();
+
+        // For the Reve extraction path, crop the approved cell server-side so the
+        // editor enhances ONLY that exact cell instead of re-interpreting the whole
+        // grid (Reve edits the entire reference image, so it must receive just the cell).
+        let cellImageBase64 = gridImageBase64;
+        let preCropped = false;
+        if (useReveExtraction) {
+          try {
+            cellImageBase64 = await cropGridCellFromComposite(gridImageBase64, shot.position, imageCount);
+            preCropped = true;
+          } catch (cropError) {
+            console.warn(
+              `InstaMe grid-pipeline/extract-shots position ${shot.position}: cell crop failed, falling back to full grid.`,
+              cropError,
+            );
+            cellImageBase64 = gridImageBase64;
+            preCropped = false;
+          }
+        }
+
         const images: import("./lib/instame-image").RuntimeImageInput[] = [
-          { base64: gridImageBase64, mimeType: "image/png" },
+          { base64: cellImageBase64, mimeType: "image/png" },
         ];
         if (portrait) {
           images.push({ base64: portrait, mimeType: "image/jpeg" });
@@ -7780,6 +7848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           aesthetic,
           palette,
           lightType,
+          preCropped,
         }) + referenceImagePromptNote);
 
         let generatedImageBase64: string | null = null;

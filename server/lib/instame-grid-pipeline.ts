@@ -372,6 +372,15 @@ Every position where the model appears MUST have:
 NO two adjacent positions may share the same hairstyle OR the same angle.
 
 SUBJECT VARIETY (MANDATORY): every position must depict a DISTINCT subject/object/location. Never show the same object, prop, garment, or place twice — not even from a different distance, crop, or angle. Spread SIMPLE/object positions across different subject categories (e.g. accessory, food/drink, architecture detail, interior texture, outdoor element, wardrobe flat-lay) so the grid tells a varied story instead of repeating one motif.
+
+═══════════════════════════════════════════════
+TONAL CONTRAST & VISUAL RHYTHM (MANDATORY)
+═══════════════════════════════════════════════
+The finished grid must NOT be tonally flat — a grid where every cell is equally bright (or equally dark) looks amateur. Staying STRICTLY inside the palette "${palette}", deliberately alternate the tonal value of the cells:
+- Some cells must lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones).
+- Other cells must lean to the LIGHTER / airier / high-key end (bright, soft, luminous).
+- Neighbouring cells (side by side AND stacked) must differ in overall brightness so the grid reads as a light-and-dark rhythm, not one uniform tone.
+In EVERY imagePrompt, explicitly state whether that shot is "bright and airy" or "dark and moody" and name the lighter or darker palette colors accordingly. This varies brightness and mood ONLY — never the color family.
 ${assignmentSection}
 ═══════════════════════════════════════════════
 PORTRAIT REFERENCE
@@ -905,8 +914,15 @@ OUTFIT & WARDROBE VARIETY (MANDATORY):
 - NEVER reuse the same black blazer (or any single garment) across multiple cells. If one cell is a black blazer, the others must be e.g. a knit, a dress, a coat, a blouse, tailored trousers with a different top, etc.
 - Also vary pose, expression, and framing in every portrait cell. Never repeat the same look from a different angle.
 
+TONAL CONTRAST & VISUAL RHYTHM (MANDATORY — this is what makes the grid look professional):
+- Do NOT render every cell at the same brightness. A monotone grid where all cells are equally light (or equally dark) looks flat and amateur.
+- Within the SAME palette "${plan.palette}", deliberately alternate the tonal value of neighbouring cells: some cells lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones) and others to the LIGHTER / airier / high-key end (bright, soft, luminous).
+- No two side-by-side or stacked cells should share the same overall brightness — create a checkerboard-like rhythm of light and dark across the grid.
+- Mix close-up high-detail cells with open negative-space cells, and bright daylight moments with shadowy dramatic ones.
+- This tonal variation must stay strictly inside the palette — change brightness and mood, NOT the color family.
+
 RULES:
-- All cells share identical color grading, tonal range, and aesthetic mood
+- All cells share the SAME palette and overall color grade, but their TONAL VALUE (brightness/darkness) MUST deliberately vary from cell to cell per the TONAL CONTRAST section above — do not flatten them to one identical brightness
 - Each cell is clearly distinct but visually harmonious with all others
 - VISUAL BALANCE (IMPORTANT): keep object/flat-lay (OBJECT-ONLY) cells minimalist and airy — ONE hero subject with generous negative space, never cluttered. Alternate busy and calm cells so the overall grid feels balanced and breathable, not crowded
 - ${portraitNote}
@@ -929,8 +945,12 @@ export function buildExtractionPrompt(params: {
   aesthetic: string;
   palette: string;
   lightType: string;
+  // When true, the FIRST input image is already the single cropped cell (not the
+  // full grid), so the prompt must tell the model to enhance the whole provided
+  // image instead of locating and cropping cell N out of a grid.
+  preCropped?: boolean;
 }): string {
-  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType } = params;
+  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType, preCropped } = params;
   const totalRows = Math.ceil(imageCount / GRID_COLS);
   const row = Math.ceil(position / GRID_COLS);
   const col = ((position - 1) % GRID_COLS) + 1;
@@ -962,9 +982,17 @@ export function buildExtractionPrompt(params: {
     ? `\nCRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait, exactly as they already appear in the reference cell. Never alter their identity.`
     : "";
 
-  return `Upscale and enhance cell ${position} of ${imageCount} from the Instagram grid preview (first image provided) into a single full-resolution editorial photo. This is an ENHANCEMENT task, NOT a re-generation: the reference cell is the exact picture the user already approved.
+  const openingLine = preCropped
+    ? `Upscale and enhance the provided photo into a single full-resolution editorial image. This is an ENHANCEMENT task, NOT a re-generation: the provided image is the exact picture the user already approved.`
+    : `Upscale and enhance cell ${position} of ${imageCount} from the Instagram grid preview (first image provided) into a single full-resolution editorial photo. This is an ENHANCEMENT task, NOT a re-generation: the reference cell is the exact picture the user already approved.`;
 
-REFERENCE CELL: position ${position}, counting left to right, top to bottom — row ${row}, column ${col} (${corner}). Crop to this cell and treat its pixels as the SOURCE OF TRUTH.
+  const referenceLine = preCropped
+    ? `REFERENCE: the provided image IS the photo to enhance — it already shows ONLY this single cell. Treat every pixel of it as the SOURCE OF TRUTH and keep the entire frame; do NOT crop, zoom, re-frame, or cut anything out.`
+    : `REFERENCE CELL: position ${position}, counting left to right, top to bottom — row ${row}, column ${col} (${corner}). Crop to this cell and treat its pixels as the SOURCE OF TRUTH.`;
+
+  return `${openingLine}
+
+${referenceLine}
 
 WHAT TO PRESERVE EXACTLY (do NOT change any of these):
 - The exact same composition, framing, camera angle, and crop
