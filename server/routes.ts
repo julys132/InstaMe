@@ -706,6 +706,17 @@ const GRID_PIPELINE_PREVIEW_PROVIDER = (
   .toLowerCase();
 const GRID_PIPELINE_PREVIEW_REVE_MODEL =
   process.env.INSTAME_GRID_PIPELINE_PREVIEW_REVE_MODEL || "reve-2.0";
+// Per-shot EXTRACTION provider. Set INSTAME_GRID_PIPELINE_EXTRACT_PROVIDER=reve to
+// render the final extracted shots with Reve 2.0 (edit/enhance of the approved grid
+// cell) instead of GPT Image 2. Independent from the preview provider so they can be
+// tested separately. Falls back to OpenAI if REVE_API_KEY is missing.
+const GRID_PIPELINE_EXTRACT_PROVIDER = (
+  process.env.INSTAME_GRID_PIPELINE_EXTRACT_PROVIDER || "openai"
+)
+  .trim()
+  .toLowerCase();
+const GRID_PIPELINE_EXTRACT_REVE_MODEL =
+  process.env.INSTAME_GRID_PIPELINE_EXTRACT_REVE_MODEL || "reve-2.0";
 const INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path.resolve(
   process.cwd(),
   "assets",
@@ -2787,6 +2798,34 @@ async function renderGridCompositePreview(options: {
     quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
   });
   return { imageBase64, provider: "OpenAI", model: GRID_PIPELINE_RENDER_OPENAI_MODEL };
+}
+
+// Renders a single EXTRACTED shot. When the extraction provider is Reve, it edits/
+// enhances the approved grid cell (images[0]) with Reve 2.0 at high resolution;
+// otherwise it falls back to GPT Image 2 with the full image set. Kept signature-
+// compatible with the previous generateOpenAiImage call so both the primary and the
+// moderation-safe fallback paths can use it.
+async function renderGridExtractedShot(options: {
+  prompt: string;
+  images: import("./lib/instame-image").RuntimeImageInput[];
+}): Promise<string> {
+  if (GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig()) {
+    return generateReveImage({
+      model: GRID_PIPELINE_EXTRACT_REVE_MODEL,
+      prompt: options.prompt,
+      referenceImage: options.images[0],
+      aspectRatio: "2:3",
+      mode: "high_res",
+    });
+  }
+
+  return generateOpenAiImage({
+    model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+    prompt: options.prompt,
+    images: options.images.length > 0 ? options.images : undefined,
+    size: "1024x1536",
+    quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
+  });
 }
 
 function resolveAvailablePromptOnlyModel(
@@ -7748,12 +7787,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Attempt 1: primary prompt
         try {
-          generatedImageBase64 = await generateOpenAiImage({
-            model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+          generatedImageBase64 = await renderGridExtractedShot({
             prompt: primaryPrompt,
             images,
-            size: "1024x1536",
-            quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
           });
         } catch (primaryError: unknown) {
           const isModerationBlock =
@@ -7779,12 +7815,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 lightType,
                 hasPortrait: Boolean(portrait),
               });
-              generatedImageBase64 = await generateOpenAiImage({
-                model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+              generatedImageBase64 = await renderGridExtractedShot({
                 prompt: fallbackPrompt,
                 images,
-                size: "1024x1536",
-                quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY,
               });
             } catch (fallbackError) {
               console.error(
