@@ -29,6 +29,7 @@ var import_express = __toESM(require("express"));
 var import_node_http = require("node:http");
 var fs2 = __toESM(require("node:fs"));
 var path2 = __toESM(require("node:path"));
+var import_sharp = __toESM(require("sharp"));
 var import_node_crypto2 = require("node:crypto");
 var import_drizzle_orm3 = require("drizzle-orm");
 
@@ -2000,6 +2001,15 @@ Every position where the model appears MUST have:
 NO two adjacent positions may share the same hairstyle OR the same angle.
 
 SUBJECT VARIETY (MANDATORY): every position must depict a DISTINCT subject/object/location. Never show the same object, prop, garment, or place twice \u2014 not even from a different distance, crop, or angle. Spread SIMPLE/object positions across different subject categories (e.g. accessory, food/drink, architecture detail, interior texture, outdoor element, wardrobe flat-lay) so the grid tells a varied story instead of repeating one motif.
+
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+TONAL CONTRAST & VISUAL RHYTHM (MANDATORY)
+\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+The finished grid must NOT be tonally flat \u2014 a grid where every cell is equally bright (or equally dark) looks amateur. Staying STRICTLY inside the palette "${palette}", deliberately alternate the tonal value of the cells:
+- Some cells must lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones).
+- Other cells must lean to the LIGHTER / airier / high-key end (bright, soft, luminous).
+- Neighbouring cells (side by side AND stacked) must differ in overall brightness so the grid reads as a light-and-dark rhythm, not one uniform tone.
+In EVERY imagePrompt, explicitly state whether that shot is "bright and airy" or "dark and moody" and name the lighter or darker palette colors accordingly. This varies brightness and mood ONLY \u2014 never the color family.
 ${assignmentSection}
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 PORTRAIT REFERENCE
@@ -2337,8 +2347,15 @@ OUTFIT & WARDROBE VARIETY (MANDATORY):
 - NEVER reuse the same black blazer (or any single garment) across multiple cells. If one cell is a black blazer, the others must be e.g. a knit, a dress, a coat, a blouse, tailored trousers with a different top, etc.
 - Also vary pose, expression, and framing in every portrait cell. Never repeat the same look from a different angle.
 
+TONAL CONTRAST & VISUAL RHYTHM (MANDATORY \u2014 this is what makes the grid look professional):
+- Do NOT render every cell at the same brightness. A monotone grid where all cells are equally light (or equally dark) looks flat and amateur.
+- Within the SAME palette "${plan.palette}", deliberately alternate the tonal value of neighbouring cells: some cells lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones) and others to the LIGHTER / airier / high-key end (bright, soft, luminous).
+- No two side-by-side or stacked cells should share the same overall brightness \u2014 create a checkerboard-like rhythm of light and dark across the grid.
+- Mix close-up high-detail cells with open negative-space cells, and bright daylight moments with shadowy dramatic ones.
+- This tonal variation must stay strictly inside the palette \u2014 change brightness and mood, NOT the color family.
+
 RULES:
-- All cells share identical color grading, tonal range, and aesthetic mood
+- All cells share the SAME palette and overall color grade, but their TONAL VALUE (brightness/darkness) MUST deliberately vary from cell to cell per the TONAL CONTRAST section above \u2014 do not flatten them to one identical brightness
 - Each cell is clearly distinct but visually harmonious with all others
 - VISUAL BALANCE (IMPORTANT): keep object/flat-lay (OBJECT-ONLY) cells minimalist and airy \u2014 ONE hero subject with generous negative space, never cluttered. Alternate busy and calm cells so the overall grid feels balanced and breathable, not crowded
 - ${portraitNote}
@@ -2347,7 +2364,7 @@ RULES:
 - Professional editorial photography quality, photorealistic`;
 }
 function buildExtractionPrompt(params) {
-  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType } = params;
+  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType, preCropped } = params;
   const totalRows = Math.ceil(imageCount / GRID_COLS);
   const row = Math.ceil(position / GRID_COLS);
   const col = (position - 1) % GRID_COLS + 1;
@@ -2357,20 +2374,35 @@ function buildExtractionPrompt(params) {
   const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame. ONE single hero subject with generous empty negative space around it; minimalist, clean, airy, uncluttered and breathable \u2014 never busy or crowded" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
   const brief = shot.imagePrompt && shot.imagePrompt.trim().length > 0 ? shot.imagePrompt.trim() : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
   const portraitInstruction = hasPortrait ? `
-CRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait. Adapt their face naturally to the scene. Never alter their identity.` : "";
-  return `Produce a single full-resolution editorial photo that matches cell ${position} of ${imageCount} from the Instagram grid preview (first image provided).
+CRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait, exactly as they already appear in the reference cell. Never alter their identity.` : "";
+  const openingLine = preCropped ? `Upscale and enhance the provided photo into a single full-resolution editorial image. This is an ENHANCEMENT task, NOT a re-generation: the provided image is the exact picture the user already approved.` : `Upscale and enhance cell ${position} of ${imageCount} from the Instagram grid preview (first image provided) into a single full-resolution editorial photo. This is an ENHANCEMENT task, NOT a re-generation: the reference cell is the exact picture the user already approved.`;
+  const referenceLine = preCropped ? `REFERENCE: the provided image IS the photo to enhance \u2014 it already shows ONLY this single cell. Treat every pixel of it as the SOURCE OF TRUTH and keep the entire frame; do NOT crop, zoom, re-frame, or cut anything out.` : `REFERENCE CELL: position ${position}, counting left to right, top to bottom \u2014 row ${row}, column ${col} (${corner}). Crop to this cell and treat its pixels as the SOURCE OF TRUTH.`;
+  return `${openingLine}
 
-REFERENCE CELL: position ${position}, counting left to right, top to bottom \u2014 row ${row}, column ${col} (${corner}). Use this grid cell ONLY as a reference for composition, framing, pose, wardrobe and styling. Do NOT copy its low-resolution pixels; regenerate the photo sharply at full resolution from the detailed brief below.
+${referenceLine}
 
-DETAILED BRIEF (primary instruction \u2014 render this faithfully):
+WHAT TO PRESERVE EXACTLY (do NOT change any of these):
+- The exact same composition, framing, camera angle, and crop
+- The exact same outfit / wardrobe \u2014 every garment, color, cut, fabric, and accessory stays identical (do not add, remove, swap, or restyle clothing)
+- The exact same background, location, set dressing, props, and every object in frame
+- The exact same pose, body position, hands, and facial expression
+- The exact same colors, palette, tonal range, and lighting direction
+- For object/flat-lay cells: the exact same hero subject and layout
+
+WHAT TO IMPROVE (this is the ONLY thing you may change):
+- Increase resolution and sharpness; add realistic fine detail and texture (skin, fabric weave, material surfaces, edges)
+- Remove the blur, softness, and compression artifacts of the small preview cell
+- Do NOT introduce new elements, new scenery, or any creative reinterpretation
+
+CONTEXT (describes the approved cell \u2014 use only to understand what you are enhancing, never to override what is visible):
 ${brief}
 
 SHOT TYPE: ${typeDesc}
 
 OUTPUT REQUIREMENTS:
 - Output ONLY this single standalone photo \u2014 no grid lines, no other cells, no borders
-- Match the composition, subject, styling and background of the reference cell, but render it crisp and ultra-detailed at full resolution (do NOT reproduce any blur or softness from the small preview cell)
-- Maintain the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting
+- The result must look like the SAME photo as the reference cell, just at much higher resolution and clarity
+- Keep the ${aesthetic} aesthetic, palette (${palette}), and ${lightType} lighting consistent with the reference cell \u2014 do not re-grade or shift colors
 - Ultra-detailed, photorealistic, shot with a professional 8K camera
 - Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene must fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders${portraitInstruction}`;
 }
@@ -2735,6 +2767,11 @@ var INSTAME_PORTRAIT_ENHANCE_SIZE = (process.env.INSTAME_PORTRAIT_ENHANCE_SIZE |
 var GRID_PIPELINE_ALLOWED_IMAGE_COUNTS = /* @__PURE__ */ new Set([4, 6, 9, 12]);
 var GRID_PIPELINE_RENDER_OPENAI_MODEL = process.env.INSTAME_GRID_PIPELINE_RENDER_MODEL || "gpt-image-2-2026-04-21";
 var GRID_PIPELINE_RENDER_OPENAI_QUALITY = "medium";
+var GRID_PIPELINE_PREVIEW_PROVIDER = (process.env.INSTAME_GRID_PIPELINE_PREVIEW_PROVIDER || "openai").trim().toLowerCase();
+var GRID_PIPELINE_PREVIEW_REVE_MODEL = process.env.INSTAME_GRID_PIPELINE_PREVIEW_REVE_MODEL || "reve-2.0";
+var GRID_PIPELINE_EXTRACT_PROVIDER = (process.env.INSTAME_GRID_PIPELINE_EXTRACT_PROVIDER || "openai").trim().toLowerCase();
+var GRID_PIPELINE_EXTRACT_REVE_MODEL = process.env.INSTAME_GRID_PIPELINE_EXTRACT_REVE_MODEL || "reve-2.0";
+var GRID_PIPELINE_EXTRACT_OPENAI_MODEL = process.env.INSTAME_GRID_PIPELINE_EXTRACT_MODEL || "gpt-image-2";
 var INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path2.resolve(
   process.cwd(),
   "assets",
@@ -4170,6 +4207,66 @@ function toUploadedReferenceImageFromStoredOwnStyle(image) {
 }
 function hasReveImageConfig() {
   return Boolean(process.env.REVE_API_KEY);
+}
+async function renderGridCompositePreview(options) {
+  if (GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig()) {
+    const imageBase642 = await generateReveImage({
+      model: GRID_PIPELINE_PREVIEW_REVE_MODEL,
+      prompt: options.prompt,
+      referenceImage: options.images[0],
+      aspectRatio: "2:3",
+      mode: "preview"
+    });
+    return { imageBase64: imageBase642, provider: "Reve", model: GRID_PIPELINE_PREVIEW_REVE_MODEL };
+  }
+  const imageBase64 = await generateOpenAiImage({
+    model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+    prompt: options.prompt,
+    images: options.images.length > 0 ? options.images : void 0,
+    size: "1024x1536",
+    quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
+  });
+  return { imageBase64, provider: "OpenAI", model: GRID_PIPELINE_RENDER_OPENAI_MODEL };
+}
+async function renderGridExtractedShot(options) {
+  if (GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig()) {
+    return generateReveImage({
+      model: GRID_PIPELINE_EXTRACT_REVE_MODEL,
+      prompt: options.prompt,
+      referenceImage: options.images[0],
+      aspectRatio: "2:3",
+      mode: "high_res"
+    });
+  }
+  return generateOpenAiImage({
+    model: GRID_PIPELINE_EXTRACT_OPENAI_MODEL,
+    prompt: options.prompt,
+    images: options.images.length > 0 ? options.images : void 0,
+    size: "1024x1536",
+    quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
+  });
+}
+async function cropGridCellFromComposite(gridBase64, position, imageCount) {
+  const cols = 3;
+  const rows = Math.max(1, Math.ceil(imageCount / cols));
+  const row = Math.ceil(position / cols);
+  const col = (position - 1) % cols + 1;
+  const buffer = Buffer.from(gridBase64, "base64");
+  const meta = await (0, import_sharp.default)(buffer).metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  if (!width || !height) {
+    throw new Error("Could not read composite grid dimensions for cell crop.");
+  }
+  const cellWidth = Math.floor(width / cols);
+  const cellHeight = Math.floor(height / rows);
+  if (cellWidth <= 0 || cellHeight <= 0) {
+    throw new Error("Computed an invalid grid cell size for cell crop.");
+  }
+  const left = Math.min(Math.max((col - 1) * cellWidth, 0), width - cellWidth);
+  const top = Math.min(Math.max((row - 1) * cellHeight, 0), height - cellHeight);
+  const cropped = await (0, import_sharp.default)(buffer).extract({ left, top, width: cellWidth, height: cellHeight }).png().toBuffer();
+  return cropped.toString("base64");
 }
 function resolveAvailablePromptOnlyModel(requestedModel, mode) {
   if (!requestedModel) {
@@ -7798,12 +7895,9 @@ async function registerRoutes(app2) {
         compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
       }
       compositeImages.push(...referenceImages);
-      const compositeImageBase64 = await generateOpenAiImage({
-        model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+      const { imageBase64: compositeImageBase64 } = await renderGridCompositePreview({
         prompt: compositePrompt,
-        images: compositeImages.length > 0 ? compositeImages : void 0,
-        size: "1024x1536",
-        quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
+        images: compositeImages
       });
       consumed = false;
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
@@ -7866,8 +7960,24 @@ async function registerRoutes(app2) {
       const failedPositions = [];
       const shotsToExtract = plan.shots.filter((shot) => uniqueSortedPositions.includes(shot.position));
       for (const shot of shotsToExtract) {
+        const useReveExtraction = GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig();
+        let cellImageBase64 = gridImageBase64;
+        let preCropped = false;
+        if (useReveExtraction) {
+          try {
+            cellImageBase64 = await cropGridCellFromComposite(gridImageBase64, shot.position, imageCount);
+            preCropped = true;
+          } catch (cropError) {
+            console.warn(
+              `InstaMe grid-pipeline/extract-shots position ${shot.position}: cell crop failed, falling back to full grid.`,
+              cropError
+            );
+            cellImageBase64 = gridImageBase64;
+            preCropped = false;
+          }
+        }
         const images = [
-          { base64: gridImageBase64, mimeType: "image/png" }
+          { base64: cellImageBase64, mimeType: "image/png" }
         ];
         if (portrait) {
           images.push({ base64: portrait, mimeType: "image/jpeg" });
@@ -7888,17 +7998,15 @@ async function registerRoutes(app2) {
           hasPortrait: Boolean(portrait),
           aesthetic,
           palette,
-          lightType
+          lightType,
+          preCropped
         }) + referenceImagePromptNote);
         let generatedImageBase64 = null;
         let shotFailed = false;
         try {
-          generatedImageBase64 = await generateOpenAiImage({
-            model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+          generatedImageBase64 = await renderGridExtractedShot({
             prompt: primaryPrompt,
-            images,
-            size: "1024x1536",
-            quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
+            images
           });
         } catch (primaryError) {
           const isModerationBlock = primaryError instanceof Error && (primaryError.message.includes("moderation_blocked") || primaryError.message.includes("safety") || primaryError.message.includes("safety_violations") || primaryError.message.includes("Your request was rejected")) || primaryError?.code === "moderation_blocked";
@@ -7916,12 +8024,9 @@ async function registerRoutes(app2) {
                 lightType,
                 hasPortrait: Boolean(portrait)
               });
-              generatedImageBase64 = await generateOpenAiImage({
-                model: GRID_PIPELINE_RENDER_OPENAI_MODEL,
+              generatedImageBase64 = await renderGridExtractedShot({
                 prompt: fallbackPrompt,
-                images,
-                size: "1024x1536",
-                quality: GRID_PIPELINE_RENDER_OPENAI_QUALITY
+                images
               });
             } catch (fallbackError) {
               console.error(
