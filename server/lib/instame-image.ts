@@ -199,10 +199,14 @@ function resolveReveVersion(options: {
   const alias = normalizeReveModelEnvKey(options.model);
   const qualityKey = options.mode === "high_res" ? "HIGH_RES" : "PREVIEW";
   const operationKey = options.operation.toUpperCase();
-  // The Reve edit endpoint does not expose a "fast" tier, so use "latest" for
-  // both edit modes; create keeps "latest". A "latest-fast" version on edit is
-  // rejected by the API ("One of the request parameters has an invalid value.").
-  const defaultVersion = options.operation === "edit" ? "latest" : "latest";
+  // Edit supports latest-fast (cheaper/faster) for preview and latest for high_res;
+  // create only supports latest. All are valid per the Reve API docs.
+  const defaultVersion =
+    options.operation === "edit"
+      ? options.mode === "high_res"
+        ? "latest"
+        : "latest-fast"
+      : "latest";
   return (
     readFirstEnv([
       `REVE_${operationKey}_VERSION_${alias}_${qualityKey}`,
@@ -214,6 +218,18 @@ function resolveReveVersion(options: {
       "REVE_VERSION",
     ]) || defaultVersion
   );
+}
+
+// The Reve create/edit endpoints cap prompt / edit_instruction at 2560 characters;
+// anything longer is rejected with "One of the request parameters has an invalid
+// value." Cap at a clean sentence/line boundary so the request still succeeds.
+const REVE_MAX_INSTRUCTION_CHARS = 2560;
+function capReveInstruction(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= REVE_MAX_INSTRUCTION_CHARS) return trimmed;
+  const slice = trimmed.slice(0, REVE_MAX_INSTRUCTION_CHARS);
+  const boundary = Math.max(slice.lastIndexOf("\n"), slice.lastIndexOf(". "));
+  return (boundary > REVE_MAX_INSTRUCTION_CHARS / 2 ? slice.slice(0, boundary) : slice).trim();
 }
 
 function sanitizeBase64Image(input: string): string {
@@ -417,10 +433,9 @@ export async function generateReveImage(options: {
     version,
   };
 
-  // The Reve edit endpoint derives the output dimensions from the reference
-  // image and rejects an explicit aspect_ratio ("One of the request parameters
-  // has an invalid value."). Only send aspect_ratio on the create endpoint.
-  if (!isEdit && options.aspectRatio && options.aspectRatio !== "auto") {
+  // The Reve create/edit endpoints both accept an explicit aspect_ratio; on edit
+  // it overrides the reference image's aspect ratio.
+  if (options.aspectRatio && options.aspectRatio !== "auto") {
     payload.aspect_ratio = options.aspectRatio;
   }
 
@@ -438,10 +453,10 @@ export async function generateReveImage(options: {
   }
 
   if (isEdit) {
-    payload.edit_instruction = options.prompt;
+    payload.edit_instruction = capReveInstruction(options.prompt);
     payload.reference_image = sanitizeBase64Image(options.referenceImage!.base64);
   } else {
-    payload.prompt = options.prompt;
+    payload.prompt = capReveInstruction(options.prompt);
   }
 
   const response = await fetch(`${baseUrl}${endpoint}`, {
@@ -469,9 +484,14 @@ export async function generateReveImage(options: {
       parsed?.error_code ||
       responseText ||
       `Reve API returned status ${response.status}`;
+    const errorCode = parsed?.error_code ? ` code=${parsed.error_code}` : "";
+    const params =
+      parsed?.params && typeof parsed.params === "object"
+        ? ` params=${JSON.stringify(parsed.params)}`
+        : "";
     const payloadKeys = Object.keys(payload).sort().join(", ");
     throw new Error(
-      `Reve API error (${response.status}) on ${endpoint} [version=${version}, payload keys: ${payloadKeys}]: ${remoteMessage}`,
+      `Reve API error (${response.status}) on ${endpoint} [version=${version}, payload keys: ${payloadKeys}]:${errorCode} ${remoteMessage}${params}`,
     );
   }
 

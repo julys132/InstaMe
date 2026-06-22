@@ -1112,7 +1112,7 @@ function resolveReveVersion(options) {
   const alias = normalizeReveModelEnvKey(options.model);
   const qualityKey = options.mode === "high_res" ? "HIGH_RES" : "PREVIEW";
   const operationKey = options.operation.toUpperCase();
-  const defaultVersion = options.operation === "edit" ? "latest" : "latest";
+  const defaultVersion = options.operation === "edit" ? options.mode === "high_res" ? "latest" : "latest-fast" : "latest";
   return readFirstEnv([
     `REVE_${operationKey}_VERSION_${alias}_${qualityKey}`,
     `REVE_${operationKey}_VERSION_${alias}`,
@@ -1122,6 +1122,14 @@ function resolveReveVersion(options) {
     `REVE_VERSION_${alias}`,
     "REVE_VERSION"
   ]) || defaultVersion;
+}
+var REVE_MAX_INSTRUCTION_CHARS = 2560;
+function capReveInstruction(text2) {
+  const trimmed = text2.trim();
+  if (trimmed.length <= REVE_MAX_INSTRUCTION_CHARS) return trimmed;
+  const slice = trimmed.slice(0, REVE_MAX_INSTRUCTION_CHARS);
+  const boundary = Math.max(slice.lastIndexOf("\n"), slice.lastIndexOf(". "));
+  return (boundary > REVE_MAX_INSTRUCTION_CHARS / 2 ? slice.slice(0, boundary) : slice).trim();
 }
 function sanitizeBase64Image(input) {
   return input.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "").trim();
@@ -1270,7 +1278,7 @@ async function generateReveImage(options) {
   const payload = {
     version
   };
-  if (!isEdit && options.aspectRatio && options.aspectRatio !== "auto") {
+  if (options.aspectRatio && options.aspectRatio !== "auto") {
     payload.aspect_ratio = options.aspectRatio;
   }
   if (typeof options.testTimeScaling === "number" && Number.isFinite(options.testTimeScaling) && options.testTimeScaling >= 1 && options.testTimeScaling <= 15) {
@@ -1280,10 +1288,10 @@ async function generateReveImage(options) {
     payload.postprocessing = options.postprocessing;
   }
   if (isEdit) {
-    payload.edit_instruction = options.prompt;
+    payload.edit_instruction = capReveInstruction(options.prompt);
     payload.reference_image = sanitizeBase64Image(options.referenceImage.base64);
   } else {
-    payload.prompt = options.prompt;
+    payload.prompt = capReveInstruction(options.prompt);
   }
   const response = await fetch(`${baseUrl}${endpoint}`, {
     method: "POST",
@@ -1303,9 +1311,11 @@ async function generateReveImage(options) {
   }
   if (!response.ok) {
     const remoteMessage = parsed?.message || parsed?.error || parsed?.error_code || responseText || `Reve API returned status ${response.status}`;
+    const errorCode = parsed?.error_code ? ` code=${parsed.error_code}` : "";
+    const params = parsed?.params && typeof parsed.params === "object" ? ` params=${JSON.stringify(parsed.params)}` : "";
     const payloadKeys = Object.keys(payload).sort().join(", ");
     throw new Error(
-      `Reve API error (${response.status}) on ${endpoint} [version=${version}, payload keys: ${payloadKeys}]: ${remoteMessage}`
+      `Reve API error (${response.status}) on ${endpoint} [version=${version}, payload keys: ${payloadKeys}]:${errorCode} ${remoteMessage}${params}`
     );
   }
   const base64 = extractReveImageBase64(parsed);
