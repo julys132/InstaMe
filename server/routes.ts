@@ -2788,10 +2788,14 @@ async function renderGridCompositePreview(options: {
   images: import("./lib/instame-image").RuntimeImageInput[];
 }): Promise<{ imageBase64: string; provider: string; model: string }> {
   if (GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig()) {
+    // Reve text-to-image (CREATE, not edit): generate a single image that LOOKS like
+    // an Instagram profile grid page straight from the prompt. We deliberately do NOT
+    // pass the portrait here — Reve edit cannot composite a real multi-cell grid from
+    // one face, so the preview stays synthetic and the real identity (face + hair
+    // color) is injected later, only at extraction.
     const imageBase64 = await generateReveImage({
       model: GRID_PIPELINE_PREVIEW_REVE_MODEL,
       prompt: options.prompt,
-      referenceImage: options.images[0],
       aspectRatio: "2:3",
       mode: "preview",
     });
@@ -2816,12 +2820,16 @@ async function renderGridCompositePreview(options: {
 async function renderGridExtractedShot(options: {
   prompt: string;
   images: import("./lib/instame-image").RuntimeImageInput[];
+  // Optional single reference image for the Reve (one-reference) editor. When the
+  // extracted cell contains a person we pass the PORTRAIT here so Reve reproduces the
+  // user's real face and hair color; otherwise it falls back to images[0] (the cell).
+  reveReferenceImage?: import("./lib/instame-image").RuntimeImageInput;
 }): Promise<string> {
   if (GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig()) {
     return generateReveImage({
       model: GRID_PIPELINE_EXTRACT_REVE_MODEL,
       prompt: options.prompt,
-      referenceImage: options.images[0],
+      referenceImage: options.reveReferenceImage ?? options.images[0],
       aspectRatio: "2:3",
       mode: "high_res",
     });
@@ -7697,9 +7705,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         : planContext;
 
+      const usingRevePreview = GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig();
       const compositePrompt = sanitizeGridPromptText(
-        GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig()
-          ? buildReveCompositeGridPrompt(plan, hasPortraitReference)
+        usingRevePreview
+          ? // Reve preview is text-to-image with NO portrait attached, so the prompt must
+            // not claim a portrait reference is provided (identity is implied here).
+            buildReveCompositeGridPrompt(plan, false)
           : buildCompositeGridPrompt(plan, hasPortraitReference),
       );
 
@@ -7807,12 +7818,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const useReveExtraction =
           GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig();
 
-        // For the Reve extraction path, crop the approved cell server-side so the
-        // editor enhances ONLY that exact cell instead of re-interpreting the whole
-        // grid (Reve edits the entire reference image, so it must receive just the cell).
+        // New grid concept: the composite preview is generated from scratch (Reve
+        // create / GPT) and does NOT contain the user's real face. So for PORTRAIT
+        // cells we recreate the scene and take the real identity (face + hair color)
+        // from the portrait reference instead of enhancing the synthetic preview cell.
+        // OBJECT cells (SIMPLE) have no person, so they still enhance the approved cell.
+        const usePortraitIdentity =
+          useReveExtraction && Boolean(portrait) && shot.type !== "SIMPLE";
+
+        // For the Reve extraction path on OBJECT cells, crop the approved cell server-
+        // side so the editor enhances ONLY that exact cell instead of re-interpreting
+        // the whole grid (Reve edits the entire reference image).
         let cellImageBase64 = gridImageBase64;
         let preCropped = false;
-        if (useReveExtraction) {
+        if (useReveExtraction && !usePortraitIdentity) {
           try {
             cellImageBase64 = await cropGridCellFromComposite(gridImageBase64, shot.position, imageCount);
             preCropped = true;
@@ -7834,6 +7853,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         images.push(...referenceImages);
 
+        // When recreating a PORTRAIT cell, Reve (a single-reference editor) must edit the
+        // portrait itself so the generated person keeps the user's real face and hair color.
+        const reveReferenceImage: import("./lib/instame-image").RuntimeImageInput | undefined =
+          usePortraitIdentity && portrait
+            ? { base64: portrait, mimeType: "image/jpeg" }
+            : undefined;
+
         const safeShot = {
           ...shot,
           label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
@@ -7854,6 +7880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           palette,
           lightType,
           preCropped,
+          identityFromPortraitReference: usePortraitIdentity,
         }) + referenceImagePromptNote);
 
         let generatedImageBase64: string | null = null;
@@ -7864,6 +7891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generatedImageBase64 = await renderGridExtractedShot({
             prompt: primaryPrompt,
             images,
+            reveReferenceImage,
           });
         } catch (primaryError: unknown) {
           const isModerationBlock =
@@ -7892,6 +7920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               generatedImageBase64 = await renderGridExtractedShot({
                 prompt: fallbackPrompt,
                 images,
+                reveReferenceImage,
               });
             } catch (fallbackError) {
               console.error(

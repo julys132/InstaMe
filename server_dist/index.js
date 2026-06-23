@@ -2413,7 +2413,7 @@ RULES:
 - Professional editorial photography quality, photorealistic`;
 }
 function buildExtractionPrompt(params) {
-  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType, preCropped } = params;
+  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType, preCropped, identityFromPortraitReference } = params;
   const totalRows = Math.ceil(imageCount / GRID_COLS);
   const row = Math.ceil(position / GRID_COLS);
   const col = (position - 1) % GRID_COLS + 1;
@@ -2421,6 +2421,29 @@ function buildExtractionPrompt(params) {
   const colLabel = col === 1 ? "left" : col === GRID_COLS ? "right" : "center";
   const corner = rowLabel === "center" && colLabel === "center" ? "center of the grid" : `${rowLabel}-${colLabel} of the grid`;
   const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame. ONE single hero subject with generous empty negative space around it; minimalist, clean, airy, uncluttered and breathable \u2014 never busy or crowded" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
+  if (identityFromPortraitReference) {
+    const sceneBrief = shot.imagePrompt && shot.imagePrompt.trim().length > 0 ? shot.imagePrompt.trim() : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
+    return `Create a single full-resolution, photorealistic editorial photo for position ${position} of a ${imageCount}-photo Instagram grid.
+
+IDENTITY (from the provided reference portrait):
+- The provided reference image is a PORTRAIT of the person. Reproduce their face, facial features, face shape, skin tone, and natural HAIR COLOR exactly from it.
+- Use the reference ONLY for identity (face + hair color). Do NOT copy its background, framing, crop, outfit, or lighting.
+
+SCENE TO CREATE (build everything else from this brief):
+${sceneBrief}
+
+SHOT TYPE: ${typeDesc}
+
+STYLE:
+- Aesthetic: ${aesthetic}. Dominant color palette (applies to wardrobe, set dressing, props, and color grade): ${palette}. Lighting: ${lightType}.
+${shot.hairstyle ? `- Style the hair as: ${shot.hairstyle}, but keep the natural hair COLOR from the reference portrait.
+` : ""}${shot.angle ? `- Camera angle: ${shot.angle}.
+` : ""}- Editorial fashion photography, ultra-detailed, photorealistic, shot on a professional 8K camera.
+
+OUTPUT REQUIREMENTS:
+- Output ONLY this single standalone photo \u2014 no grid lines, no other cells, no borders, no text, captions, logos, or UI.
+- Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders.`;
+  }
   const brief = shot.imagePrompt && shot.imagePrompt.trim().length > 0 ? shot.imagePrompt.trim() : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
   const portraitInstruction = hasPortrait ? `
 CRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait, exactly as they already appear in the reference cell. Never alter their identity.` : "";
@@ -4262,7 +4285,6 @@ async function renderGridCompositePreview(options) {
     const imageBase642 = await generateReveImage({
       model: GRID_PIPELINE_PREVIEW_REVE_MODEL,
       prompt: options.prompt,
-      referenceImage: options.images[0],
       aspectRatio: "2:3",
       mode: "preview"
     });
@@ -4282,7 +4304,7 @@ async function renderGridExtractedShot(options) {
     return generateReveImage({
       model: GRID_PIPELINE_EXTRACT_REVE_MODEL,
       prompt: options.prompt,
-      referenceImage: options.images[0],
+      referenceImage: options.reveReferenceImage ?? options.images[0],
       aspectRatio: "2:3",
       mode: "high_res"
     });
@@ -7938,8 +7960,13 @@ async function registerRoutes(app2) {
         usedHairstyles: [.../* @__PURE__ */ new Set([...priorContext.usedHairstyles, ...planContext.usedHairstyles])].map((hairstyle) => sanitizeGridPromptText(hairstyle)).filter(Boolean),
         usedAngles: [.../* @__PURE__ */ new Set([...priorContext.usedAngles, ...planContext.usedAngles])].map((angle) => sanitizeGridPromptText(angle)).filter(Boolean)
       } : planContext;
+      const usingRevePreview = GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig();
       const compositePrompt = sanitizeGridPromptText(
-        GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig() ? buildReveCompositeGridPrompt(plan, hasPortraitReference) : buildCompositeGridPrompt(plan, hasPortraitReference)
+        usingRevePreview ? (
+          // Reve preview is text-to-image with NO portrait attached, so the prompt must
+          // not claim a portrait reference is provided (identity is implied here).
+          buildReveCompositeGridPrompt(plan, false)
+        ) : buildCompositeGridPrompt(plan, hasPortraitReference)
       );
       const compositeImages = [];
       if (portrait) {
@@ -8012,9 +8039,10 @@ async function registerRoutes(app2) {
       const shotsToExtract = plan.shots.filter((shot) => uniqueSortedPositions.includes(shot.position));
       for (const shot of shotsToExtract) {
         const useReveExtraction = GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig();
+        const usePortraitIdentity = useReveExtraction && Boolean(portrait) && shot.type !== "SIMPLE";
         let cellImageBase64 = gridImageBase64;
         let preCropped = false;
-        if (useReveExtraction) {
+        if (useReveExtraction && !usePortraitIdentity) {
           try {
             cellImageBase64 = await cropGridCellFromComposite(gridImageBase64, shot.position, imageCount);
             preCropped = true;
@@ -8034,6 +8062,7 @@ async function registerRoutes(app2) {
           images.push({ base64: portrait, mimeType: "image/jpeg" });
         }
         images.push(...referenceImages);
+        const reveReferenceImage = usePortraitIdentity && portrait ? { base64: portrait, mimeType: "image/jpeg" } : void 0;
         const safeShot = {
           ...shot,
           label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
@@ -8050,14 +8079,16 @@ async function registerRoutes(app2) {
           aesthetic,
           palette,
           lightType,
-          preCropped
+          preCropped,
+          identityFromPortraitReference: usePortraitIdentity
         }) + referenceImagePromptNote);
         let generatedImageBase64 = null;
         let shotFailed = false;
         try {
           generatedImageBase64 = await renderGridExtractedShot({
             prompt: primaryPrompt,
-            images
+            images,
+            reveReferenceImage
           });
         } catch (primaryError) {
           const isModerationBlock = primaryError instanceof Error && (primaryError.message.includes("moderation_blocked") || primaryError.message.includes("safety") || primaryError.message.includes("safety_violations") || primaryError.message.includes("Your request was rejected")) || primaryError?.code === "moderation_blocked";
@@ -8077,7 +8108,8 @@ async function registerRoutes(app2) {
               });
               generatedImageBase64 = await renderGridExtractedShot({
                 prompt: fallbackPrompt,
-                images
+                images,
+                reveReferenceImage
               });
             } catch (fallbackError) {
               console.error(

@@ -1000,8 +1000,13 @@ export function buildExtractionPrompt(params: {
   // full grid), so the prompt must tell the model to enhance the whole provided
   // image instead of locating and cropping cell N out of a grid.
   preCropped?: boolean;
+  // When true, the provided reference image is the user's PORTRAIT (not the approved
+  // cell). The preview grid is synthetic and does not contain the user's real face,
+  // so for portrait cells we RECREATE the scene from the brief and take only the
+  // identity (face + hair color) from the portrait reference.
+  identityFromPortraitReference?: boolean;
 }): string {
-  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType, preCropped } = params;
+  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType, preCropped, identityFromPortraitReference } = params;
   const totalRows = Math.ceil(imageCount / GRID_COLS);
   const row = Math.ceil(position / GRID_COLS);
   const col = ((position - 1) % GRID_COLS) + 1;
@@ -1018,6 +1023,32 @@ export function buildExtractionPrompt(params: {
       : shot.type === "MEDIUM"
       ? "Tight portrait — face and shoulders, calm and refined"
       : "Full or medium body — action, movement, or rich location";
+
+  // Identity-from-portrait mode: the preview cell is synthetic, so RECREATE the scene
+  // from the brief and take the person's face + hair color from the portrait reference.
+  if (identityFromPortraitReference) {
+    const sceneBrief = (shot.imagePrompt && shot.imagePrompt.trim().length > 0)
+      ? shot.imagePrompt.trim()
+      : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
+    return `Create a single full-resolution, photorealistic editorial photo for position ${position} of a ${imageCount}-photo Instagram grid.
+
+IDENTITY (from the provided reference portrait):
+- The provided reference image is a PORTRAIT of the person. Reproduce their face, facial features, face shape, skin tone, and natural HAIR COLOR exactly from it.
+- Use the reference ONLY for identity (face + hair color). Do NOT copy its background, framing, crop, outfit, or lighting.
+
+SCENE TO CREATE (build everything else from this brief):
+${sceneBrief}
+
+SHOT TYPE: ${typeDesc}
+
+STYLE:
+- Aesthetic: ${aesthetic}. Dominant color palette (applies to wardrobe, set dressing, props, and color grade): ${palette}. Lighting: ${lightType}.
+${shot.hairstyle ? `- Style the hair as: ${shot.hairstyle}, but keep the natural hair COLOR from the reference portrait.\n` : ""}${shot.angle ? `- Camera angle: ${shot.angle}.\n` : ""}- Editorial fashion photography, ultra-detailed, photorealistic, shot on a professional 8K camera.
+
+OUTPUT REQUIREMENTS:
+- Output ONLY this single standalone photo — no grid lines, no other cells, no borders, no text, captions, logos, or UI.
+- Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders.`;
+  }
 
   // The grid cell shown in the preview is the SOURCE OF TRUTH. The user already
   // approved that preview, so extraction must FAITHFULLY reproduce that exact cell
