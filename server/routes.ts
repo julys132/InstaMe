@@ -7696,7 +7696,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         : planContext;
 
-      const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference));
+      const compositePrompt = sanitizeGridPromptText(
+        GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig()
+          ? buildReveCompositeGridPrompt(plan, hasPortraitReference)
+          : buildCompositeGridPrompt(plan, hasPortraitReference),
+      );
 
       const compositeImages: import("./lib/instame-image").RuntimeImageInput[] = [];
       if (portrait) {
@@ -7704,7 +7708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       compositeImages.push(...referenceImages);
 
-      const { imageBase64: compositeImageBase64 } = await renderGridCompositePreview({
+      const { imageBase64: compositeImageBase64, provider: previewProvider } = await renderGridCompositePreview({
         prompt: compositePrompt,
         images: compositeImages,
       });

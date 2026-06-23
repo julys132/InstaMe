@@ -7902,13 +7902,15 @@ async function registerRoutes(app2) {
         usedHairstyles: [.../* @__PURE__ */ new Set([...priorContext.usedHairstyles, ...planContext.usedHairstyles])].map((hairstyle) => sanitizeGridPromptText(hairstyle)).filter(Boolean),
         usedAngles: [.../* @__PURE__ */ new Set([...priorContext.usedAngles, ...planContext.usedAngles])].map((angle) => sanitizeGridPromptText(angle)).filter(Boolean)
       } : planContext;
-      const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference));
+      const compositePrompt = sanitizeGridPromptText(
+        GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig() ? buildReveCompositeGridPrompt(plan, hasPortraitReference) : buildCompositeGridPrompt(plan, hasPortraitReference)
+      );
       const compositeImages = [];
       if (portrait) {
         compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
       }
       compositeImages.push(...referenceImages);
-      const { imageBase64: compositeImageBase64 } = await renderGridCompositePreview({
+      const { imageBase64: compositeImageBase64, provider: previewProvider } = await renderGridCompositePreview({
         prompt: compositePrompt,
         images: compositeImages
       });
