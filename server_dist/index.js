@@ -2319,42 +2319,6 @@ var GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CRE
 var GRID_PIPELINE_COMPOSITE_CREDIT_COST = INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST;
 var GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
 var GRID_COLS = 3;
-function buildReveCompositeGridPrompt(plan, hasPortraitReference) {
-  const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
-  const shotLines = plan.shots.map((shot) => {
-    const row = Math.ceil(shot.position / GRID_COLS);
-    const col = (shot.position - 1) % GRID_COLS + 1;
-    const cellKind = shot.type === "SIMPLE" ? "OBJECT-ONLY: no people, minimal hero object with generous negative space" : shot.type === "MEDIUM" ? "PORTRAIT: tight face/shoulders" : "PORTRAIT: medium/full body with action or location detail";
-    const detail = [
-      cellKind,
-      shot.label,
-      shot.hairstyle ? `hairstyle: ${shot.hairstyle}` : null,
-      shot.angle ? `angle: ${shot.angle}` : null
-    ].filter(Boolean).join(" \u2014 ");
-    return `  Position ${shot.position} (row ${row}, col ${col}): ${detail}`;
-  }).join("\n");
-  const modelPositions = plan.shots.filter((s) => s.type !== "SIMPLE").map((s) => s.position);
-  const objectPositions = plan.shots.filter((s) => s.type === "SIMPLE").map((s) => s.position);
-  const portraitNote = hasPortraitReference ? "The model identity is fixed from the provided portrait reference." : "A single consistent model identity is implied across all portrait cells.";
-  return `Create a photorealistic Instagram profile grid preview with exactly ${plan.imageCount} editorial photos arranged in ${GRID_COLS} columns and ${totalRows} rows. Use the same dominant color palette everywhere: ${plan.palette}. Use the same light quality everywhere: ${plan.lightType}.
-
-GRID CONTENTS:
-${shotLines}
-
-GRID RULES:
-- Keep every cell strictly within the palette ${plan.palette}.
-- Alternate tonal value across neighboring cells: some cells should be darker/moodier, others lighter/airier, while staying inside the palette. This tonal contrast is essential.
-- Portrait cells are only positions: ${modelPositions.join(", ") || "none"}.
-- Object-only cells are only positions: ${objectPositions.join(", ") || "none"}.
-- Do not place any person in an object-only cell.
-- Object cells should be minimalist, clean, and airy with one hero subject and generous negative space.
-- Portrait cells should show the model in distinct outfits, poses, and expressions across portrait positions.
-- ${portraitNote}
-- No text, labels, captions, logos, stickers, or UI elements anywhere.
-- No borders, menus, or other interface chrome outside the grid.
-- Render the grid as professional editorial photography, not illustration, collage, or graphic design.
-- The grid should fill the entire image canvas with only thin white separators between cells.`;
-}
 function buildCompositeGridPrompt(plan, hasPortraitReference) {
   const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
   const shotLines = plan.shots.map((shot) => {
@@ -2413,7 +2377,7 @@ RULES:
 - Professional editorial photography quality, photorealistic`;
 }
 function buildExtractionPrompt(params) {
-  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType, preCropped, identityFromPortraitReference } = params;
+  const { position, imageCount, shot, hasPortrait, aesthetic, palette, lightType, preCropped } = params;
   const totalRows = Math.ceil(imageCount / GRID_COLS);
   const row = Math.ceil(position / GRID_COLS);
   const col = (position - 1) % GRID_COLS + 1;
@@ -2421,29 +2385,6 @@ function buildExtractionPrompt(params) {
   const colLabel = col === 1 ? "left" : col === GRID_COLS ? "right" : "center";
   const corner = rowLabel === "center" && colLabel === "center" ? "center of the grid" : `${rowLabel}-${colLabel} of the grid`;
   const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame. ONE single hero subject with generous empty negative space around it; minimalist, clean, airy, uncluttered and breathable \u2014 never busy or crowded" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
-  if (identityFromPortraitReference) {
-    const sceneBrief = shot.imagePrompt && shot.imagePrompt.trim().length > 0 ? shot.imagePrompt.trim() : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
-    return `Create a single full-resolution, photorealistic editorial photo for position ${position} of a ${imageCount}-photo Instagram grid.
-
-IDENTITY (from the provided reference portrait):
-- The provided reference image is a PORTRAIT of the person. Reproduce their face, facial features, face shape, skin tone, and natural HAIR COLOR exactly from it.
-- Use the reference ONLY for identity (face + hair color). Do NOT copy its background, framing, crop, outfit, or lighting.
-
-SCENE TO CREATE (build everything else from this brief):
-${sceneBrief}
-
-SHOT TYPE: ${typeDesc}
-
-STYLE:
-- Aesthetic: ${aesthetic}. Dominant color palette (applies to wardrobe, set dressing, props, and color grade): ${palette}. Lighting: ${lightType}.
-${shot.hairstyle ? `- Style the hair as: ${shot.hairstyle}, but keep the natural hair COLOR from the reference portrait.
-` : ""}${shot.angle ? `- Camera angle: ${shot.angle}.
-` : ""}- Editorial fashion photography, ultra-detailed, photorealistic, shot on a professional 8K camera.
-
-OUTPUT REQUIREMENTS:
-- Output ONLY this single standalone photo \u2014 no grid lines, no other cells, no borders, no text, captions, logos, or UI.
-- Tall vertical portrait format, as close to a 9:16 ratio as possible: the subject and scene fill the entire frame edge-to-edge with NO letterboxing, NO black or white bars, and NO borders.`;
-  }
   const brief = shot.imagePrompt && shot.imagePrompt.trim().length > 0 ? shot.imagePrompt.trim() : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
   const portraitInstruction = hasPortrait ? `
 CRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait, exactly as they already appear in the reference cell. Never alter their identity.` : "";
@@ -4285,6 +4226,7 @@ async function renderGridCompositePreview(options) {
     const imageBase642 = await generateReveImage({
       model: GRID_PIPELINE_PREVIEW_REVE_MODEL,
       prompt: options.prompt,
+      referenceImage: options.images[0],
       aspectRatio: "2:3",
       mode: "preview"
     });
@@ -4304,7 +4246,7 @@ async function renderGridExtractedShot(options) {
     return generateReveImage({
       model: GRID_PIPELINE_EXTRACT_REVE_MODEL,
       prompt: options.prompt,
-      referenceImage: options.reveReferenceImage ?? options.images[0],
+      referenceImage: options.images[0],
       aspectRatio: "2:3",
       mode: "high_res"
     });
@@ -7960,20 +7902,13 @@ async function registerRoutes(app2) {
         usedHairstyles: [.../* @__PURE__ */ new Set([...priorContext.usedHairstyles, ...planContext.usedHairstyles])].map((hairstyle) => sanitizeGridPromptText(hairstyle)).filter(Boolean),
         usedAngles: [.../* @__PURE__ */ new Set([...priorContext.usedAngles, ...planContext.usedAngles])].map((angle) => sanitizeGridPromptText(angle)).filter(Boolean)
       } : planContext;
-      const usingRevePreview = GRID_PIPELINE_PREVIEW_PROVIDER === "reve" && hasReveImageConfig();
-      const compositePrompt = sanitizeGridPromptText(
-        usingRevePreview ? (
-          // Reve preview is text-to-image with NO portrait attached, so the prompt must
-          // not claim a portrait reference is provided (identity is implied here).
-          buildReveCompositeGridPrompt(plan, false)
-        ) : buildCompositeGridPrompt(plan, hasPortraitReference)
-      );
+      const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference));
       const compositeImages = [];
       if (portrait) {
         compositeImages.push({ base64: portrait, mimeType: "image/jpeg" });
       }
       compositeImages.push(...referenceImages);
-      const { imageBase64: compositeImageBase64, provider: previewProvider } = await renderGridCompositePreview({
+      const { imageBase64: compositeImageBase64 } = await renderGridCompositePreview({
         prompt: compositePrompt,
         images: compositeImages
       });
@@ -8039,10 +7974,9 @@ async function registerRoutes(app2) {
       const shotsToExtract = plan.shots.filter((shot) => uniqueSortedPositions.includes(shot.position));
       for (const shot of shotsToExtract) {
         const useReveExtraction = GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig();
-        const usePortraitIdentity = useReveExtraction && Boolean(portrait) && shot.type !== "SIMPLE";
         let cellImageBase64 = gridImageBase64;
         let preCropped = false;
-        if (useReveExtraction && !usePortraitIdentity) {
+        if (useReveExtraction) {
           try {
             cellImageBase64 = await cropGridCellFromComposite(gridImageBase64, shot.position, imageCount);
             preCropped = true;
@@ -8062,7 +7996,6 @@ async function registerRoutes(app2) {
           images.push({ base64: portrait, mimeType: "image/jpeg" });
         }
         images.push(...referenceImages);
-        const reveReferenceImage = usePortraitIdentity && portrait ? { base64: portrait, mimeType: "image/jpeg" } : void 0;
         const safeShot = {
           ...shot,
           label: sanitizeGridPromptText(normalizeStringValue(shot.label)),
@@ -8079,16 +8012,14 @@ async function registerRoutes(app2) {
           aesthetic,
           palette,
           lightType,
-          preCropped,
-          identityFromPortraitReference: usePortraitIdentity
+          preCropped
         }) + referenceImagePromptNote);
         let generatedImageBase64 = null;
         let shotFailed = false;
         try {
           generatedImageBase64 = await renderGridExtractedShot({
             prompt: primaryPrompt,
-            images,
-            reveReferenceImage
+            images
           });
         } catch (primaryError) {
           const isModerationBlock = primaryError instanceof Error && (primaryError.message.includes("moderation_blocked") || primaryError.message.includes("safety") || primaryError.message.includes("safety_violations") || primaryError.message.includes("Your request was rejected")) || primaryError?.code === "moderation_blocked";
@@ -8108,8 +8039,7 @@ async function registerRoutes(app2) {
               });
               generatedImageBase64 = await renderGridExtractedShot({
                 prompt: fallbackPrompt,
-                images,
-                reveReferenceImage
+                images
               });
             } catch (fallbackError) {
               console.error(
