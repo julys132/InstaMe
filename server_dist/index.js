@@ -1010,11 +1010,11 @@ function resolveOpenAiImageRequest(model) {
     return { model };
   }
   const aliases = /* @__PURE__ */ new Map([
-    // gpt-image-2 family — force high input fidelity so the portrait reference
-    // identity (face) is preserved in the pack composite + extracted images.
-    ["gpt-image-2", { model: "gpt-image-2", inputFidelity: "high" }],
-    ["gpt image 2", { model: "gpt-image-2", inputFidelity: "high" }],
-    // The dated gpt-image-2 snapshot rejects the `input_fidelity` parameter
+    // gpt-image-2 family — this model rejects the `input_fidelity` parameter
+    // (returns 400 invalid_input_fidelity_model), so do NOT request it here.
+    ["gpt-image-2", { model: "gpt-image-2" }],
+    ["gpt image 2", { model: "gpt-image-2" }],
+    // The dated gpt-image-2 snapshot also rejects the `input_fidelity` parameter
     // (returns 400), so do NOT request it for these model ids.
     ["gpt-image-2-2026-04-21", { model: "gpt-image-2-2026-04-21" }],
     ["gpt image 2 2026 04 21", { model: "gpt-image-2-2026-04-21" }],
