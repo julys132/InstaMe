@@ -3215,20 +3215,30 @@ export default function InstaMeScreen() {
       const recommendationLine = recommendedPack
         ? `\n\nQuickest top-up: ${recommendedPack.name} for $${recommendedPack.price.toFixed(2)}.`
         : "";
-      Alert.alert(
-        "You're a little short on credits",
-        `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} costs ${needed} credits and you have ${credits}. You need ${missing} more.${recommendationLine}`,
-        [
-          { text: "Not now", style: "cancel" },
-          {
-            text: "Get credits",
-            onPress: () => {
-              void Haptics.selectionAsync();
-              router.push("/(tabs)/credits" as any);
-            },
-          },
-        ],
-      );
+      const title = "You're a little short on credits";
+      const message = `${actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)} costs ${needed} credits and you have ${credits}. You need ${missing} more.${recommendationLine}`;
+      const goToCredits = () => {
+        void Haptics.selectionAsync();
+        router.push("/(tabs)/credits" as any);
+      };
+
+      // React Native's Alert is a no-op on web, so use a native browser dialog
+      // there; otherwise the button would appear to "do nothing".
+      if (Platform.OS === "web") {
+        const confirmed =
+          typeof window !== "undefined" &&
+          window.confirm(`${title}\n\n${message}\n\nGo to the credits page now?`);
+        if (confirmed) goToCredits();
+        return;
+      }
+
+      Alert.alert(title, message, [
+        { text: "Not now", style: "cancel" },
+        {
+          text: "Get credits",
+          onPress: goToCredits,
+        },
+      ]);
     },
     [credits],
   );
