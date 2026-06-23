@@ -336,6 +336,16 @@ var INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST = INSTAME_QUALITY_TIER_CREDITS[INSTA
 var INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST = 1;
 var INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST = INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST + INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
 var INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
+var INSTAME_GRID_EXTRACT_QUALITY_CREDIT_COST = {
+  standard: INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
+  max: INSTAME_QUALITY_TIER_CREDITS.pro
+};
+function getInstaMeGridExtractCreditCostPerImage(quality = "standard") {
+  return INSTAME_GRID_EXTRACT_QUALITY_CREDIT_COST[quality] ?? INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+}
+function normalizeInstaMeGridExtractQuality(value) {
+  return value === "max" ? "max" : "standard";
+}
 var INSTAME_GENERATION_TIERS = [
   {
     id: "good",
@@ -2317,22 +2327,30 @@ function extractContinuityContext(plan) {
 var GRID_PIPELINE_PLAN_CREDIT_COST = INSTAME_GRID_PIPELINE_PLAN_CREDIT_COST;
 var GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
 var GRID_PIPELINE_COMPOSITE_CREDIT_COST = INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST;
-var GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
 var GRID_COLS = 3;
 function buildCompositeGridPrompt(plan, hasPortraitReference) {
   const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
+  const toneForPosition = (position) => {
+    const row = Math.ceil(position / GRID_COLS);
+    const col = (position - 1) % GRID_COLS + 1;
+    return (row + col) % 2 === 0 ? "LIGHT" : "DARK";
+  };
   const shotLines = plan.shots.map((shot) => {
     const row = Math.ceil(shot.position / GRID_COLS);
     const col = (shot.position - 1) % GRID_COLS + 1;
     const cellKind = shot.type === "SIMPLE" ? "OBJECT-ONLY (NO person, NO model \u2014 flat-lay / accessory / texture detail)" : shot.type === "MEDIUM" ? "PORTRAIT (model present \u2014 tight on face/shoulders)" : "PORTRAIT (model present \u2014 full or medium body, action/location)";
+    const tone = toneForPosition(shot.position) === "DARK" ? "tone: DARK & moody (low-key, deep shadow, rich dark palette tones)" : "tone: BRIGHT & airy (high-key, luminous, light palette tones)";
     const detail = [
       cellKind,
       shot.label,
       shot.hairstyle ? `hairstyle: ${shot.hairstyle}` : null,
-      shot.angle ? `camera angle: ${shot.angle}` : null
+      shot.angle ? `camera angle: ${shot.angle}` : null,
+      tone
     ].filter(Boolean).join(" \u2014 ");
     return `  Position ${shot.position} (row ${row}, col ${col}): ${detail}`;
   }).join("\n");
+  const darkPositions = plan.shots.filter((s) => toneForPosition(s.position) === "DARK").map((s) => s.position);
+  const lightPositions = plan.shots.filter((s) => toneForPosition(s.position) === "LIGHT").map((s) => s.position);
   const modelPositions = plan.shots.filter((s) => s.type !== "SIMPLE").map((s) => s.position);
   const objectPositions = plan.shots.filter((s) => s.type === "SIMPLE").map((s) => s.position);
   const portraitNote = hasPortraitReference ? "The female model with consistent identity (same face) appears ONLY in the PORTRAIT cells listed below." : "A stylish female model with consistent appearance (same face) appears ONLY in the PORTRAIT cells listed below.";
@@ -2363,7 +2381,11 @@ OUTFIT & WARDROBE VARIETY (MANDATORY):
 TONAL CONTRAST & VISUAL RHYTHM (MANDATORY \u2014 this is what makes the grid look professional):
 - Do NOT render every cell at the same brightness. A monotone grid where all cells are equally light (or equally dark) looks flat and amateur.
 - Within the SAME palette "${plan.palette}", deliberately alternate the tonal value of neighbouring cells: some cells lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones) and others to the LIGHTER / airier / high-key end (bright, soft, luminous).
-- No two side-by-side or stacked cells should share the same overall brightness \u2014 create a checkerboard-like rhythm of light and dark across the grid.
+- EXACT TONAL ASSIGNMENT (MANDATORY \u2014 follow position-by-position, this creates the light/dark checkerboard):
+   \u2022 DARK & moody (low-key) cells \u2014 render these positions noticeably darker, deep shadow, dramatic light: ${darkPositions.join(", ") || "none"}.
+   \u2022 BRIGHT & airy (high-key) cells \u2014 render these positions noticeably lighter, luminous, soft light: ${lightPositions.join(", ") || "none"}.
+- The brightness gap between a DARK cell and an adjacent BRIGHT cell must be OBVIOUS at a glance \u2014 clearly different exposure, not a subtle shift.
+- No two side-by-side or stacked cells may share the same overall brightness \u2014 the DARK and BRIGHT positions above already form a checkerboard; honour it exactly.
 - Mix close-up high-detail cells with open negative-space cells, and bright daylight moments with shadowy dramatic ones.
 - This tonal variation must stay strictly inside the palette \u2014 change brightness and mood, NOT the color family.
 
@@ -2785,6 +2807,7 @@ var GRID_PIPELINE_PREVIEW_REVE_MODEL = process.env.INSTAME_GRID_PIPELINE_PREVIEW
 var GRID_PIPELINE_EXTRACT_PROVIDER = (process.env.INSTAME_GRID_PIPELINE_EXTRACT_PROVIDER || "openai").trim().toLowerCase();
 var GRID_PIPELINE_EXTRACT_REVE_MODEL = process.env.INSTAME_GRID_PIPELINE_EXTRACT_REVE_MODEL || "reve-2.0";
 var GRID_PIPELINE_EXTRACT_OPENAI_MODEL = process.env.INSTAME_GRID_PIPELINE_EXTRACT_MODEL || "gpt-image-2";
+var GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL = process.env.INSTAME_GRID_PIPELINE_EXTRACT_MAX_MODEL || "gemini-3-pro-image-preview";
 var INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path2.resolve(
   process.cwd(),
   "assets",
@@ -4242,6 +4265,26 @@ async function renderGridCompositePreview(options) {
   return { imageBase64, provider: "OpenAI", model: GRID_PIPELINE_RENDER_OPENAI_MODEL };
 }
 async function renderGridExtractedShot(options) {
+  if (options.quality === "max") {
+    const stripDataUri = (value) => value.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "").trim();
+    const parts = [
+      { text: options.prompt },
+      ...options.images.map((image) => ({
+        inlineData: {
+          mimeType: image.mimeType || "image/png",
+          data: stripDataUri(image.base64)
+        }
+      }))
+    ];
+    const { imageBase64 } = await generateGeminiImageFromParts({
+      model: GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL,
+      parts,
+      maxOutputTokens: 1400,
+      imageSize: "2K",
+      aspectRatio: "2:3"
+    });
+    return imageBase64;
+  }
   if (GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig()) {
     return generateReveImage({
       model: GRID_PIPELINE_EXTRACT_REVE_MODEL,
@@ -7964,7 +8007,9 @@ async function registerRoutes(app2) {
     const aesthetic = sanitizeGridPromptText(normalizeStringValue(plan.aesthetic) || "");
     const palette = sanitizeGridPromptText(normalizeStringValue(plan.palette) || "");
     const lightType = sanitizeGridPromptText(normalizeStringValue(plan.lightType) || "");
-    const totalCost = uniqueSortedPositions.length * GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+    const extractQuality = normalizeInstaMeGridExtractQuality(body.quality ?? body.qualityTier);
+    const extractCostPerImage = getInstaMeGridExtractCreditCostPerImage(extractQuality);
+    const totalCost = uniqueSortedPositions.length * extractCostPerImage;
     await consumeCredits(userId, totalCost, "instame_grid_pipeline_extract_shots");
     let creditsConsumedCount = totalCost;
     try {
@@ -8019,7 +8064,8 @@ async function registerRoutes(app2) {
         try {
           generatedImageBase64 = await renderGridExtractedShot({
             prompt: primaryPrompt,
-            images
+            images,
+            quality: extractQuality
           });
         } catch (primaryError) {
           const isModerationBlock = primaryError instanceof Error && (primaryError.message.includes("moderation_blocked") || primaryError.message.includes("safety") || primaryError.message.includes("safety_violations") || primaryError.message.includes("Your request was rejected")) || primaryError?.code === "moderation_blocked";
@@ -8039,7 +8085,8 @@ async function registerRoutes(app2) {
               });
               generatedImageBase64 = await renderGridExtractedShot({
                 prompt: fallbackPrompt,
-                images
+                images,
+                quality: extractQuality
               });
             } catch (fallbackError) {
               console.error(
@@ -8064,11 +8111,11 @@ async function registerRoutes(app2) {
             imageBase64: generatedImageBase64
           });
         } else if (shotFailed) {
-          creditsFailed += GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+          creditsFailed += extractCostPerImage;
           failedPositions.push(shot.position);
           await refundCredits(
             userId,
-            GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
+            extractCostPerImage,
             "instame_grid_pipeline_extract_shot_failed"
           );
         }

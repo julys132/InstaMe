@@ -200,6 +200,30 @@ export const INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST =
 export const INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE =
   INSTAME_GRID_PIPELINE_IMAGE_CREDIT_COST;
 
+// ─── Extraction quality tiers ────────────────────────────────────────────────
+// The user picks the extraction quality per pack. "standard" keeps the current
+// model/price; "max" uses a higher-fidelity model (Gemini Pro Image) for more
+// realistic skin texture and detail, at the "pro" credit tier.
+export type InstaMeGridExtractQuality = "standard" | "max";
+
+export const INSTAME_GRID_EXTRACT_QUALITY_CREDIT_COST: Record<InstaMeGridExtractQuality, number> = {
+  standard: INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
+  max: INSTAME_QUALITY_TIER_CREDITS.pro,
+};
+
+export function getInstaMeGridExtractCreditCostPerImage(
+  quality: InstaMeGridExtractQuality = "standard",
+): number {
+  return (
+    INSTAME_GRID_EXTRACT_QUALITY_CREDIT_COST[quality] ??
+    INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE
+  );
+}
+
+export function normalizeInstaMeGridExtractQuality(value: unknown): InstaMeGridExtractQuality {
+  return value === "max" ? "max" : "standard";
+}
+
 /**
  * Full estimated credit cost for a complete pack of `imageCount` photos:
  * one composite preview (plan + composite render) plus per-image extraction.

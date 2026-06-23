@@ -36,12 +36,15 @@ import {
   INSTAME_PORTRAIT_ENHANCE_TIER,
   getHigherInstaMeQualityTier,
   getInstaMeCreditsForQualityTier,
+  getInstaMeGridExtractCreditCostPerImage,
   getInstaMeQualityTierLabel,
   getLiveInstaMeGenerationTier,
+  normalizeInstaMeGridExtractQuality,
   resolveHighestInstaMeQualityTier,
   toPublicInstaMeEditTier,
   toPublicInstaMeGenerationTier,
   toPublicInstaMePortraitEnhanceTier,
+  type InstaMeGridExtractQuality,
   type InstaMeQualityTier,
 } from "../shared/instame-pricing";
 import {
@@ -724,6 +727,11 @@ const GRID_PIPELINE_EXTRACT_REVE_MODEL =
 // fidelity — default extraction to plain "gpt-image-2" which sends input_fidelity:high.
 const GRID_PIPELINE_EXTRACT_OPENAI_MODEL =
   process.env.INSTAME_GRID_PIPELINE_EXTRACT_MODEL || "gpt-image-2";
+// "Max" quality extraction model. Gemini Pro Image produces more photorealistic
+// skin texture/detail than the standard GPT Image 2 pass. User selects this per
+// pack and it is billed at the higher "pro" credit tier.
+const GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL =
+  process.env.INSTAME_GRID_PIPELINE_EXTRACT_MAX_MODEL || "gemini-3-pro-image-preview";
 const INSTAME_PORTRAIT_ENHANCE_PROMPT_PATH = path.resolve(
   process.cwd(),
   "assets",
@@ -2815,7 +2823,33 @@ async function renderGridCompositePreview(options: {
 async function renderGridExtractedShot(options: {
   prompt: string;
   images: import("./lib/instame-image").RuntimeImageInput[];
+  quality?: InstaMeGridExtractQuality;
 }): Promise<string> {
+  // "Max" quality: high-fidelity Gemini Pro Image pass for more realistic skin
+  // texture and detail than the standard GPT Image 2 extraction. The approved cell
+  // (images[0]) plus optional portrait/reference images are passed as inline parts.
+  if (options.quality === "max") {
+    const stripDataUri = (value: string): string =>
+      value.replace(/^data:image\/[a-zA-Z0-9.+-]+;base64,/, "").trim();
+    const parts: GeminiPart[] = [
+      { text: options.prompt },
+      ...options.images.map((image) => ({
+        inlineData: {
+          mimeType: image.mimeType || "image/png",
+          data: stripDataUri(image.base64),
+        },
+      })),
+    ];
+    const { imageBase64 } = await generateGeminiImageFromParts({
+      model: GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL,
+      parts,
+      maxOutputTokens: 1400,
+      imageSize: "2K",
+      aspectRatio: "2:3",
+    });
+    return imageBase64;
+  }
+
   if (GRID_PIPELINE_EXTRACT_PROVIDER === "reve" && hasReveImageConfig()) {
     return generateReveImage({
       model: GRID_PIPELINE_EXTRACT_REVE_MODEL,
@@ -7785,7 +7819,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const palette = sanitizeGridPromptText(normalizeStringValue(plan.palette) || "");
     const lightType = sanitizeGridPromptText(normalizeStringValue(plan.lightType) || "");
 
-    const totalCost = uniqueSortedPositions.length * GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+    const extractQuality = normalizeInstaMeGridExtractQuality(body.quality ?? body.qualityTier);
+    const extractCostPerImage = getInstaMeGridExtractCreditCostPerImage(extractQuality);
+
+    const totalCost = uniqueSortedPositions.length * extractCostPerImage;
     await consumeCredits(userId, totalCost, "instame_grid_pipeline_extract_shots");
     let creditsConsumedCount = totalCost;
 
@@ -7859,6 +7896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           generatedImageBase64 = await renderGridExtractedShot({
             prompt: primaryPrompt,
             images,
+            quality: extractQuality,
           });
         } catch (primaryError: unknown) {
           const isModerationBlock =
@@ -7887,6 +7925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               generatedImageBase64 = await renderGridExtractedShot({
                 prompt: fallbackPrompt,
                 images,
+                quality: extractQuality,
               });
             } catch (fallbackError) {
               console.error(
@@ -7912,11 +7951,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             imageBase64: generatedImageBase64,
           });
         } else if (shotFailed) {
-          creditsFailed += GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+          creditsFailed += extractCostPerImage;
           failedPositions.push(shot.position);
           await refundCredits(
             userId,
-            GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
+            extractCostPerImage,
             "instame_grid_pipeline_extract_shot_failed",
           );
         }

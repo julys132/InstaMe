@@ -1164,6 +1164,7 @@ class ApiClient {
     positions: number[];
     portrait?: string; // base64
     referenceImages?: Array<{ base64: string; mimeType?: string }>;
+    quality?: "standard" | "max";
   }) {
     return this.request<{
       images: Array<{

@@ -76,7 +76,9 @@ import {
   INSTAME_OWN_STYLE_FIRST_USE_SURCHARGE_CREDITS,
   INSTAME_PORTRAIT_ENHANCE_TIER,
   getInstaMeCreditsForQualityTier,  getInstaMeQualityTierLabel,
+  getInstaMeGridExtractCreditCostPerImage,
   getInstaMePackBundleCreditCost,
+  type InstaMeGridExtractQuality,
   type InstaMeQualityTier,
   type PublicInstaMeEditTier,
   type PublicInstaMeGenerationTier,
@@ -1024,6 +1026,7 @@ export default function InstaMeScreen() {
   const [packGridRenderLoading, setPackGridRenderLoading] = useState(false);
   const [packGridExtractProgress, setPackGridExtractProgress] = useState<{ done: number; total: number } | null>(null);
   const [packGridExtractNotice, setPackGridExtractNotice] = useState<string | null>(null);
+  const [packGridExtractQuality, setPackGridExtractQuality] = useState<InstaMeGridExtractQuality>("standard");
   const [packGridError, setPackGridError] = useState<string | null>(null);
   const [packImagePreviewId, setPackImagePreviewId] = useState<string | null>(null);
   const [packImagePreviewIndex, setPackImagePreviewIndex] = useState(0);
@@ -2599,6 +2602,7 @@ export default function InstaMeScreen() {
               positions: [position],
               portrait,
               referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
+              quality: packGridExtractQuality,
             });
 
             const extractedImages = Array.isArray(result.images) ? result.images : [];
@@ -2704,7 +2708,7 @@ export default function InstaMeScreen() {
     }
 
     const orderedShots = [...shotsToRender].sort((a, b) => a.position - b.position);
-    const cost = shotsToRender.length * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+    const cost = shotsToRender.length * getInstaMeGridExtractCreditCostPerImage(packGridExtractQuality);
     const title = `Generate ${shotsToRender.length} final photo${shotsToRender.length === 1 ? "" : "s"}?`;
     const message = [
       `We'll turn your ${shotsToRender.length} selected frame${shotsToRender.length === 1 ? "" : "s"} into full-resolution photos, ready to post.`,
@@ -4349,10 +4353,59 @@ export default function InstaMeScreen() {
                           </>
                         ) : null}
                         {packGridPreviewBase64 ? (
+                          <View style={styles.packQualityRow}>
+                            {([
+                              {
+                                key: "standard" as InstaMeGridExtractQuality,
+                                title: "Standard",
+                                subtitle: `${getInstaMeGridExtractCreditCostPerImage("standard")} credits/photo`,
+                              },
+                              {
+                                key: "max" as InstaMeGridExtractQuality,
+                                title: "Max quality",
+                                subtitle: `${getInstaMeGridExtractCreditCostPerImage("max")} credits/photo · sharper, more realistic skin texture`,
+                              },
+                            ]).map((option) => {
+                              const active = packGridExtractQuality === option.key;
+                              return (
+                                <Pressable
+                                  key={option.key}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Select ${option.title} extraction quality`}
+                                  onPress={() => setPackGridExtractQuality(option.key)}
+                                  disabled={packGridRenderLoading}
+                                  style={({ pressed }) => [
+                                    styles.packQualityOption,
+                                    active && styles.packQualityOptionActive,
+                                    pressed && !packGridRenderLoading ? { opacity: 0.85 } : undefined,
+                                  ]}
+                                >
+                                  <View style={styles.packQualityOptionHeader}>
+                                    <Ionicons
+                                      name={active ? "radio-button-on" : "radio-button-off"}
+                                      size={16}
+                                      color={active ? "#FFF" : "rgba(255,255,255,0.55)"}
+                                    />
+                                    <Text
+                                      style={[
+                                        styles.packQualityOptionTitle,
+                                        active && styles.packQualityOptionTitleActive,
+                                      ]}
+                                    >
+                                      {option.title}
+                                    </Text>
+                                  </View>
+                                  <Text style={styles.packQualityOptionSubtitle}>{option.subtitle}</Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        ) : null}
+                        {packGridPreviewBase64 ? (
                           <Pressable
                             onPress={() => {
                               const extractCredits =
-                                selectedPipelineShotCount * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+                                selectedPipelineShotCount * getInstaMeGridExtractCreditCostPerImage(packGridExtractQuality);
                               if (credits < extractCredits) {
                                 promptInsufficientCredits(extractCredits, "these photos");
                                 return;
@@ -4377,7 +4430,7 @@ export default function InstaMeScreen() {
                                   : "Creating your photos..."
                                 : (() => {
                                     const extractCredits =
-                                      selectedPipelineShotCount * INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
+                                      selectedPipelineShotCount * getInstaMeGridExtractCreditCostPerImage(packGridExtractQuality);
                                     return `Get my ${selectedPipelineShotCount} photo${selectedPipelineShotCount === 1 ? "" : "s"} \u2014 ${extractCredits} credit${extractCredits === 1 ? "" : "s"}`;
                                   })()}
                             </Text>
@@ -7289,6 +7342,45 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 14,
     marginTop: 4,
+  },
+  packQualityRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  packQualityOption: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    gap: 4,
+  },
+  packQualityOptionActive: {
+    borderColor: "rgba(126,243,255,0.55)",
+    backgroundColor: "rgba(126,243,255,0.10)",
+  },
+  packQualityOptionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  packQualityOptionTitle: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  packQualityOptionTitleActive: {
+    color: "#FFF",
+  },
+  packQualityOptionSubtitle: {
+    color: "rgba(255,255,255,0.5)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    lineHeight: 13,
   },
   packPlannerRenderButtonText: {
     color: "#000",

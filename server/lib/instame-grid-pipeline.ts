@@ -861,6 +861,15 @@ export function getGridPositionLabel(position: number, imageCount: number): stri
 export function buildCompositeGridPrompt(plan: GridPlan, hasPortraitReference: boolean): string {
   const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
 
+  // Deterministic light/dark checkerboard so neighbouring cells ALWAYS alternate
+  // tonal value (side by side AND stacked) instead of leaving it to the render
+  // model's interpretation. (row + col) even = bright/airy, odd = dark/moody.
+  const toneForPosition = (position: number): "DARK" | "LIGHT" => {
+    const row = Math.ceil(position / GRID_COLS);
+    const col = ((position - 1) % GRID_COLS) + 1;
+    return (row + col) % 2 === 0 ? "LIGHT" : "DARK";
+  };
+
   const shotLines = plan.shots
     .map((shot) => {
       const row = Math.ceil(shot.position / GRID_COLS);
@@ -871,17 +880,25 @@ export function buildCompositeGridPrompt(plan: GridPlan, hasPortraitReference: b
           : shot.type === "MEDIUM"
           ? "PORTRAIT (model present — tight on face/shoulders)"
           : "PORTRAIT (model present — full or medium body, action/location)";
+      const tone =
+        toneForPosition(shot.position) === "DARK"
+          ? "tone: DARK & moody (low-key, deep shadow, rich dark palette tones)"
+          : "tone: BRIGHT & airy (high-key, luminous, light palette tones)";
       const detail = [
         cellKind,
         shot.label,
         shot.hairstyle ? `hairstyle: ${shot.hairstyle}` : null,
         shot.angle ? `camera angle: ${shot.angle}` : null,
+        tone,
       ]
         .filter(Boolean)
         .join(" — ");
       return `  Position ${shot.position} (row ${row}, col ${col}): ${detail}`;
     })
     .join("\n");
+
+  const darkPositions = plan.shots.filter((s) => toneForPosition(s.position) === "DARK").map((s) => s.position);
+  const lightPositions = plan.shots.filter((s) => toneForPosition(s.position) === "LIGHT").map((s) => s.position);
 
   const modelPositions = plan.shots.filter((s) => s.type !== "SIMPLE").map((s) => s.position);
   const objectPositions = plan.shots.filter((s) => s.type === "SIMPLE").map((s) => s.position);
@@ -917,7 +934,11 @@ OUTFIT & WARDROBE VARIETY (MANDATORY):
 TONAL CONTRAST & VISUAL RHYTHM (MANDATORY — this is what makes the grid look professional):
 - Do NOT render every cell at the same brightness. A monotone grid where all cells are equally light (or equally dark) looks flat and amateur.
 - Within the SAME palette "${plan.palette}", deliberately alternate the tonal value of neighbouring cells: some cells lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones) and others to the LIGHTER / airier / high-key end (bright, soft, luminous).
-- No two side-by-side or stacked cells should share the same overall brightness — create a checkerboard-like rhythm of light and dark across the grid.
+- EXACT TONAL ASSIGNMENT (MANDATORY — follow position-by-position, this creates the light/dark checkerboard):
+   • DARK & moody (low-key) cells — render these positions noticeably darker, deep shadow, dramatic light: ${darkPositions.join(", ") || "none"}.
+   • BRIGHT & airy (high-key) cells — render these positions noticeably lighter, luminous, soft light: ${lightPositions.join(", ") || "none"}.
+- The brightness gap between a DARK cell and an adjacent BRIGHT cell must be OBVIOUS at a glance — clearly different exposure, not a subtle shift.
+- No two side-by-side or stacked cells may share the same overall brightness — the DARK and BRIGHT positions above already form a checkerboard; honour it exactly.
 - Mix close-up high-detail cells with open negative-space cells, and bright daylight moments with shadowy dramatic ones.
 - This tonal variation must stay strictly inside the palette — change brightness and mood, NOT the color family.
 
