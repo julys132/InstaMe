@@ -107,6 +107,7 @@ import {
   buildMasterGridSystemPrompt,
   buildContinuityGridSystemPrompt,
   buildCompositeGridPrompt,
+  buildReveCompositeGridPrompt,
   buildExtractionPrompt,
   callGeminiFlashText,
   parseGridPlan,

@@ -2319,6 +2319,42 @@ var GRID_PIPELINE_RENDER_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_IMAGE_CRE
 var GRID_PIPELINE_COMPOSITE_CREDIT_COST = INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST;
 var GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE = INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE;
 var GRID_COLS = 3;
+function buildReveCompositeGridPrompt(plan, hasPortraitReference) {
+  const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
+  const shotLines = plan.shots.map((shot) => {
+    const row = Math.ceil(shot.position / GRID_COLS);
+    const col = (shot.position - 1) % GRID_COLS + 1;
+    const cellKind = shot.type === "SIMPLE" ? "OBJECT-ONLY: no people, minimal hero object with generous negative space" : shot.type === "MEDIUM" ? "PORTRAIT: tight face/shoulders" : "PORTRAIT: medium/full body with action or location detail";
+    const detail = [
+      cellKind,
+      shot.label,
+      shot.hairstyle ? `hairstyle: ${shot.hairstyle}` : null,
+      shot.angle ? `angle: ${shot.angle}` : null
+    ].filter(Boolean).join(" \u2014 ");
+    return `  Position ${shot.position} (row ${row}, col ${col}): ${detail}`;
+  }).join("\n");
+  const modelPositions = plan.shots.filter((s) => s.type !== "SIMPLE").map((s) => s.position);
+  const objectPositions = plan.shots.filter((s) => s.type === "SIMPLE").map((s) => s.position);
+  const portraitNote = hasPortraitReference ? "The model identity is fixed from the provided portrait reference." : "A single consistent model identity is implied across all portrait cells.";
+  return `Create a photorealistic Instagram profile grid preview with exactly ${plan.imageCount} editorial photos arranged in ${GRID_COLS} columns and ${totalRows} rows. Use the same dominant color palette everywhere: ${plan.palette}. Use the same light quality everywhere: ${plan.lightType}.
+
+GRID CONTENTS:
+${shotLines}
+
+GRID RULES:
+- Keep every cell strictly within the palette ${plan.palette}.
+- Alternate tonal value across neighboring cells: some cells should be darker/moodier, others lighter/airier, while staying inside the palette. This tonal contrast is essential.
+- Portrait cells are only positions: ${modelPositions.join(", ") || "none"}.
+- Object-only cells are only positions: ${objectPositions.join(", ") || "none"}.
+- Do not place any person in an object-only cell.
+- Object cells should be minimalist, clean, and airy with one hero subject and generous negative space.
+- Portrait cells should show the model in distinct outfits, poses, and expressions across portrait positions.
+- ${portraitNote}
+- No text, labels, captions, logos, stickers, or UI elements anywhere.
+- No borders, menus, or other interface chrome outside the grid.
+- Render the grid as professional editorial photography, not illustration, collage, or graphic design.
+- The grid should fill the entire image canvas with only thin white separators between cells.`;
+}
 function buildCompositeGridPrompt(plan, hasPortraitReference) {
   const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
   const shotLines = plan.shots.map((shot) => {
