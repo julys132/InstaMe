@@ -45,6 +45,7 @@ import {
   inferImageMimeTypeFromBase64,
   optimizeImageAsset,
   optimizeGeneratedBase64Image,
+  prepareGeneratedPackImage,
   stripDataUriPrefix,
   type PreparedUploadImage,
 } from "@/lib/instame-uploaded-images";
@@ -923,7 +924,8 @@ async function persistGeneratedPack(params: PersistGeneratedPackParams): Promise
       const base64 = (image.imageBase64 || "").trim();
       if (!base64) continue;
       try {
-        const optimized = await optimizeGeneratedBase64Image({ base64, mimeType: "image/png" });
+        const mimeType = inferImageMimeTypeFromBase64(base64);
+        const optimized = await prepareGeneratedPackImage({ base64, mimeType });
         optimizedImages.push({
           role: "image",
           position: image.position,
@@ -947,9 +949,9 @@ async function persistGeneratedPack(params: PersistGeneratedPackParams): Promise
     const previewSource = (params.previewBase64 || "").trim();
     if (previewSource) {
       try {
-        const optimizedPreview = await optimizeGeneratedBase64Image({
+        const optimizedPreview = await prepareGeneratedPackImage({
           base64: previewSource,
-          mimeType: params.previewMimeType || "image/png",
+          mimeType: params.previewMimeType || inferImageMimeTypeFromBase64(previewSource),
         });
         preview = {
           role: "preview",
@@ -3907,14 +3909,14 @@ export default function InstaMeScreen() {
               <View style={styles.packHeaderRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.packEyebrow}>Content packs</Text>
-                  <Text style={styles.packTitle}>Create your photo pack ✨</Text>
+                  <Text style={styles.packTitle}>Create your photo pack</Text>
                 </View>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Open my saved packs"
                   onPress={() => {
                     void Haptics.selectionAsync();
-                    router.push("/saved-packs" as any);
+                    router.push("/library" as any);
                   }}
                   style={({ pressed }) => [styles.myPacksButton, pressed ? { opacity: 0.85 } : undefined]}
                 >
@@ -3928,7 +3930,7 @@ export default function InstaMeScreen() {
                 </View>
               </View>
               <Text style={styles.packIntroText}>
-                A pack is a set of matching AI photos of you in one aesthetic — generated together so they look great as an Instagram grid or carousel.
+                A pack is a set of matching AI photos of you in one aesthetic, generated together so they look great as an Instagram grid or carousel.
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
                 {PHOTO_PACK_PRESETS.map((pack) => {
@@ -4165,12 +4167,6 @@ export default function InstaMeScreen() {
                       />
                     </Pressable>
 
-                    {!packBriefShowMore ? (
-                      <Text style={styles.packPlannerHint}>
-                        Optional \u2014 skip this and we'll use your pack's recommended styling.
-                      </Text>
-                    ) : null}
-
                     {packBriefShowMore ? (
                       <>
                         <View style={styles.packPlannerBlock}>
@@ -4277,7 +4273,7 @@ export default function InstaMeScreen() {
                         {packGridPreviewBase64 ? (
                           <>
                             <Text style={styles.packPlannerHint}>
-                              All photos are selected. Tap any frame to exclude it \u2014 you only pay for the ones you keep.
+                              All photos are selected. Tap any frame to exclude it - you only pay for the ones you keep.
                             </Text>
                             <View style={styles.packPlannerCompositeCard}>
                               <View style={styles.packPlannerPreviewFrame}>
@@ -4373,7 +4369,7 @@ export default function InstaMeScreen() {
                               {
                                 key: "max" as InstaMeGridExtractQuality,
                                 title: "Max quality",
-                                subtitle: `${getInstaMeGridExtractCreditCostPerImage("max")} credits/photo · sharper, more realistic skin texture`,
+                                subtitle: `${getInstaMeGridExtractCreditCostPerImage("max")} credits/photo - Gemini Pro 4K`,
                               },
                             ]).map((option) => {
                               const active = packGridExtractQuality === option.key;
@@ -4441,7 +4437,7 @@ export default function InstaMeScreen() {
                                 : (() => {
                                     const extractCredits =
                                       selectedPipelineShotCount * getInstaMeGridExtractCreditCostPerImage(packGridExtractQuality);
-                                    return `Get my ${selectedPipelineShotCount} photo${selectedPipelineShotCount === 1 ? "" : "s"} \u2014 ${extractCredits} credit${extractCredits === 1 ? "" : "s"}`;
+                                    return `Get my ${selectedPipelineShotCount} photo${selectedPipelineShotCount === 1 ? "" : "s"} - ${extractCredits} credit${extractCredits === 1 ? "" : "s"}`;
                                   })()}
                             </Text>
                           </Pressable>
@@ -4499,22 +4495,22 @@ export default function InstaMeScreen() {
                           )}
                           <Text style={styles.packPlannerPreviewButtonText}>
                             {packGridPreviewLoading
-                              ? "Building more for this pack\u2026"
-                              : `Get ${selectedPackImageCount} more \u2014 fresh & unique \u2014 ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
+                              ? "Building more for this pack..."
+                              : `Get ${selectedPackImageCount} more - fresh & unique - ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
                           </Text>
                         </Pressable>
                         <Pressable
                           onPress={() => {
                             void Haptics.selectionAsync();
-                            router.push("/saved-packs" as any);
+                            router.push("/library" as any);
                           }}
                           style={styles.packPlannerResetButton}
                         >
                           <Ionicons name="folder-open-outline" size={13} color="rgba(255,255,255,0.72)" />
-                          <Text style={styles.packPlannerResetButtonText}>Saved to My Packs \u2014 view all</Text>
+                          <Text style={styles.packPlannerResetButtonText}>Saved to My Packs - view all</Text>
                         </Pressable>
                         <Text style={styles.packPlannerHint}>
-                          Tap a photo to save or share it. Post them in order (1, 2, 3\u2026) to recreate the grid on your profile.
+                          Tap a photo to save or share it. Post them in order (1, 2, 3...) to recreate the grid on your profile.
                         </Text>
                       </View>
                     ) : null}
@@ -4541,8 +4537,8 @@ export default function InstaMeScreen() {
                         )}
                         <Text style={styles.packPlannerPreviewButtonText}>
                           {packGridPreviewLoading
-                            ? "Building your grid preview\u2026"
-                            : `Preview your grid \u2014 ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
+                            ? "Building your grid preview..."
+                            : `Preview your grid - ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits`}
                         </Text>
                       </Pressable>
                     ) : (

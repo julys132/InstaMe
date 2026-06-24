@@ -218,3 +218,49 @@ export async function optimizeGeneratedBase64Image(options: {
     fileSizeBytes: optimizedBytes,
   };
 }
+
+export async function prepareGeneratedPackImage(options: {
+  base64: string;
+  mimeType?: string;
+  previewDimension?: number;
+}): Promise<PreparedUploadImage> {
+  const normalizedBase64 = stripDataUriPrefix(options.base64).replace(/\s+/g, "");
+  if (!normalizedBase64) {
+    throw new Error("Could not prepare this pack image.");
+  }
+
+  const mimeType = options.mimeType || inferImageMimeTypeFromBase64(normalizedBase64);
+  const inputUri = buildDataUri(normalizedBase64, mimeType);
+  const previewDimension = options.previewDimension || LIBRARY_PREVIEW_DIMENSION;
+
+  const sourceResult = await manipulateAsync(inputUri, [], {
+    compress: 1,
+    format: mimeType.includes("png") ? SaveFormat.PNG : SaveFormat.JPEG,
+    base64: false,
+  });
+
+  const sourceWidth = Math.max(sourceResult.width || 0, 1);
+  const sourceHeight = Math.max(sourceResult.height || 0, 1);
+  const previewResizeAction =
+    Math.max(sourceWidth, sourceHeight) > previewDimension
+      ? sourceWidth >= sourceHeight
+        ? [{ resize: { width: previewDimension } }]
+        : [{ resize: { height: previewDimension } }]
+      : [];
+
+  const previewResult = await manipulateAsync(sourceResult.uri, previewResizeAction, {
+    compress: 0.62,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
+
+  return {
+    uri: sourceResult.uri,
+    base64: normalizedBase64,
+    previewBase64: stripDataUriPrefix(previewResult.base64 || normalizedBase64),
+    mimeType,
+    width: sourceWidth,
+    height: sourceHeight,
+    fileSizeBytes: estimateBase64Bytes(normalizedBase64),
+  };
+}
