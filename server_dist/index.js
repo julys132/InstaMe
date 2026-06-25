@@ -2835,7 +2835,7 @@ var MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 22e4;
 var MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8e3;
 var MAX_INSTAME_SAVED_PACKS = 30;
 var MAX_INSTAME_PACK_IMAGES = 16;
-var MAX_INSTAME_PACK_IMAGE_BASE64_LENGTH = 6e6;
+var MAX_INSTAME_PACK_IMAGE_BASE64_LENGTH = 2e7;
 var STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 var INSTAME_HIGH_RES_OUTPUT_DIMENSION = 1024;
 var DEFAULT_IAP_PRODUCT_CREDITS = {
@@ -4279,8 +4279,8 @@ async function renderGridExtractedShot(options) {
     const { imageBase64 } = await generateGeminiImageFromParts({
       model: GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL,
       parts,
-      maxOutputTokens: 1400,
-      imageSize: "2K",
+      maxOutputTokens: 8192,
+      imageSize: "4K",
       aspectRatio: "2:3"
     });
     return imageBase64;
