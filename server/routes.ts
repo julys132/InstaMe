@@ -2843,7 +2843,7 @@ async function renderGridExtractedShot(options: {
     const { imageBase64 } = await generateGeminiImageFromParts({
       model: GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL,
       parts,
-      maxOutputTokens: 8192,
+      maxOutputTokens: 2000,
       imageSize: "4K",
       aspectRatio: "2:3",
     });
