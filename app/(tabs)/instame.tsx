@@ -428,8 +428,8 @@ const PACK_GRID_TONE_CONTRAST_OPTIONS: Array<{
   title: string;
   subtitle: string;
 }> = [
-  { key: "medium", title: "Medium contrast", subtitle: "Softer rhythm between grid cells" },
-  { key: "high", title: "High contrast", subtitle: "Stronger light/dark alternation" },
+  { key: "medium", title: "Medium contrast", subtitle: "Balanced light/dark mix between photos" },
+  { key: "high", title: "High contrast", subtitle: "Bolder light/dark switch between photos" },
 ];
 const GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT = 3;
 const GRID_EXTRACT_WAIT_NOTE = "Full extraction can take a couple of minutes, depending on how many photos you picked.";
@@ -4203,7 +4203,7 @@ export default function InstaMeScreen() {
                     </View>
 
                     <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Grid contrast</Text>
+                      <Text style={styles.packPlannerLabel}>Photo contrast</Text>
                       <View style={styles.packQualityRow}>
                         {PACK_GRID_TONE_CONTRAST_OPTIONS.map((option) => {
                           const active = packGridToneContrast === option.key;
