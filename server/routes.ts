@@ -121,6 +121,7 @@ import {
   type GridPipelineImageCount,
   type GridPipelineUserInputs,
   type GridContinuityContext,
+  type GridToneContrast,
 } from "./lib/instame-grid-pipeline";
 
 function getGeminiApiKey(): string {
@@ -744,6 +745,10 @@ const EXPOSE_STYLE_DEBUG_PROMPT =
 
 function isGridPipelineImageCount(value: unknown): value is GridPipelineImageCount {
   return typeof value === "number" && GRID_PIPELINE_ALLOWED_IMAGE_COUNTS.has(value);
+}
+
+function normalizeGridToneContrast(value: unknown): GridToneContrast {
+  return value === "high" ? "high" : "medium";
 }
 const MAX_IMAGE_COUNT_BY_MODE: Record<ImageInputMode, number> = {
   single_item: 10,
@@ -7623,6 +7628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const aesthetic = sanitizeGridPromptText(normalizeStringValue(body.aesthetic) || "Old Money Luxury");
     const palette = sanitizeGridPromptText(normalizeStringValue(body.palette) || "");
     const lightType = sanitizeGridPromptText(normalizeStringValue(body.lightType) || "");
+    const toneContrast = normalizeGridToneContrast(body.toneContrast ?? body.contrastLevel);
     const extraNotes = sanitizeGridPromptText(normalizeStringValue(body.extraNotes) || "");
     const hasPortraitReference = body.hasPortraitReference === true;
     const portrait: string | undefined =
@@ -7683,6 +7689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       aesthetic,
       palette,
       lightType,
+      toneContrast,
       extraNotes: mergedExtraNotes,
       hasPortraitReference,
       seed,
@@ -7701,7 +7708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use the continuity prompt when extending an existing pack so the new shots
       // avoid all previously-used scenes/hairstyles; otherwise plan a fresh master grid.
       const systemPrompt = priorContext
-        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes, seed)
+        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes, seed, toneContrast)
         : buildMasterGridSystemPrompt(inputs);
       const rawPlan = await callGeminiFlashText({
         systemPrompt,
@@ -7730,7 +7737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         : planContext;
 
-      const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference));
+      const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference, toneContrast));
 
       const compositeImages: import("./lib/instame-image").RuntimeImageInput[] = [];
       if (portrait) {

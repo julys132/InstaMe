@@ -102,6 +102,7 @@ type UploadedPhoto = {
 type TransformIntensity = "soft" | "editorial" | "dramatic";
 type OptionalTransformIntensity = TransformIntensity | null;
 type OwnStyleGenerationMode = "reference_locked" | "creative_prompt";
+type PackGridToneContrast = "medium" | "high";
 type GenerationResultMeta = {
   qualityTier?: InstaMeQualityTier;
   qualityLabel?: string;
@@ -422,6 +423,14 @@ const PACK_BRIEF_SCENE_IMAGES_MAX = 3;
 
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
 const PACK_CUSTOM_PALETTE_ID = "custom-palette";
+const PACK_GRID_TONE_CONTRAST_OPTIONS: Array<{
+  key: PackGridToneContrast;
+  title: string;
+  subtitle: string;
+}> = [
+  { key: "medium", title: "Medium contrast", subtitle: "Softer rhythm between grid cells" },
+  { key: "high", title: "High contrast", subtitle: "Stronger light/dark alternation" },
+];
 const GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT = 3;
 const GRID_EXTRACT_WAIT_NOTE = "Full extraction can take a couple of minutes, depending on how many photos you picked.";
 
@@ -1022,6 +1031,8 @@ export default function InstaMeScreen() {
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
   const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string | null>(null);
   const [customPackPaletteText, setCustomPackPaletteText] = useState("");
+  const [customPackDefaultAccent, setCustomPackDefaultAccent] = useState("");
+  const [packGridToneContrast, setPackGridToneContrast] = useState<PackGridToneContrast>("medium");
   const [packGridPreviewBase64, setPackGridPreviewBase64] = useState<string | null>(null);
   const [packGridPreviewLoading, setPackGridPreviewLoading] = useState(false);
   const [packGridRenderImages, setPackGridRenderImages] = useState<Array<{ shotIndex: number; shotLabel: string; imageBase64: string }>>([]);
@@ -1333,6 +1344,13 @@ export default function InstaMeScreen() {
     },
     [customPackPaletteText, isCustomPackPalette, selectedPackPalette, selectedPackPaletteId],
   );
+  const selectedDefaultPackPalettePrompt = useMemo(() => {
+    if (!activePhotoPack) return "";
+    const aesthetic = GRID_PIPELINE_AESTHETICS.find((item) => item.id === activePhotoPack.id);
+    const basePalette = aesthetic?.defaultPalette || "";
+    const accent = customPackDefaultAccent.trim();
+    return [basePalette, accent].filter(Boolean).join(", ");
+  }, [activePhotoPack, customPackDefaultAccent]);
   const selectedPackRequiredLabels = useMemo(
     () =>
       PACK_BRIEF_REQUIRED_ELEMENTS
@@ -2392,6 +2410,8 @@ export default function InstaMeScreen() {
     // Reset brief settings when switching packs
     setSelectedPackPaletteId(null);
     setCustomPackPaletteText("");
+    setCustomPackDefaultAccent("");
+    setPackGridToneContrast("medium");
     setPackBriefRequiredElementIds([]);
     setPackBriefNotes("");
     // Reset pipeline state when switching packs
@@ -2504,8 +2524,9 @@ export default function InstaMeScreen() {
       const result = await apiClient.generateInstaMeGridCompositePreview({
         imageCount: selectedPackImageCount,
         aesthetic: activePhotoPack.id,
-        palette: selectedPackPalettePrompt || aesthetic?.defaultPalette || "",
+        palette: selectedPackPalettePrompt || selectedDefaultPackPalettePrompt || aesthetic?.defaultPalette || "",
         lightType: aesthetic?.defaultLightType || "",
+        toneContrast: packGridToneContrast,
         extraNotes: extraNotes || undefined,
         hasPortraitReference: Boolean(photo),
         portrait: photo.base64,
@@ -2536,6 +2557,8 @@ export default function InstaMeScreen() {
     isCustomPackPalette,
     selectedPackImageCount,
     selectedPackPalettePrompt,
+    selectedDefaultPackPalettePrompt,
+    packGridToneContrast,
     pipelineContinuityContext,
   ]);
 
@@ -4087,6 +4110,24 @@ export default function InstaMeScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.packPlannerPaletteRail}
                       >
+                        <Pressable
+                          onPress={() => {
+                            setSelectedPackPaletteId(null);
+                            void Haptics.selectionAsync();
+                          }}
+                          style={({ pressed }) => [
+                            styles.packPlannerPaletteCard,
+                            !selectedPackPaletteId && styles.packPlannerPaletteCardActive,
+                            pressed ? { opacity: 0.9 } : undefined,
+                          ]}
+                        >
+                          <View style={styles.packPlannerPaletteSwatches}>
+                            {["#F3EEE4", "#A9A79E", "#6F6357", "#C7A66A"].map((color) => (
+                              <View key={`default-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
+                            ))}
+                          </View>
+                          <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Default</Text>
+                        </Pressable>
                         {PACK_COLOR_PALETTES.map((palette) => {
                           const active = selectedPackPaletteId === palette.id;
                           return (
@@ -4129,7 +4170,21 @@ export default function InstaMeScreen() {
                           <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Custom</Text>
                         </Pressable>
                       </ScrollView>
-                      {selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID ? (
+                      {!selectedPackPaletteId ? (
+                        <>
+                          <TextInput
+                            value={customPackDefaultAccent}
+                            onChangeText={setCustomPackDefaultAccent}
+                            placeholder="Optional accent color for default palette"
+                            placeholderTextColor="rgba(255,255,255,0.40)"
+                            maxLength={40}
+                            style={styles.packPlannerPaletteCustomInput}
+                          />
+                          <Text style={styles.packPlannerPaletteCustomHint}>
+                            Adds one color to the pack's recommended palette.
+                          </Text>
+                        </>
+                      ) : selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID ? (
                         <>
                           <TextInput
                             value={customPackPaletteText}
@@ -4145,6 +4200,44 @@ export default function InstaMeScreen() {
                           </Text>
                         </>
                       ) : null}
+                    </View>
+
+                    <View style={styles.packPlannerBlock}>
+                      <Text style={styles.packPlannerLabel}>Grid contrast</Text>
+                      <View style={styles.packQualityRow}>
+                        {PACK_GRID_TONE_CONTRAST_OPTIONS.map((option) => {
+                          const active = packGridToneContrast === option.key;
+                          return (
+                            <Pressable
+                              key={option.key}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Select ${option.title}`}
+                              onPress={() => {
+                                setPackGridToneContrast(option.key);
+                                void Haptics.selectionAsync();
+                              }}
+                              disabled={packGridPreviewLoading || packGridRenderLoading}
+                              style={({ pressed }) => [
+                                styles.packQualityOption,
+                                active && styles.packQualityOptionActive,
+                                pressed && !packGridPreviewLoading && !packGridRenderLoading ? { opacity: 0.85 } : undefined,
+                              ]}
+                            >
+                              <View style={styles.packQualityOptionHeader}>
+                                <Ionicons
+                                  name={active ? "radio-button-on" : "radio-button-off"}
+                                  size={16}
+                                  color={active ? "#FFF" : "rgba(255,255,255,0.55)"}
+                                />
+                                <Text style={[styles.packQualityOptionTitle, active && styles.packQualityOptionTitleActive]}>
+                                  {option.title}
+                                </Text>
+                              </View>
+                              <Text style={styles.packQualityOptionSubtitle}>{option.subtitle}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
                     </View>
 
                     <Pressable
@@ -4369,7 +4462,7 @@ export default function InstaMeScreen() {
                               {
                                 key: "max" as InstaMeGridExtractQuality,
                                 title: "Max quality",
-                                subtitle: `${getInstaMeGridExtractCreditCostPerImage("max")} credits/photo - Gemini Pro 4K`,
+                                subtitle: `${getInstaMeGridExtractCreditCostPerImage("max")} credits/photo - highest detail`,
                               },
                             ]).map((option) => {
                               const active = packGridExtractQuality === option.key;

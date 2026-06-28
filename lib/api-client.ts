@@ -972,6 +972,7 @@ class ApiClient {
     aesthetic: string;
     palette: string;
     lightType: string;
+    toneContrast?: "medium" | "high";
     extraNotes?: string;
     hasPortraitReference?: boolean;
   }) {
@@ -1093,6 +1094,7 @@ class ApiClient {
     aesthetic: string;
     palette: string;
     lightType: string;
+    toneContrast?: "medium" | "high";
     extraNotes?: string;
     hasPortraitReference?: boolean;
     portrait?: string; // base64
