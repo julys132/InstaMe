@@ -1889,6 +1889,126 @@ var PIPELINE_AESTHETIC_VOCABULARY = {
     "monogram luggage detail",
     "sleek jet staircase",
     "city skyline from altitude"
+  ],
+  "Monaco Night Drive": [
+    "Monaco marina lights",
+    "black luxury car",
+    "casino entrance",
+    "chrome reflections",
+    "leather car interior",
+    "harbor night walk",
+    "flash evening portrait",
+    "silk evening outfit",
+    "city lights bokeh",
+    "polished night drive"
+  ],
+  "Paris Hotel Morning": [
+    "Paris hotel balcony",
+    "cream knit lounge set",
+    "room service tray",
+    "croissant and espresso",
+    "marble vanity",
+    "French window light",
+    "ornate balcony railing",
+    "tailored cardigan",
+    "hotel corridor",
+    "soft morning city view"
+  ],
+  "Milan Street Editorial": [
+    "Milan street architecture",
+    "tailored oversized blazer",
+    "fashion week crosswalk",
+    "luxury boutique facade",
+    "structured leather handbag",
+    "stone sidewalk",
+    "espresso bar corner",
+    "sleek sunglasses",
+    "editorial city walk",
+    "Italian fashion district"
+  ],
+  "Ski Chalet Luxe": [
+    "alpine chalet interior",
+    "fireplace lounge",
+    "cashmere knit texture",
+    "snowy window view",
+    "pine wood walls",
+    "apres-ski outfit",
+    "wool scarf detail",
+    "hot drink still-life",
+    "mountain lodge sofa",
+    "warm amber cabin light"
+  ],
+  "Gallery Date Muse": [
+    "modern art gallery",
+    "sculptural pose",
+    "minimal black dress",
+    "marble floor",
+    "framed abstract artwork",
+    "museum bench",
+    "clean white walls",
+    "soft gallery lighting",
+    "stone sculpture detail",
+    "cultured date mood"
+  ],
+  "Champagne Brunch Club": [
+    "terrace brunch table",
+    "champagne glass",
+    "fresh flower arrangement",
+    "linen table setting",
+    "pastry plate",
+    "polished daytime outfit",
+    "sunlit cafe terrace",
+    "delicate glassware",
+    "soft greenery",
+    "social brunch moment"
+  ],
+  "Balletcore Soft Glam": [
+    "satin ballet ribbon",
+    "pearl accessory",
+    "wrap cardigan",
+    "ballet flats",
+    "soft studio backdrop",
+    "delicate pose",
+    "tulle texture",
+    "champagne highlight",
+    "romantic closeup",
+    "polished soft glam"
+  ],
+  "Rooftop Golden Hour": [
+    "rooftop skyline",
+    "golden hour backlight",
+    "silk evening dress",
+    "city railing",
+    "cocktail glass",
+    "sunset wind movement",
+    "warm skyline bokeh",
+    "elevated terrace",
+    "black evening outfit",
+    "amber city glow"
+  ],
+  "Bridal Weekend Glow": [
+    "bridal hotel suite",
+    "white tailored mini dress",
+    "pearl earrings",
+    "champagne toast",
+    "bouquet detail",
+    "silver accessories",
+    "hotel mirror moment",
+    "soft blush flowers",
+    "celebration prep",
+    "clean bridal weekend"
+  ],
+  "CEO Airport Uniform": [
+    "premium airport lounge",
+    "structured blazer",
+    "carry-on suitcase",
+    "boarding gate walk",
+    "espresso cup",
+    "brushed steel detail",
+    "executive travel outfit",
+    "passport holder",
+    "quiet luxury commute",
+    "airport window light"
   ]
 };
 function getAestheticVocabularyLine(aesthetic) {
