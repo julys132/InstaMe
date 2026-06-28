@@ -52,6 +52,7 @@ import {
 import Colors from "@/constants/colors";
 import { INSTAME_ART_STYLES } from "@/constants/instameArtStyles";
 import {
+  CUSTOM_PHOTO_PACK_ID,
   PHOTO_PACK_PRESETS,
   STYLE_VIBE_CATEGORIES,
   getPhotoPackPreviewImages,
@@ -423,6 +424,8 @@ const PACK_BRIEF_SCENE_IMAGES_MAX = 3;
 
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
 const PACK_CUSTOM_PALETTE_ID = "custom-palette";
+const CUSTOM_PACK_STYLE_MIN_WORDS = 3;
+const CUSTOM_PACK_PALETTE_MIN_COLORS = 3;
 const PACK_GRID_TONE_CONTRAST_OPTIONS: Array<{
   key: PackGridToneContrast;
   title: string;
@@ -433,6 +436,21 @@ const PACK_GRID_TONE_CONTRAST_OPTIONS: Array<{
 ];
 const GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT = 3;
 const GRID_EXTRACT_WAIT_NOTE = "Full extraction can take a couple of minutes, depending on how many photos you picked.";
+
+function normalizePromptText(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function countPromptWords(value: string): number {
+  return value.split(/\s+/).map((item) => item.trim()).filter(Boolean).length;
+}
+
+function countPaletteColors(value: string): number {
+  return value
+    .split(/[,;\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+}
 
 const PACK_COLOR_PALETTES = [
   {
@@ -1030,6 +1048,7 @@ export default function InstaMeScreen() {
   const [packBriefShowMore, setPackBriefShowMore] = useState(false);
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
   const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string | null>(null);
+  const [customPackStyleText, setCustomPackStyleText] = useState("");
   const [customPackPaletteText, setCustomPackPaletteText] = useState("");
   const [customPackDefaultAccent, setCustomPackDefaultAccent] = useState("");
   const [packGridToneContrast, setPackGridToneContrast] = useState<PackGridToneContrast>("medium");
@@ -1263,6 +1282,22 @@ export default function InstaMeScreen() {
     () => PHOTO_PACK_PRESETS.find((pack) => pack.id === selectedPhotoPackId) || null,
     [selectedPhotoPackId],
   );
+  const isCustomPhotoPack = activePhotoPack?.id === CUSTOM_PHOTO_PACK_ID;
+  const normalizedCustomPackStyle = useMemo(() => normalizePromptText(customPackStyleText), [customPackStyleText]);
+  const customPackStyleWordCount = useMemo(
+    () => countPromptWords(normalizedCustomPackStyle),
+    [normalizedCustomPackStyle],
+  );
+  const customPackPaletteColorCount = useMemo(
+    () => countPaletteColors(customPackPaletteText),
+    [customPackPaletteText],
+  );
+  const isCustomPackPaletteValid =
+    !customPackPaletteText.trim() || customPackPaletteColorCount >= CUSTOM_PACK_PALETTE_MIN_COLORS;
+  const customPhotoPackTitle =
+    isCustomPhotoPack && normalizedCustomPackStyle ? `Custom Pack - ${normalizedCustomPackStyle}` : activePhotoPack?.label ?? "";
+  const customPhotoPackAesthetic =
+    isCustomPhotoPack && normalizedCustomPackStyle ? `Custom Pack: ${normalizedCustomPackStyle}` : activePhotoPack?.id ?? "";
 
   const photoPackPreviewMap = useMemo(
     () =>
@@ -1346,11 +1381,12 @@ export default function InstaMeScreen() {
   );
   const selectedDefaultPackPalettePrompt = useMemo(() => {
     if (!activePhotoPack) return "";
+    if (isCustomPhotoPack) return "";
     const aesthetic = GRID_PIPELINE_AESTHETICS.find((item) => item.id === activePhotoPack.id);
     const basePalette = aesthetic?.defaultPalette || "";
     const accent = customPackDefaultAccent.trim();
     return [basePalette, accent].filter(Boolean).join(", ");
-  }, [activePhotoPack, customPackDefaultAccent]);
+  }, [activePhotoPack, customPackDefaultAccent, isCustomPhotoPack]);
   const selectedPackRequiredLabels = useMemo(
     () =>
       PACK_BRIEF_REQUIRED_ELEMENTS
@@ -2407,8 +2443,12 @@ export default function InstaMeScreen() {
     setSelectedPhotoPackId(pack.id);
     setSelectedStyleVibeId(pack.vibeId);
     setSelectedPackBriefVibeId(pack.vibeId);
+    const nextPackImageCount = pack.count === 9 ? 9 : 6;
+    setSelectedPackImageCount(nextPackImageCount);
+    setPipelineImageCount(nextPackImageCount);
     // Reset brief settings when switching packs
     setSelectedPackPaletteId(null);
+    setCustomPackStyleText("");
     setCustomPackPaletteText("");
     setCustomPackDefaultAccent("");
     setPackGridToneContrast("medium");
@@ -2492,12 +2532,34 @@ export default function InstaMeScreen() {
       Alert.alert("Portrait required", "Add a portrait above before generating this pack.");
       return;
     }
-    if (isCustomPackPalette && !selectedPackPalettePrompt) {
+    if (isCustomPhotoPack && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS) {
+      Alert.alert(
+        "Custom style required",
+        `Describe the style in at least ${CUSTOM_PACK_STYLE_MIN_WORDS} words before generating this pack.`,
+      );
+      return;
+    }
+    if (isCustomPhotoPack && !isCustomPackPaletteValid) {
+      Alert.alert(
+        "Palette needs 3 colors",
+        `Add at least ${CUSTOM_PACK_PALETTE_MIN_COLORS} colors separated by commas, or leave the palette blank.`,
+      );
+      return;
+    }
+    if (!isCustomPhotoPack && isCustomPackPalette && !selectedPackPalettePrompt) {
       Alert.alert("Custom palette required", "Enter your custom color palette before generating the visual grid.");
       return;
     }
     const extend = options?.extend === true && Boolean(pipelineContinuityContext);
     const aesthetic = GRID_PIPELINE_AESTHETICS.find((a) => a.id === activePhotoPack.id);
+    const customPaletteText = customPackPaletteText.trim();
+    const requestAesthetic = isCustomPhotoPack ? customPhotoPackAesthetic : activePhotoPack.id;
+    const requestPalette = isCustomPhotoPack
+      ? customPaletteText || `AI-selected cohesive palette matching this custom aesthetic: ${normalizedCustomPackStyle}`
+      : selectedPackPalettePrompt || selectedDefaultPackPalettePrompt || aesthetic?.defaultPalette || "";
+    const requestLightType = isCustomPhotoPack
+      ? `premium realistic lighting that best supports this custom aesthetic: ${normalizedCustomPackStyle}`
+      : aesthetic?.defaultLightType || "";
     const elementsNote =
       packBriefRequiredElementIds.length > 0
         ? `Include: ${packBriefRequiredElementIds
@@ -2505,7 +2567,18 @@ export default function InstaMeScreen() {
             .filter(Boolean)
             .join(", ")}.`
         : "";
-    const extraNotes = [elementsNote, packBriefNotes.trim() ? `Must-have details: ${packBriefNotes.trim()}` : ""]
+    const customStyleNote = isCustomPhotoPack
+      ? `Custom pack style direction: ${normalizedCustomPackStyle}. Build a cohesive Instagram pack around this exact user-described aesthetic.`
+      : "";
+    const customPaletteNote = isCustomPhotoPack && customPaletteText
+      ? `Use this user palette: ${customPaletteText}.`
+      : "";
+    const extraNotes = [
+      customStyleNote,
+      customPaletteNote,
+      elementsNote,
+      packBriefNotes.trim() ? `Must-have details: ${packBriefNotes.trim()}` : "",
+    ]
       .filter(Boolean)
       .join(" ");
     const referenceImages = packBriefSceneImages.map((image) => ({
@@ -2523,9 +2596,9 @@ export default function InstaMeScreen() {
     try {
       const result = await apiClient.generateInstaMeGridCompositePreview({
         imageCount: selectedPackImageCount,
-        aesthetic: activePhotoPack.id,
-        palette: selectedPackPalettePrompt || selectedDefaultPackPalettePrompt || aesthetic?.defaultPalette || "",
-        lightType: aesthetic?.defaultLightType || "",
+        aesthetic: requestAesthetic,
+        palette: requestPalette,
+        lightType: requestLightType,
         toneContrast: packGridToneContrast,
         extraNotes: extraNotes || undefined,
         hasPortraitReference: Boolean(photo),
@@ -2555,6 +2628,12 @@ export default function InstaMeScreen() {
     photo,
     refreshCredits,
     isCustomPackPalette,
+    isCustomPhotoPack,
+    isCustomPackPaletteValid,
+    customPackStyleWordCount,
+    customPhotoPackAesthetic,
+    normalizedCustomPackStyle,
+    customPackPaletteText,
     selectedPackImageCount,
     selectedPackPalettePrompt,
     selectedDefaultPackPalettePrompt,
@@ -2693,7 +2772,7 @@ export default function InstaMeScreen() {
       // Persist the generated pack so the user can revisit / download / retouch it later.
       // Fire-and-forget: never blocks or breaks the extraction flow.
       void persistGeneratedPack({
-        title: activePhotoPack.label,
+        title: customPhotoPackTitle || activePhotoPack.label,
         aesthetic: pipelinePlan.aesthetic || activePhotoPack.id,
         palette: pipelinePlan.palette || undefined,
         previewBase64: packGridPreviewBase64,
@@ -2717,7 +2796,16 @@ export default function InstaMeScreen() {
       setPackGridExtractProgress(null);
       setPackGridRenderLoading(false);
     }
-  }, [activePhotoPack, pipelinePlan, photo, refreshCredits, packGridPreviewBase64, packBriefSceneImages]);
+  }, [
+    activePhotoPack,
+    pipelinePlan,
+    photo,
+    refreshCredits,
+    packGridPreviewBase64,
+    packBriefSceneImages,
+    customPhotoPackTitle,
+    packGridExtractQuality,
+  ]);
 
   const handleRenderGridPack = useCallback(() => {
     if (!activePhotoPack || !pipelinePlan) return;
@@ -4054,9 +4142,9 @@ export default function InstaMeScreen() {
                 ) : (
                   <>
                     <View style={styles.packPlannerSummaryCard}>
-                      <Text style={styles.packPlannerSummaryTitle}>{activePhotoPack.label}</Text>
+                      <Text style={styles.packPlannerSummaryTitle}>{customPhotoPackTitle || activePhotoPack.label}</Text>
                       <Text style={styles.packPlannerSummaryText}>
-                        {selectedPackImageCount} photos • {selectedPackBriefVibe.label}
+                        {selectedPackImageCount} photos • {isCustomPhotoPack ? "Custom style" : selectedPackBriefVibe.label}
                       </Text>
                       <Text style={styles.packPlannerSummaryLadder}>
                         {`Step 1 · Preview the grid — ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits\nStep 2 · Keep your photos — ${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"} each`}
@@ -4071,6 +4159,53 @@ export default function InstaMeScreen() {
                         Takes about 1–2 minutes. You only pay for photos that come out right — failed ones are refunded.
                       </Text>
                     </View>
+
+                    {isCustomPhotoPack ? (
+                      <View style={styles.packPlannerBlock}>
+                        <Text style={styles.packPlannerLabel}>Describe your style</Text>
+                        <TextInput
+                          value={customPackStyleText}
+                          onChangeText={setCustomPackStyleText}
+                          placeholder="Ex: chrome city glam"
+                          placeholderTextColor="rgba(255,255,255,0.40)"
+                          maxLength={90}
+                          style={styles.packPlannerPaletteCustomInput}
+                        />
+                        <Text
+                          style={[
+                            styles.packPlannerPaletteCustomHint,
+                            customPackStyleText.trim() && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS
+                              ? styles.packPlannerPaletteCustomHintWarning
+                              : undefined,
+                          ]}
+                        >
+                          {customPackStyleWordCount >= CUSTOM_PACK_STYLE_MIN_WORDS
+                            ? `${customPackStyleWordCount} words`
+                            : `${customPackStyleWordCount}/${CUSTOM_PACK_STYLE_MIN_WORDS} words minimum`}
+                        </Text>
+                        <Text style={styles.packPlannerLabel}>Optional palette</Text>
+                        <TextInput
+                          value={customPackPaletteText}
+                          onChangeText={setCustomPackPaletteText}
+                          placeholder="Ex: black, chrome silver, icy blue"
+                          placeholderTextColor="rgba(255,255,255,0.40)"
+                          maxLength={120}
+                          style={styles.packPlannerPaletteCustomInput}
+                        />
+                        <Text
+                          style={[
+                            styles.packPlannerPaletteCustomHint,
+                            customPackPaletteText.trim() && !isCustomPackPaletteValid
+                              ? styles.packPlannerPaletteCustomHintWarning
+                              : undefined,
+                          ]}
+                        >
+                          {customPackPaletteText.trim()
+                            ? `${customPackPaletteColorCount}/${CUSTOM_PACK_PALETTE_MIN_COLORS} colors minimum`
+                            : "Leave blank for AI-picked colors, or add 3+ colors separated by commas."}
+                        </Text>
+                      </View>
+                    ) : null}
 
                     <View style={styles.packPlannerBlock}>
                       <Text style={styles.packPlannerLabel}>How many photos?</Text>
@@ -4103,104 +4238,106 @@ export default function InstaMeScreen() {
                       </View>
                     </View>
 
-                    <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Choose your colors</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.packPlannerPaletteRail}
-                      >
-                        <Pressable
-                          onPress={() => {
-                            setSelectedPackPaletteId(null);
-                            void Haptics.selectionAsync();
-                          }}
-                          style={({ pressed }) => [
-                            styles.packPlannerPaletteCard,
-                            !selectedPackPaletteId && styles.packPlannerPaletteCardActive,
-                            pressed ? { opacity: 0.9 } : undefined,
-                          ]}
+                    {!isCustomPhotoPack ? (
+                      <View style={styles.packPlannerBlock}>
+                        <Text style={styles.packPlannerLabel}>Choose your colors</Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.packPlannerPaletteRail}
                         >
-                          <View style={styles.packPlannerPaletteSwatches}>
-                            {["#F3EEE4", "#A9A79E", "#6F6357", "#C7A66A"].map((color) => (
-                              <View key={`default-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
-                            ))}
-                          </View>
-                          <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Default</Text>
-                        </Pressable>
-                        {PACK_COLOR_PALETTES.map((palette) => {
-                          const active = selectedPackPaletteId === palette.id;
-                          return (
-                            <Pressable
-                              key={palette.id}
-                              onPress={() => {
-                                setSelectedPackPaletteId(palette.id);
-                                void Haptics.selectionAsync();
-                              }}
-                              style={({ pressed }) => [
-                                styles.packPlannerPaletteCard,
-                                active && styles.packPlannerPaletteCardActive,
-                                pressed ? { opacity: 0.9 } : undefined,
-                              ]}
-                            >
-                              <View style={styles.packPlannerPaletteSwatches}>
-                                {palette.colors.map((color) => (
-                                  <View key={`${palette.id}-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
-                                ))}
-                              </View>
-                              <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>{palette.label}</Text>
-                            </Pressable>
-                          );
-                        })}
-                        <Pressable
-                          onPress={() => {
-                            setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID);
-                            void Haptics.selectionAsync();
-                          }}
-                          style={({ pressed }) => [
-                            styles.packPlannerPaletteCard,
-                            styles.packPlannerPaletteCustomCard,
-                            selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID && styles.packPlannerPaletteCardActive,
-                            pressed ? { opacity: 0.9 } : undefined,
-                          ]}
-                        >
-                          <View style={styles.packPlannerPaletteCustomIconWrap}>
-                            <Ionicons name="color-palette-outline" size={16} color="rgba(255,255,255,0.82)" />
-                          </View>
-                          <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Custom</Text>
-                        </Pressable>
-                      </ScrollView>
-                      {!selectedPackPaletteId ? (
-                        <>
-                          <TextInput
-                            value={customPackDefaultAccent}
-                            onChangeText={setCustomPackDefaultAccent}
-                            placeholder="Optional accent color for default palette"
-                            placeholderTextColor="rgba(255,255,255,0.40)"
-                            maxLength={40}
-                            style={styles.packPlannerPaletteCustomInput}
-                          />
-                          <Text style={styles.packPlannerPaletteCustomHint}>
-                            Adds one color to the pack's recommended palette.
-                          </Text>
-                        </>
-                      ) : selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID ? (
-                        <>
-                          <TextInput
-                            value={customPackPaletteText}
-                            onChangeText={setCustomPackPaletteText}
-                            onFocus={() => setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID)}
-                            placeholder="Ex: ivory cream, burgundy wine, matte black, antique gold"
-                            placeholderTextColor="rgba(255,255,255,0.40)"
-                            maxLength={120}
-                            style={styles.packPlannerPaletteCustomInput}
-                          />
-                          <Text style={styles.packPlannerPaletteCustomHint}>
-                            Use 3-5 colors, separated by commas.
-                          </Text>
-                        </>
-                      ) : null}
-                    </View>
+                          <Pressable
+                            onPress={() => {
+                              setSelectedPackPaletteId(null);
+                              void Haptics.selectionAsync();
+                            }}
+                            style={({ pressed }) => [
+                              styles.packPlannerPaletteCard,
+                              !selectedPackPaletteId && styles.packPlannerPaletteCardActive,
+                              pressed ? { opacity: 0.9 } : undefined,
+                            ]}
+                          >
+                            <View style={styles.packPlannerPaletteSwatches}>
+                              {["#F3EEE4", "#A9A79E", "#6F6357", "#C7A66A"].map((color) => (
+                                <View key={`default-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
+                              ))}
+                            </View>
+                            <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Default</Text>
+                          </Pressable>
+                          {PACK_COLOR_PALETTES.map((palette) => {
+                            const active = selectedPackPaletteId === palette.id;
+                            return (
+                              <Pressable
+                                key={palette.id}
+                                onPress={() => {
+                                  setSelectedPackPaletteId(palette.id);
+                                  void Haptics.selectionAsync();
+                                }}
+                                style={({ pressed }) => [
+                                  styles.packPlannerPaletteCard,
+                                  active && styles.packPlannerPaletteCardActive,
+                                  pressed ? { opacity: 0.9 } : undefined,
+                                ]}
+                              >
+                                <View style={styles.packPlannerPaletteSwatches}>
+                                  {palette.colors.map((color) => (
+                                    <View key={`${palette.id}-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
+                                  ))}
+                                </View>
+                                <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>{palette.label}</Text>
+                              </Pressable>
+                            );
+                          })}
+                          <Pressable
+                            onPress={() => {
+                              setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID);
+                              void Haptics.selectionAsync();
+                            }}
+                            style={({ pressed }) => [
+                              styles.packPlannerPaletteCard,
+                              styles.packPlannerPaletteCustomCard,
+                              selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID && styles.packPlannerPaletteCardActive,
+                              pressed ? { opacity: 0.9 } : undefined,
+                            ]}
+                          >
+                            <View style={styles.packPlannerPaletteCustomIconWrap}>
+                              <Ionicons name="color-palette-outline" size={16} color="rgba(255,255,255,0.82)" />
+                            </View>
+                            <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Custom</Text>
+                          </Pressable>
+                        </ScrollView>
+                        {!selectedPackPaletteId ? (
+                          <>
+                            <TextInput
+                              value={customPackDefaultAccent}
+                              onChangeText={setCustomPackDefaultAccent}
+                              placeholder="Optional accent color for default palette"
+                              placeholderTextColor="rgba(255,255,255,0.40)"
+                              maxLength={40}
+                              style={styles.packPlannerPaletteCustomInput}
+                            />
+                            <Text style={styles.packPlannerPaletteCustomHint}>
+                              Adds one color to the pack's recommended palette.
+                            </Text>
+                          </>
+                        ) : selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID ? (
+                          <>
+                            <TextInput
+                              value={customPackPaletteText}
+                              onChangeText={setCustomPackPaletteText}
+                              onFocus={() => setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID)}
+                              placeholder="Ex: ivory cream, burgundy wine, matte black, antique gold"
+                              placeholderTextColor="rgba(255,255,255,0.40)"
+                              maxLength={120}
+                              style={styles.packPlannerPaletteCustomInput}
+                            />
+                            <Text style={styles.packPlannerPaletteCustomHint}>
+                              Use 3-5 colors, separated by commas.
+                            </Text>
+                          </>
+                        ) : null}
+                      </View>
+                    ) : null}
 
                     <View style={styles.packPlannerBlock}>
                       <Text style={styles.packPlannerLabel}>Photo contrast</Text>
@@ -7261,6 +7398,9 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.50)",
     fontFamily: "Inter_400Regular",
     fontSize: 10,
+  },
+  packPlannerPaletteCustomHintWarning: {
+    color: "#FF8CAB",
   },
   packPlannerElementWrap: {
     flexDirection: "row",

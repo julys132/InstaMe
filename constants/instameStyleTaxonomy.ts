@@ -32,6 +32,8 @@ export type PhotoPackPreset = {
   previewImages?: ReturnType<typeof require>[];
 };
 
+export const CUSTOM_PHOTO_PACK_ID = "custom_pack";
+
 export const STYLE_VIBE_CATEGORIES: StyleVibeCategory[] = [
   {
     id: "all",
@@ -199,6 +201,26 @@ export const STYLE_VIBE_CATEGORIES: StyleVibeCategory[] = [
 ];
 
 export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
+  {
+    id: CUSTOM_PHOTO_PACK_ID,
+    label: "Custom Pack",
+    count: 6,
+    vibeId: "all",
+    icon: "create-outline",
+    accent: "#86F4FF",
+    gradient: ["rgba(134,244,255,0.24)", "rgba(255,79,125,0.14)", "rgba(0,0,0,0.88)"],
+    subtitle: "Build a pack from your own style words.",
+    example: "",
+    shots: [
+      "Custom hero portrait",
+      "Signature detail",
+      "Mood portrait",
+      "Texture still-life",
+      "Style moment",
+      "Custom grid hero",
+    ],
+    deliverable: "6 vertical AI photos - your custom aesthetic - same preview and extraction flow",
+  },
   {
     id: "Dark Academia",
     label: "Dark Academia",
@@ -425,6 +447,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Flash evening hero",
     ],
     deliverable: "6 vertical AI photos - black, navy & champagne palette - Monaco night-drive editorial",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/monaco-night-drive-1.png"),
+    ],
   },
   {
     id: "Paris Hotel Morning",
@@ -445,6 +471,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Morning city hero",
     ],
     deliverable: "6 vertical AI photos - ivory, beige & muted gold palette - Paris hotel morning story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/paris-hotel-morning-1.png"),
+    ],
   },
   {
     id: "Milan Street Editorial",
@@ -465,6 +495,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Fashion week hero",
     ],
     deliverable: "6 vertical AI photos - charcoal, cream & espresso palette - Milan street editorial carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/milan-street-editorial-1.png"),
+    ],
   },
   {
     id: "Ski Chalet Luxe",
@@ -485,6 +519,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Chalet evening hero",
     ],
     deliverable: "6 vertical AI photos - cream, pine & chocolate palette - ski chalet luxury story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/ski-chalet-luxe-1.png"),
+    ],
   },
   {
     id: "Gallery Date Muse",
@@ -505,6 +543,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Museum date hero",
     ],
     deliverable: "6 vertical AI photos - white, stone & black palette - gallery date editorial",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/gallery-date-muse-1.png"),
+    ],
   },
   {
     id: "Champagne Brunch Club",
@@ -525,6 +567,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Sunlit social hero",
     ],
     deliverable: "6 vertical AI photos - blush, champagne & ivory palette - polished brunch carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/champagne-brunch-club-1.png"),
+    ],
   },
   {
     id: "Balletcore Soft Glam",
@@ -545,6 +591,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Delicate glam hero",
     ],
     deliverable: "6 vertical AI photos - dusty rose, pearl & champagne palette - balletcore soft glam story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/balletcore-soft-glam-1.png"),
+    ],
   },
   {
     id: "Rooftop Golden Hour",
@@ -565,6 +615,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Golden hour hero",
     ],
     deliverable: "6 vertical AI photos - amber, cream & black palette - rooftop golden-hour editorial",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/rooftop-golden-hour-1.png"),
+    ],
   },
   {
     id: "Bridal Weekend Glow",
@@ -585,6 +639,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Celebration weekend hero",
     ],
     deliverable: "6 vertical AI photos - white, pearl & blush palette - bridal weekend glow carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/bridal-weekend-glow-1.png"),
+    ],
   },
   {
     id: "CEO Airport Uniform",
@@ -605,6 +663,10 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Executive travel hero",
     ],
     deliverable: "6 vertical AI photos - black, camel & brushed steel palette - CEO airport uniform story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/ceo-airport-uniform-1.png"),
+    ],
   },
   {
     id: "couple_drop_four",
