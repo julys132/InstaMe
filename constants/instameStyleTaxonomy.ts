@@ -33,6 +33,7 @@ export type PhotoPackPreset = {
 };
 
 export const CUSTOM_PHOTO_PACK_ID = "custom_pack";
+export const MIXED_PHOTO_PACK_ID = "mixed_packs";
 
 export const STYLE_VIBE_CATEGORIES: StyleVibeCategory[] = [
   {
@@ -220,6 +221,26 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       "Custom grid hero",
     ],
     deliverable: "6 vertical AI photos - your custom aesthetic - same preview and extraction flow",
+  },
+  {
+    id: MIXED_PHOTO_PACK_ID,
+    label: "Mixed Packs",
+    count: 6,
+    vibeId: "all",
+    icon: "git-compare-outline",
+    accent: "#FFB3E6",
+    gradient: ["rgba(255,179,230,0.24)", "rgba(126,243,255,0.16)", "rgba(0,0,0,0.90)"],
+    subtitle: "Blend two packs into one cohesive grid.",
+    example: "",
+    shots: [
+      "Hybrid hero portrait",
+      "Style crossover detail",
+      "Mixed mood portrait",
+      "Texture fusion still-life",
+      "Dual-aesthetic moment",
+      "Cohesive mixed grid hero",
+    ],
+    deliverable: "6 vertical AI photos - two selected pack styles blended into one cohesive story",
   },
   {
     id: "Dark Academia",

@@ -53,6 +53,7 @@ import Colors from "@/constants/colors";
 import { INSTAME_ART_STYLES } from "@/constants/instameArtStyles";
 import {
   CUSTOM_PHOTO_PACK_ID,
+  MIXED_PHOTO_PACK_ID,
   PHOTO_PACK_PRESETS,
   STYLE_VIBE_CATEGORIES,
   getPhotoPackPreviewImages,
@@ -60,6 +61,7 @@ import {
   getStyleVibeById,
   matchStylePresetSearch,
   matchStyleVibe,
+  type PhotoPackPreset,
 } from "@/constants/instameStyleTaxonomy";
 import {
   GRID_PIPELINE_AESTHETICS,
@@ -426,6 +428,7 @@ const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
 const PACK_CUSTOM_PALETTE_ID = "custom-palette";
 const CUSTOM_PACK_STYLE_MIN_WORDS = 3;
 const CUSTOM_PACK_PALETTE_MIN_COLORS = 3;
+const MIXED_PACK_SELECTION_LIMIT = 2;
 const PACK_GRID_TONE_CONTRAST_OPTIONS: Array<{
   key: PackGridToneContrast;
   title: string;
@@ -1046,6 +1049,7 @@ export default function InstaMeScreen() {
   const [packBriefNotes, setPackBriefNotes] = useState("");
   const [packBriefSceneImages, setPackBriefSceneImages] = useState<Array<{ id: string; uri: string; base64: string; mimeType: string }>>([]);
   const [packBriefShowMore, setPackBriefShowMore] = useState(false);
+  const [mixedPackSelectedIds, setMixedPackSelectedIds] = useState<string[]>([]);
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
   const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string | null>(null);
   const [customPackStyleText, setCustomPackStyleText] = useState("");
@@ -1283,6 +1287,7 @@ export default function InstaMeScreen() {
     [selectedPhotoPackId],
   );
   const isCustomPhotoPack = activePhotoPack?.id === CUSTOM_PHOTO_PACK_ID;
+  const isMixedPhotoPack = activePhotoPack?.id === MIXED_PHOTO_PACK_ID;
   const normalizedCustomPackStyle = useMemo(() => normalizePromptText(customPackStyleText), [customPackStyleText]);
   const customPackStyleWordCount = useMemo(
     () => countPromptWords(normalizedCustomPackStyle),
@@ -1298,6 +1303,33 @@ export default function InstaMeScreen() {
     isCustomPhotoPack && normalizedCustomPackStyle ? `Custom Pack - ${normalizedCustomPackStyle}` : activePhotoPack?.label ?? "";
   const customPhotoPackAesthetic =
     isCustomPhotoPack && normalizedCustomPackStyle ? `Custom Pack: ${normalizedCustomPackStyle}` : activePhotoPack?.id ?? "";
+  const mixedPackOptions = useMemo(
+    () => PHOTO_PACK_PRESETS.filter((pack) => pack.id !== MIXED_PHOTO_PACK_ID),
+    [],
+  );
+  const selectedMixedPhotoPacks = useMemo(
+    () =>
+      mixedPackSelectedIds
+        .map((packId) => PHOTO_PACK_PRESETS.find((pack) => pack.id === packId) || null)
+        .filter((pack): pack is PhotoPackPreset => Boolean(pack)),
+    [mixedPackSelectedIds],
+  );
+  const mixedIncludesCustomPack = mixedPackSelectedIds.includes(CUSTOM_PHOTO_PACK_ID);
+  const shouldShowCustomPackInputs = isCustomPhotoPack || (isMixedPhotoPack && mixedIncludesCustomPack);
+  const selectedMixedPhotoPackLabels = useMemo(
+    () =>
+      selectedMixedPhotoPacks.map((pack) =>
+        pack.id === CUSTOM_PHOTO_PACK_ID && normalizedCustomPackStyle
+          ? `Custom (${normalizedCustomPackStyle})`
+          : pack.label,
+      ),
+    [normalizedCustomPackStyle, selectedMixedPhotoPacks],
+  );
+  const mixedPhotoPackTitle =
+    isMixedPhotoPack && selectedMixedPhotoPackLabels.length === MIXED_PACK_SELECTION_LIMIT
+      ? `Mixed Packs - ${selectedMixedPhotoPackLabels.join(" + ")}`
+      : "Mixed Packs";
+  const packPlannerDisplayTitle = isMixedPhotoPack ? mixedPhotoPackTitle : (customPhotoPackTitle || activePhotoPack?.label || "");
 
   const photoPackPreviewMap = useMemo(
     () =>
@@ -1366,6 +1398,13 @@ export default function InstaMeScreen() {
 
   const isPhoneViewport = viewportWidth <= 430;
   const selectedPackBriefVibe = useMemo(() => getStyleVibeById(selectedPackBriefVibeId), [selectedPackBriefVibeId]);
+  const packPlannerSummaryDescriptor = isMixedPhotoPack
+    ? selectedMixedPhotoPackLabels.length === MIXED_PACK_SELECTION_LIMIT
+      ? selectedMixedPhotoPackLabels.join(" + ")
+      : `${selectedMixedPhotoPackLabels.length}/${MIXED_PACK_SELECTION_LIMIT} packs selected`
+    : isCustomPhotoPack
+      ? "Custom style"
+      : selectedPackBriefVibe.label;
   const selectedPackPalette = useMemo(
     () => (selectedPackPaletteId ? PACK_COLOR_PALETTES.find((palette) => palette.id === selectedPackPaletteId) || null : null),
     [selectedPackPaletteId],
@@ -1381,12 +1420,12 @@ export default function InstaMeScreen() {
   );
   const selectedDefaultPackPalettePrompt = useMemo(() => {
     if (!activePhotoPack) return "";
-    if (isCustomPhotoPack) return "";
+    if (isCustomPhotoPack || isMixedPhotoPack) return "";
     const aesthetic = GRID_PIPELINE_AESTHETICS.find((item) => item.id === activePhotoPack.id);
     const basePalette = aesthetic?.defaultPalette || "";
     const accent = customPackDefaultAccent.trim();
     return [basePalette, accent].filter(Boolean).join(", ");
-  }, [activePhotoPack, customPackDefaultAccent, isCustomPhotoPack]);
+  }, [activePhotoPack, customPackDefaultAccent, isCustomPhotoPack, isMixedPhotoPack]);
   const selectedPackRequiredLabels = useMemo(
     () =>
       PACK_BRIEF_REQUIRED_ELEMENTS
@@ -2434,6 +2473,18 @@ export default function InstaMeScreen() {
     void Haptics.selectionAsync();
   }, []);
 
+  const resetPackGenerationState = useCallback(() => {
+    setPipelinePlan(null);
+    setPipelineContinuityContext(null);
+    setPipelineRenderResults([]);
+    setPipelineError(null);
+    setPackGridPreviewBase64(null);
+    setPackGridRenderImages([]);
+    setPackGridError(null);
+    setPackGridExtractProgress(null);
+    setPackGridExtractNotice(null);
+  }, []);
+
   const handlePhotoPackPress = useCallback((packId: string) => {
     const pack = PHOTO_PACK_PRESETS.find((item) => item.id === packId);
     if (!pack) {
@@ -2446,6 +2497,7 @@ export default function InstaMeScreen() {
     const nextPackImageCount = pack.count === 9 ? 9 : 6;
     setSelectedPackImageCount(nextPackImageCount);
     setPipelineImageCount(nextPackImageCount);
+    setMixedPackSelectedIds([]);
     // Reset brief settings when switching packs
     setSelectedPackPaletteId(null);
     setCustomPackStyleText("");
@@ -2455,15 +2507,24 @@ export default function InstaMeScreen() {
     setPackBriefRequiredElementIds([]);
     setPackBriefNotes("");
     // Reset pipeline state when switching packs
-    setPipelinePlan(null);
-    setPipelineContinuityContext(null);
-    setPipelineRenderResults([]);
-    setPipelineError(null);
-    setPackGridPreviewBase64(null);
-    setPackGridRenderImages([]);
-    setPackGridError(null);
+    resetPackGenerationState();
     void Haptics.selectionAsync();
-  }, []);
+  }, [resetPackGenerationState]);
+
+  const toggleMixedPackSelection = useCallback((packId: string) => {
+    const active = mixedPackSelectedIds.includes(packId);
+
+    if (!active && mixedPackSelectedIds.length >= MIXED_PACK_SELECTION_LIMIT) {
+      Alert.alert("Two packs only", "Unselect one pack before adding another to this mix.");
+      return;
+    }
+
+    setMixedPackSelectedIds((current) =>
+      active ? current.filter((id) => id !== packId) : [...current, packId],
+    );
+    resetPackGenerationState();
+    void Haptics.selectionAsync();
+  }, [mixedPackSelectedIds, resetPackGenerationState]);
 
   const togglePackBriefRequiredElement = useCallback((elementId: string) => {
     setPackBriefRequiredElementIds((current) =>
@@ -2532,34 +2593,66 @@ export default function InstaMeScreen() {
       Alert.alert("Portrait required", "Add a portrait above before generating this pack.");
       return;
     }
-    if (isCustomPhotoPack && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS) {
+    if (isMixedPhotoPack && selectedMixedPhotoPacks.length !== MIXED_PACK_SELECTION_LIMIT) {
+      Alert.alert("Pick two packs", `Select exactly ${MIXED_PACK_SELECTION_LIMIT} packs to create a mixed pack.`);
+      return;
+    }
+    if (shouldShowCustomPackInputs && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS) {
       Alert.alert(
         "Custom style required",
         `Describe the style in at least ${CUSTOM_PACK_STYLE_MIN_WORDS} words before generating this pack.`,
       );
       return;
     }
-    if (isCustomPhotoPack && !isCustomPackPaletteValid) {
+    if (shouldShowCustomPackInputs && !isCustomPackPaletteValid) {
       Alert.alert(
         "Palette needs 3 colors",
         `Add at least ${CUSTOM_PACK_PALETTE_MIN_COLORS} colors separated by commas, or leave the palette blank.`,
       );
       return;
     }
-    if (!isCustomPhotoPack && isCustomPackPalette && !selectedPackPalettePrompt) {
+    if (!isCustomPhotoPack && !isMixedPhotoPack && isCustomPackPalette && !selectedPackPalettePrompt) {
       Alert.alert("Custom palette required", "Enter your custom color palette before generating the visual grid.");
       return;
     }
     const extend = options?.extend === true && Boolean(pipelineContinuityContext);
     const aesthetic = GRID_PIPELINE_AESTHETICS.find((a) => a.id === activePhotoPack.id);
     const customPaletteText = customPackPaletteText.trim();
-    const requestAesthetic = isCustomPhotoPack ? customPhotoPackAesthetic : activePhotoPack.id;
-    const requestPalette = isCustomPhotoPack
-      ? customPaletteText || `AI-selected cohesive palette matching this custom aesthetic: ${normalizedCustomPackStyle}`
-      : selectedPackPalettePrompt || selectedDefaultPackPalettePrompt || aesthetic?.defaultPalette || "";
-    const requestLightType = isCustomPhotoPack
-      ? `premium realistic lighting that best supports this custom aesthetic: ${normalizedCustomPackStyle}`
-      : aesthetic?.defaultLightType || "";
+    const getMixedPackAestheticName = (pack: PhotoPackPreset) =>
+      pack.id === CUSTOM_PHOTO_PACK_ID ? `Custom style: ${normalizedCustomPackStyle}` : pack.label;
+    const getMixedPackPaletteLine = (pack: PhotoPackPreset) => {
+      if (pack.id === CUSTOM_PHOTO_PACK_ID) {
+        return customPaletteText
+          ? `Custom style: ${customPaletteText}`
+          : `Custom style: AI-selected cohesive colors matching ${normalizedCustomPackStyle}`;
+      }
+
+      const packAesthetic = GRID_PIPELINE_AESTHETICS.find((item) => item.id === pack.id);
+      return `${pack.label}: ${packAesthetic?.defaultPalette || pack.deliverable}`;
+    };
+    const getMixedPackLightLine = (pack: PhotoPackPreset) => {
+      if (pack.id === CUSTOM_PHOTO_PACK_ID) {
+        return `Custom style: premium realistic lighting matching ${normalizedCustomPackStyle}`;
+      }
+
+      const packAesthetic = GRID_PIPELINE_AESTHETICS.find((item) => item.id === pack.id);
+      return `${pack.label}: ${packAesthetic?.defaultLightType || "premium editorial lighting"}`;
+    };
+    const requestAesthetic = isMixedPhotoPack
+      ? `Mixed Pack: ${selectedMixedPhotoPacks.map(getMixedPackAestheticName).join(" + ")}`
+      : isCustomPhotoPack
+        ? customPhotoPackAesthetic
+        : activePhotoPack.id;
+    const requestPalette = isMixedPhotoPack
+      ? `Blend these two source palettes into one cohesive Instagram grid palette: ${selectedMixedPhotoPacks.map(getMixedPackPaletteLine).join("; ")}`
+      : isCustomPhotoPack
+        ? customPaletteText || `AI-selected cohesive palette matching this custom aesthetic: ${normalizedCustomPackStyle}`
+        : selectedPackPalettePrompt || selectedDefaultPackPalettePrompt || aesthetic?.defaultPalette || "";
+    const requestLightType = isMixedPhotoPack
+      ? `Hybrid lighting plan for a cohesive two-style grid: ${selectedMixedPhotoPacks.map(getMixedPackLightLine).join("; ")}`
+      : isCustomPhotoPack
+        ? `premium realistic lighting that best supports this custom aesthetic: ${normalizedCustomPackStyle}`
+        : aesthetic?.defaultLightType || "";
     const elementsNote =
       packBriefRequiredElementIds.length > 0
         ? `Include: ${packBriefRequiredElementIds
@@ -2569,11 +2662,17 @@ export default function InstaMeScreen() {
         : "";
     const customStyleNote = isCustomPhotoPack
       ? `Custom pack style direction: ${normalizedCustomPackStyle}. Build a cohesive Instagram pack around this exact user-described aesthetic.`
+      : shouldShowCustomPackInputs
+        ? `Custom style inside this mixed pack: ${normalizedCustomPackStyle}. Keep that custom direction visible in the blend.`
       : "";
-    const customPaletteNote = isCustomPhotoPack && customPaletteText
+    const customPaletteNote = shouldShowCustomPackInputs && customPaletteText
       ? `Use this user palette: ${customPaletteText}.`
       : "";
+    const mixedStyleNote = isMixedPhotoPack
+      ? `Mixed pack direction: combine exactly these two selected pack directions - ${selectedMixedPhotoPackLabels.join(" + ")}. Every imagePrompt should feel like a deliberate cohesive blend of BOTH source styles, not a split grid where one cell is only one style and the next cell is only the other.`
+      : "";
     const extraNotes = [
+      mixedStyleNote,
       customStyleNote,
       customPaletteNote,
       elementsNote,
@@ -2629,11 +2728,15 @@ export default function InstaMeScreen() {
     refreshCredits,
     isCustomPackPalette,
     isCustomPhotoPack,
+    isMixedPhotoPack,
+    shouldShowCustomPackInputs,
     isCustomPackPaletteValid,
     customPackStyleWordCount,
     customPhotoPackAesthetic,
     normalizedCustomPackStyle,
     customPackPaletteText,
+    selectedMixedPhotoPacks,
+    selectedMixedPhotoPackLabels,
     selectedPackImageCount,
     selectedPackPalettePrompt,
     selectedDefaultPackPalettePrompt,
@@ -2772,7 +2875,7 @@ export default function InstaMeScreen() {
       // Persist the generated pack so the user can revisit / download / retouch it later.
       // Fire-and-forget: never blocks or breaks the extraction flow.
       void persistGeneratedPack({
-        title: customPhotoPackTitle || activePhotoPack.label,
+        title: packPlannerDisplayTitle || activePhotoPack.label,
         aesthetic: pipelinePlan.aesthetic || activePhotoPack.id,
         palette: pipelinePlan.palette || undefined,
         previewBase64: packGridPreviewBase64,
@@ -2803,7 +2906,7 @@ export default function InstaMeScreen() {
     refreshCredits,
     packGridPreviewBase64,
     packBriefSceneImages,
-    customPhotoPackTitle,
+    packPlannerDisplayTitle,
     packGridExtractQuality,
   ]);
 
@@ -4046,6 +4149,8 @@ export default function InstaMeScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
                 {PHOTO_PACK_PRESETS.map((pack) => {
                   const active = activePhotoPack?.id === pack.id;
+                  const isCustomCard = pack.id === CUSTOM_PHOTO_PACK_ID;
+                  const isMixedCard = pack.id === MIXED_PHOTO_PACK_ID;
                   const hasImages = (pack.previewImages?.length ?? 0) > 0;
                   const imgCount = pack.previewImages?.length ?? 0;
                   return (
@@ -4073,6 +4178,22 @@ export default function InstaMeScreen() {
                       ) : (
                         <LinearGradient colors={pack.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject as any} />
                       )}
+
+                      {isCustomCard || isMixedCard ? (
+                        <View pointerEvents="none" style={styles.packCardFeatureArt}>
+                          <View style={styles.packCardFeatureIcon}>
+                            <Ionicons
+                              name={isMixedCard ? "git-compare-outline" : "create-outline"}
+                              size={18}
+                              color="#071013"
+                            />
+                          </View>
+                          <Text style={styles.packCardFeatureKicker}>{isMixedCard ? "MIX 2" : "CUSTOM"}</Text>
+                          <Text style={styles.packCardFeatureText}>
+                            {isMixedCard ? "blend two packs" : "your own style"}
+                          </Text>
+                        </View>
+                      ) : null}
 
                       {/* Bottom gradient overlay with text */}
                       <LinearGradient
@@ -4142,9 +4263,9 @@ export default function InstaMeScreen() {
                 ) : (
                   <>
                     <View style={styles.packPlannerSummaryCard}>
-                      <Text style={styles.packPlannerSummaryTitle}>{customPhotoPackTitle || activePhotoPack.label}</Text>
+                      <Text style={styles.packPlannerSummaryTitle}>{packPlannerDisplayTitle}</Text>
                       <Text style={styles.packPlannerSummaryText}>
-                        {selectedPackImageCount} photos • {isCustomPhotoPack ? "Custom style" : selectedPackBriefVibe.label}
+                        {selectedPackImageCount} photos • {packPlannerSummaryDescriptor}
                       </Text>
                       <Text style={styles.packPlannerSummaryLadder}>
                         {`Step 1 · Preview the grid — ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits\nStep 2 · Keep your photos — ${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"} each`}
@@ -4160,9 +4281,64 @@ export default function InstaMeScreen() {
                       </Text>
                     </View>
 
-                    {isCustomPhotoPack ? (
+                    {isMixedPhotoPack ? (
                       <View style={styles.packPlannerBlock}>
-                        <Text style={styles.packPlannerLabel}>Describe your style</Text>
+                        <View style={styles.mixedPackHeaderRow}>
+                          <Text style={styles.packPlannerLabel}>Choose 2 packs to mix</Text>
+                          <Text style={styles.mixedPackCounterText}>
+                            {selectedMixedPhotoPacks.length}/{MIXED_PACK_SELECTION_LIMIT}
+                          </Text>
+                        </View>
+                        <Text style={styles.packPlannerHint}>
+                          Pick exactly two directions. You can mix Custom Pack with any existing pack.
+                        </Text>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.mixedPackRail}
+                        >
+                          {mixedPackOptions.map((pack) => {
+                            const active = mixedPackSelectedIds.includes(pack.id);
+                            const visuallyDisabled = !active && selectedMixedPhotoPacks.length >= MIXED_PACK_SELECTION_LIMIT;
+                            return (
+                              <Pressable
+                                key={`mixed-pack-${pack.id}`}
+                                accessibilityRole="checkbox"
+                                accessibilityState={{ checked: active }}
+                                accessibilityLabel={`Mix ${pack.label}`}
+                                onPress={() => toggleMixedPackSelection(pack.id)}
+                                style={({ pressed }) => [
+                                  styles.mixedPackOptionCard,
+                                  active && styles.mixedPackOptionCardActive,
+                                  visuallyDisabled && styles.mixedPackOptionCardDisabled,
+                                  pressed ? { opacity: 0.88 } : undefined,
+                                ]}
+                              >
+                                <View style={[styles.mixedPackCheck, active && styles.mixedPackCheckActive]}>
+                                  <Ionicons
+                                    name={active ? "checkmark" : "add"}
+                                    size={13}
+                                    color={active ? "#071013" : "rgba(255,255,255,0.72)"}
+                                  />
+                                </View>
+                                <View style={styles.mixedPackOptionCopy}>
+                                  <Text numberOfLines={1} style={styles.mixedPackOptionTitle}>{pack.label}</Text>
+                                  <Text numberOfLines={2} style={styles.mixedPackOptionSubtitle}>
+                                    {pack.id === CUSTOM_PHOTO_PACK_ID ? "User-described style" : pack.subtitle}
+                                  </Text>
+                                </View>
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    ) : null}
+
+                    {shouldShowCustomPackInputs ? (
+                      <View style={styles.packPlannerBlock}>
+                        <Text style={styles.packPlannerLabel}>
+                          {isMixedPhotoPack ? "Describe Custom Pack style" : "Describe your style"}
+                        </Text>
                         <TextInput
                           value={customPackStyleText}
                           onChangeText={setCustomPackStyleText}
@@ -4238,7 +4414,7 @@ export default function InstaMeScreen() {
                       </View>
                     </View>
 
-                    {!isCustomPhotoPack ? (
+                    {!isCustomPhotoPack && !isMixedPhotoPack ? (
                       <View style={styles.packPlannerBlock}>
                         <Text style={styles.packPlannerLabel}>Choose your colors</Text>
                         <ScrollView
@@ -6814,6 +6990,42 @@ const styles = StyleSheet.create({
     padding: 10,
     paddingBottom: 12,
   },
+  packCardFeatureArt: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingBottom: 44,
+  },
+  packCardFeatureIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#7EF3FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 9,
+    shadowColor: "#7EF3FF",
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  packCardFeatureKicker: {
+    color: "#FFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 21,
+    lineHeight: 25,
+    letterSpacing: 1,
+    textAlign: "center",
+  },
+  packCardFeatureText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10.5,
+    lineHeight: 14,
+    textAlign: "center",
+    marginTop: 2,
+  },
   packCardFill: {
     padding: 10,
     gap: 10,
@@ -7261,6 +7473,67 @@ const styles = StyleSheet.create({
   },
   packPlannerBlock: {
     gap: 10,
+  },
+  mixedPackHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  mixedPackCounterText: {
+    color: Colors.accentLight,
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  mixedPackRail: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  mixedPackOptionCard: {
+    width: 154,
+    minHeight: 82,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    padding: 10,
+    gap: 8,
+  },
+  mixedPackOptionCardActive: {
+    borderColor: "rgba(126,243,255,0.52)",
+    backgroundColor: "rgba(126,243,255,0.13)",
+  },
+  mixedPackOptionCardDisabled: {
+    opacity: 0.45,
+  },
+  mixedPackCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  mixedPackCheckActive: {
+    borderColor: "#7EF3FF",
+    backgroundColor: "#7EF3FF",
+  },
+  mixedPackOptionCopy: {
+    gap: 3,
+  },
+  mixedPackOptionTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12.5,
+    lineHeight: 16,
+  },
+  mixedPackOptionSubtitle: {
+    color: "rgba(255,255,255,0.55)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10.5,
+    lineHeight: 14,
   },
   packPlannerMoreToggle: {
     flexDirection: "row",
