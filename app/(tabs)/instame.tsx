@@ -1050,6 +1050,7 @@ export default function InstaMeScreen() {
   const [packBriefSceneImages, setPackBriefSceneImages] = useState<Array<{ id: string; uri: string; base64: string; mimeType: string }>>([]);
   const [packBriefShowMore, setPackBriefShowMore] = useState(false);
   const [mixedPackSelectedIds, setMixedPackSelectedIds] = useState<string[]>([]);
+  const [mixedPackSelectionMode, setMixedPackSelectionMode] = useState(false);
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
   const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string | null>(null);
   const [customPackStyleText, setCustomPackStyleText] = useState("");
@@ -1303,6 +1304,10 @@ export default function InstaMeScreen() {
     isCustomPhotoPack && normalizedCustomPackStyle ? `Custom Pack - ${normalizedCustomPackStyle}` : activePhotoPack?.label ?? "";
   const customPhotoPackAesthetic =
     isCustomPhotoPack && normalizedCustomPackStyle ? `Custom Pack: ${normalizedCustomPackStyle}` : activePhotoPack?.id ?? "";
+  const regularPhotoPackPresets = useMemo(
+    () => PHOTO_PACK_PRESETS.filter((pack) => pack.id !== CUSTOM_PHOTO_PACK_ID && pack.id !== MIXED_PHOTO_PACK_ID),
+    [],
+  );
   const mixedPackOptions = useMemo(
     () => PHOTO_PACK_PRESETS.filter((pack) => pack.id !== MIXED_PHOTO_PACK_ID),
     [],
@@ -2498,6 +2503,7 @@ export default function InstaMeScreen() {
     setSelectedPackImageCount(nextPackImageCount);
     setPipelineImageCount(nextPackImageCount);
     setMixedPackSelectedIds([]);
+    setMixedPackSelectionMode(pack.id === MIXED_PHOTO_PACK_ID);
     // Reset brief settings when switching packs
     setSelectedPackPaletteId(null);
     setCustomPackStyleText("");
@@ -2713,6 +2719,9 @@ export default function InstaMeScreen() {
       setPackGridPreviewBase64(previewBase64);
       setPipelinePlan(result.plan);
       setPipelineContinuityContext(result.continuityContext);
+      if (isMixedPhotoPack) {
+        setMixedPackSelectionMode(false);
+      }
       await refreshCredits();
     } catch (error: any) {
       setPackGridError(error?.message || "Failed to generate visual grid preview. Please try again.");
@@ -4147,16 +4156,98 @@ export default function InstaMeScreen() {
                 A pack is a set of matching AI photos of you in one aesthetic, generated together so they look great as an Instagram grid or carousel.
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
-                {PHOTO_PACK_PRESETS.map((pack) => {
-                  const active = activePhotoPack?.id === pack.id;
+                {!(isMixedPhotoPack && mixedPackSelectionMode) ? (
+                  <View style={[
+                    styles.packCard,
+                    styles.packComboCard,
+                    (isCustomPhotoPack || isMixedPhotoPack) && styles.packCardActive,
+                  ]}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Select Custom Pack"
+                      onPress={() => handlePhotoPackPress(CUSTOM_PHOTO_PACK_ID)}
+                      style={({ pressed }) => [
+                        styles.packComboHalf,
+                        styles.packComboHalfTop,
+                        isCustomPhotoPack && styles.packComboHalfActive,
+                        pressed ? { opacity: 0.88 } : undefined,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={["rgba(134,244,255,0.26)", "rgba(255,79,125,0.12)", "rgba(0,0,0,0.90)"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFillObject as any}
+                      />
+                      <View style={styles.packComboTopRow}>
+                        <View style={isCustomPhotoPack ? styles.packCardActivePill : styles.packComboIcon}>
+                          <Ionicons
+                            name={isCustomPhotoPack ? "checkmark" : "create-outline"}
+                            size={isCustomPhotoPack ? 11 : 14}
+                            color="#071013"
+                          />
+                        </View>
+                        <Text style={styles.packComboMiniText}>15 cr</Text>
+                      </View>
+                      <View style={styles.packComboCopy}>
+                        <Text style={styles.packComboKicker}>CUSTOM</Text>
+                        <Text style={styles.packComboSubtitle}>your own style</Text>
+                      </View>
+                    </Pressable>
+
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Select Mixed Packs"
+                      onPress={() => handlePhotoPackPress(MIXED_PHOTO_PACK_ID)}
+                      style={({ pressed }) => [
+                        styles.packComboHalf,
+                        styles.packComboHalfBottom,
+                        isMixedPhotoPack && styles.packComboHalfActive,
+                        pressed ? { opacity: 0.88 } : undefined,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={["rgba(255,179,230,0.20)", "rgba(126,243,255,0.15)", "rgba(0,0,0,0.92)"]}
+                        start={{ x: 1, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={StyleSheet.absoluteFillObject as any}
+                      />
+                      <View style={styles.packComboTopRow}>
+                        <View style={isMixedPhotoPack ? styles.packCardActivePill : styles.packComboIcon}>
+                          <Ionicons
+                            name={isMixedPhotoPack ? "checkmark" : "git-compare-outline"}
+                            size={isMixedPhotoPack ? 11 : 14}
+                            color="#071013"
+                          />
+                        </View>
+                        <Text style={styles.packComboMiniText}>15 cr</Text>
+                      </View>
+                      <View style={styles.packComboCopy}>
+                        <Text style={styles.packComboKicker}>MIX 2</Text>
+                        <Text style={styles.packComboSubtitle}>blend two packs</Text>
+                      </View>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                {(isMixedPhotoPack && mixedPackSelectionMode ? mixedPackOptions : regularPhotoPackPresets).map((pack) => {
+                  const isSelectingMixedPack = isMixedPhotoPack && mixedPackSelectionMode;
+                  const active = isSelectingMixedPack
+                    ? mixedPackSelectedIds.includes(pack.id)
+                    : activePhotoPack?.id === pack.id;
                   const isCustomCard = pack.id === CUSTOM_PHOTO_PACK_ID;
                   const isMixedCard = pack.id === MIXED_PHOTO_PACK_ID;
+                  const visuallyDisabled = isSelectingMixedPack && !active && selectedMixedPhotoPacks.length >= MIXED_PACK_SELECTION_LIMIT;
                   const hasImages = (pack.previewImages?.length ?? 0) > 0;
                   const imgCount = pack.previewImages?.length ?? 0;
                   return (
                     <Pressable
                       key={pack.id}
                       onPress={() => {
+                        if (isSelectingMixedPack) {
+                          toggleMixedPackSelection(pack.id);
+                          return;
+                        }
                         if (hasImages) {
                           setPackImagePreviewId(pack.id);
                           setPackImagePreviewIndex(0);
@@ -4167,6 +4258,7 @@ export default function InstaMeScreen() {
                       style={({ pressed }) => [
                         styles.packCard,
                         active && styles.packCardActive,
+                        visuallyDisabled && styles.packCardMuted,
                         pressed ? { opacity: 0.9, transform: [{ scale: 0.97 }] } : undefined,
                       ]}
                     >
@@ -4206,8 +4298,16 @@ export default function InstaMeScreen() {
                             <View style={styles.packCardActivePill}>
                               <Ionicons name="checkmark" size={11} color="#0a0a0f" />
                             </View>
+                          ) : isSelectingMixedPack ? (
+                            <View style={styles.packCardSelectPill}>
+                              <Ionicons name="add" size={13} color="rgba(255,255,255,0.78)" />
+                            </View>
                           ) : <View />}
-                          {hasImages ? (
+                          {isSelectingMixedPack ? (
+                            <Text style={styles.packCardSelectCount}>
+                              {mixedPackSelectedIds.indexOf(pack.id) >= 0 ? mixedPackSelectedIds.indexOf(pack.id) + 1 : ""}
+                            </Text>
+                          ) : hasImages ? (
                             <View style={styles.packCardExpandHint}>
                               <Ionicons name="expand-outline" size={11} color="rgba(255,255,255,0.82)" />
                             </View>
@@ -4218,10 +4318,20 @@ export default function InstaMeScreen() {
                         <View style={styles.packCardBottomCopy}>
                           <Text numberOfLines={2} style={styles.packCardTitle}>{pack.label}</Text>
                           <View style={styles.packCardPriceRow}>
-                            <Ionicons name="diamond-outline" size={10} color="rgba(255,255,255,0.92)" />
+                            <Ionicons
+                              name={isSelectingMixedPack ? "checkmark-done-outline" : "diamond-outline"}
+                              size={10}
+                              color="rgba(255,255,255,0.92)"
+                            />
+                            {isSelectingMixedPack ? (
+                              <Text style={styles.packCardPriceText}>
+                                {active ? "selected" : "tap to mix"}
+                              </Text>
+                            ) : (
                             <Text style={styles.packCardPriceText}>
                               {getInstaMePackBundleCreditCost(pack.count)} cr · {pack.count} photos
                             </Text>
+                            )}
                           </View>
                         </View>
                       </LinearGradient>
@@ -4290,47 +4400,57 @@ export default function InstaMeScreen() {
                           </Text>
                         </View>
                         <Text style={styles.packPlannerHint}>
-                          Pick exactly two directions. You can mix Custom Pack with any existing pack.
+                          Tap Choose 2 packs, then select from the visual pack cards above.
                         </Text>
-                        <ScrollView
-                          horizontal
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={styles.mixedPackRail}
-                        >
-                          {mixedPackOptions.map((pack) => {
-                            const active = mixedPackSelectedIds.includes(pack.id);
-                            const visuallyDisabled = !active && selectedMixedPhotoPacks.length >= MIXED_PACK_SELECTION_LIMIT;
-                            return (
-                              <Pressable
-                                key={`mixed-pack-${pack.id}`}
-                                accessibilityRole="checkbox"
-                                accessibilityState={{ checked: active }}
-                                accessibilityLabel={`Mix ${pack.label}`}
-                                onPress={() => toggleMixedPackSelection(pack.id)}
-                                style={({ pressed }) => [
-                                  styles.mixedPackOptionCard,
-                                  active && styles.mixedPackOptionCardActive,
-                                  visuallyDisabled && styles.mixedPackOptionCardDisabled,
-                                  pressed ? { opacity: 0.88 } : undefined,
-                                ]}
-                              >
-                                <View style={[styles.mixedPackCheck, active && styles.mixedPackCheckActive]}>
-                                  <Ionicons
-                                    name={active ? "checkmark" : "add"}
-                                    size={13}
-                                    color={active ? "#071013" : "rgba(255,255,255,0.72)"}
-                                  />
-                                </View>
-                                <View style={styles.mixedPackOptionCopy}>
-                                  <Text numberOfLines={1} style={styles.mixedPackOptionTitle}>{pack.label}</Text>
-                                  <Text numberOfLines={2} style={styles.mixedPackOptionSubtitle}>
-                                    {pack.id === CUSTOM_PHOTO_PACK_ID ? "User-described style" : pack.subtitle}
-                                  </Text>
-                                </View>
-                              </Pressable>
-                            );
-                          })}
-                        </ScrollView>
+                        <View style={styles.mixedPackSelectedRow}>
+                          {selectedMixedPhotoPackLabels.length > 0 ? (
+                            selectedMixedPhotoPackLabels.map((label) => (
+                              <View key={`mixed-selected-${label}`} style={styles.mixedPackSelectedPill}>
+                                <Text numberOfLines={1} style={styles.mixedPackSelectedPillText}>{label}</Text>
+                              </View>
+                            ))
+                          ) : (
+                            <Text style={styles.mixedPackEmptyText}>No packs selected yet.</Text>
+                          )}
+                        </View>
+                        <View style={styles.mixedPackActionRow}>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Choose two packs to mix"
+                            onPress={() => {
+                              setMixedPackSelectionMode(true);
+                              void Haptics.selectionAsync();
+                            }}
+                            style={({ pressed }) => [
+                              styles.mixedPackChooseButton,
+                              mixedPackSelectionMode && styles.mixedPackChooseButtonActive,
+                              pressed ? { opacity: 0.88 } : undefined,
+                            ]}
+                          >
+                            <Ionicons name="images-outline" size={15} color="#071013" />
+                            <Text style={styles.mixedPackChooseButtonText}>
+                              {selectedMixedPhotoPacks.length > 0 ? "Change packs" : "Choose 2 packs"}
+                            </Text>
+                          </Pressable>
+                          {mixedPackSelectionMode ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel="Done choosing mixed packs"
+                              disabled={selectedMixedPhotoPacks.length !== MIXED_PACK_SELECTION_LIMIT}
+                              onPress={() => {
+                                setMixedPackSelectionMode(false);
+                                void Haptics.selectionAsync();
+                              }}
+                              style={({ pressed }) => [
+                                styles.mixedPackDoneButton,
+                                selectedMixedPhotoPacks.length !== MIXED_PACK_SELECTION_LIMIT && styles.mixedPackDoneButtonDisabled,
+                                pressed && selectedMixedPhotoPacks.length === MIXED_PACK_SELECTION_LIMIT ? { opacity: 0.85 } : undefined,
+                              ]}
+                            >
+                              <Text style={styles.mixedPackDoneButtonText}>Done</Text>
+                            </Pressable>
+                          ) : null}
+                        </View>
                       </View>
                     ) : null}
 
@@ -6976,6 +7096,61 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
+  packCardMuted: {
+    opacity: 0.46,
+  },
+  packComboCard: {
+    padding: 0,
+    backgroundColor: "rgba(10,12,16,0.98)",
+  },
+  packComboHalf: {
+    flex: 1,
+    overflow: "hidden",
+    padding: 10,
+    justifyContent: "space-between",
+  },
+  packComboHalfTop: {
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.14)",
+  },
+  packComboHalfBottom: {},
+  packComboHalfActive: {
+    backgroundColor: "rgba(126,243,255,0.09)",
+  },
+  packComboTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  packComboIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#7EF3FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  packComboMiniText: {
+    color: "rgba(255,255,255,0.68)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+  },
+  packComboCopy: {
+    gap: 2,
+  },
+  packComboKicker: {
+    color: "#FFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 18,
+    lineHeight: 21,
+    letterSpacing: 0.6,
+  },
+  packComboSubtitle: {
+    color: "rgba(255,255,255,0.70)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10.5,
+    lineHeight: 13,
+  },
   packCardDiptych: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: "row",
@@ -7075,6 +7250,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#7EF3FF",
     alignItems: "center",
     justifyContent: "center",
+  },
+  packCardSelectPill: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  packCardSelectCount: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 12,
+    minWidth: 18,
+    textAlign: "right",
   },
   // ── Aesthetic lightbox ──────────────────────────────────────────────────────
   packLightboxBackdrop: {
@@ -7482,6 +7674,72 @@ const styles = StyleSheet.create({
   },
   mixedPackCounterText: {
     color: Colors.accentLight,
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+  },
+  mixedPackSelectedRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  mixedPackSelectedPill: {
+    maxWidth: "100%",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(126,243,255,0.36)",
+    backgroundColor: "rgba(126,243,255,0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  mixedPackSelectedPillText: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  mixedPackEmptyText: {
+    color: "rgba(255,255,255,0.48)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+  mixedPackActionRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  mixedPackChooseButton: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 12,
+    backgroundColor: "#7EF3FF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 7,
+    paddingHorizontal: 12,
+  },
+  mixedPackChooseButtonActive: {
+    backgroundColor: "#A8FBFF",
+  },
+  mixedPackChooseButtonText: {
+    color: "#071013",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 12,
+  },
+  mixedPackDoneButton: {
+    minWidth: 72,
+    minHeight: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  mixedPackDoneButtonDisabled: {
+    opacity: 0.42,
+  },
+  mixedPackDoneButtonText: {
+    color: "rgba(255,255,255,0.82)",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
   },
