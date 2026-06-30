@@ -426,7 +426,7 @@ const PACK_BRIEF_SCENE_IMAGES_MAX = 3;
 
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
 const PACK_CUSTOM_PALETTE_ID = "custom-palette";
-const CUSTOM_PACK_STYLE_MIN_WORDS = 3;
+const CUSTOM_PACK_STYLE_MIN_WORDS = 2;
 const CUSTOM_PACK_PALETTE_MIN_COLORS = 3;
 const MIXED_PACK_SELECTION_LIMIT = 2;
 const PACK_GRID_TONE_CONTRAST_OPTIONS: Array<{
@@ -2596,28 +2596,36 @@ export default function InstaMeScreen() {
   const handleGenerateGridPreview = useCallback(async (options?: { extend?: boolean }) => {
     if (!activePhotoPack) return;
     if (!photo) {
+      setPackGridError("Add a portrait above before generating this pack.");
       Alert.alert("Portrait required", "Add a portrait above before generating this pack.");
       return;
     }
     if (isMixedPhotoPack && selectedMixedPhotoPacks.length !== MIXED_PACK_SELECTION_LIMIT) {
-      Alert.alert("Pick two packs", `Select exactly ${MIXED_PACK_SELECTION_LIMIT} packs to create a mixed pack.`);
+      const message = `Select exactly ${MIXED_PACK_SELECTION_LIMIT} packs to create a mixed pack.`;
+      setPackGridError(message);
+      Alert.alert("Pick two packs", message);
       return;
     }
     if (shouldShowCustomPackInputs && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS) {
+      const message = `Describe the style in at least ${CUSTOM_PACK_STYLE_MIN_WORDS} words before generating this pack.`;
+      setPackGridError(message);
       Alert.alert(
         "Custom style required",
-        `Describe the style in at least ${CUSTOM_PACK_STYLE_MIN_WORDS} words before generating this pack.`,
+        message,
       );
       return;
     }
     if (shouldShowCustomPackInputs && !isCustomPackPaletteValid) {
+      const message = `Add at least ${CUSTOM_PACK_PALETTE_MIN_COLORS} colors separated by commas, or leave the palette blank.`;
+      setPackGridError(message);
       Alert.alert(
         "Palette needs 3 colors",
-        `Add at least ${CUSTOM_PACK_PALETTE_MIN_COLORS} colors separated by commas, or leave the palette blank.`,
+        message,
       );
       return;
     }
     if (!isCustomPhotoPack && !isMixedPhotoPack && isCustomPackPalette && !selectedPackPalettePrompt) {
+      setPackGridError("Enter your custom color palette before generating the visual grid.");
       Alert.alert("Custom palette required", "Enter your custom color palette before generating the visual grid.");
       return;
     }
@@ -4461,7 +4469,10 @@ export default function InstaMeScreen() {
                         </Text>
                         <TextInput
                           value={customPackStyleText}
-                          onChangeText={setCustomPackStyleText}
+                          onChangeText={(value) => {
+                            setCustomPackStyleText(value);
+                            setPackGridError(null);
+                          }}
                           placeholder="Ex: chrome city glam"
                           placeholderTextColor="rgba(255,255,255,0.40)"
                           maxLength={90}
@@ -4482,7 +4493,10 @@ export default function InstaMeScreen() {
                         <Text style={styles.packPlannerLabel}>Optional palette</Text>
                         <TextInput
                           value={customPackPaletteText}
-                          onChangeText={setCustomPackPaletteText}
+                          onChangeText={(value) => {
+                            setCustomPackPaletteText(value);
+                            setPackGridError(null);
+                          }}
                           placeholder="Ex: black, chrome silver, icy blue"
                           placeholderTextColor="rgba(255,255,255,0.40)"
                           maxLength={120}
@@ -4620,7 +4634,10 @@ export default function InstaMeScreen() {
                           <>
                             <TextInput
                               value={customPackPaletteText}
-                              onChangeText={setCustomPackPaletteText}
+                              onChangeText={(value) => {
+                                setCustomPackPaletteText(value);
+                                setPackGridError(null);
+                              }}
                               onFocus={() => setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID)}
                               placeholder="Ex: ivory cream, burgundy wine, matte black, antique gold"
                               placeholderTextColor="rgba(255,255,255,0.40)"
