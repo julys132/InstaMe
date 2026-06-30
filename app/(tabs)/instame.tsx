@@ -437,6 +437,65 @@ const PACK_GRID_TONE_CONTRAST_OPTIONS: Array<{
   { key: "medium", title: "Medium contrast", subtitle: "Balanced light/dark mix between photos" },
   { key: "high", title: "High contrast", subtitle: "Bolder light/dark switch between photos" },
 ];
+type PackInfoKey =
+  | "cost"
+  | "selectedPacks"
+  | "style"
+  | "optionalPalette"
+  | "photoCount"
+  | "palette"
+  | "contrast"
+  | "fineTune"
+  | "details"
+  | "notes"
+  | "sceneElements";
+
+const PACK_INFO_CONTENT: Record<PackInfoKey, { title: string; body: string }> = {
+  cost: {
+    title: "Cost summary",
+    body: "Preview creates the first full grid so you can approve the look. You only pay the per-photo cost for images you keep; failed extractions are refunded automatically.",
+  },
+  selectedPacks: {
+    title: "Selected packs",
+    body: "These are the two style directions being blended into one cohesive grid. Changing them updates the aesthetic, locations, lighting, wardrobe mood, and palette guidance.",
+  },
+  style: {
+    title: "Style",
+    body: "Describe the custom direction in a few words. This becomes the core aesthetic instruction for the whole pack, so use words that describe mood, location, or fashion energy.",
+  },
+  optionalPalette: {
+    title: "Optional palette",
+    body: "Use this when you want stronger control over colors. Add at least three comma-separated colors, or leave it blank so the AI chooses colors that fit the selected pack.",
+  },
+  photoCount: {
+    title: "Photo count",
+    body: "Choose how many images the grid preview should plan. Six is fastest, nine gives a fuller Instagram grid, and twelve creates the richest pack.",
+  },
+  palette: {
+    title: "Palette",
+    body: "Palette controls the dominant color story across wardrobe, props, backgrounds, and lighting. Default uses the pack recommendation; Custom lets you write your own colors.",
+  },
+  contrast: {
+    title: "Contrast",
+    body: "Medium keeps the grid balanced and softer. High contrast creates stronger light/dark switches between cells for a bolder editorial rhythm.",
+  },
+  fineTune: {
+    title: "Fine-tune details",
+    body: "Open this when you want more control. These fields are optional and help steer specific props, scenes, products, or details without changing the whole pack idea.",
+  },
+  details: {
+    title: "Details",
+    body: "Pick must-have moments you want represented in the pack. They guide the shot plan, but the AI still keeps the grid varied and cohesive.",
+  },
+  notes: {
+    title: "Notes",
+    body: "Use notes for very specific requests, such as a blazer, marble stairs, a watch close-up, or a mood that should appear in the final grid.",
+  },
+  sceneElements: {
+    title: "Scene elements",
+    body: "Upload product, outfit, or prop references here. The generator treats them as visual material to include naturally while keeping the portrait subject consistent.",
+  },
+};
 const GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT = 3;
 const GRID_EXTRACT_WAIT_NOTE = "Full extraction can take a couple of minutes, depending on how many photos you picked.";
 
@@ -1065,6 +1124,7 @@ export default function InstaMeScreen() {
   const [packGridExtractNotice, setPackGridExtractNotice] = useState<string | null>(null);
   const [packGridExtractQuality, setPackGridExtractQuality] = useState<InstaMeGridExtractQuality>("standard");
   const [packGridError, setPackGridError] = useState<string | null>(null);
+  const [activePackInfoKey, setActivePackInfoKey] = useState<PackInfoKey | null>(null);
   const [packImagePreviewId, setPackImagePreviewId] = useState<string | null>(null);
   const [packImagePreviewIndex, setPackImagePreviewIndex] = useState(0);
   const [pipelineAestheticId, setPipelineAestheticId] = useState<string | null>(null);
@@ -3942,6 +4002,61 @@ export default function InstaMeScreen() {
     });
   }, [exportBase64Image, packGridPreviewBase64]);
 
+  const dismissPackInfo = useCallback(() => {
+    setActivePackInfoKey(null);
+  }, []);
+
+  const togglePackInfo = useCallback((key: PackInfoKey) => {
+    setActivePackInfoKey((current) => (current === key ? null : key));
+    void Haptics.selectionAsync();
+  }, []);
+
+  const renderPackInfoButton = useCallback(
+    (key: PackInfoKey): ReactNode => {
+      const active = activePackInfoKey === key;
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Show ${PACK_INFO_CONTENT[key].title} info`}
+          onPress={() => togglePackInfo(key)}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.packInfoButton,
+            active && styles.packInfoButtonActive,
+            pressed ? { opacity: 0.78 } : undefined,
+          ]}
+        >
+          <Text style={[styles.packInfoButtonText, active && styles.packInfoButtonTextActive]}>i</Text>
+        </Pressable>
+      );
+    },
+    [activePackInfoKey, togglePackInfo],
+  );
+
+  const renderPackInfoPopover = useCallback(
+    (key: PackInfoKey): ReactNode => {
+      if (activePackInfoKey !== key) return null;
+      const content = PACK_INFO_CONTENT[key];
+      return (
+        <View style={styles.packInfoPopover}>
+          <Text style={styles.packInfoPopoverTitle}>{content.title}</Text>
+          <Text style={styles.packInfoPopoverText}>{content.body}</Text>
+        </View>
+      );
+    },
+    [activePackInfoKey],
+  );
+
+  const renderPackSectionLabel = useCallback(
+    (label: string, infoKey: PackInfoKey): ReactNode => (
+      <View style={styles.packPlannerSectionHeader}>
+        <Text style={styles.packPlannerLabel}>{label}</Text>
+        {renderPackInfoButton(infoKey)}
+      </View>
+    ),
+    [renderPackInfoButton],
+  );
+
   const selectedStyleVibeCount = styleVibeCounts[selectedStyleVibe.id] ?? mainOnlyStylePresets.length;
 
   return (
@@ -4349,26 +4464,28 @@ export default function InstaMeScreen() {
               </ScrollView>
 
               <View style={styles.packPlannerCard}>
-                <View style={styles.packPlannerProgress}>
-                  <View style={styles.packPlannerProgressTrack}>
-                    {PACK_BRIEF_FLOW_STEPS.map((stepLabel, index) => {
-                      const stepNumber = index + 1;
-                      const reached = stepNumber <= packPlannerCurrentStep;
-                      return (
-                        <View
-                          key={stepLabel}
-                          style={[
-                            styles.packPlannerProgressSegment,
-                            reached && styles.packPlannerProgressSegmentActive,
-                          ]}
-                        />
-                      );
-                    })}
+                {!activePhotoPack ? (
+                  <View style={styles.packPlannerProgress}>
+                    <View style={styles.packPlannerProgressTrack}>
+                      {PACK_BRIEF_FLOW_STEPS.map((stepLabel, index) => {
+                        const stepNumber = index + 1;
+                        const reached = stepNumber <= packPlannerCurrentStep;
+                        return (
+                          <View
+                            key={stepLabel}
+                            style={[
+                              styles.packPlannerProgressSegment,
+                              reached && styles.packPlannerProgressSegmentActive,
+                            ]}
+                          />
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.packPlannerProgressLabel}>
+                      {PACK_BRIEF_FLOW_STEPS[packPlannerCurrentStep - 1]}
+                    </Text>
                   </View>
-                  <Text style={styles.packPlannerProgressLabel}>
-                    {PACK_BRIEF_FLOW_STEPS[packPlannerCurrentStep - 1]}
-                  </Text>
-                </View>
+                ) : null}
 
                 {!activePhotoPack ? (
                   <View style={styles.packPlannerEmptyState}>
@@ -4380,51 +4497,65 @@ export default function InstaMeScreen() {
                   </View>
                 ) : (
                   <>
+                    {activePackInfoKey ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Close section info"
+                        onPress={dismissPackInfo}
+                        style={styles.packInfoDismissLayer}
+                      />
+                    ) : null}
                     <View style={styles.packPlannerConfigHeader}>
                       <Text style={styles.packPlannerConfigTitle}>Your Configuration</Text>
-                      <Text style={styles.packPlannerConfigSubtitle}>
-                        {packPlannerDisplayTitle} - {selectedPackImageCount} photos
-                      </Text>
                     </View>
 
-                    <View style={styles.packPlannerSummaryCard}>
+                    <View
+                      style={[
+                        styles.packPlannerSummaryCard,
+                        activePackInfoKey === "cost" && styles.packPlannerActiveInfoRow,
+                      ]}
+                    >
+                      <View style={styles.packSummaryInfoCorner}>
+                        {renderPackInfoButton("cost")}
+                      </View>
                       <Text style={styles.packPlannerSummaryTitle}>
-                        Preview grid - {INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits
+                        Preview grid • {INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits
                       </Text>
                       <Text style={styles.packPlannerSummaryText}>
-                        Per kept photo - {INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit{INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"}
+                        Per kept photo • {INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit{INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"}
                       </Text>
-                      <View style={styles.packPlannerSummaryPriceRow}>
-                        <Ionicons name="diamond-outline" size={12} color="#F3A0B1" />
-                        <Text style={styles.packPlannerSummaryPriceText}>
-                          Full pack - ~{getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
-                        </Text>
-                      </View>
+                      <Text style={styles.packPlannerSummaryPriceText}>
+                        Full pack • ~{getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
+                      </Text>
                       <Text style={styles.packPlannerSummaryFootnote}>
                         Failed photos refunded
                       </Text>
+                      {renderPackInfoPopover("cost")}
                     </View>
+                    <Text style={styles.packPlannerConfigSubtitle}>
+                      {packPlannerDisplayTitle} • {selectedPackImageCount} photos
+                    </Text>
 
                     {isMixedPhotoPack ? (
-                      <View style={styles.packPlannerBlock}>
-                        <View style={styles.mixedPackHeaderRow}>
-                          <Text style={styles.packPlannerLabel}>Selected Packs</Text>
-                          <Text style={styles.mixedPackCounterText}>
-                            {selectedMixedPhotoPacks.length}/{MIXED_PACK_SELECTION_LIMIT}
-                          </Text>
-                        </View>
-                        <View style={styles.mixedPackSelectedRow}>
-                          {selectedMixedPhotoPackLabels.length > 0 ? (
-                            selectedMixedPhotoPackLabels.map((label) => (
-                              <View key={`mixed-selected-${label}`} style={styles.mixedPackSelectedPill}>
-                                <Text numberOfLines={1} style={styles.mixedPackSelectedPillText}>{label}</Text>
-                              </View>
-                            ))
-                          ) : (
-                            <Text style={styles.mixedPackEmptyText}>No packs selected yet.</Text>
-                          )}
-                        </View>
-                        <View style={styles.mixedPackActionRow}>
+                      <View
+                        style={[
+                          styles.packPlannerSectionBlock,
+                          activePackInfoKey === "selectedPacks" && styles.packPlannerActiveInfoRow,
+                        ]}
+                      >
+                        {renderPackSectionLabel("Selected Packs", "selectedPacks")}
+                        <View style={styles.mixedPackCompactRow}>
+                          <View style={styles.mixedPackSelectedRow}>
+                            {selectedMixedPhotoPackLabels.length > 0 ? (
+                              selectedMixedPhotoPackLabels.map((label) => (
+                                <View key={`mixed-selected-${label}`} style={styles.mixedPackSelectedPill}>
+                                  <Text numberOfLines={1} style={styles.mixedPackSelectedPillText}>{label}</Text>
+                                </View>
+                              ))
+                            ) : (
+                              <Text style={styles.mixedPackEmptyText}>No packs selected yet.</Text>
+                            )}
+                          </View>
                           <Pressable
                             accessibilityRole="button"
                             accessibilityLabel="Choose two packs to mix"
@@ -4433,14 +4564,13 @@ export default function InstaMeScreen() {
                               void Haptics.selectionAsync();
                             }}
                             style={({ pressed }) => [
-                              styles.mixedPackChooseButton,
-                              mixedPackSelectionMode && styles.mixedPackChooseButtonActive,
+                              styles.mixedPackChangeButton,
+                              mixedPackSelectionMode && styles.mixedPackChangeButtonActive,
                               pressed ? { opacity: 0.88 } : undefined,
                             ]}
                           >
-                            <Ionicons name="images-outline" size={14} color="#FFF" />
-                            <Text style={styles.mixedPackChooseButtonText}>
-                              {selectedMixedPhotoPacks.length > 0 ? "Change packs" : "Choose 2 packs"}
+                            <Text style={styles.mixedPackChangeButtonText}>
+                              {selectedMixedPhotoPacks.length > 0 ? "Change packs" : "Choose packs"}
                             </Text>
                           </Pressable>
                           {mixedPackSelectionMode ? (
@@ -4462,100 +4592,120 @@ export default function InstaMeScreen() {
                             </Pressable>
                           ) : null}
                         </View>
+                        {renderPackInfoPopover("selectedPacks")}
                       </View>
                     ) : null}
 
                     {shouldShowCustomPackInputs ? (
-                      <View style={styles.packPlannerBlock}>
-                        <Text style={styles.packPlannerLabel}>
-                          Style
-                        </Text>
-                        <TextInput
-                          value={customPackStyleText}
-                          onChangeText={(value) => {
-                            setCustomPackStyleText(value);
-                            setPackGridError(null);
-                          }}
-                          placeholder="Ex: chrome city glam"
-                          placeholderTextColor="rgba(255,255,255,0.40)"
-                          maxLength={90}
-                          style={styles.packPlannerPaletteCustomInput}
-                        />
-                        <Text
-                          style={[
-                            styles.packPlannerPaletteCustomHint,
-                            customPackStyleText.trim() && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS
-                              ? styles.packPlannerPaletteCustomHintWarning
-                              : undefined,
-                          ]}
-                        >
-                          {customPackStyleWordCount >= CUSTOM_PACK_STYLE_MIN_WORDS
-                            ? `${customPackStyleWordCount} words`
-                            : `${customPackStyleWordCount}/${CUSTOM_PACK_STYLE_MIN_WORDS} words minimum`}
-                        </Text>
+                      <View
+                        style={[
+                          styles.packPlannerFieldRow,
+                          activePackInfoKey === "style" && styles.packPlannerActiveInfoRow,
+                        ]}
+                      >
+                        <View style={styles.packPlannerFieldLabelColumn}>
+                          {renderPackSectionLabel("Style", "style")}
+                        </View>
+                        <View style={styles.packPlannerFieldControl}>
+                          <TextInput
+                            value={customPackStyleText}
+                            onChangeText={(value) => {
+                              setCustomPackStyleText(value);
+                              setPackGridError(null);
+                            }}
+                            placeholder="Ex: chrome city glam"
+                            placeholderTextColor="rgba(255,255,255,0.40)"
+                            maxLength={90}
+                            style={styles.packPlannerPaletteCustomInput}
+                          />
+                          {customPackStyleText.trim() && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS ? (
+                            <Text style={[styles.packPlannerPaletteCustomHint, styles.packPlannerPaletteCustomHintWarning]}>
+                              {customPackStyleWordCount}/{CUSTOM_PACK_STYLE_MIN_WORDS} words minimum
+                            </Text>
+                          ) : null}
+                        </View>
+                        {renderPackInfoPopover("style")}
                       </View>
                     ) : null}
 
                     {shouldShowCustomPackInputs ? (
-                      <View style={styles.packPlannerBlock}>
-                        <Text style={styles.packPlannerLabel}>Optional Palette</Text>
-                        <TextInput
-                          value={customPackPaletteText}
-                          onChangeText={(value) => {
-                            setCustomPackPaletteText(value);
-                            setPackGridError(null);
-                          }}
-                          placeholder="Ex: black, chrome silver, icy blue"
-                          placeholderTextColor="rgba(255,255,255,0.40)"
-                          maxLength={120}
-                          style={styles.packPlannerPaletteCustomInput}
-                        />
-                        <Text
-                          style={[
-                            styles.packPlannerPaletteCustomHint,
-                            customPackPaletteText.trim() && !isCustomPackPaletteValid
-                              ? styles.packPlannerPaletteCustomHintWarning
-                              : undefined,
-                          ]}
-                        >
-                          {customPackPaletteText.trim()
-                            ? `${customPackPaletteColorCount}/${CUSTOM_PACK_PALETTE_MIN_COLORS} colors minimum`
-                            : "Leave blank for AI-picked colors, or add 3+ colors separated by commas."}
-                        </Text>
+                      <View
+                        style={[
+                          styles.packPlannerFieldRow,
+                          activePackInfoKey === "optionalPalette" && styles.packPlannerActiveInfoRow,
+                        ]}
+                      >
+                        <View style={styles.packPlannerFieldLabelColumn}>
+                          {renderPackSectionLabel("Optional Palette", "optionalPalette")}
+                        </View>
+                        <View style={styles.packPlannerFieldControl}>
+                          <TextInput
+                            value={customPackPaletteText}
+                            onChangeText={(value) => {
+                              setCustomPackPaletteText(value);
+                              setPackGridError(null);
+                            }}
+                            placeholder="Ex: black, chrome silver, icy blue"
+                            placeholderTextColor="rgba(255,255,255,0.40)"
+                            maxLength={120}
+                            style={styles.packPlannerPaletteCustomInput}
+                          />
+                          {customPackPaletteText.trim() && !isCustomPackPaletteValid ? (
+                            <Text style={[styles.packPlannerPaletteCustomHint, styles.packPlannerPaletteCustomHintWarning]}>
+                              {customPackPaletteColorCount}/{CUSTOM_PACK_PALETTE_MIN_COLORS} colors minimum
+                            </Text>
+                          ) : null}
+                        </View>
+                        {renderPackInfoPopover("optionalPalette")}
                       </View>
                     ) : null}
 
-                    <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Photo Count</Text>
-                      <View style={styles.packPlannerCountRow}>
-                        {PACK_IMAGE_COUNT_OPTIONS.map((count) => {
-                          const active = selectedPackImageCount === count;
-                          return (
-                            <Pressable
-                              key={`pack-count-${count}`}
-                              onPress={() => {
-                                setSelectedPackImageCount(count);
-                                setPipelineImageCount(count);
-                                void Haptics.selectionAsync();
-                              }}
-                              style={({ pressed }) => [
-                                styles.packPlannerCountChip,
-                                active && styles.packPlannerCountChipActive,
-                                pressed ? { opacity: 0.88 } : undefined,
-                              ]}
-                            >
-                              <Text style={[styles.packPlannerCountChipText, active && styles.packPlannerCountChipTextActive]}>
-                                {count}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
+                    <View
+                      style={[
+                        styles.packPlannerFieldRow,
+                        activePackInfoKey === "photoCount" && styles.packPlannerActiveInfoRow,
+                      ]}
+                    >
+                      <View style={styles.packPlannerFieldLabelColumn}>
+                        {renderPackSectionLabel("Photo Count", "photoCount")}
                       </View>
+                      <View style={styles.packPlannerFieldControl}>
+                        <View style={styles.packPlannerCountRow}>
+                          {PACK_IMAGE_COUNT_OPTIONS.map((count) => {
+                            const active = selectedPackImageCount === count;
+                            return (
+                              <Pressable
+                                key={`pack-count-${count}`}
+                                onPress={() => {
+                                  setSelectedPackImageCount(count);
+                                  setPipelineImageCount(count);
+                                  void Haptics.selectionAsync();
+                                }}
+                                style={({ pressed }) => [
+                                  styles.packPlannerCountChip,
+                                  active && styles.packPlannerCountChipActive,
+                                  pressed ? { opacity: 0.88 } : undefined,
+                                ]}
+                              >
+                                <Text style={[styles.packPlannerCountChipText, active && styles.packPlannerCountChipTextActive]}>
+                                  {count}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                      {renderPackInfoPopover("photoCount")}
                     </View>
 
                     {!isCustomPhotoPack && !isMixedPhotoPack ? (
-                      <View style={styles.packPlannerBlock}>
-                        <Text style={styles.packPlannerLabel}>Palette</Text>
+                      <View
+                        style={[
+                          styles.packPlannerSectionBlock,
+                          activePackInfoKey === "palette" && styles.packPlannerActiveInfoRow,
+                        ]}
+                      >
+                        {renderPackSectionLabel("Palette", "palette")}
                         <ScrollView
                           horizontal
                           showsHorizontalScrollIndicator={false}
@@ -4654,134 +4804,185 @@ export default function InstaMeScreen() {
                             </Text>
                           </>
                         ) : null}
+                        {renderPackInfoPopover("palette")}
                       </View>
                     ) : null}
 
-                    <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Contrast</Text>
-                      <View style={styles.packQualityRow}>
-                        {PACK_GRID_TONE_CONTRAST_OPTIONS.map((option) => {
-                          const active = packGridToneContrast === option.key;
-                          return (
-                            <Pressable
-                              key={option.key}
-                              accessibilityRole="button"
-                              accessibilityLabel={`Select ${option.title}`}
-                              onPress={() => {
-                                setPackGridToneContrast(option.key);
-                                void Haptics.selectionAsync();
-                              }}
-                              disabled={packGridPreviewLoading || packGridRenderLoading}
-                              style={({ pressed }) => [
-                                styles.packQualityOption,
-                                active && styles.packQualityOptionActive,
-                                pressed && !packGridPreviewLoading && !packGridRenderLoading ? { opacity: 0.85 } : undefined,
-                              ]}
-                            >
-                              <View style={styles.packQualityOptionHeader}>
+                    <View
+                      style={[
+                        styles.packPlannerFieldRow,
+                        activePackInfoKey === "contrast" && styles.packPlannerActiveInfoRow,
+                      ]}
+                    >
+                      <View style={styles.packPlannerFieldLabelColumn}>
+                        {renderPackSectionLabel("Contrast", "contrast")}
+                      </View>
+                      <View style={styles.packPlannerFieldControl}>
+                        <View style={styles.packContrastList}>
+                          {PACK_GRID_TONE_CONTRAST_OPTIONS.map((option) => {
+                            const active = packGridToneContrast === option.key;
+                            return (
+                              <Pressable
+                                key={option.key}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Select ${option.title}`}
+                                onPress={() => {
+                                  setPackGridToneContrast(option.key);
+                                  void Haptics.selectionAsync();
+                                }}
+                                disabled={packGridPreviewLoading || packGridRenderLoading}
+                                style={({ pressed }) => [
+                                  styles.packContrastOption,
+                                  pressed && !packGridPreviewLoading && !packGridRenderLoading ? { opacity: 0.82 } : undefined,
+                                ]}
+                              >
                                 <Ionicons
                                   name={active ? "radio-button-on" : "radio-button-off"}
                                   size={16}
                                   color={active ? "#F3A0B1" : "rgba(255,255,255,0.42)"}
                                 />
-                                <Text style={[styles.packQualityOptionTitle, active && styles.packQualityOptionTitleActive]}>
+                                <Text style={[styles.packContrastOptionText, active && styles.packContrastOptionTextActive]}>
                                   {option.title}
                                 </Text>
-                              </View>
-                              <Text style={styles.packQualityOptionSubtitle}>{option.subtitle}</Text>
-                            </Pressable>
-                          );
-                        })}
+                              </Pressable>
+                            );
+                          })}
+                        </View>
                       </View>
+                      {renderPackInfoPopover("contrast")}
                     </View>
 
-                    <Pressable
-                      onPress={() => {
-                        setPackBriefShowMore((prev) => !prev);
-                        void Haptics.selectionAsync();
-                      }}
-                      style={({ pressed }) => [styles.packPlannerMoreToggle, pressed ? { opacity: 0.8 } : undefined]}
+                    <View
+                      style={[
+                        styles.packPlannerMoreToggle,
+                        activePackInfoKey === "fineTune" && styles.packPlannerActiveInfoRow,
+                      ]}
                     >
-                      <Text style={styles.packPlannerMoreToggleText}>
-                        {packBriefShowMore ? "Hide extra options" : "Fine-tune details"}
-                        {!packBriefShowMore && packBriefRequiredElementIds.length > 0
-                          ? ` - ${packBriefRequiredElementIds.length}`
-                          : ""}
-                      </Text>
-                      <Ionicons
-                        name={packBriefShowMore ? "chevron-up" : "chevron-down"}
-                        size={15}
-                        color="rgba(255,255,255,0.62)"
-                      />
-                    </Pressable>
+                      <View style={styles.packPlannerSectionHeader}>
+                        <Text style={styles.packPlannerMoreToggleText}>
+                          {packBriefShowMore ? "Hide extra options" : "Fine-tune details"}
+                          {!packBriefShowMore && packBriefRequiredElementIds.length > 0
+                            ? ` - ${packBriefRequiredElementIds.length}`
+                            : ""}
+                        </Text>
+                        {renderPackInfoButton("fineTune")}
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={packBriefShowMore ? "Hide fine tune details" : "Show fine tune details"}
+                        onPress={() => {
+                          setPackBriefShowMore((prev) => !prev);
+                          void Haptics.selectionAsync();
+                        }}
+                        hitSlop={10}
+                        style={({ pressed }) => [styles.packPlannerMoreChevron, pressed ? { opacity: 0.72 } : undefined]}
+                      >
+                        <Ionicons
+                          name={packBriefShowMore ? "chevron-up" : "chevron-forward"}
+                          size={15}
+                          color="rgba(255,255,255,0.62)"
+                        />
+                      </Pressable>
+                      {renderPackInfoPopover("fineTune")}
+                    </View>
 
                     {packBriefShowMore ? (
                       <>
-                        <View style={styles.packPlannerBlock}>
-                          <Text style={styles.packPlannerLabel}>Add a few details</Text>
-                          <View style={styles.packPlannerElementWrap}>
-                            {PACK_BRIEF_REQUIRED_ELEMENTS.map((element) => {
-                              const active = packBriefRequiredElementIds.includes(element.id);
-                              return (
-                                <Pressable
-                                  key={element.id}
-                                  onPress={() => togglePackBriefRequiredElement(element.id)}
-                                  style={({ pressed }) => [
-                                    styles.packPlannerElementChip,
-                                    active && styles.packPlannerElementChipActive,
-                                    pressed ? { opacity: 0.88 } : undefined,
-                                  ]}
-                                >
-                                  <Text style={[styles.packPlannerElementChipText, active && styles.packPlannerElementChipTextActive]}>
-                                    {element.label}
-                                  </Text>
-                                </Pressable>
-                              );
-                            })}
+                        <View
+                          style={[
+                            styles.packPlannerFieldRow,
+                            activePackInfoKey === "details" && styles.packPlannerActiveInfoRow,
+                          ]}
+                        >
+                          <View style={styles.packPlannerFieldLabelColumn}>
+                            {renderPackSectionLabel("Details", "details")}
                           </View>
+                          <View style={styles.packPlannerFieldControl}>
+                            <View style={styles.packPlannerElementWrap}>
+                              {PACK_BRIEF_REQUIRED_ELEMENTS.map((element) => {
+                                const active = packBriefRequiredElementIds.includes(element.id);
+                                return (
+                                  <Pressable
+                                    key={element.id}
+                                    onPress={() => togglePackBriefRequiredElement(element.id)}
+                                    style={({ pressed }) => [
+                                      styles.packPlannerElementChip,
+                                      active && styles.packPlannerElementChipActive,
+                                      pressed ? { opacity: 0.88 } : undefined,
+                                    ]}
+                                  >
+                                    <Text style={[styles.packPlannerElementChipText, active && styles.packPlannerElementChipTextActive]}>
+                                      {element.label}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          </View>
+                          {renderPackInfoPopover("details")}
                         </View>
 
-                        <View style={styles.packPlannerBlock}>
-                          <Text style={styles.packPlannerLabel}>Anything else?</Text>
-                          <TextInput
-                            value={packBriefNotes}
-                            onChangeText={setPackBriefNotes}
-                            placeholder="Ex: white blazer, marble stairs, watch close-up"
-                            placeholderTextColor="rgba(255,255,255,0.40)"
-                            multiline
-                            maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
-                            style={styles.packPlannerNotesInput}
-                          />
+                        <View
+                          style={[
+                            styles.packPlannerFieldRow,
+                            activePackInfoKey === "notes" && styles.packPlannerActiveInfoRow,
+                          ]}
+                        >
+                          <View style={styles.packPlannerFieldLabelColumn}>
+                            {renderPackSectionLabel("Notes", "notes")}
+                          </View>
+                          <View style={styles.packPlannerFieldControl}>
+                            <TextInput
+                              value={packBriefNotes}
+                              onChangeText={setPackBriefNotes}
+                              placeholder="Ex: white blazer, marble stairs, watch close-up"
+                              placeholderTextColor="rgba(255,255,255,0.40)"
+                              multiline
+                              maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
+                              style={styles.packPlannerNotesInput}
+                            />
+                          </View>
+                          {renderPackInfoPopover("notes")}
                         </View>
 
-                        <View style={styles.packPlannerBlock}>
-                          <Text style={styles.packPlannerLabel}>Scene elements / products</Text>
-                          <Text style={styles.packPlannerHint}>
-                            Add photos of items you want featured in the shots - a product, outfit, or prop. We keep them faithful across the scenes.
-                          </Text>
-                          <View style={styles.packPlannerSceneWrap}>
-                            {packBriefSceneImages.map((image) => (
-                              <View key={image.id} style={styles.packPlannerSceneThumb}>
-                                <Image source={{ uri: image.uri }} style={StyleSheet.absoluteFillObject as any} contentFit="cover" />
-                                <Pressable
-                                  onPress={() => removePackBriefSceneImage(image.id)}
-                                  hitSlop={8}
-                                  style={styles.packPlannerSceneRemove}
-                                >
-                                  <Ionicons name="close" size={12} color="#FFF" />
-                                </Pressable>
-                              </View>
-                            ))}
-                            {packBriefSceneImages.length < PACK_BRIEF_SCENE_IMAGES_MAX ? (
-                              <Pressable
-                                onPress={() => void addPackBriefSceneImage()}
-                                style={({ pressed }) => [styles.packPlannerSceneAdd, pressed ? { opacity: 0.85 } : undefined]}
-                              >
-                                <Ionicons name="add" size={20} color="rgba(255,255,255,0.7)" />
-                                <Text style={styles.packPlannerSceneAddText}>Add</Text>
-                              </Pressable>
-                            ) : null}
+                        <View
+                          style={[
+                            styles.packPlannerFieldRow,
+                            activePackInfoKey === "sceneElements" && styles.packPlannerActiveInfoRow,
+                          ]}
+                        >
+                          <View style={styles.packPlannerFieldLabelColumn}>
+                            {renderPackSectionLabel("Elements", "sceneElements")}
                           </View>
+                          <View style={styles.packPlannerFieldControl}>
+                            <Text style={styles.packPlannerHint}>
+                              Add product, outfit, or prop references.
+                            </Text>
+                            <View style={styles.packPlannerSceneWrap}>
+                              {packBriefSceneImages.map((image) => (
+                                <View key={image.id} style={styles.packPlannerSceneThumb}>
+                                  <Image source={{ uri: image.uri }} style={StyleSheet.absoluteFillObject as any} contentFit="cover" />
+                                  <Pressable
+                                    onPress={() => removePackBriefSceneImage(image.id)}
+                                    hitSlop={8}
+                                    style={styles.packPlannerSceneRemove}
+                                  >
+                                    <Ionicons name="close" size={12} color="#FFF" />
+                                  </Pressable>
+                                </View>
+                              ))}
+                              {packBriefSceneImages.length < PACK_BRIEF_SCENE_IMAGES_MAX ? (
+                                <Pressable
+                                  onPress={() => void addPackBriefSceneImage()}
+                                  style={({ pressed }) => [styles.packPlannerSceneAdd, pressed ? { opacity: 0.85 } : undefined]}
+                                >
+                                  <Ionicons name="add" size={20} color="rgba(255,255,255,0.7)" />
+                                  <Text style={styles.packPlannerSceneAddText}>Add</Text>
+                                </Pressable>
+                              ) : null}
+                            </View>
+                          </View>
+                          {renderPackInfoPopover("sceneElements")}
                         </View>
                       </>
                     ) : null}
@@ -7441,8 +7642,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "rgba(6,6,8,0.98)",
     paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingTop: 28,
+    paddingBottom: 18,
     gap: 14,
+    position: "relative",
   },
   packPlannerProgress: {
     gap: 7,
@@ -7467,20 +7670,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   packPlannerConfigHeader: {
+    alignItems: "center",
     gap: 4,
     paddingTop: 2,
   },
   packPlannerConfigTitle: {
-    color: "rgba(255,255,255,0.92)",
-    fontFamily: "Inter_700Bold",
-    fontSize: 26,
-    lineHeight: 31,
+    color: "rgba(255,255,255,0.86)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 30,
+    lineHeight: 36,
+    textAlign: "center",
   },
   packPlannerConfigSubtitle: {
-    color: "rgba(255,255,255,0.66)",
-    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.82)",
+    fontFamily: "Inter_700Bold",
     fontSize: 12,
     lineHeight: 17,
+    textAlign: "center",
+    marginTop: -4,
+    marginBottom: 18,
   },
   packPlannerStepsRow: {
     flexDirection: "row",
@@ -7526,12 +7734,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   packPlannerSummaryCard: {
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.065)",
+    minHeight: 104,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.07)",
     paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 4,
     alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 6,
+    marginTop: 6,
+    position: "relative",
   },
   packPlannerSummaryTitle: {
     color: "rgba(255,255,255,0.94)",
@@ -7710,6 +7923,114 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.09)",
   },
+  packPlannerSectionBlock: {
+    position: "relative",
+    gap: 9,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    zIndex: 30,
+  },
+  packPlannerFieldRow: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    zIndex: 30,
+  },
+  packPlannerActiveInfoRow: {
+    zIndex: 90,
+  },
+  packPlannerFieldLabelColumn: {
+    width: 112,
+    flexShrink: 0,
+  },
+  packPlannerFieldControl: {
+    flex: 1,
+    minWidth: 0,
+  },
+  packPlannerSectionTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  packPlannerSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
+    zIndex: 45,
+  },
+  packInfoDismissLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    backgroundColor: "transparent",
+  },
+  packInfoButton: {
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.26)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    zIndex: 46,
+  },
+  packInfoButtonActive: {
+    borderColor: "rgba(243,160,177,0.78)",
+    backgroundColor: "rgba(243,160,177,0.18)",
+  },
+  packInfoButtonText: {
+    color: "rgba(255,255,255,0.66)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    lineHeight: 13,
+  },
+  packInfoButtonTextActive: {
+    color: "#F3A0B1",
+  },
+  packSummaryInfoCorner: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 47,
+  },
+  packInfoPopover: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 38,
+    zIndex: 60,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(243,160,177,0.34)",
+    backgroundColor: "rgba(22,19,22,0.98)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 14,
+    gap: 4,
+  },
+  packInfoPopoverTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  packInfoPopoverText: {
+    color: "rgba(255,255,255,0.70)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+  },
   mixedPackHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -7725,6 +8046,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  mixedPackCompactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   mixedPackSelectedPill: {
     maxWidth: "100%",
@@ -7769,6 +8097,21 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontFamily: "Inter_700Bold",
     fontSize: 11,
+  },
+  mixedPackChangeButton: {
+    minHeight: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2,
+  },
+  mixedPackChangeButtonActive: {
+    opacity: 0.84,
+  },
+  mixedPackChangeButtonText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9.5,
+    lineHeight: 13,
   },
   mixedPackDoneButton: {
     minWidth: 72,
@@ -7840,23 +8183,33 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   packPlannerMoreToggle: {
+    position: "relative",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
-    paddingVertical: 13,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(255,255,255,0.09)",
+    zIndex: 30,
   },
   packPlannerMoreToggleText: {
-    color: "rgba(255,255,255,0.70)",
+    color: "rgba(255,255,255,0.58)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontSize: 11,
+  },
+  packPlannerMoreChevron: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 45,
   },
   packPlannerLabel: {
     color: "rgba(255,255,255,0.92)",
     fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontSize: 12.5,
     lineHeight: 16,
   },
   packPlannerHint: {
@@ -7893,8 +8246,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 0,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    backgroundColor: "rgba(255,255,255,0.065)",
     padding: 3,
+    minHeight: 40,
   },
   packPlannerCountChip: {
     flex: 1,
@@ -7967,14 +8321,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   packPlannerPaletteCustomInput: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.055)",
+    minHeight: 44,
+    borderRadius: 11,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "rgba(255,255,255,0.075)",
     color: "#FFF",
     fontFamily: "Inter_500Medium",
+    fontStyle: "italic",
     fontSize: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: 0,
   },
@@ -8047,14 +8403,15 @@ const styles = StyleSheet.create({
   },
   packPlannerNotesInput: {
     minHeight: 72,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.10)",
-    backgroundColor: "rgba(255,255,255,0.055)",
-    paddingHorizontal: 12,
+    borderRadius: 11,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "rgba(255,255,255,0.075)",
+    paddingHorizontal: 14,
     paddingVertical: 10,
     color: "#FFF",
     fontFamily: "Inter_500Medium",
+    fontStyle: "italic",
     fontSize: 12,
     lineHeight: 17,
     textAlignVertical: "top",
@@ -8208,6 +8565,26 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 9.5,
     lineHeight: 12,
+  },
+  packContrastList: {
+    gap: 7,
+    alignItems: "flex-start",
+  },
+  packContrastOption: {
+    minHeight: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  packContrastOptionText: {
+    color: "rgba(255,255,255,0.76)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  packContrastOptionTextActive: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
   },
   packPlannerRenderButtonText: {
     color: "#111",
