@@ -4380,36 +4380,39 @@ export default function InstaMeScreen() {
                   </View>
                 ) : (
                   <>
-                    <View style={styles.packPlannerSummaryCard}>
-                      <Text style={styles.packPlannerSummaryTitle}>{packPlannerDisplayTitle}</Text>
-                      <Text style={styles.packPlannerSummaryText}>
-                        {selectedPackImageCount} photos • {packPlannerSummaryDescriptor}
+                    <View style={styles.packPlannerConfigHeader}>
+                      <Text style={styles.packPlannerConfigTitle}>Your Configuration</Text>
+                      <Text style={styles.packPlannerConfigSubtitle}>
+                        {packPlannerDisplayTitle} - {selectedPackImageCount} photos
                       </Text>
-                      <Text style={styles.packPlannerSummaryLadder}>
-                        {`Step 1 · Preview the grid — ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits\nStep 2 · Keep your photos — ${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"} each`}
+                    </View>
+
+                    <View style={styles.packPlannerSummaryCard}>
+                      <Text style={styles.packPlannerSummaryTitle}>
+                        Preview grid - {INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits
+                      </Text>
+                      <Text style={styles.packPlannerSummaryText}>
+                        Per kept photo - {INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit{INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"}
                       </Text>
                       <View style={styles.packPlannerSummaryPriceRow}>
-                        <Ionicons name="diamond-outline" size={12} color={Colors.accentLight} />
+                        <Ionicons name="diamond-outline" size={12} color="#F3A0B1" />
                         <Text style={styles.packPlannerSummaryPriceText}>
-                          Full pack ≈ {getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
+                          Full pack - ~{getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
                         </Text>
                       </View>
                       <Text style={styles.packPlannerSummaryFootnote}>
-                        Takes about 1–2 minutes. You only pay for photos that come out right — failed ones are refunded.
+                        Failed photos refunded
                       </Text>
                     </View>
 
                     {isMixedPhotoPack ? (
                       <View style={styles.packPlannerBlock}>
                         <View style={styles.mixedPackHeaderRow}>
-                          <Text style={styles.packPlannerLabel}>Choose 2 packs to mix</Text>
+                          <Text style={styles.packPlannerLabel}>Selected Packs</Text>
                           <Text style={styles.mixedPackCounterText}>
                             {selectedMixedPhotoPacks.length}/{MIXED_PACK_SELECTION_LIMIT}
                           </Text>
                         </View>
-                        <Text style={styles.packPlannerHint}>
-                          Tap Choose 2 packs, then select from the visual pack cards above.
-                        </Text>
                         <View style={styles.mixedPackSelectedRow}>
                           {selectedMixedPhotoPackLabels.length > 0 ? (
                             selectedMixedPhotoPackLabels.map((label) => (
@@ -4435,7 +4438,7 @@ export default function InstaMeScreen() {
                               pressed ? { opacity: 0.88 } : undefined,
                             ]}
                           >
-                            <Ionicons name="images-outline" size={15} color="#071013" />
+                            <Ionicons name="images-outline" size={14} color="#FFF" />
                             <Text style={styles.mixedPackChooseButtonText}>
                               {selectedMixedPhotoPacks.length > 0 ? "Change packs" : "Choose 2 packs"}
                             </Text>
@@ -4465,7 +4468,7 @@ export default function InstaMeScreen() {
                     {shouldShowCustomPackInputs ? (
                       <View style={styles.packPlannerBlock}>
                         <Text style={styles.packPlannerLabel}>
-                          {isMixedPhotoPack ? "Describe Custom Pack style" : "Describe your style"}
+                          Style
                         </Text>
                         <TextInput
                           value={customPackStyleText}
@@ -4490,7 +4493,12 @@ export default function InstaMeScreen() {
                             ? `${customPackStyleWordCount} words`
                             : `${customPackStyleWordCount}/${CUSTOM_PACK_STYLE_MIN_WORDS} words minimum`}
                         </Text>
-                        <Text style={styles.packPlannerLabel}>Optional palette</Text>
+                      </View>
+                    ) : null}
+
+                    {shouldShowCustomPackInputs ? (
+                      <View style={styles.packPlannerBlock}>
+                        <Text style={styles.packPlannerLabel}>Optional Palette</Text>
                         <TextInput
                           value={customPackPaletteText}
                           onChangeText={(value) => {
@@ -4518,10 +4526,7 @@ export default function InstaMeScreen() {
                     ) : null}
 
                     <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>How many photos?</Text>
-                      <Text style={styles.packPlannerHint}>
-                        Starts at your pack's recommended count — change it anytime.
-                      </Text>
+                      <Text style={styles.packPlannerLabel}>Photo Count</Text>
                       <View style={styles.packPlannerCountRow}>
                         {PACK_IMAGE_COUNT_OPTIONS.map((count) => {
                           const active = selectedPackImageCount === count;
@@ -4550,7 +4555,7 @@ export default function InstaMeScreen() {
 
                     {!isCustomPhotoPack && !isMixedPhotoPack ? (
                       <View style={styles.packPlannerBlock}>
-                        <Text style={styles.packPlannerLabel}>Choose your colors</Text>
+                        <Text style={styles.packPlannerLabel}>Palette</Text>
                         <ScrollView
                           horizontal
                           showsHorizontalScrollIndicator={false}
@@ -4653,7 +4658,7 @@ export default function InstaMeScreen() {
                     ) : null}
 
                     <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Photo contrast</Text>
+                      <Text style={styles.packPlannerLabel}>Contrast</Text>
                       <View style={styles.packQualityRow}>
                         {PACK_GRID_TONE_CONTRAST_OPTIONS.map((option) => {
                           const active = packGridToneContrast === option.key;
@@ -4677,7 +4682,7 @@ export default function InstaMeScreen() {
                                 <Ionicons
                                   name={active ? "radio-button-on" : "radio-button-off"}
                                   size={16}
-                                  color={active ? "#FFF" : "rgba(255,255,255,0.55)"}
+                                  color={active ? "#F3A0B1" : "rgba(255,255,255,0.42)"}
                                 />
                                 <Text style={[styles.packQualityOptionTitle, active && styles.packQualityOptionTitleActive]}>
                                   {option.title}
@@ -4700,7 +4705,7 @@ export default function InstaMeScreen() {
                       <Text style={styles.packPlannerMoreToggleText}>
                         {packBriefShowMore ? "Hide extra options" : "Fine-tune details"}
                         {!packBriefShowMore && packBriefRequiredElementIds.length > 0
-                          ? ` · ${packBriefRequiredElementIds.length}`
+                          ? ` - ${packBriefRequiredElementIds.length}`
                           : ""}
                       </Text>
                       <Ionicons
@@ -4933,7 +4938,7 @@ export default function InstaMeScreen() {
                                     <Ionicons
                                       name={active ? "radio-button-on" : "radio-button-off"}
                                       size={16}
-                                      color={active ? "#FFF" : "rgba(255,255,255,0.55)"}
+                                      color={active ? "#F3A0B1" : "rgba(255,255,255,0.42)"}
                                     />
                                     <Text
                                       style={[
@@ -4968,9 +4973,9 @@ export default function InstaMeScreen() {
                             ]}
                           >
                             {packGridRenderLoading ? (
-                              <ActivityIndicator size="small" color="#FFF" />
+                              <ActivityIndicator size="small" color="#111" />
                             ) : (
-                              <Ionicons name="images-outline" size={14} color="#FFF" />
+                              <Ionicons name="images-outline" size={14} color="#111" />
                             )}
                             <Text style={styles.packPlannerRenderButtonText}>
                               {packGridRenderLoading
@@ -7433,33 +7438,49 @@ const styles = StyleSheet.create({
   },
   packPlannerCard: {
     marginHorizontal: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(12,12,16,0.95)",
-    padding: 16,
-    gap: 16,
+    borderRadius: 20,
+    backgroundColor: "rgba(6,6,8,0.98)",
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    gap: 14,
   },
   packPlannerProgress: {
-    gap: 8,
+    gap: 7,
   },
   packPlannerProgressTrack: {
     flexDirection: "row",
-    gap: 5,
+    gap: 6,
   },
   packPlannerProgressSegment: {
     flex: 1,
-    height: 5,
+    height: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   packPlannerProgressSegmentActive: {
-    backgroundColor: "#7EF3FF",
+    backgroundColor: "#F3A0B1",
   },
   packPlannerProgressLabel: {
-    color: "rgba(255,255,255,0.78)",
+    color: "rgba(255,255,255,0.62)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    letterSpacing: 0.2,
+  },
+  packPlannerConfigHeader: {
+    gap: 4,
+    paddingTop: 2,
+  },
+  packPlannerConfigTitle: {
+    color: "rgba(255,255,255,0.92)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 26,
+    lineHeight: 31,
+  },
+  packPlannerConfigSubtitle: {
+    color: "rgba(255,255,255,0.66)",
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
+    lineHeight: 17,
   },
   packPlannerStepsRow: {
     flexDirection: "row",
@@ -7506,41 +7527,43 @@ const styles = StyleSheet.create({
   },
   packPlannerSummaryCard: {
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(126,243,255,0.28)",
-    backgroundColor: "rgba(126,243,255,0.09)",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 2,
+    backgroundColor: "rgba(255,255,255,0.065)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 4,
+    alignItems: "center",
   },
   packPlannerSummaryTitle: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.94)",
     fontFamily: "Inter_700Bold",
-    fontSize: 14,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
   },
   packPlannerSummaryText: {
-    color: "rgba(255,255,255,0.72)",
+    color: "rgba(255,255,255,0.78)",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
   },
   packPlannerSummaryPriceRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginTop: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: "rgba(126,243,255,0.34)",
-    backgroundColor: "rgba(66,214,235,0.10)",
+    marginTop: 2,
+    alignSelf: "center",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
   },
   packPlannerSummaryPriceText: {
-    color: Colors.accentLight,
+    color: "rgba(255,255,255,0.82)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 11.5,
-    letterSpacing: 0.2,
+    fontSize: 12,
+    lineHeight: 16,
   },
   packIntroText: {
     color: "rgba(255,255,255,0.60)",
@@ -7558,11 +7581,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   packPlannerSummaryFootnote: {
-    color: "rgba(255,255,255,0.55)",
+    color: "rgba(255,255,255,0.42)",
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 8,
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 4,
+    textAlign: "center",
   },
   packPlannerDeliverableText: {
     color: "rgba(255,255,255,0.52)",
@@ -7681,7 +7705,10 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
   },
   packPlannerBlock: {
-    gap: 10,
+    gap: 9,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.09)",
   },
   mixedPackHeaderRow: {
     flexDirection: "row",
@@ -7690,28 +7717,28 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   mixedPackCounterText: {
-    color: Colors.accentLight,
+    color: "#F4A3B6",
     fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontSize: 11,
   },
   mixedPackSelectedRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 6,
   },
   mixedPackSelectedPill: {
     maxWidth: "100%",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(126,243,255,0.36)",
-    backgroundColor: "rgba(126,243,255,0.12)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: "rgba(244,163,182,0.70)",
+    backgroundColor: "rgba(244,163,182,0.08)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
   },
   mixedPackSelectedPillText: {
-    color: "#DFFFFF",
-    fontFamily: "Inter_700Bold",
-    fontSize: 11,
+    color: "rgba(255,255,255,0.88)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10.5,
   },
   mixedPackEmptyText: {
     color: "rgba(255,255,255,0.48)",
@@ -7721,33 +7748,35 @@ const styles = StyleSheet.create({
   mixedPackActionRow: {
     flexDirection: "row",
     gap: 8,
+    alignItems: "center",
   },
   mixedPackChooseButton: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 12,
-    backgroundColor: "#7EF3FF",
+    minHeight: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(244,163,182,0.42)",
+    backgroundColor: "rgba(244,163,182,0.10)",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 7,
-    paddingHorizontal: 12,
+    gap: 6,
+    paddingHorizontal: 11,
   },
   mixedPackChooseButtonActive: {
-    backgroundColor: "#A8FBFF",
+    backgroundColor: "rgba(244,163,182,0.16)",
   },
   mixedPackChooseButtonText: {
-    color: "#071013",
-    fontFamily: "Inter_800ExtraBold",
-    fontSize: 12,
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
   },
   mixedPackDoneButton: {
     minWidth: 72,
-    minHeight: 40,
-    borderRadius: 12,
+    minHeight: 34,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.055)",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,
@@ -7756,9 +7785,9 @@ const styles = StyleSheet.create({
     opacity: 0.42,
   },
   mixedPackDoneButtonText: {
-    color: "rgba(255,255,255,0.82)",
+    color: "rgba(255,255,255,0.78)",
     fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontSize: 11,
   },
   mixedPackRail: {
     gap: 8,
@@ -7813,25 +7842,28 @@ const styles = StyleSheet.create({
   packPlannerMoreToggle: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingVertical: 6,
+    justifyContent: "space-between",
+    gap: 8,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.09)",
   },
   packPlannerMoreToggleText: {
-    color: "rgba(255,255,255,0.62)",
+    color: "rgba(255,255,255,0.70)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12.5,
+    fontSize: 12,
   },
   packPlannerLabel: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.92)",
     fontFamily: "Inter_700Bold",
-    fontSize: 14,
+    fontSize: 12,
+    lineHeight: 16,
   },
   packPlannerHint: {
-    color: "rgba(255,255,255,0.56)",
+    color: "rgba(255,255,255,0.46)",
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 10.5,
+    lineHeight: 15,
   },
   packPlannerVibeRail: {
     gap: 8,
@@ -7859,48 +7891,52 @@ const styles = StyleSheet.create({
   },
   packPlannerCountRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 0,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    padding: 3,
   },
   packPlannerCountChip: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    minHeight: 34,
+    borderRadius: 999,
+    borderWidth: 0,
+    backgroundColor: "transparent",
     alignItems: "center",
-    paddingVertical: 12,
+    justifyContent: "center",
+    paddingVertical: 8,
   },
   packPlannerCountChipActive: {
-    borderColor: "rgba(126,243,255,0.44)",
-    backgroundColor: "rgba(126,243,255,0.16)",
+    backgroundColor: "#F3A0B1",
   },
   packPlannerCountChipText: {
-    color: "rgba(255,255,255,0.78)",
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    color: "rgba(255,255,255,0.74)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
   packPlannerCountChipTextActive: {
-    color: "#DFFFFF",
+    color: "#101010",
+    fontFamily: "Inter_800ExtraBold",
   },
   packPlannerPaletteRail: {
     gap: 8,
     paddingRight: 8,
   },
   packPlannerPaletteCard: {
-    width: 96,
-    borderRadius: 14,
+    width: 92,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 9,
-    gap: 8,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    padding: 8,
+    gap: 7,
   },
   packPlannerPaletteCustomCard: {
     borderStyle: "dashed",
   },
   packPlannerPaletteCardActive: {
-    borderColor: "rgba(126,243,255,0.46)",
-    backgroundColor: "rgba(126,243,255,0.12)",
+    borderColor: "rgba(244,163,182,0.58)",
+    backgroundColor: "rgba(244,163,182,0.10)",
   },
   packPlannerPaletteCustomIconWrap: {
     flexDirection: "row",
@@ -7915,15 +7951,15 @@ const styles = StyleSheet.create({
   },
   packPlannerPaletteSwatch: {
     flex: 1,
-    height: 22,
-    borderRadius: 6,
+    height: 20,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.24)",
   },
   packPlannerPaletteTitle: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.88)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontSize: 11,
   },
   packPlannerPaletteSubtitle: {
     color: "rgba(255,255,255,0.62)",
@@ -7933,19 +7969,20 @@ const styles = StyleSheet.create({
   packPlannerPaletteCustomInput: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.055)",
     color: "#FFF",
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_500Medium",
     fontSize: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    marginTop: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 0,
   },
   packPlannerPaletteCustomHint: {
-    color: "rgba(255,255,255,0.50)",
+    color: "rgba(255,255,255,0.42)",
     fontFamily: "Inter_400Regular",
     fontSize: 10,
+    lineHeight: 14,
   },
   packPlannerPaletteCustomHintWarning: {
     color: "#FF8CAB",
@@ -7953,24 +7990,24 @@ const styles = StyleSheet.create({
   packPlannerElementWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 7,
   },
   packPlannerElementChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   packPlannerElementChipActive: {
-    borderColor: "rgba(255,79,125,0.52)",
-    backgroundColor: "rgba(255,79,125,0.14)",
+    borderColor: "rgba(244,163,182,0.62)",
+    backgroundColor: "rgba(244,163,182,0.12)",
   },
   packPlannerElementChipText: {
     color: "rgba(255,255,255,0.72)",
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   packPlannerElementChipTextActive: {
     color: "#FFF",
@@ -8010,31 +8047,31 @@ const styles = StyleSheet.create({
   },
   packPlannerNotesInput: {
     minHeight: 72,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.055)",
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: "#FFF",
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    lineHeight: 18,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    lineHeight: 17,
     textAlignVertical: "top",
   },
   packPlannerSceneWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 9,
   },
   packPlannerSceneThumb: {
-    width: 72,
-    height: 72,
-    borderRadius: 14,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
   packPlannerSceneRemove: {
     position: "absolute",
@@ -8050,12 +8087,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.16)",
   },
   packPlannerSceneAdd: {
-    width: 72,
-    height: 72,
-    borderRadius: 14,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.16)",
     backgroundColor: "rgba(255,255,255,0.04)",
     alignItems: "center",
     justifyContent: "center",
@@ -8105,50 +8142,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   packPlannerPreviewButton: {
-    borderRadius: 12,
-    backgroundColor: "#FFF",
+    minHeight: 48,
+    borderRadius: 18,
+    backgroundColor: "#F3A0B1",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
   },
   packPlannerPreviewButtonText: {
-    color: "#000",
+    color: "#111",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
   },
   packPlannerRenderButton: {
-    borderRadius: 12,
-    backgroundColor: "rgba(126,243,255,0.80)",
+    minHeight: 48,
+    borderRadius: 18,
+    backgroundColor: "#F3A0B1",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
     marginTop: 4,
   },
   packQualityRow: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 2,
+    gap: 7,
+    marginTop: 2,
+    marginBottom: 0,
   },
   packQualityOption: {
     flex: 1,
+    minHeight: 42,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
     paddingHorizontal: 10,
     paddingVertical: 9,
-    gap: 4,
+    gap: 3,
   },
   packQualityOptionActive: {
-    borderColor: "rgba(126,243,255,0.55)",
-    backgroundColor: "rgba(126,243,255,0.10)",
+    borderColor: "rgba(244,163,182,0.64)",
+    backgroundColor: "rgba(244,163,182,0.10)",
   },
   packQualityOptionHeader: {
     flexDirection: "row",
@@ -8157,20 +8197,20 @@ const styles = StyleSheet.create({
   },
   packQualityOptionTitle: {
     color: "rgba(255,255,255,0.72)",
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   packQualityOptionTitleActive: {
     color: "#FFF",
   },
   packQualityOptionSubtitle: {
-    color: "rgba(255,255,255,0.5)",
+    color: "rgba(255,255,255,0.42)",
     fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 9.5,
+    lineHeight: 12,
   },
   packPlannerRenderButtonText: {
-    color: "#000",
+    color: "#111",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
   },
