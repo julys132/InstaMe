@@ -120,6 +120,7 @@ import {
   GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
   type GridPipelineImageCount,
   type GridPipelineUserInputs,
+  type GridPlan,
   type GridContinuityContext,
   type GridToneContrast,
 } from "./lib/instame-grid-pipeline";
@@ -749,6 +750,42 @@ function isGridPipelineImageCount(value: unknown): value is GridPipelineImageCou
 
 function normalizeGridToneContrast(value: unknown): GridToneContrast {
   return value === "high" ? "high" : "medium";
+}
+
+async function callGeminiGridPlanWithRetry(params: {
+  systemPrompt: string;
+  expectedCount: GridPipelineImageCount;
+  seed?: number;
+  geminiApiBaseUrl: string;
+  geminiApiKey: string;
+  model: string;
+}): Promise<GridPlan> {
+  const rawJson = await callGeminiFlashText({
+    systemPrompt: params.systemPrompt,
+    geminiApiBaseUrl: params.geminiApiBaseUrl,
+    geminiApiKey: params.geminiApiKey,
+    model: params.model,
+  });
+
+  try {
+    return parseGridPlan(rawJson, params.expectedCount, params.seed);
+  } catch (error) {
+    console.warn("Gemini grid plan parse failed; retrying once:", error);
+  }
+
+  const retryPrompt = `${params.systemPrompt}
+
+The previous response was not valid parseable JSON. Try again.
+Return ONLY one strict JSON object. No markdown, no comments, no prose, no union syntax, no trailing commas.`;
+
+  const retryRawJson = await callGeminiFlashText({
+    systemPrompt: retryPrompt,
+    geminiApiBaseUrl: params.geminiApiBaseUrl,
+    geminiApiKey: params.geminiApiKey,
+    model: params.model,
+  });
+
+  return parseGridPlan(retryRawJson, params.expectedCount, params.seed);
 }
 const MAX_IMAGE_COUNT_BY_MODE: Record<ImageInputMode, number> = {
   single_item: 10,
@@ -7388,14 +7425,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = getGeminiApiKey();
       const systemPrompt = buildMasterGridSystemPrompt(inputs);
 
-      const rawJson = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: imageCount,
         geminiApiBaseUrl: GEMINI_API_BASE_URL,
         geminiApiKey: apiKey,
         model: DEFAULT_STYLE_TEXT_MODEL,
       });
-
-      const plan = parseGridPlan(rawJson, imageCount);
       const continuityContext = extractContinuityContext(plan);
 
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
@@ -7558,14 +7594,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = getGeminiApiKey();
       const systemPrompt = buildContinuityGridSystemPrompt(ctx, newImageCount, hasPortraitReference, extraNotes);
 
-      const rawJson = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: newImageCount,
         geminiApiBaseUrl: GEMINI_API_BASE_URL,
         geminiApiKey: apiKey,
         model: DEFAULT_STYLE_TEXT_MODEL,
       });
-
-      const plan = parseGridPlan(rawJson, newImageCount);
       // Merge used scenes/hairstyles for the next potential extension
       const nextContinuityContext = extractContinuityContext(plan);
       nextContinuityContext.aesthetic = sanitizeGridPromptText(nextContinuityContext.aesthetic);
@@ -7710,13 +7745,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const systemPrompt = priorContext
         ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes, seed, toneContrast)
         : buildMasterGridSystemPrompt(inputs);
-      const rawPlan = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: imageCount,
+        seed,
         geminiApiBaseUrl,
         geminiApiKey,
         model: DEFAULT_STYLE_TEXT_MODEL,
       });
-      const plan = parseGridPlan(rawPlan, imageCount, seed);
 
       // Accumulate prior + new used scenes/hairstyles so the NEXT extension stays unique.
       const planContext = extractContinuityContext(plan);

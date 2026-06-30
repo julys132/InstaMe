@@ -2073,11 +2073,38 @@ In EVERY imagePrompt, explicitly state whether that shot is "bright and airy" or
 - The brightness rhythm should be visible when scanning the grid, while still feeling cohesive and calm.
 In EVERY imagePrompt, describe the shot as either "softly luminous", "balanced midtone", or "gently moody" and name the palette colors used. This varies brightness and mood ONLY - never the color family.`;
 }
+function buildGridPlanOutputExample(params) {
+  return JSON.stringify(
+    {
+      imageCount: params.imageCount,
+      aesthetic: params.aesthetic,
+      palette: params.palette,
+      lightType: params.lightType,
+      shots: params.positionMap.map(({ position, type }) => ({
+        position,
+        type,
+        label: type === "SIMPLE" ? `Position ${position} minimalist object/detail label` : `Position ${position} model scene label`,
+        hairstyle: type === "SIMPLE" ? null : "assigned distinct hairstyle",
+        angle: type === "SIMPLE" ? null : "assigned camera angle",
+        imagePrompt: `Complete, self-contained GPT Image 2 prompt for position ${position}. Include the aesthetic, palette, light, scene, assigned type, and portrait-reference instruction when applicable.`
+      }))
+    },
+    null,
+    2
+  );
+}
 function buildMasterGridSystemPrompt(inputs) {
   const { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference, seed } = inputs;
   const toneContrast = normalizeGridToneContrast(inputs.toneContrast);
   const toneContrastDirective = getPlanToneContrastDirective(toneContrast, palette);
   const positionMap = buildPositionMap(imageCount, seed);
+  const outputJsonExample = buildGridPlanOutputExample({
+    imageCount,
+    aesthetic,
+    palette,
+    lightType,
+    positionMap
+  });
   const positionInstructions = positionMap.map(
     ({ position, type }) => `  - Position ${position}: ${type} \u2014 ${POSITION_TYPE_RULES[type]}`
   ).join("\n");
@@ -2133,6 +2160,9 @@ Tone contrast mode: ${toneContrast === "high" ? "high contrast" : "medium contra
 Image count: ${imageCount}
 ${vocabularyLine ? vocabularyLine + "\n" : ""}Extra notes from user: ${extraNotes || "none"}${variationDirective}
 
+CRITICAL JSON RULES: output strict parseable JSON only. Do NOT use comments, markdown fences, union syntax such as "COMPLEX" | "SIMPLE", prose, or trailing commas. Use this valid structure and fill every placeholder with real content:
+${outputJsonExample}
+
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 COLOR PALETTE (DOMINANT \u2014 overrides scene-natural colors)
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -2178,28 +2208,19 @@ ${portraitInstruction}
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 OUTPUT FORMAT (strict \u2014 output ONLY this JSON, no extra text)
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-{
-  "imageCount": ${imageCount},
-  "aesthetic": "${aesthetic}",
-  "palette": "${palette}",
-  "lightType": "${lightType}",
-  "shots": [
-    {
-      "position": 1,
-      "type": "COMPLEX" | "SIMPLE" | "MEDIUM",
-      "label": "<short human-readable scene label>",
-      "hairstyle": "<hairstyle or null if no model in frame>",
-      "angle": "<camera angle or null if no model in frame>",
-      "imagePrompt": "<complete, self-contained prompt for GPT Image 2 \u2014 include aesthetic, palette, light, scene, hairstyle, angle, and any portrait-reference instruction>"
-    }
-    // ... one entry per position, total ${imageCount} entries
-  ]
-}`;
+${outputJsonExample}`;
 }
 function buildContinuityGridSystemPrompt(context, newImageCount, hasPortraitReference, extraNotes = "", seed, toneContrast = "medium") {
   const normalizedToneContrast = normalizeGridToneContrast(toneContrast);
   const toneContrastDirective = getPlanToneContrastDirective(normalizedToneContrast, context.palette);
   const positionMap = buildPositionMap(newImageCount, seed);
+  const outputJsonExample = buildGridPlanOutputExample({
+    imageCount: newImageCount,
+    aesthetic: context.aesthetic,
+    palette: context.palette,
+    lightType: context.lightType,
+    positionMap
+  });
   const positionInstructions = positionMap.map(({ position, type }) => `  - Position ${position}: ${type}`).join("\n");
   const vocabularyLine = getAestheticVocabularyLine(context.aesthetic);
   const usedScenesList = context.usedScenes.length > 0 ? context.usedScenes.join(", ") : "none";
@@ -2257,6 +2278,9 @@ New image count: ${newImageCount}
 Tone contrast mode: ${normalizedToneContrast === "high" ? "high contrast" : "medium contrast"}
 Extra notes: ${extraNotes || "none"}
 
+CRITICAL JSON RULES: output strict parseable JSON only. Do NOT use comments, markdown fences, union syntax such as "COMPLEX" | "SIMPLE", prose, or trailing commas. Use this valid structure and fill every placeholder with real content:
+${outputJsonExample}
+
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 CONTRAST MATRIX (MANDATORY)
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
@@ -2282,22 +2306,7 @@ ${portraitInstruction}
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
 OUTPUT FORMAT (output ONLY this JSON)
 \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-{
-  "imageCount": ${newImageCount},
-  "aesthetic": "${context.aesthetic}",
-  "palette": "${context.palette}",
-  "lightType": "${context.lightType}",
-  "shots": [
-    {
-      "position": 1,
-      "type": "COMPLEX" | "SIMPLE" | "MEDIUM",
-      "label": "<scene label>",
-      "hairstyle": "<hairstyle or null>",
-      "angle": "<angle or null>",
-      "imagePrompt": "<complete GPT Image 2 prompt>"
-    }
-  ]
-}`;
+${outputJsonExample}`;
 }
 var POSITION_TYPE_RULES = {
   COMPLEX: "medium or full-body frame, action, movement, rich location details",
@@ -2405,11 +2414,51 @@ async function callGeminiFlashText(options) {
   }
   throw new Error("Gemini Flash returned no usable text.");
 }
+function stripMarkdownFences(value) {
+  return value.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "").trim();
+}
+function extractJsonObjectText(value) {
+  const clean = stripMarkdownFences(value);
+  if (!clean) return clean;
+  if (clean.startsWith("{") && clean.endsWith("}")) return clean;
+  const start = clean.indexOf("{");
+  if (start < 0) return clean;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < clean.length; i += 1) {
+    const char = clean[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return clean.slice(start, i + 1);
+      }
+    }
+  }
+  return clean;
+}
 function parseGridPlan(rawJson, expectedCount, seed) {
   let parsed;
   try {
-    const clean = rawJson.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const clean = extractJsonObjectText(rawJson);
     parsed = JSON.parse(clean);
+    if (typeof parsed === "string") {
+      parsed = JSON.parse(extractJsonObjectText(parsed));
+    }
   } catch {
     throw new Error("Grid plan parsing failed: Gemini did not return valid JSON.");
   }
@@ -2972,6 +3021,30 @@ function isGridPipelineImageCount(value) {
 }
 function normalizeGridToneContrast2(value) {
   return value === "high" ? "high" : "medium";
+}
+async function callGeminiGridPlanWithRetry(params) {
+  const rawJson = await callGeminiFlashText({
+    systemPrompt: params.systemPrompt,
+    geminiApiBaseUrl: params.geminiApiBaseUrl,
+    geminiApiKey: params.geminiApiKey,
+    model: params.model
+  });
+  try {
+    return parseGridPlan(rawJson, params.expectedCount, params.seed);
+  } catch (error) {
+    console.warn("Gemini grid plan parse failed; retrying once:", error);
+  }
+  const retryPrompt = `${params.systemPrompt}
+
+The previous response was not valid parseable JSON. Try again.
+Return ONLY one strict JSON object. No markdown, no comments, no prose, no union syntax, no trailing commas.`;
+  const retryRawJson = await callGeminiFlashText({
+    systemPrompt: retryPrompt,
+    geminiApiBaseUrl: params.geminiApiBaseUrl,
+    geminiApiKey: params.geminiApiKey,
+    model: params.model
+  });
+  return parseGridPlan(retryRawJson, params.expectedCount, params.seed);
 }
 var MAX_IMAGE_COUNT_BY_MODE = {
   single_item: 10,
@@ -7869,13 +7942,13 @@ async function registerRoutes(app2) {
     try {
       const apiKey = getGeminiApiKey();
       const systemPrompt = buildMasterGridSystemPrompt(inputs);
-      const rawJson = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: imageCount,
         geminiApiBaseUrl: GEMINI_API_BASE_URL,
         geminiApiKey: apiKey,
         model: DEFAULT_STYLE_TEXT_MODEL
       });
-      const plan = parseGridPlan(rawJson, imageCount);
       const continuityContext = extractContinuityContext(plan);
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
       planConsumed = false;
@@ -7997,13 +8070,13 @@ async function registerRoutes(app2) {
     try {
       const apiKey = getGeminiApiKey();
       const systemPrompt = buildContinuityGridSystemPrompt(ctx, newImageCount, hasPortraitReference, extraNotes);
-      const rawJson = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: newImageCount,
         geminiApiBaseUrl: GEMINI_API_BASE_URL,
         geminiApiKey: apiKey,
         model: DEFAULT_STYLE_TEXT_MODEL
       });
-      const plan = parseGridPlan(rawJson, newImageCount);
       const nextContinuityContext = extractContinuityContext(plan);
       nextContinuityContext.aesthetic = sanitizeGridPromptText(nextContinuityContext.aesthetic);
       nextContinuityContext.palette = sanitizeGridPromptText(nextContinuityContext.palette);
@@ -8085,13 +8158,14 @@ async function registerRoutes(app2) {
       const geminiApiKey = getGeminiApiKey();
       const geminiApiBaseUrl = process.env.GEMINI_API_BASE_URL || process.env.AI_INTEGRATIONS_GEMINI_API_BASE_URL || "https://generativelanguage.googleapis.com/v1beta";
       const systemPrompt = priorContext ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes, seed, toneContrast) : buildMasterGridSystemPrompt(inputs);
-      const rawPlan = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: imageCount,
+        seed,
         geminiApiBaseUrl,
         geminiApiKey,
         model: DEFAULT_STYLE_TEXT_MODEL
       });
-      const plan = parseGridPlan(rawPlan, imageCount, seed);
       const planContext = extractContinuityContext(plan);
       const continuityContext = priorContext ? {
         aesthetic: sanitizeGridPromptText(planContext.aesthetic) || priorContext.aesthetic,
