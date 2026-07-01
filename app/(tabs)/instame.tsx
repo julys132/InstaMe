@@ -407,6 +407,24 @@ const OWN_STYLE_MODE_OPTIONS: {
   },
 ];
 
+type MakeupMode = "enhanced" | "original";
+const MAKEUP_MODE_OPTIONS: {
+  value: MakeupMode;
+  label: string;
+  subtitle: string;
+}[] = [
+  {
+    value: "enhanced",
+    label: "Enhanced",
+    subtitle: "Polished makeup from the style",
+  },
+  {
+    value: "original",
+    label: "Original portrait",
+    subtitle: "Keep your photo's own makeup",
+  },
+];
+
 const PACK_BRIEF_REQUIRED_ELEMENTS = [
   { id: "outfit", label: "Signature outfit" },
   { id: "location", label: "Location moment" },
@@ -1065,6 +1083,7 @@ export default function InstaMeScreen() {
   const [renamingOwnStyle, setRenamingOwnStyle] = useState(false);
   const [comparisonImageUri, setComparisonImageUri] = useState<string | null>(null);
   const [preserveBackground, setPreserveBackground] = useState(true);
+  const [makeupMode, setMakeupMode] = useState<MakeupMode>("enhanced");
   const [resultBase64, setResultBase64] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<GenerationResultMeta | null>(null);
   const [isRetouchDrawerOpen, setIsRetouchDrawerOpen] = useState(false);
@@ -3401,6 +3420,7 @@ export default function InstaMeScreen() {
         saveOwnStyle: Boolean(isOwnStyleSelected && ownStylePhoto && !selectedOwnStyleId),
         ownStyleMode: isOwnStyleSelected ? ownStyleMode : undefined,
         customPrompt: composedPrompt,
+        makeupMode,
         intensity: selectedArtStyle || isOwnStyleSelected ? undefined : intensity || undefined,
         preserveBackground,
         stylePresetId: selectedPreset?.id,
@@ -4022,7 +4042,7 @@ export default function InstaMeScreen() {
 
                 {!activePhotoPack ? (
                   <View style={styles.packPlannerEmptyState}>
-                    <Ionicons name="sparkles-outline" size={20} color={Colors.accentLight} />
+                    <Ionicons name="sparkles-outline" size={20} color={Colors.accentTeal} />
                     <Text style={styles.packPlannerEmptyTitle}>Pick a pack to get started</Text>
                     <Text style={styles.packPlannerEmptySubtitle}>
                       Choose a look above. You'll preview the full grid first and only pay for the photos you keep.
@@ -4039,7 +4059,7 @@ export default function InstaMeScreen() {
                         {`Step 1 · Preview the grid — ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits\nStep 2 · Keep your photos — ${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"} each`}
                       </Text>
                       <View style={styles.packPlannerSummaryPriceRow}>
-                        <Ionicons name="diamond-outline" size={12} color={Colors.accentLight} />
+                        <Ionicons name="diamond-outline" size={12} color={Colors.accentTeal} />
                         <Text style={styles.packPlannerSummaryPriceText}>
                           Full pack ≈ {getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
                         </Text>
@@ -4913,6 +4933,28 @@ export default function InstaMeScreen() {
                   </>
                 )}
               </Pressable>
+              {photo ? (
+                <View style={styles.studioPortraitSelected}>
+                  <Image
+                    source={{ uri: photo.uri || buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType) }}
+                    style={styles.studioPortraitSelectedThumb}
+                    contentFit="cover"
+                  />
+                  <View style={styles.studioPortraitSelectedCopy}>
+                    <Text style={styles.studioPortraitSelectedName} numberOfLines={1}>
+                      {photo.name || "Your portrait"}
+                    </Text>
+                    <Text style={styles.studioPortraitSelectedHint} numberOfLines={1}>
+                      {usingEnhancedPortrait ? "Enhanced portrait active" : "This portrait will be used for this style"}
+                    </Text>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={20} color={Colors.accentTeal} />
+                </View>
+              ) : (
+                <Text style={styles.studioPortraitEmptyHint}>
+                  No portrait selected yet — tap Upload, Uploaded or Enhanced above to add one.
+                </Text>
+              )}
               {inlineGalleryType ? (
                 <View style={styles.inlineGalleryPanel}>
                   <View style={styles.inlineGalleryHeader}>
@@ -5098,6 +5140,28 @@ export default function InstaMeScreen() {
                           </Pressable>
                         );
                       })}
+                    </View>
+                    <View style={styles.makeupToggleBlock}>
+                      <Text style={styles.makeupToggleLabel}>Makeup</Text>
+                      <View style={styles.subTabBar}>
+                        {MAKEUP_MODE_OPTIONS.map((option) => {
+                          const active = makeupMode === option.value;
+                          return (
+                            <Pressable
+                              key={option.value}
+                              onPress={() => setMakeupMode(option.value)}
+                              style={[styles.subTab, active && styles.subTabActive]}
+                            >
+                              <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{option.label}</Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      <Text style={styles.makeupToggleHint}>
+                        {makeupMode === "original"
+                          ? "Keeps your original makeup exactly as in the uploaded photo."
+                          : "Applies the polished makeup defined by the style."}
+                      </Text>
                     </View>
                     <TextInput
                       value={customPrompt}
@@ -5795,6 +5859,28 @@ export default function InstaMeScreen() {
                           })}
                         </View>
                       ) : null}
+                      <View style={styles.makeupToggleBlock}>
+                        <Text style={styles.makeupToggleLabel}>Makeup</Text>
+                        <View style={styles.subTabBar}>
+                          {MAKEUP_MODE_OPTIONS.map((option) => {
+                            const active = makeupMode === option.value;
+                            return (
+                              <Pressable
+                                key={option.value}
+                                onPress={() => setMakeupMode(option.value)}
+                                style={[styles.subTab, active && styles.subTabActive]}
+                              >
+                                <Text style={[styles.subTabText, active && styles.subTabTextActive]}>{option.label}</Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                        <Text style={styles.makeupToggleHint}>
+                          {makeupMode === "original"
+                            ? "Keeps your original makeup exactly as in the uploaded photo."
+                            : "Applies the polished makeup defined by the style."}
+                        </Text>
+                      </View>
                       <TextInput
                         value={customPrompt}
                         onChangeText={setCustomPrompt}
@@ -5889,6 +5975,28 @@ export default function InstaMeScreen() {
                     </>
                   )}
                 </Pressable>
+                {photo ? (
+                  <View style={styles.studioPortraitSelected}>
+                    <Image
+                      source={{ uri: photo.uri || buildDataUri(photo.previewBase64 || photo.base64, photo.mimeType) }}
+                      style={styles.studioPortraitSelectedThumb}
+                      contentFit="cover"
+                    />
+                    <View style={styles.studioPortraitSelectedCopy}>
+                      <Text style={styles.studioPortraitSelectedName} numberOfLines={1}>
+                        {photo.name || "Your portrait"}
+                      </Text>
+                      <Text style={styles.studioPortraitSelectedHint} numberOfLines={1}>
+                        {usingEnhancedPortrait ? "Enhanced portrait active" : "This portrait will be used for this style"}
+                      </Text>
+                    </View>
+                    <Ionicons name="checkmark-circle" size={20} color={Colors.accentTeal} />
+                  </View>
+                ) : (
+                  <Text style={styles.studioPortraitEmptyHint}>
+                    No portrait selected yet — tap Upload, Uploaded or Enhanced above to add one.
+                  </Text>
+                )}
                 {inlineGalleryType ? (
                   <View style={styles.inlineGalleryPanel}>
                     <View style={styles.inlineGalleryHeader}>
@@ -7366,8 +7474,12 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   packQualityOptionActive: {
-    borderColor: "rgba(126,243,255,0.55)",
-    backgroundColor: "rgba(126,243,255,0.10)",
+    borderColor: "rgba(35,227,184,0.6)",
+    backgroundColor: "rgba(35,227,184,0.12)",
+    shadowColor: Colors.accentTeal,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
   },
   packQualityOptionHeader: {
     flexDirection: "row",
@@ -8367,6 +8479,44 @@ const styles = StyleSheet.create({
   },
   portraitSourceCardTextActive: {
     color: "#DFFFFF",
+  },
+  studioPortraitSelected: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(35,227,184,0.4)",
+    backgroundColor: "rgba(35,227,184,0.08)",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  studioPortraitSelectedThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  studioPortraitSelectedCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  studioPortraitSelectedName: {
+    color: "#EAFFFB",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+  studioPortraitSelectedHint: {
+    color: "rgba(200,245,234,0.7)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+  studioPortraitEmptyHint: {
+    color: "rgba(235,255,255,0.55)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 16,
   },
   portraitEnhanceCard: {
     minHeight: 74,
@@ -9687,6 +9837,21 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+  },
+  makeupToggleBlock: {
+    gap: 8,
+    marginBottom: 12,
+  },
+  makeupToggleLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  makeupToggleHint: {
+    color: "rgba(255,255,255,0.45)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 15,
   },
   postGenerationSection: {
     gap: 12,

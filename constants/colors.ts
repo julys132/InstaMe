@@ -6,9 +6,16 @@ const Colors = {
   cardBorder: "rgba(255,255,255,0.08)",
   accent: "#FF4F7D",
   accentLight: "#FF8FAE",
-  accentSoft: "#FFD8E4",
-  accentPale: "#FFE1EA",
+  accentSoft: "#B8F1E0",
+  accentPale: "#D8F7EE",
   accentPink: "#FF9EBC",
+
+  // Secondary accent (AI / premium / max-quality / sparkle) — bright green -> turquoise
+  accentTeal: "#23E3B8",
+  accentTealBright: "#41F0A8",
+  accentTealDeep: "#12C2C2",
+  accentTealSoft: "#8CF2DA",
+  accentTealGlow: "rgba(35,227,184,0.35)",
   text: "#FFFFFF",
   textSecondary: "#C5C5C5",
   textMuted: "#9A9A9A",

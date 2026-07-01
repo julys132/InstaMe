@@ -1268,7 +1268,7 @@ function buildModerationSafeFallbackExtractionPrompt(params: {
       : "full or medium body in a styled fashion scene";
 
   const portraitInstruction = hasPortrait
-    ? "\nCRITICAL IDENTITY RULE: Preserve the face and identity of the person in the provided reference portrait exactly."
+    ? "\nCRITICAL IDENTITY RULE: Match the face, facial features, skin tone, and hair color of the person to the provided reference portrait exactly (1:1). Keep the same hair color as the reference portrait; do not recolor the hair. The facial expression may stay as shown in the approved cell."
     : "";
 
   return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
@@ -2844,7 +2844,7 @@ async function renderGridExtractedShot(options: {
       model: GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL,
       parts,
       maxOutputTokens: 1400,
-      imageSize: "2K",
+      imageSize: "4K",
       aspectRatio: "2:3",
     });
     return imageBase64;
@@ -6601,6 +6601,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const userId = req.user!.id;
     const body = req.body || {};
     const customPrompt = normalizeStringValue(body.customPrompt);
+    const makeupMode = normalizeStringValue(body.makeupMode) === "original" ? "original" : "enhanced";
+    const makeupDirective =
+      makeupMode === "original"
+        ? "Keep the subject's original makeup exactly as it appears in the uploaded photo: do NOT add, enhance, intensify, or restyle any makeup — preserve the same lipstick, eyeshadow, eyeliner, lashes, blush, and coverage as in the original."
+        : "";
+    const generationCustomPrompt = [customPrompt, makeupDirective].filter(Boolean).join(". ");
     const requestedStylePresetId = normalizeStringValue(body.stylePresetId);
     const requestedSavedOwnStyleId = normalizeStringValue(body.savedOwnStyleId);
     const shouldSaveOwnStyle = body.saveOwnStyle !== false;
@@ -6802,7 +6808,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             uploadedImages,
             styleReferenceImage: activeOwnStyleReferenceImage!,
             analyzedStylePrompt: analyzedOwnStylePrompt,
-            customPrompt,
+            customPrompt: generationCustomPrompt,
             preserveBackground,
             generationMode,
             generationTierId: generationTier.id,
@@ -6819,7 +6825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             generationMode,
             generationTierId: generationTier.id,
             preserveBackground,
-            customPrompt,
+            customPrompt: generationCustomPrompt,
           })
         : generationMode === "high_res"
           ? await generateReferenceGuidedHighResImage({
@@ -6827,7 +6833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               uploadedImages,
               selectedStyleReferences,
               intensity,
-              customPrompt,
+              customPrompt: generationCustomPrompt,
               preserveBackground,
               stylePresetLabel,
               stylePresetPromptHint,
@@ -6837,7 +6843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               uploadedImages,
               selectedStyleReferences,
               intensity,
-              customPrompt,
+              customPrompt: generationCustomPrompt,
               preserveBackground,
               stylePresetLabel,
               stylePresetPromptHint,

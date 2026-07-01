@@ -1000,7 +1000,7 @@ export function buildExtractionPrompt(params: {
     : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
 
   const portraitInstruction = hasPortrait
-    ? `\nCRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait, exactly as they already appear in the reference cell. Never alter their identity.`
+    ? `\nCRITICAL IDENTITY RULE — MATCH THE REFERENCE PORTRAIT 1:1: The face shape, facial features, facial proportions, skin tone, and especially the HAIR COLOR of any person in this image MUST match the provided reference portrait EXACTLY (1:1), in addition to staying consistent with the approved grid cell. Reproduce the SAME hair color as the reference portrait — never lighten, darken, tint, or recolor the hair. Do NOT beautify, slim, age, or otherwise alter their identity. The facial EXPRESSION does NOT need to copy the reference portrait: keep the natural expression already shown in the approved grid cell (a smile, a neutral look, or a candid expression is all fine) — only the identity, facial features, and hair color must be locked to the reference portrait.`
     : "";
 
   const openingLine = preCropped
@@ -1019,7 +1019,7 @@ WHAT TO PRESERVE EXACTLY (do NOT change any of these):
 - The exact same composition, framing, camera angle, and crop
 - The exact same outfit / wardrobe — every garment, color, cut, fabric, and accessory stays identical (do not add, remove, swap, or restyle clothing)
 - The exact same background, location, set dressing, props, and every object in frame
-- The exact same pose, body position, hands, and facial expression
+- The exact same pose, body position, and hands (keep the natural facial expression already shown in the approved cell — it does not need to be forced or neutralized)
 - The exact same colors, palette, tonal range, and lighting direction
 - For object/flat-lay cells: the exact same hero subject and layout
 

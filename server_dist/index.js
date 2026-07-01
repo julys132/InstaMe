@@ -2409,7 +2409,7 @@ function buildExtractionPrompt(params) {
   const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame. ONE single hero subject with generous empty negative space around it; minimalist, clean, airy, uncluttered and breathable \u2014 never busy or crowded" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
   const brief = shot.imagePrompt && shot.imagePrompt.trim().length > 0 ? shot.imagePrompt.trim() : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
   const portraitInstruction = hasPortrait ? `
-CRITICAL IDENTITY RULE: The facial features, face shape, skin tone, and complete identity of any person in this image MUST belong 100% to the individual shown in the provided reference portrait, exactly as they already appear in the reference cell. Never alter their identity.` : "";
+CRITICAL IDENTITY RULE \u2014 MATCH THE REFERENCE PORTRAIT 1:1: The face shape, facial features, facial proportions, skin tone, and especially the HAIR COLOR of any person in this image MUST match the provided reference portrait EXACTLY (1:1), in addition to staying consistent with the approved grid cell. Reproduce the SAME hair color as the reference portrait \u2014 never lighten, darken, tint, or recolor the hair. Do NOT beautify, slim, age, or otherwise alter their identity. The facial EXPRESSION does NOT need to copy the reference portrait: keep the natural expression already shown in the approved grid cell (a smile, a neutral look, or a candid expression is all fine) \u2014 only the identity, facial features, and hair color must be locked to the reference portrait.` : "";
   const openingLine = preCropped ? `Upscale and enhance the provided photo into a single full-resolution editorial image. This is an ENHANCEMENT task, NOT a re-generation: the provided image is the exact picture the user already approved.` : `Upscale and enhance cell ${position} of ${imageCount} from the Instagram grid preview (first image provided) into a single full-resolution editorial photo. This is an ENHANCEMENT task, NOT a re-generation: the reference cell is the exact picture the user already approved.`;
   const referenceLine = preCropped ? `REFERENCE: the provided image IS the photo to enhance \u2014 it already shows ONLY this single cell. Treat every pixel of it as the SOURCE OF TRUTH and keep the entire frame; do NOT crop, zoom, re-frame, or cut anything out.` : `REFERENCE CELL: position ${position}, counting left to right, top to bottom \u2014 row ${row}, column ${col} (${corner}). Crop to this cell and treat its pixels as the SOURCE OF TRUTH.`;
   return `${openingLine}
@@ -2420,7 +2420,7 @@ WHAT TO PRESERVE EXACTLY (do NOT change any of these):
 - The exact same composition, framing, camera angle, and crop
 - The exact same outfit / wardrobe \u2014 every garment, color, cut, fabric, and accessory stays identical (do not add, remove, swap, or restyle clothing)
 - The exact same background, location, set dressing, props, and every object in frame
-- The exact same pose, body position, hands, and facial expression
+- The exact same pose, body position, and hands (keep the natural facial expression already shown in the approved cell \u2014 it does not need to be forced or neutralized)
 - The exact same colors, palette, tonal range, and lighting direction
 - For object/flat-lay cells: the exact same hero subject and layout
 
@@ -2835,7 +2835,7 @@ var MAX_INSTAME_LIBRARY_PREVIEW_BASE64_LENGTH = 22e4;
 var MAX_INSTAME_OWN_STYLE_PROMPT_LENGTH = 8e3;
 var MAX_INSTAME_SAVED_PACKS = 30;
 var MAX_INSTAME_PACK_IMAGES = 16;
-var MAX_INSTAME_PACK_IMAGE_BASE64_LENGTH = 6e6;
+var MAX_INSTAME_PACK_IMAGE_BASE64_LENGTH = 2e7;
 var STRIPE_WEBHOOK_TOLERANCE_SEC = 300;
 var INSTAME_HIGH_RES_OUTPUT_DIMENSION = 1024;
 var DEFAULT_IAP_PRODUCT_CREDITS = {
@@ -3191,7 +3191,7 @@ function buildModerationSafeFallbackExtractionPrompt(params) {
   const row = Math.ceil(position / GRID_COLS2);
   const col = (position - 1) % GRID_COLS2 + 1;
   const typeDesc = type === "SIMPLE" ? "minimalist flat-lay or object detail \u2014 no person in frame" : type === "MEDIUM" ? "tight portrait, face and shoulders, calm and refined" : "full or medium body in a styled fashion scene";
-  const portraitInstruction = hasPortrait ? "\nCRITICAL IDENTITY RULE: Preserve the face and identity of the person in the provided reference portrait exactly." : "";
+  const portraitInstruction = hasPortrait ? "\nCRITICAL IDENTITY RULE: Match the face, facial features, skin tone, and hair color of the person to the provided reference portrait exactly (1:1). Keep the same hair color as the reference portrait; do not recolor the hair. The facial expression may stay as shown in the approved cell." : "";
   return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
 
 EXACT POSITION: row ${row}, column ${col} (counting left to right, top to bottom).
@@ -4280,7 +4280,7 @@ async function renderGridExtractedShot(options) {
       model: GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL,
       parts,
       maxOutputTokens: 1400,
-      imageSize: "2K",
+      imageSize: "4K",
       aspectRatio: "2:3"
     });
     return imageBase64;
@@ -7072,6 +7072,9 @@ async function registerRoutes(app2) {
     const userId = req.user.id;
     const body = req.body || {};
     const customPrompt = normalizeStringValue(body.customPrompt);
+    const makeupMode = normalizeStringValue(body.makeupMode) === "original" ? "original" : "enhanced";
+    const makeupDirective = makeupMode === "original" ? "Keep the subject's original makeup exactly as it appears in the uploaded photo: do NOT add, enhance, intensify, or restyle any makeup \u2014 preserve the same lipstick, eyeshadow, eyeliner, lashes, blush, and coverage as in the original." : "";
+    const generationCustomPrompt = [customPrompt, makeupDirective].filter(Boolean).join(". ");
     const requestedStylePresetId = normalizeStringValue(body.stylePresetId);
     const requestedSavedOwnStyleId = normalizeStringValue(body.savedOwnStyleId);
     const shouldSaveOwnStyle = body.saveOwnStyle !== false;
@@ -7221,7 +7224,7 @@ async function registerRoutes(app2) {
         uploadedImages,
         styleReferenceImage: activeOwnStyleReferenceImage,
         analyzedStylePrompt: analyzedOwnStylePrompt,
-        customPrompt,
+        customPrompt: generationCustomPrompt,
         preserveBackground,
         generationMode,
         generationTierId: generationTier.id,
@@ -7236,13 +7239,13 @@ async function registerRoutes(app2) {
         generationMode,
         generationTierId: generationTier.id,
         preserveBackground,
-        customPrompt
+        customPrompt: generationCustomPrompt
       }) : generationMode === "high_res" ? await generateReferenceGuidedHighResImage({
         req,
         uploadedImages,
         selectedStyleReferences,
         intensity,
-        customPrompt,
+        customPrompt: generationCustomPrompt,
         preserveBackground,
         stylePresetLabel,
         stylePresetPromptHint,
@@ -7251,7 +7254,7 @@ async function registerRoutes(app2) {
         uploadedImages,
         selectedStyleReferences,
         intensity,
-        customPrompt,
+        customPrompt: generationCustomPrompt,
         preserveBackground,
         stylePresetLabel,
         stylePresetPromptHint

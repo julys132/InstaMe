@@ -593,6 +593,7 @@ class ApiClient {
     saveOwnStyle?: boolean;
     ownStyleMode?: "reference_locked" | "creative_prompt";
     customPrompt?: string;
+    makeupMode?: "enhanced" | "original";
     intensity?: "soft" | "editorial" | "dramatic";
     preserveBackground?: boolean;
     stylePresetId?: string;
