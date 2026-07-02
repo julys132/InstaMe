@@ -2609,7 +2609,18 @@ function buildExtractionPrompt(params) {
   const typeDesc = shot.type === "SIMPLE" ? "Flat-lay / object detail \u2014 no person in frame. ONE single hero subject with generous empty negative space around it; minimalist, clean, airy, uncluttered and breathable \u2014 never busy or crowded" : shot.type === "MEDIUM" ? "Tight portrait \u2014 face and shoulders, calm and refined" : "Full or medium body \u2014 action, movement, or rich location";
   const brief = shot.imagePrompt && shot.imagePrompt.trim().length > 0 ? shot.imagePrompt.trim() : `Scene: ${shot.label}.${shot.hairstyle ? ` Hairstyle: ${shot.hairstyle}.` : ""}${shot.angle ? ` Camera angle: ${shot.angle}.` : ""}`;
   const portraitInstruction = hasPortrait ? `
-CRITICAL IDENTITY RULE \u2014 MATCH THE REFERENCE PORTRAIT 1:1: The face shape, facial features, facial proportions, skin tone, and especially the HAIR COLOR of any person in this image MUST match the provided reference portrait EXACTLY (1:1), in addition to staying consistent with the approved grid cell. Reproduce the SAME hair color as the reference portrait \u2014 never lighten, darken, tint, or recolor the hair. Do NOT beautify, slim, age, or otherwise alter their identity. The facial EXPRESSION does NOT need to copy the reference portrait: keep the natural expression already shown in the approved grid cell (a smile, a neutral look, or a candid expression is all fine) \u2014 only the identity, facial features, and hair color must be locked to the reference portrait.` : "";
+
+REFERENCE PORTRAIT \u2014 IDENTITY LOCK (READ CAREFULLY):
+Alongside the grid cell you are enhancing, a SEPARATE REFERENCE PORTRAIT image of the REAL person is also provided. The grid cell is the source of truth for the COMPOSITION (pose, outfit, background, framing, colors). The REFERENCE PORTRAIT is the source of truth for the person's IDENTITY.
+
+Transfer the following FROM THE REFERENCE PORTRAIT onto the person in the final image, 1:1, so it is unmistakably the SAME person (this prevents the face from drifting into a different-looking identity, which disappoints users):
+- Exact face shape, facial features and proportions (eyes, brows, nose, lips, jaw, cheekbones)
+- Exact skin tone and complexion
+- Exact HAIR COLOR \u2014 reproduce it identically; never lighten, darken, tint, warm, cool, or recolor it
+- The hair length and hair type/texture from the reference portrait when applicable \u2014 do not shorten long hair or lengthen short hair, and keep the same natural hair character, UNLESS the approved grid cell clearly and intentionally shows a different styling (e.g. an updo or a pinned-back look)
+
+Do NOT beautify, slim, widen, age, de-age, or otherwise restyle the identity.
+Do NOT copy the reference portrait's facial EXPRESSION \u2014 keep the natural expression already shown in the approved grid cell (a smile, a neutral look, or a candid expression are all fine). Only the identity, facial features, and hair must be locked to the reference portrait.` : "";
   const openingLine = preCropped ? `Upscale and enhance the provided photo into a single full-resolution editorial image. This is an ENHANCEMENT task, NOT a re-generation: the provided image is the exact picture the user already approved.` : `Upscale and enhance cell ${position} of ${imageCount} from the Instagram grid preview (first image provided) into a single full-resolution editorial photo. This is an ENHANCEMENT task, NOT a re-generation: the reference cell is the exact picture the user already approved.`;
   const referenceLine = preCropped ? `REFERENCE: the provided image IS the photo to enhance \u2014 it already shows ONLY this single cell. Treat every pixel of it as the SOURCE OF TRUTH and keep the entire frame; do NOT crop, zoom, re-frame, or cut anything out.` : `REFERENCE CELL: position ${position}, counting left to right, top to bottom \u2014 row ${row}, column ${col} (${corner}). Crop to this cell and treat its pixels as the SOURCE OF TRUTH.`;
   return `${openingLine}
@@ -3418,7 +3429,7 @@ function buildModerationSafeFallbackExtractionPrompt(params) {
   const row = Math.ceil(position / GRID_COLS2);
   const col = (position - 1) % GRID_COLS2 + 1;
   const typeDesc = type === "SIMPLE" ? "minimalist flat-lay or object detail \u2014 no person in frame" : type === "MEDIUM" ? "tight portrait, face and shoulders, calm and refined" : "full or medium body in a styled fashion scene";
-  const portraitInstruction = hasPortrait ? "\nCRITICAL IDENTITY RULE: Match the face, facial features, skin tone, and hair color of the person to the provided reference portrait exactly (1:1). Keep the same hair color as the reference portrait; do not recolor the hair. The facial expression may stay as shown in the approved cell." : "";
+  const portraitInstruction = hasPortrait ? "\nIDENTITY LOCK \u2014 a SEPARATE reference portrait of the real person is provided alongside the cell. Match that reference portrait 1:1 so it is clearly the SAME person: face shape, facial features, proportions, skin tone, hair color, and hair length/type must be identical. Keep the exact same hair color \u2014 do not recolor. Do not beautify, slim, or restyle the identity. The facial expression may stay as shown in the approved cell." : "";
   return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
 
 EXACT POSITION: row ${row}, column ${col} (counting left to right, top to bottom).

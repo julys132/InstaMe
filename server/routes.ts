@@ -1310,7 +1310,7 @@ function buildModerationSafeFallbackExtractionPrompt(params: {
       : "full or medium body in a styled fashion scene";
 
   const portraitInstruction = hasPortrait
-    ? "\nCRITICAL IDENTITY RULE: Match the face, facial features, skin tone, and hair color of the person to the provided reference portrait exactly (1:1). Keep the same hair color as the reference portrait; do not recolor the hair. The facial expression may stay as shown in the approved cell."
+    ? "\nIDENTITY LOCK — a SEPARATE reference portrait of the real person is provided alongside the cell. Match that reference portrait 1:1 so it is clearly the SAME person: face shape, facial features, proportions, skin tone, hair color, and hair length/type must be identical. Keep the exact same hair color — do not recolor. Do not beautify, slim, or restyle the identity. The facial expression may stay as shown in the approved cell."
     : "";
 
   return `Extract and recreate at full standalone resolution the single photo at position ${position} of ${imageCount} in the Instagram grid preview (first image provided).
