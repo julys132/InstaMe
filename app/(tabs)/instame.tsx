@@ -4303,7 +4303,6 @@ export default function InstaMeScreen() {
                   <View style={[
                     styles.packCard,
                     styles.packComboCard,
-                    (isCustomPhotoPack || isMixedPhotoPack) && styles.packCardActive,
                   ]}>
                     <Pressable
                       accessibilityRole="button"
@@ -7432,21 +7431,31 @@ const styles = StyleSheet.create({
   },
   packComboCard: {
     padding: 0,
-    backgroundColor: "rgba(10,12,16,0.98)",
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    overflow: "visible",
+    gap: 8,
   },
   packComboHalf: {
     flex: 1,
     overflow: "hidden",
-    padding: 10,
+    padding: 11,
     justifyContent: "space-between",
+    borderRadius: 14,
+    borderWidth: 0.5,
+    borderColor: "rgba(255,255,255,0.18)",
+    backgroundColor: "rgba(12,12,16,0.95)",
   },
-  packComboHalfTop: {
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.14)",
-  },
+  packComboHalfTop: {},
   packComboHalfBottom: {},
   packComboHalfActive: {
-    backgroundColor: "rgba(126,243,255,0.09)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.52)",
+    shadowColor: "#7EF3FF",
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
   packComboTopRow: {
     flexDirection: "row",
