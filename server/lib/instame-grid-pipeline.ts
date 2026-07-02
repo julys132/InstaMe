@@ -24,6 +24,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type GridPositionType = "COMPLEX" | "SIMPLE" | "MEDIUM";
+export type GridToneContrast = "medium" | "high";
 
 export type GridShotPlan = {
   /** 1-based position index */
@@ -65,6 +66,8 @@ export type GridPipelineUserInputs = {
   palette: string;
   /** Light type (e.g. "soft golden hour", "cool studio", "flash night") */
   lightType: string;
+  /** Tonal contrast between neighbouring grid cells */
+  toneContrast?: GridToneContrast;
   /** Extra free-text instructions from the user */
   extraNotes: string;
   /** Whether there is a portrait reference uploaded */
@@ -175,6 +178,126 @@ const PIPELINE_AESTHETIC_VOCABULARY: Record<string, string[]> = {
     "sleek jet staircase",
     "city skyline from altitude",
   ],
+  "Monaco Night Drive": [
+    "Monaco marina lights",
+    "black luxury car",
+    "casino entrance",
+    "chrome reflections",
+    "leather car interior",
+    "harbor night walk",
+    "flash evening portrait",
+    "silk evening outfit",
+    "city lights bokeh",
+    "polished night drive",
+  ],
+  "Paris Hotel Morning": [
+    "Paris hotel balcony",
+    "cream knit lounge set",
+    "room service tray",
+    "croissant and espresso",
+    "marble vanity",
+    "French window light",
+    "ornate balcony railing",
+    "tailored cardigan",
+    "hotel corridor",
+    "soft morning city view",
+  ],
+  "Milan Street Editorial": [
+    "Milan street architecture",
+    "tailored oversized blazer",
+    "fashion week crosswalk",
+    "luxury boutique facade",
+    "structured leather handbag",
+    "stone sidewalk",
+    "espresso bar corner",
+    "sleek sunglasses",
+    "editorial city walk",
+    "Italian fashion district",
+  ],
+  "Ski Chalet Luxe": [
+    "alpine chalet interior",
+    "fireplace lounge",
+    "cashmere knit texture",
+    "snowy window view",
+    "pine wood walls",
+    "apres-ski outfit",
+    "wool scarf detail",
+    "hot drink still-life",
+    "mountain lodge sofa",
+    "warm amber cabin light",
+  ],
+  "Gallery Date Muse": [
+    "modern art gallery",
+    "sculptural pose",
+    "minimal black dress",
+    "marble floor",
+    "framed abstract artwork",
+    "museum bench",
+    "clean white walls",
+    "soft gallery lighting",
+    "stone sculpture detail",
+    "cultured date mood",
+  ],
+  "Champagne Brunch Club": [
+    "terrace brunch table",
+    "champagne glass",
+    "fresh flower arrangement",
+    "linen table setting",
+    "pastry plate",
+    "polished daytime outfit",
+    "sunlit cafe terrace",
+    "delicate glassware",
+    "soft greenery",
+    "social brunch moment",
+  ],
+  "Balletcore Soft Glam": [
+    "satin ballet ribbon",
+    "pearl accessory",
+    "wrap cardigan",
+    "ballet flats",
+    "soft studio backdrop",
+    "delicate pose",
+    "tulle texture",
+    "champagne highlight",
+    "romantic closeup",
+    "polished soft glam",
+  ],
+  "Rooftop Golden Hour": [
+    "rooftop skyline",
+    "golden hour backlight",
+    "silk evening dress",
+    "city railing",
+    "cocktail glass",
+    "sunset wind movement",
+    "warm skyline bokeh",
+    "elevated terrace",
+    "black evening outfit",
+    "amber city glow",
+  ],
+  "Bridal Weekend Glow": [
+    "bridal hotel suite",
+    "white tailored mini dress",
+    "pearl earrings",
+    "champagne toast",
+    "bouquet detail",
+    "silver accessories",
+    "hotel mirror moment",
+    "soft blush flowers",
+    "celebration prep",
+    "clean bridal weekend",
+  ],
+  "CEO Airport Uniform": [
+    "premium airport lounge",
+    "structured blazer",
+    "carry-on suitcase",
+    "boarding gate walk",
+    "espresso cup",
+    "brushed steel detail",
+    "executive travel outfit",
+    "passport holder",
+    "quiet luxury commute",
+    "airport window light",
+  ],
 };
 
 function getAestheticVocabularyLine(aesthetic: string): string {
@@ -237,7 +360,57 @@ function shuffleWith<T>(items: T[], rng: () => number): T[] {
   return copy;
 }
 
+function normalizeGridToneContrast(value: unknown): GridToneContrast {
+  return value === "high" ? "high" : "medium";
+}
+
+function getPlanToneContrastDirective(toneContrast: GridToneContrast, palette: string): string {
+  if (toneContrast === "high") {
+    return `The finished grid must NOT be tonally flat. Staying STRICTLY inside the palette "${palette}", deliberately alternate the tonal value of the cells:
+- Some cells must lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones).
+- Other cells must lean to the LIGHTER / airier / high-key end (bright, soft, luminous).
+- Neighbouring cells (side by side AND stacked) must differ in overall brightness so the grid reads as a clear light-and-dark rhythm.
+In EVERY imagePrompt, explicitly state whether that shot is "bright and airy" or "dark and moody" and name the lighter or darker palette colors accordingly. This varies brightness and mood ONLY - never the color family.`;
+  }
+
+  return `The finished grid should have MEDIUM editorial contrast, not a harsh checkerboard and not a flat monotone look. Staying STRICTLY inside the palette "${palette}":
+- Keep most cells in balanced midtones with natural shadows and soft highlights.
+- Let some neighbouring cells be gently brighter or gently moodier, but avoid extreme black shadows or blown-out whites.
+- The brightness rhythm should be visible when scanning the grid, while still feeling cohesive and calm.
+In EVERY imagePrompt, describe the shot as either "softly luminous", "balanced midtone", or "gently moody" and name the palette colors used. This varies brightness and mood ONLY - never the color family.`;
+}
+
 // ─── System Prompt builders ───────────────────────────────────────────────────
+
+function buildGridPlanOutputExample(params: {
+  imageCount: GridPipelineImageCount;
+  aesthetic: string;
+  palette: string;
+  lightType: string;
+  positionMap: Array<{ position: number; type: GridPositionType }>;
+}): string {
+  return JSON.stringify(
+    {
+      imageCount: params.imageCount,
+      aesthetic: params.aesthetic,
+      palette: params.palette,
+      lightType: params.lightType,
+      shots: params.positionMap.map(({ position, type }) => ({
+        position,
+        type,
+        label:
+          type === "SIMPLE"
+            ? `Position ${position} minimalist object/detail label`
+            : `Position ${position} model scene label`,
+        hairstyle: type === "SIMPLE" ? null : "assigned distinct hairstyle",
+        angle: type === "SIMPLE" ? null : "assigned camera angle",
+        imagePrompt: `Complete, self-contained GPT Image 2 prompt for position ${position}. Include the aesthetic, palette, light, scene, assigned type, and portrait-reference instruction when applicable.`,
+      })),
+    },
+    null,
+    2,
+  );
+}
 
 /**
  * Builds the rigid system prompt for Gemini Flash (Master Grid generation).
@@ -245,10 +418,19 @@ function shuffleWith<T>(items: T[], rng: () => number): T[] {
  */
 export function buildMasterGridSystemPrompt(inputs: GridPipelineUserInputs): string {
   const { imageCount, aesthetic, palette, lightType, extraNotes, hasPortraitReference, seed } = inputs;
+  const toneContrast = normalizeGridToneContrast(inputs.toneContrast);
+  const toneContrastDirective = getPlanToneContrastDirective(toneContrast, palette);
 
   // Derive position assignments using the contrast matrix (seeded when available
   // so two identical requests still produce visibly different layouts).
   const positionMap = buildPositionMap(imageCount, seed);
+  const outputJsonExample = buildGridPlanOutputExample({
+    imageCount,
+    aesthetic,
+    palette,
+    lightType,
+    positionMap,
+  });
 
   const positionInstructions = positionMap
     .map(
@@ -338,8 +520,12 @@ GRID PARAMETERS
 Aesthetic: ${aesthetic}
 Color palette: ${palette}
 Light type: ${lightType}
+Tone contrast mode: ${toneContrast === "high" ? "high contrast" : "medium contrast"}
 Image count: ${imageCount}
 ${vocabularyLine ? vocabularyLine + "\n" : ""}Extra notes from user: ${extraNotes || "none"}${variationDirective}
+
+CRITICAL JSON RULES: output strict parseable JSON only. Do NOT use comments, markdown fences, union syntax such as "COMPLEX" | "SIMPLE", prose, or trailing commas. Use this valid structure and fill every placeholder with real content:
+${outputJsonExample}
 
 ═══════════════════════════════════════════════
 COLOR PALETTE (DOMINANT — overrides scene-natural colors)
@@ -376,11 +562,7 @@ SUBJECT VARIETY (MANDATORY): every position must depict a DISTINCT subject/objec
 ═══════════════════════════════════════════════
 TONAL CONTRAST & VISUAL RHYTHM (MANDATORY)
 ═══════════════════════════════════════════════
-The finished grid must NOT be tonally flat — a grid where every cell is equally bright (or equally dark) looks amateur. Staying STRICTLY inside the palette "${palette}", deliberately alternate the tonal value of the cells:
-- Some cells must lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones).
-- Other cells must lean to the LIGHTER / airier / high-key end (bright, soft, luminous).
-- Neighbouring cells (side by side AND stacked) must differ in overall brightness so the grid reads as a light-and-dark rhythm, not one uniform tone.
-In EVERY imagePrompt, explicitly state whether that shot is "bright and airy" or "dark and moody" and name the lighter or darker palette colors accordingly. This varies brightness and mood ONLY — never the color family.
+${toneContrastDirective}
 ${assignmentSection}
 ═══════════════════════════════════════════════
 PORTRAIT REFERENCE
@@ -390,23 +572,7 @@ ${portraitInstruction}
 ═══════════════════════════════════════════════
 OUTPUT FORMAT (strict — output ONLY this JSON, no extra text)
 ═══════════════════════════════════════════════
-{
-  "imageCount": ${imageCount},
-  "aesthetic": "${aesthetic}",
-  "palette": "${palette}",
-  "lightType": "${lightType}",
-  "shots": [
-    {
-      "position": 1,
-      "type": "COMPLEX" | "SIMPLE" | "MEDIUM",
-      "label": "<short human-readable scene label>",
-      "hairstyle": "<hairstyle or null if no model in frame>",
-      "angle": "<camera angle or null if no model in frame>",
-      "imagePrompt": "<complete, self-contained prompt for GPT Image 2 — include aesthetic, palette, light, scene, hairstyle, angle, and any portrait-reference instruction>"
-    }
-    // ... one entry per position, total ${imageCount} entries
-  ]
-}`;
+${outputJsonExample}`;
 }
 
 /**
@@ -419,8 +585,18 @@ export function buildContinuityGridSystemPrompt(
   hasPortraitReference: boolean,
   extraNotes = "",
   seed?: number,
+  toneContrast: GridToneContrast = "medium",
 ): string {
+  const normalizedToneContrast = normalizeGridToneContrast(toneContrast);
+  const toneContrastDirective = getPlanToneContrastDirective(normalizedToneContrast, context.palette);
   const positionMap = buildPositionMap(newImageCount, seed);
+  const outputJsonExample = buildGridPlanOutputExample({
+    imageCount: newImageCount,
+    aesthetic: context.aesthetic,
+    palette: context.palette,
+    lightType: context.lightType,
+    positionMap,
+  });
 
   const positionInstructions = positionMap
     .map(({ position, type }) => `  - Position ${position}: ${type}`)
@@ -499,7 +675,11 @@ Already-used camera angles (AVOID repeating these): ${usedAnglesList}
 NEW GRID PARAMETERS
 ═══════════════════════════════════════════════
 New image count: ${newImageCount}
+Tone contrast mode: ${normalizedToneContrast === "high" ? "high contrast" : "medium contrast"}
 Extra notes: ${extraNotes || "none"}
+
+CRITICAL JSON RULES: output strict parseable JSON only. Do NOT use comments, markdown fences, union syntax such as "COMPLEX" | "SIMPLE", prose, or trailing commas. Use this valid structure and fill every placeholder with real content:
+${outputJsonExample}
 
 ═══════════════════════════════════════════════
 CONTRAST MATRIX (MANDATORY)
@@ -516,6 +696,7 @@ CONTINUITY RULES (MANDATORY)
 5. SIMPLE positions must be pure minimalist object/texture shots — no model. Compose ONE single hero subject with generous negative space around it: clean, airy, uncluttered, breathable — never busy or crowded.
 6. NO RE-SHOOTING SUBJECTS (CRITICAL): treat the already-used scenes above as subjects/objects/props/locations that are now OFF-LIMITS. Do NOT re-depict any of them from a different distance, crop, zoom, or angle. Example: if a previous image already featured a wristwatch, this extension must NOT contain ANY watch — not closer, not farther, not from another angle. Pick entirely different objects and locations.
 7. EXPAND THE STORY: each new image must ADD a genuinely new narrative beat to the pack (new prop category, new wardrobe piece, new setting, new lifestyle moment, new texture). Across the whole extension, vary the subject categories (e.g. accessories, food/drink, architecture, interior detail, outdoor scene, wardrobe flat-lay) so the grid feels like the next chapter — never a re-run of the same motifs in new framing.
+8. TONAL CONTRAST MODE: ${toneContrastDirective}
 ${assignmentSection}
 ═══════════════════════════════════════════════
 PORTRAIT REFERENCE
@@ -525,22 +706,7 @@ ${portraitInstruction}
 ═══════════════════════════════════════════════
 OUTPUT FORMAT (output ONLY this JSON)
 ═══════════════════════════════════════════════
-{
-  "imageCount": ${newImageCount},
-  "aesthetic": "${context.aesthetic}",
-  "palette": "${context.palette}",
-  "lightType": "${context.lightType}",
-  "shots": [
-    {
-      "position": 1,
-      "type": "COMPLEX" | "SIMPLE" | "MEDIUM",
-      "label": "<scene label>",
-      "hairstyle": "<hairstyle or null>",
-      "angle": "<angle or null>",
-      "imagePrompt": "<complete GPT Image 2 prompt>"
-    }
-  ]
-}`;
+${outputJsonExample}`;
 }
 
 // ─── Position map builder (Contrast Matrix) ───────────────────────────────────
@@ -712,6 +878,54 @@ export async function callGeminiFlashText(options: {
   throw new Error("Gemini Flash returned no usable text.");
 }
 
+function stripMarkdownFences(value: string): string {
+  return value.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "").trim();
+}
+
+function extractJsonObjectText(value: string): string {
+  const clean = stripMarkdownFences(value);
+  if (!clean) return clean;
+  if (clean.startsWith("{") && clean.endsWith("}")) return clean;
+
+  const start = clean.indexOf("{");
+  if (start < 0) return clean;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < clean.length; i += 1) {
+    const char = clean[i];
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) continue;
+
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return clean.slice(start, i + 1);
+      }
+    }
+  }
+
+  return clean;
+}
+
 // ─── Plan parser ─────────────────────────────────────────────────────────────
 
 /**
@@ -721,9 +935,11 @@ export async function callGeminiFlashText(options: {
 export function parseGridPlan(rawJson: string, expectedCount: number, seed?: number): GridPlan {
   let parsed: unknown;
   try {
-    // Strip any accidental markdown fences Gemini might add despite instructions
-    const clean = rawJson.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const clean = extractJsonObjectText(rawJson);
     parsed = JSON.parse(clean);
+    if (typeof parsed === "string") {
+      parsed = JSON.parse(extractJsonObjectText(parsed));
+    }
   } catch {
     throw new Error("Grid plan parsing failed: Gemini did not return valid JSON.");
   }
@@ -858,8 +1074,14 @@ export function getGridPositionLabel(position: number, imageCount: number): stri
  * Builds the GPT Image 2 prompt for generating a single composite
  * Instagram grid preview image containing all shots in a grid layout.
  */
-export function buildCompositeGridPrompt(plan: GridPlan, hasPortraitReference: boolean): string {
+export function buildCompositeGridPrompt(
+  plan: GridPlan,
+  hasPortraitReference: boolean,
+  toneContrast: GridToneContrast = "medium",
+): string {
   const totalRows = Math.ceil(plan.imageCount / GRID_COLS);
+  const normalizedToneContrast = normalizeGridToneContrast(toneContrast);
+  const isHighContrast = normalizedToneContrast === "high";
 
   // Deterministic light/dark checkerboard so neighbouring cells ALWAYS alternate
   // tonal value (side by side AND stacked) instead of leaving it to the render
@@ -882,8 +1104,12 @@ export function buildCompositeGridPrompt(plan: GridPlan, hasPortraitReference: b
           : "PORTRAIT (model present — full or medium body, action/location)";
       const tone =
         toneForPosition(shot.position) === "DARK"
-          ? "tone: DARK & moody (low-key, deep shadow, rich dark palette tones)"
-          : "tone: BRIGHT & airy (high-key, luminous, light palette tones)";
+          ? isHighContrast
+            ? "tone: DARK & moody (low-key, deep shadow, rich dark palette tones)"
+            : "tone: gently moody (balanced midtones, soft shadow, rich but not black)"
+          : isHighContrast
+            ? "tone: BRIGHT & airy (high-key, luminous, light palette tones)"
+            : "tone: softly luminous (natural highlights, balanced exposure, not blown out)";
       const detail = [
         cellKind,
         shot.label,
@@ -899,6 +1125,26 @@ export function buildCompositeGridPrompt(plan: GridPlan, hasPortraitReference: b
 
   const darkPositions = plan.shots.filter((s) => toneForPosition(s.position) === "DARK").map((s) => s.position);
   const lightPositions = plan.shots.filter((s) => toneForPosition(s.position) === "LIGHT").map((s) => s.position);
+  const tonalContrastSection = isHighContrast
+    ? `TONAL CONTRAST & VISUAL RHYTHM (HIGH CONTRAST):
+- Do NOT render every cell at the same brightness. A monotone grid where all cells are equally light (or equally dark) looks flat and amateur.
+- Within the SAME palette "${plan.palette}", deliberately alternate the tonal value of neighbouring cells: some cells lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones) and others to the LIGHTER / airier / high-key end (bright, soft, luminous).
+- EXACT TONAL ASSIGNMENT (MANDATORY - follow position-by-position, this creates the light/dark checkerboard):
+   - DARK & moody (low-key) cells - render these positions noticeably darker, deep shadow, dramatic light: ${darkPositions.join(", ") || "none"}.
+   - BRIGHT & airy (high-key) cells - render these positions noticeably lighter, luminous, soft light: ${lightPositions.join(", ") || "none"}.
+- The brightness gap between a DARK cell and an adjacent BRIGHT cell must be obvious at a glance - clearly different exposure, not a subtle shift.
+- No two side-by-side or stacked cells may share the same overall brightness. Honour the dark/light positions exactly.
+- Mix close-up high-detail cells with open negative-space cells, and bright daylight moments with shadowy dramatic ones.
+- This tonal variation must stay strictly inside the palette - change brightness and mood, NOT the color family.`
+    : `TONAL CONTRAST & VISUAL RHYTHM (MEDIUM CONTRAST):
+- Do NOT render every cell at the exact same brightness, but avoid a harsh checkerboard.
+- Within the SAME palette "${plan.palette}", create a soft editorial rhythm using balanced midtones, natural shadows, and gentle highlights.
+- SUGGESTED TONAL ASSIGNMENT (follow softly, not extremely):
+   - GENTLY MOODY cells - render these positions with deeper midtones and soft shadow, not black underexposure: ${darkPositions.join(", ") || "none"}.
+   - SOFTLY LUMINOUS cells - render these positions slightly brighter with natural highlights, not blown-out whites: ${lightPositions.join(", ") || "none"}.
+- The brightness difference between neighbouring cells should be visible but refined, like a cohesive editorial carousel.
+- No cell should become extremely dark or extremely bright; keep the full grid calm, premium, and harmonious.
+- This tonal variation must stay strictly inside the palette - change brightness and mood, NOT the color family.`;
 
   const modelPositions = plan.shots.filter((s) => s.type !== "SIMPLE").map((s) => s.position);
   const objectPositions = plan.shots.filter((s) => s.type === "SIMPLE").map((s) => s.position);
@@ -931,16 +1177,7 @@ OUTFIT & WARDROBE VARIETY (MANDATORY):
 - NEVER reuse the same black blazer (or any single garment) across multiple cells. If one cell is a black blazer, the others must be e.g. a knit, a dress, a coat, a blouse, tailored trousers with a different top, etc.
 - Also vary pose, expression, and framing in every portrait cell. Never repeat the same look from a different angle.
 
-TONAL CONTRAST & VISUAL RHYTHM (MANDATORY — this is what makes the grid look professional):
-- Do NOT render every cell at the same brightness. A monotone grid where all cells are equally light (or equally dark) looks flat and amateur.
-- Within the SAME palette "${plan.palette}", deliberately alternate the tonal value of neighbouring cells: some cells lean to the DARKER / moodier / low-key end of the palette (deep shadow, dramatic light, rich dark tones) and others to the LIGHTER / airier / high-key end (bright, soft, luminous).
-- EXACT TONAL ASSIGNMENT (MANDATORY — follow position-by-position, this creates the light/dark checkerboard):
-   • DARK & moody (low-key) cells — render these positions noticeably darker, deep shadow, dramatic light: ${darkPositions.join(", ") || "none"}.
-   • BRIGHT & airy (high-key) cells — render these positions noticeably lighter, luminous, soft light: ${lightPositions.join(", ") || "none"}.
-- The brightness gap between a DARK cell and an adjacent BRIGHT cell must be OBVIOUS at a glance — clearly different exposure, not a subtle shift.
-- No two side-by-side or stacked cells may share the same overall brightness — the DARK and BRIGHT positions above already form a checkerboard; honour it exactly.
-- Mix close-up high-detail cells with open negative-space cells, and bright daylight moments with shadowy dramatic ones.
-- This tonal variation must stay strictly inside the palette — change brightness and mood, NOT the color family.
+${tonalContrastSection}
 
 RULES:
 - All cells share the SAME palette and overall color grade, but their TONAL VALUE (brightness/darkness) MUST deliberately vary from cell to cell per the TONAL CONTRAST section above — do not flatten them to one identical brightness

@@ -32,6 +32,9 @@ export type PhotoPackPreset = {
   previewImages?: ReturnType<typeof require>[];
 };
 
+export const CUSTOM_PHOTO_PACK_ID = "custom_pack";
+export const MIXED_PHOTO_PACK_ID = "mixed_packs";
+
 export const STYLE_VIBE_CATEGORIES: StyleVibeCategory[] = [
   {
     id: "all",
@@ -199,6 +202,46 @@ export const STYLE_VIBE_CATEGORIES: StyleVibeCategory[] = [
 ];
 
 export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
+  {
+    id: CUSTOM_PHOTO_PACK_ID,
+    label: "Custom Pack",
+    count: 6,
+    vibeId: "all",
+    icon: "create-outline",
+    accent: "#86F4FF",
+    gradient: ["rgba(134,244,255,0.24)", "rgba(255,79,125,0.14)", "rgba(0,0,0,0.88)"],
+    subtitle: "Build a pack from your own style words.",
+    example: "",
+    shots: [
+      "Custom hero portrait",
+      "Signature detail",
+      "Mood portrait",
+      "Texture still-life",
+      "Style moment",
+      "Custom grid hero",
+    ],
+    deliverable: "6 vertical AI photos - your custom aesthetic - same preview and extraction flow",
+  },
+  {
+    id: MIXED_PHOTO_PACK_ID,
+    label: "Mixed Packs",
+    count: 6,
+    vibeId: "all",
+    icon: "git-compare-outline",
+    accent: "#FFB3E6",
+    gradient: ["rgba(255,179,230,0.24)", "rgba(126,243,255,0.16)", "rgba(0,0,0,0.90)"],
+    subtitle: "Blend two packs into one cohesive grid.",
+    example: "",
+    shots: [
+      "Hybrid hero portrait",
+      "Style crossover detail",
+      "Mixed mood portrait",
+      "Texture fusion still-life",
+      "Dual-aesthetic moment",
+      "Cohesive mixed grid hero",
+    ],
+    deliverable: "6 vertical AI photos - two selected pack styles blended into one cohesive story",
+  },
   {
     id: "Dark Academia",
     label: "Dark Academia",
@@ -404,6 +447,246 @@ export const PHOTO_PACK_PRESETS: PhotoPackPreset[] = [
       require("../assets/images/aesthetics/private-jet-1.png"),
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       require("../assets/images/aesthetics/private-jet-2.png"),
+    ],
+  },
+  {
+    id: "Monaco Night Drive",
+    label: "Monaco Night Drive",
+    count: 6,
+    vibeId: "car_luxe",
+    icon: "car-sport-outline",
+    accent: "#8FE6FF",
+    gradient: ["rgba(36,54,82,0.70)", "rgba(8,12,22,0.92)", "rgba(0,0,0,0.98)"],
+    subtitle: "Marina lights, luxury cars, evening flash energy.",
+    example: "",
+    shots: [
+      "Marina car arrival",
+      "Chrome detail closeup",
+      "Casino entrance portrait",
+      "Leather interior detail",
+      "Harbor night walk",
+      "Flash evening hero",
+    ],
+    deliverable: "6 vertical AI photos - black, navy & champagne palette - Monaco night-drive editorial",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/monaco-night-drive-1.png"),
+    ],
+  },
+  {
+    id: "Paris Hotel Morning",
+    label: "Paris Hotel Morning",
+    count: 6,
+    vibeId: "old_money_luxe",
+    icon: "business-outline",
+    accent: "#E7D6BE",
+    gradient: ["rgba(222,204,176,0.58)", "rgba(120,100,78,0.78)", "rgba(16,12,9,0.96)"],
+    subtitle: "Balcony coffee, tailored lounge styling, soft hotel daylight.",
+    example: "",
+    shots: [
+      "Paris balcony coffee",
+      "Room service still-life",
+      "Window light portrait",
+      "Marble vanity detail",
+      "Hotel corridor look",
+      "Morning city hero",
+    ],
+    deliverable: "6 vertical AI photos - ivory, beige & muted gold palette - Paris hotel morning story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/paris-hotel-morning-1.png"),
+    ],
+  },
+  {
+    id: "Milan Street Editorial",
+    label: "Milan Street Editorial",
+    count: 6,
+    vibeId: "street_luxe",
+    icon: "walk-outline",
+    accent: "#C9D3E8",
+    gradient: ["rgba(80,86,98,0.66)", "rgba(38,39,45,0.90)", "rgba(5,5,8,0.98)"],
+    subtitle: "Tailored city movement, boutique facades, fashion-week polish.",
+    example: "",
+    shots: [
+      "Tailored crosswalk frame",
+      "Leather handbag detail",
+      "Boutique facade portrait",
+      "Stone street texture",
+      "Cafe corner look",
+      "Fashion week hero",
+    ],
+    deliverable: "6 vertical AI photos - charcoal, cream & espresso palette - Milan street editorial carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/milan-street-editorial-1.png"),
+    ],
+  },
+  {
+    id: "Ski Chalet Luxe",
+    label: "Ski Chalet Luxe",
+    count: 6,
+    vibeId: "cozy_home",
+    icon: "snow-outline",
+    accent: "#F1D8B8",
+    gradient: ["rgba(112,86,62,0.64)", "rgba(40,30,24,0.90)", "rgba(7,6,5,0.98)"],
+    subtitle: "Alpine warmth, cashmere textures, fireplace apres-ski mood.",
+    example: "",
+    shots: [
+      "Alpine window portrait",
+      "Cashmere knit detail",
+      "Fireplace lounge frame",
+      "Snow view still-life",
+      "Apres-ski outfit",
+      "Chalet evening hero",
+    ],
+    deliverable: "6 vertical AI photos - cream, pine & chocolate palette - ski chalet luxury story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/ski-chalet-luxe-1.png"),
+    ],
+  },
+  {
+    id: "Gallery Date Muse",
+    label: "Gallery Date Muse",
+    count: 6,
+    vibeId: "signature_editorial",
+    icon: "color-palette-outline",
+    accent: "#DAD7CE",
+    gradient: ["rgba(150,148,140,0.50)", "rgba(62,62,60,0.82)", "rgba(7,7,7,0.98)"],
+    subtitle: "Modern museum light, sculptural poses, cultured minimalist style.",
+    example: "",
+    shots: [
+      "Gallery entrance portrait",
+      "Sculpture detail",
+      "Marble floor frame",
+      "Framed artwork still-life",
+      "Minimal dress portrait",
+      "Museum date hero",
+    ],
+    deliverable: "6 vertical AI photos - white, stone & black palette - gallery date editorial",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/gallery-date-muse-1.png"),
+    ],
+  },
+  {
+    id: "Champagne Brunch Club",
+    label: "Champagne Brunch Club",
+    count: 6,
+    vibeId: "cafe_lifestyle",
+    icon: "restaurant-outline",
+    accent: "#FFD2BA",
+    gradient: ["rgba(255,198,170,0.52)", "rgba(130,78,58,0.78)", "rgba(17,10,8,0.96)"],
+    subtitle: "Terrace brunch, glassware, flowers, polished daytime glow.",
+    example: "",
+    shots: [
+      "Terrace brunch portrait",
+      "Champagne glass detail",
+      "Flower table still-life",
+      "Linen outfit moment",
+      "Pastry plate closeup",
+      "Sunlit social hero",
+    ],
+    deliverable: "6 vertical AI photos - blush, champagne & ivory palette - polished brunch carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/champagne-brunch-club-1.png"),
+    ],
+  },
+  {
+    id: "Balletcore Soft Glam",
+    label: "Balletcore Soft Glam",
+    count: 6,
+    vibeId: "soft_romantic",
+    icon: "sparkles-outline",
+    accent: "#F2C9D8",
+    gradient: ["rgba(230,175,196,0.54)", "rgba(116,74,90,0.78)", "rgba(18,9,14,0.96)"],
+    subtitle: "Satin ribbons, pearl details, soft studio femininity.",
+    example: "",
+    shots: [
+      "Soft studio portrait",
+      "Satin ribbon detail",
+      "Pearl accessory closeup",
+      "Wrap cardigan look",
+      "Ballet flat still-life",
+      "Delicate glam hero",
+    ],
+    deliverable: "6 vertical AI photos - dusty rose, pearl & champagne palette - balletcore soft glam story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/balletcore-soft-glam-1.png"),
+    ],
+  },
+  {
+    id: "Rooftop Golden Hour",
+    label: "Rooftop Golden Hour",
+    count: 6,
+    vibeId: "event_glam",
+    icon: "sunny-outline",
+    accent: "#FFC46F",
+    gradient: ["rgba(230,152,74,0.58)", "rgba(106,60,35,0.82)", "rgba(12,7,5,0.96)"],
+    subtitle: "Skyline light, sunset polish, elevated evening energy.",
+    example: "",
+    shots: [
+      "Rooftop skyline portrait",
+      "Cocktail glass detail",
+      "Sunset dress movement",
+      "City railing texture",
+      "Wind-swept closeup",
+      "Golden hour hero",
+    ],
+    deliverable: "6 vertical AI photos - amber, cream & black palette - rooftop golden-hour editorial",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/rooftop-golden-hour-1.png"),
+    ],
+  },
+  {
+    id: "Bridal Weekend Glow",
+    label: "Bridal Weekend Glow",
+    count: 6,
+    vibeId: "event_glam",
+    icon: "heart-outline",
+    accent: "#F7DDE8",
+    gradient: ["rgba(245,222,232,0.54)", "rgba(140,98,114,0.78)", "rgba(18,9,13,0.96)"],
+    subtitle: "Pearls, white tailoring, champagne prep, celebration details.",
+    example: "",
+    shots: [
+      "White tailored portrait",
+      "Pearl earring detail",
+      "Champagne toast still-life",
+      "Bouquet closeup",
+      "Hotel mirror moment",
+      "Celebration weekend hero",
+    ],
+    deliverable: "6 vertical AI photos - white, pearl & blush palette - bridal weekend glow carousel",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/bridal-weekend-glow-1.png"),
+    ],
+  },
+  {
+    id: "CEO Airport Uniform",
+    label: "CEO Airport Uniform",
+    count: 6,
+    vibeId: "car_luxe",
+    icon: "airplane-outline",
+    accent: "#D7CAB9",
+    gradient: ["rgba(108,96,82,0.64)", "rgba(40,36,34,0.90)", "rgba(5,5,5,0.98)"],
+    subtitle: "Airport lounge tailoring, carry-on details, executive travel calm.",
+    example: "",
+    shots: [
+      "Airport lounge portrait",
+      "Carry-on detail",
+      "Structured blazer look",
+      "Espresso cup still-life",
+      "Boarding gate walk",
+      "Executive travel hero",
+    ],
+    deliverable: "6 vertical AI photos - black, camel & brushed steel palette - CEO airport uniform story",
+    previewImages: [
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require("../assets/images/aesthetics/ceo-airport-uniform-1.png"),
     ],
   },
   {

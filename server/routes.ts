@@ -120,7 +120,9 @@ import {
   GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE,
   type GridPipelineImageCount,
   type GridPipelineUserInputs,
+  type GridPlan,
   type GridContinuityContext,
+  type GridToneContrast,
 } from "./lib/instame-grid-pipeline";
 
 function getGeminiApiKey(): string {
@@ -744,6 +746,46 @@ const EXPOSE_STYLE_DEBUG_PROMPT =
 
 function isGridPipelineImageCount(value: unknown): value is GridPipelineImageCount {
   return typeof value === "number" && GRID_PIPELINE_ALLOWED_IMAGE_COUNTS.has(value);
+}
+
+function normalizeGridToneContrast(value: unknown): GridToneContrast {
+  return value === "high" ? "high" : "medium";
+}
+
+async function callGeminiGridPlanWithRetry(params: {
+  systemPrompt: string;
+  expectedCount: GridPipelineImageCount;
+  seed?: number;
+  geminiApiBaseUrl: string;
+  geminiApiKey: string;
+  model: string;
+}): Promise<GridPlan> {
+  const rawJson = await callGeminiFlashText({
+    systemPrompt: params.systemPrompt,
+    geminiApiBaseUrl: params.geminiApiBaseUrl,
+    geminiApiKey: params.geminiApiKey,
+    model: params.model,
+  });
+
+  try {
+    return parseGridPlan(rawJson, params.expectedCount, params.seed);
+  } catch (error) {
+    console.warn("Gemini grid plan parse failed; retrying once:", error);
+  }
+
+  const retryPrompt = `${params.systemPrompt}
+
+The previous response was not valid parseable JSON. Try again.
+Return ONLY one strict JSON object. No markdown, no comments, no prose, no union syntax, no trailing commas.`;
+
+  const retryRawJson = await callGeminiFlashText({
+    systemPrompt: retryPrompt,
+    geminiApiBaseUrl: params.geminiApiBaseUrl,
+    geminiApiKey: params.geminiApiKey,
+    model: params.model,
+  });
+
+  return parseGridPlan(retryRawJson, params.expectedCount, params.seed);
 }
 const MAX_IMAGE_COUNT_BY_MODE: Record<ImageInputMode, number> = {
   single_item: 10,
@@ -2843,7 +2885,7 @@ async function renderGridExtractedShot(options: {
     const { imageBase64 } = await generateGeminiImageFromParts({
       model: GRID_PIPELINE_EXTRACT_MAX_GEMINI_MODEL,
       parts,
-      maxOutputTokens: 1400,
+      maxOutputTokens: 2000,
       imageSize: "4K",
       aspectRatio: "2:3",
     });
@@ -7389,14 +7431,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = getGeminiApiKey();
       const systemPrompt = buildMasterGridSystemPrompt(inputs);
 
-      const rawJson = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: imageCount,
         geminiApiBaseUrl: GEMINI_API_BASE_URL,
         geminiApiKey: apiKey,
         model: DEFAULT_STYLE_TEXT_MODEL,
       });
-
-      const plan = parseGridPlan(rawJson, imageCount);
       const continuityContext = extractContinuityContext(plan);
 
       const [updatedUser] = await db.select({ credits: users.credits }).from(users).where(eq(users.id, userId));
@@ -7559,14 +7600,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const apiKey = getGeminiApiKey();
       const systemPrompt = buildContinuityGridSystemPrompt(ctx, newImageCount, hasPortraitReference, extraNotes);
 
-      const rawJson = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: newImageCount,
         geminiApiBaseUrl: GEMINI_API_BASE_URL,
         geminiApiKey: apiKey,
         model: DEFAULT_STYLE_TEXT_MODEL,
       });
-
-      const plan = parseGridPlan(rawJson, newImageCount);
       // Merge used scenes/hairstyles for the next potential extension
       const nextContinuityContext = extractContinuityContext(plan);
       nextContinuityContext.aesthetic = sanitizeGridPromptText(nextContinuityContext.aesthetic);
@@ -7629,6 +7669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const aesthetic = sanitizeGridPromptText(normalizeStringValue(body.aesthetic) || "Old Money Luxury");
     const palette = sanitizeGridPromptText(normalizeStringValue(body.palette) || "");
     const lightType = sanitizeGridPromptText(normalizeStringValue(body.lightType) || "");
+    const toneContrast = normalizeGridToneContrast(body.toneContrast ?? body.contrastLevel);
     const extraNotes = sanitizeGridPromptText(normalizeStringValue(body.extraNotes) || "");
     const hasPortraitReference = body.hasPortraitReference === true;
     const portrait: string | undefined =
@@ -7689,6 +7730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       aesthetic,
       palette,
       lightType,
+      toneContrast,
       extraNotes: mergedExtraNotes,
       hasPortraitReference,
       seed,
@@ -7707,15 +7749,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use the continuity prompt when extending an existing pack so the new shots
       // avoid all previously-used scenes/hairstyles; otherwise plan a fresh master grid.
       const systemPrompt = priorContext
-        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes, seed)
+        ? buildContinuityGridSystemPrompt(priorContext, imageCount, hasPortraitReference, mergedExtraNotes, seed, toneContrast)
         : buildMasterGridSystemPrompt(inputs);
-      const rawPlan = await callGeminiFlashText({
+      const plan = await callGeminiGridPlanWithRetry({
         systemPrompt,
+        expectedCount: imageCount,
+        seed,
         geminiApiBaseUrl,
         geminiApiKey,
         model: DEFAULT_STYLE_TEXT_MODEL,
       });
-      const plan = parseGridPlan(rawPlan, imageCount, seed);
 
       // Accumulate prior + new used scenes/hairstyles so the NEXT extension stays unique.
       const planContext = extractContinuityContext(plan);
@@ -7736,7 +7779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         : planContext;
 
-      const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference));
+      const compositePrompt = sanitizeGridPromptText(buildCompositeGridPrompt(plan, hasPortraitReference, toneContrast));
 
       const compositeImages: import("./lib/instame-image").RuntimeImageInput[] = [];
       if (portrait) {

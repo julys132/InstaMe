@@ -52,6 +52,8 @@ import {
 import Colors from "@/constants/colors";
 import { INSTAME_ART_STYLES } from "@/constants/instameArtStyles";
 import {
+  CUSTOM_PHOTO_PACK_ID,
+  MIXED_PHOTO_PACK_ID,
   PHOTO_PACK_PRESETS,
   STYLE_VIBE_CATEGORIES,
   getPhotoPackPreviewImages,
@@ -59,6 +61,7 @@ import {
   getStyleVibeById,
   matchStylePresetSearch,
   matchStyleVibe,
+  type PhotoPackPreset,
 } from "@/constants/instameStyleTaxonomy";
 import {
   GRID_PIPELINE_AESTHETICS,
@@ -102,6 +105,7 @@ type UploadedPhoto = {
 type TransformIntensity = "soft" | "editorial" | "dramatic";
 type OptionalTransformIntensity = TransformIntensity | null;
 type OwnStyleGenerationMode = "reference_locked" | "creative_prompt";
+type PackGridToneContrast = "medium" | "high";
 type GenerationResultMeta = {
   qualityTier?: InstaMeQualityTier;
   qualityLabel?: string;
@@ -440,8 +444,93 @@ const PACK_BRIEF_SCENE_IMAGES_MAX = 3;
 
 const PACK_IMAGE_COUNT_OPTIONS = [6, 9, 12] as const;
 const PACK_CUSTOM_PALETTE_ID = "custom-palette";
+const CUSTOM_PACK_STYLE_MIN_WORDS = 2;
+const CUSTOM_PACK_PALETTE_MIN_COLORS = 3;
+const MIXED_PACK_SELECTION_LIMIT = 2;
+const PACK_GRID_TONE_CONTRAST_OPTIONS: Array<{
+  key: PackGridToneContrast;
+  title: string;
+  subtitle: string;
+}> = [
+  { key: "medium", title: "Medium contrast", subtitle: "Balanced light/dark mix between photos" },
+  { key: "high", title: "High contrast", subtitle: "Bolder light/dark switch between photos" },
+];
+type PackInfoKey =
+  | "cost"
+  | "selectedPacks"
+  | "style"
+  | "optionalPalette"
+  | "photoCount"
+  | "palette"
+  | "contrast"
+  | "fineTune"
+  | "details"
+  | "notes"
+  | "sceneElements";
+
+const PACK_INFO_CONTENT: Record<PackInfoKey, { title: string; body: string }> = {
+  cost: {
+    title: "Cost summary",
+    body: "Preview creates the first full grid so you can approve the look. You only pay the per-photo cost for images you keep; failed extractions are refunded automatically.",
+  },
+  selectedPacks: {
+    title: "Selected packs",
+    body: "These are the two style directions being blended into one cohesive grid. Changing them updates the aesthetic, locations, lighting, wardrobe mood, and palette guidance.",
+  },
+  style: {
+    title: "Style",
+    body: "Describe the custom direction in a few words. This becomes the core aesthetic instruction for the whole pack, so use words that describe mood, location, or fashion energy.",
+  },
+  optionalPalette: {
+    title: "Optional palette",
+    body: "Use this when you want stronger control over colors. Add at least three comma-separated colors, or leave it blank so the AI chooses colors that fit the selected pack.",
+  },
+  photoCount: {
+    title: "Photo count",
+    body: "Choose how many images the grid preview should plan. Six is fastest, nine gives a fuller Instagram grid, and twelve creates the richest pack.",
+  },
+  palette: {
+    title: "Palette",
+    body: "Palette controls the dominant color story across wardrobe, props, backgrounds, and lighting. Default uses the pack recommendation; Custom lets you write your own colors.",
+  },
+  contrast: {
+    title: "Contrast",
+    body: "Medium keeps the grid balanced and softer. High contrast creates stronger light/dark switches between cells for a bolder editorial rhythm.",
+  },
+  fineTune: {
+    title: "Fine-tune details",
+    body: "Open this when you want more control. These fields are optional and help steer specific props, scenes, products, or details without changing the whole pack idea.",
+  },
+  details: {
+    title: "Details",
+    body: "Pick must-have moments you want represented in the pack. They guide the shot plan, but the AI still keeps the grid varied and cohesive.",
+  },
+  notes: {
+    title: "Notes",
+    body: "Use notes for very specific requests, such as a blazer, marble stairs, a watch close-up, or a mood that should appear in the final grid.",
+  },
+  sceneElements: {
+    title: "Scene elements",
+    body: "Upload product, outfit, or prop references here. The generator treats them as visual material to include naturally while keeping the portrait subject consistent.",
+  },
+};
 const GRID_EXTRACT_MAX_ATTEMPTS_PER_SHOT = 3;
 const GRID_EXTRACT_WAIT_NOTE = "Full extraction can take a couple of minutes, depending on how many photos you picked.";
+
+function normalizePromptText(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function countPromptWords(value: string): number {
+  return value.split(/\s+/).map((item) => item.trim()).filter(Boolean).length;
+}
+
+function countPaletteColors(value: string): number {
+  return value
+    .split(/[,;\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean).length;
+}
 
 const PACK_COLOR_PALETTES = [
   {
@@ -1037,9 +1126,14 @@ export default function InstaMeScreen() {
   const [packBriefNotes, setPackBriefNotes] = useState("");
   const [packBriefSceneImages, setPackBriefSceneImages] = useState<Array<{ id: string; uri: string; base64: string; mimeType: string }>>([]);
   const [packBriefShowMore, setPackBriefShowMore] = useState(false);
+  const [mixedPackSelectedIds, setMixedPackSelectedIds] = useState<string[]>([]);
+  const [mixedPackSelectionMode, setMixedPackSelectionMode] = useState(false);
   const [selectedPackImageCount, setSelectedPackImageCount] = useState<6 | 9 | 12>(6);
   const [selectedPackPaletteId, setSelectedPackPaletteId] = useState<string | null>(null);
+  const [customPackStyleText, setCustomPackStyleText] = useState("");
   const [customPackPaletteText, setCustomPackPaletteText] = useState("");
+  const [customPackDefaultAccent, setCustomPackDefaultAccent] = useState("");
+  const [packGridToneContrast, setPackGridToneContrast] = useState<PackGridToneContrast>("medium");
   const [packGridPreviewBase64, setPackGridPreviewBase64] = useState<string | null>(null);
   const [packGridPreviewLoading, setPackGridPreviewLoading] = useState(false);
   const [packGridRenderImages, setPackGridRenderImages] = useState<Array<{ shotIndex: number; shotLabel: string; imageBase64: string }>>([]);
@@ -1048,6 +1142,7 @@ export default function InstaMeScreen() {
   const [packGridExtractNotice, setPackGridExtractNotice] = useState<string | null>(null);
   const [packGridExtractQuality, setPackGridExtractQuality] = useState<InstaMeGridExtractQuality>("standard");
   const [packGridError, setPackGridError] = useState<string | null>(null);
+  const [activePackInfoKey, setActivePackInfoKey] = useState<PackInfoKey | null>(null);
   const [packImagePreviewId, setPackImagePreviewId] = useState<string | null>(null);
   const [packImagePreviewIndex, setPackImagePreviewIndex] = useState(0);
   const [pipelineAestheticId, setPipelineAestheticId] = useState<string | null>(null);
@@ -1271,6 +1366,54 @@ export default function InstaMeScreen() {
     () => PHOTO_PACK_PRESETS.find((pack) => pack.id === selectedPhotoPackId) || null,
     [selectedPhotoPackId],
   );
+  const isCustomPhotoPack = activePhotoPack?.id === CUSTOM_PHOTO_PACK_ID;
+  const isMixedPhotoPack = activePhotoPack?.id === MIXED_PHOTO_PACK_ID;
+  const normalizedCustomPackStyle = useMemo(() => normalizePromptText(customPackStyleText), [customPackStyleText]);
+  const customPackStyleWordCount = useMemo(
+    () => countPromptWords(normalizedCustomPackStyle),
+    [normalizedCustomPackStyle],
+  );
+  const customPackPaletteColorCount = useMemo(
+    () => countPaletteColors(customPackPaletteText),
+    [customPackPaletteText],
+  );
+  const isCustomPackPaletteValid =
+    !customPackPaletteText.trim() || customPackPaletteColorCount >= CUSTOM_PACK_PALETTE_MIN_COLORS;
+  const customPhotoPackTitle =
+    isCustomPhotoPack && normalizedCustomPackStyle ? `Custom Pack - ${normalizedCustomPackStyle}` : activePhotoPack?.label ?? "";
+  const customPhotoPackAesthetic =
+    isCustomPhotoPack && normalizedCustomPackStyle ? `Custom Pack: ${normalizedCustomPackStyle}` : activePhotoPack?.id ?? "";
+  const regularPhotoPackPresets = useMemo(
+    () => PHOTO_PACK_PRESETS.filter((pack) => pack.id !== CUSTOM_PHOTO_PACK_ID && pack.id !== MIXED_PHOTO_PACK_ID),
+    [],
+  );
+  const mixedPackOptions = useMemo(
+    () => PHOTO_PACK_PRESETS.filter((pack) => pack.id !== MIXED_PHOTO_PACK_ID),
+    [],
+  );
+  const selectedMixedPhotoPacks = useMemo(
+    () =>
+      mixedPackSelectedIds
+        .map((packId) => PHOTO_PACK_PRESETS.find((pack) => pack.id === packId) || null)
+        .filter((pack): pack is PhotoPackPreset => Boolean(pack)),
+    [mixedPackSelectedIds],
+  );
+  const mixedIncludesCustomPack = mixedPackSelectedIds.includes(CUSTOM_PHOTO_PACK_ID);
+  const shouldShowCustomPackInputs = isCustomPhotoPack || (isMixedPhotoPack && mixedIncludesCustomPack);
+  const selectedMixedPhotoPackLabels = useMemo(
+    () =>
+      selectedMixedPhotoPacks.map((pack) =>
+        pack.id === CUSTOM_PHOTO_PACK_ID && normalizedCustomPackStyle
+          ? `Custom (${normalizedCustomPackStyle})`
+          : pack.label,
+      ),
+    [normalizedCustomPackStyle, selectedMixedPhotoPacks],
+  );
+  const mixedPhotoPackTitle =
+    isMixedPhotoPack && selectedMixedPhotoPackLabels.length === MIXED_PACK_SELECTION_LIMIT
+      ? `Mixed Packs - ${selectedMixedPhotoPackLabels.join(" + ")}`
+      : "Mixed Packs";
+  const packPlannerDisplayTitle = isMixedPhotoPack ? mixedPhotoPackTitle : (customPhotoPackTitle || activePhotoPack?.label || "");
 
   const photoPackPreviewMap = useMemo(
     () =>
@@ -1339,6 +1482,13 @@ export default function InstaMeScreen() {
 
   const isPhoneViewport = viewportWidth <= 430;
   const selectedPackBriefVibe = useMemo(() => getStyleVibeById(selectedPackBriefVibeId), [selectedPackBriefVibeId]);
+  const packPlannerSummaryDescriptor = isMixedPhotoPack
+    ? selectedMixedPhotoPackLabels.length === MIXED_PACK_SELECTION_LIMIT
+      ? selectedMixedPhotoPackLabels.join(" + ")
+      : `${selectedMixedPhotoPackLabels.length}/${MIXED_PACK_SELECTION_LIMIT} packs selected`
+    : isCustomPhotoPack
+      ? "Custom style"
+      : selectedPackBriefVibe.label;
   const selectedPackPalette = useMemo(
     () => (selectedPackPaletteId ? PACK_COLOR_PALETTES.find((palette) => palette.id === selectedPackPaletteId) || null : null),
     [selectedPackPaletteId],
@@ -1352,6 +1502,14 @@ export default function InstaMeScreen() {
     },
     [customPackPaletteText, isCustomPackPalette, selectedPackPalette, selectedPackPaletteId],
   );
+  const selectedDefaultPackPalettePrompt = useMemo(() => {
+    if (!activePhotoPack) return "";
+    if (isCustomPhotoPack || isMixedPhotoPack) return "";
+    const aesthetic = GRID_PIPELINE_AESTHETICS.find((item) => item.id === activePhotoPack.id);
+    const basePalette = aesthetic?.defaultPalette || "";
+    const accent = customPackDefaultAccent.trim();
+    return [basePalette, accent].filter(Boolean).join(", ");
+  }, [activePhotoPack, customPackDefaultAccent, isCustomPhotoPack, isMixedPhotoPack]);
   const selectedPackRequiredLabels = useMemo(
     () =>
       PACK_BRIEF_REQUIRED_ELEMENTS
@@ -2399,6 +2557,18 @@ export default function InstaMeScreen() {
     void Haptics.selectionAsync();
   }, []);
 
+  const resetPackGenerationState = useCallback(() => {
+    setPipelinePlan(null);
+    setPipelineContinuityContext(null);
+    setPipelineRenderResults([]);
+    setPipelineError(null);
+    setPackGridPreviewBase64(null);
+    setPackGridRenderImages([]);
+    setPackGridError(null);
+    setPackGridExtractProgress(null);
+    setPackGridExtractNotice(null);
+  }, []);
+
   const handlePhotoPackPress = useCallback((packId: string) => {
     const pack = PHOTO_PACK_PRESETS.find((item) => item.id === packId);
     if (!pack) {
@@ -2408,21 +2578,38 @@ export default function InstaMeScreen() {
     setSelectedPhotoPackId(pack.id);
     setSelectedStyleVibeId(pack.vibeId);
     setSelectedPackBriefVibeId(pack.vibeId);
+    const nextPackImageCount = pack.count === 9 ? 9 : 6;
+    setSelectedPackImageCount(nextPackImageCount);
+    setPipelineImageCount(nextPackImageCount);
+    setMixedPackSelectedIds([]);
+    setMixedPackSelectionMode(pack.id === MIXED_PHOTO_PACK_ID);
     // Reset brief settings when switching packs
     setSelectedPackPaletteId(null);
+    setCustomPackStyleText("");
     setCustomPackPaletteText("");
+    setCustomPackDefaultAccent("");
+    setPackGridToneContrast("medium");
     setPackBriefRequiredElementIds([]);
     setPackBriefNotes("");
     // Reset pipeline state when switching packs
-    setPipelinePlan(null);
-    setPipelineContinuityContext(null);
-    setPipelineRenderResults([]);
-    setPipelineError(null);
-    setPackGridPreviewBase64(null);
-    setPackGridRenderImages([]);
-    setPackGridError(null);
+    resetPackGenerationState();
     void Haptics.selectionAsync();
-  }, []);
+  }, [resetPackGenerationState]);
+
+  const toggleMixedPackSelection = useCallback((packId: string) => {
+    const active = mixedPackSelectedIds.includes(packId);
+
+    if (!active && mixedPackSelectedIds.length >= MIXED_PACK_SELECTION_LIMIT) {
+      Alert.alert("Two packs only", "Unselect one pack before adding another to this mix.");
+      return;
+    }
+
+    setMixedPackSelectedIds((current) =>
+      active ? current.filter((id) => id !== packId) : [...current, packId],
+    );
+    resetPackGenerationState();
+    void Haptics.selectionAsync();
+  }, [mixedPackSelectedIds, resetPackGenerationState]);
 
   const togglePackBriefRequiredElement = useCallback((elementId: string) => {
     setPackBriefRequiredElementIds((current) =>
@@ -2488,15 +2675,77 @@ export default function InstaMeScreen() {
   const handleGenerateGridPreview = useCallback(async (options?: { extend?: boolean }) => {
     if (!activePhotoPack) return;
     if (!photo) {
+      setPackGridError("Add a portrait above before generating this pack.");
       Alert.alert("Portrait required", "Add a portrait above before generating this pack.");
       return;
     }
-    if (isCustomPackPalette && !selectedPackPalettePrompt) {
+    if (isMixedPhotoPack && selectedMixedPhotoPacks.length !== MIXED_PACK_SELECTION_LIMIT) {
+      const message = `Select exactly ${MIXED_PACK_SELECTION_LIMIT} packs to create a mixed pack.`;
+      setPackGridError(message);
+      Alert.alert("Pick two packs", message);
+      return;
+    }
+    if (shouldShowCustomPackInputs && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS) {
+      const message = `Describe the style in at least ${CUSTOM_PACK_STYLE_MIN_WORDS} words before generating this pack.`;
+      setPackGridError(message);
+      Alert.alert(
+        "Custom style required",
+        message,
+      );
+      return;
+    }
+    if (shouldShowCustomPackInputs && !isCustomPackPaletteValid) {
+      const message = `Add at least ${CUSTOM_PACK_PALETTE_MIN_COLORS} colors separated by commas, or leave the palette blank.`;
+      setPackGridError(message);
+      Alert.alert(
+        "Palette needs 3 colors",
+        message,
+      );
+      return;
+    }
+    if (!isCustomPhotoPack && !isMixedPhotoPack && isCustomPackPalette && !selectedPackPalettePrompt) {
+      setPackGridError("Enter your custom color palette before generating the visual grid.");
       Alert.alert("Custom palette required", "Enter your custom color palette before generating the visual grid.");
       return;
     }
     const extend = options?.extend === true && Boolean(pipelineContinuityContext);
     const aesthetic = GRID_PIPELINE_AESTHETICS.find((a) => a.id === activePhotoPack.id);
+    const customPaletteText = customPackPaletteText.trim();
+    const getMixedPackAestheticName = (pack: PhotoPackPreset) =>
+      pack.id === CUSTOM_PHOTO_PACK_ID ? `Custom style: ${normalizedCustomPackStyle}` : pack.label;
+    const getMixedPackPaletteLine = (pack: PhotoPackPreset) => {
+      if (pack.id === CUSTOM_PHOTO_PACK_ID) {
+        return customPaletteText
+          ? `Custom style: ${customPaletteText}`
+          : `Custom style: AI-selected cohesive colors matching ${normalizedCustomPackStyle}`;
+      }
+
+      const packAesthetic = GRID_PIPELINE_AESTHETICS.find((item) => item.id === pack.id);
+      return `${pack.label}: ${packAesthetic?.defaultPalette || pack.deliverable}`;
+    };
+    const getMixedPackLightLine = (pack: PhotoPackPreset) => {
+      if (pack.id === CUSTOM_PHOTO_PACK_ID) {
+        return `Custom style: premium realistic lighting matching ${normalizedCustomPackStyle}`;
+      }
+
+      const packAesthetic = GRID_PIPELINE_AESTHETICS.find((item) => item.id === pack.id);
+      return `${pack.label}: ${packAesthetic?.defaultLightType || "premium editorial lighting"}`;
+    };
+    const requestAesthetic = isMixedPhotoPack
+      ? `Mixed Pack: ${selectedMixedPhotoPacks.map(getMixedPackAestheticName).join(" + ")}`
+      : isCustomPhotoPack
+        ? customPhotoPackAesthetic
+        : activePhotoPack.id;
+    const requestPalette = isMixedPhotoPack
+      ? `Blend these two source palettes into one cohesive Instagram grid palette: ${selectedMixedPhotoPacks.map(getMixedPackPaletteLine).join("; ")}`
+      : isCustomPhotoPack
+        ? customPaletteText || `AI-selected cohesive palette matching this custom aesthetic: ${normalizedCustomPackStyle}`
+        : selectedPackPalettePrompt || selectedDefaultPackPalettePrompt || aesthetic?.defaultPalette || "";
+    const requestLightType = isMixedPhotoPack
+      ? `Hybrid lighting plan for a cohesive two-style grid: ${selectedMixedPhotoPacks.map(getMixedPackLightLine).join("; ")}`
+      : isCustomPhotoPack
+        ? `premium realistic lighting that best supports this custom aesthetic: ${normalizedCustomPackStyle}`
+        : aesthetic?.defaultLightType || "";
     const elementsNote =
       packBriefRequiredElementIds.length > 0
         ? `Include: ${packBriefRequiredElementIds
@@ -2504,7 +2753,24 @@ export default function InstaMeScreen() {
             .filter(Boolean)
             .join(", ")}.`
         : "";
-    const extraNotes = [elementsNote, packBriefNotes.trim() ? `Must-have details: ${packBriefNotes.trim()}` : ""]
+    const customStyleNote = isCustomPhotoPack
+      ? `Custom pack style direction: ${normalizedCustomPackStyle}. Build a cohesive Instagram pack around this exact user-described aesthetic.`
+      : shouldShowCustomPackInputs
+        ? `Custom style inside this mixed pack: ${normalizedCustomPackStyle}. Keep that custom direction visible in the blend.`
+      : "";
+    const customPaletteNote = shouldShowCustomPackInputs && customPaletteText
+      ? `Use this user palette: ${customPaletteText}.`
+      : "";
+    const mixedStyleNote = isMixedPhotoPack
+      ? `Mixed pack direction: combine exactly these two selected pack directions - ${selectedMixedPhotoPackLabels.join(" + ")}. Every imagePrompt should feel like a deliberate cohesive blend of BOTH source styles, not a split grid where one cell is only one style and the next cell is only the other.`
+      : "";
+    const extraNotes = [
+      mixedStyleNote,
+      customStyleNote,
+      customPaletteNote,
+      elementsNote,
+      packBriefNotes.trim() ? `Must-have details: ${packBriefNotes.trim()}` : "",
+    ]
       .filter(Boolean)
       .join(" ");
     const referenceImages = packBriefSceneImages.map((image) => ({
@@ -2522,9 +2788,10 @@ export default function InstaMeScreen() {
     try {
       const result = await apiClient.generateInstaMeGridCompositePreview({
         imageCount: selectedPackImageCount,
-        aesthetic: activePhotoPack.id,
-        palette: selectedPackPalettePrompt || aesthetic?.defaultPalette || "",
-        lightType: aesthetic?.defaultLightType || "",
+        aesthetic: requestAesthetic,
+        palette: requestPalette,
+        lightType: requestLightType,
+        toneContrast: packGridToneContrast,
         extraNotes: extraNotes || undefined,
         hasPortraitReference: Boolean(photo),
         portrait: photo.base64,
@@ -2539,6 +2806,9 @@ export default function InstaMeScreen() {
       setPackGridPreviewBase64(previewBase64);
       setPipelinePlan(result.plan);
       setPipelineContinuityContext(result.continuityContext);
+      if (isMixedPhotoPack) {
+        setMixedPackSelectionMode(false);
+      }
       await refreshCredits();
     } catch (error: any) {
       setPackGridError(error?.message || "Failed to generate visual grid preview. Please try again.");
@@ -2553,8 +2823,20 @@ export default function InstaMeScreen() {
     photo,
     refreshCredits,
     isCustomPackPalette,
+    isCustomPhotoPack,
+    isMixedPhotoPack,
+    shouldShowCustomPackInputs,
+    isCustomPackPaletteValid,
+    customPackStyleWordCount,
+    customPhotoPackAesthetic,
+    normalizedCustomPackStyle,
+    customPackPaletteText,
+    selectedMixedPhotoPacks,
+    selectedMixedPhotoPackLabels,
     selectedPackImageCount,
     selectedPackPalettePrompt,
+    selectedDefaultPackPalettePrompt,
+    packGridToneContrast,
     pipelineContinuityContext,
   ]);
 
@@ -2689,7 +2971,7 @@ export default function InstaMeScreen() {
       // Persist the generated pack so the user can revisit / download / retouch it later.
       // Fire-and-forget: never blocks or breaks the extraction flow.
       void persistGeneratedPack({
-        title: activePhotoPack.label,
+        title: packPlannerDisplayTitle || activePhotoPack.label,
         aesthetic: pipelinePlan.aesthetic || activePhotoPack.id,
         palette: pipelinePlan.palette || undefined,
         previewBase64: packGridPreviewBase64,
@@ -2713,7 +2995,16 @@ export default function InstaMeScreen() {
       setPackGridExtractProgress(null);
       setPackGridRenderLoading(false);
     }
-  }, [activePhotoPack, pipelinePlan, photo, refreshCredits, packGridPreviewBase64, packBriefSceneImages]);
+  }, [
+    activePhotoPack,
+    pipelinePlan,
+    photo,
+    refreshCredits,
+    packGridPreviewBase64,
+    packBriefSceneImages,
+    packPlannerDisplayTitle,
+    packGridExtractQuality,
+  ]);
 
   const handleRenderGridPack = useCallback(() => {
     if (!activePhotoPack || !pipelinePlan) return;
@@ -3731,6 +4022,61 @@ export default function InstaMeScreen() {
     });
   }, [exportBase64Image, packGridPreviewBase64]);
 
+  const dismissPackInfo = useCallback(() => {
+    setActivePackInfoKey(null);
+  }, []);
+
+  const togglePackInfo = useCallback((key: PackInfoKey) => {
+    setActivePackInfoKey((current) => (current === key ? null : key));
+    void Haptics.selectionAsync();
+  }, []);
+
+  const renderPackInfoButton = useCallback(
+    (key: PackInfoKey): ReactNode => {
+      const active = activePackInfoKey === key;
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Show ${PACK_INFO_CONTENT[key].title} info`}
+          onPress={() => togglePackInfo(key)}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.packInfoButton,
+            active && styles.packInfoButtonActive,
+            pressed ? { opacity: 0.78 } : undefined,
+          ]}
+        >
+          <Text style={[styles.packInfoButtonText, active && styles.packInfoButtonTextActive]}>i</Text>
+        </Pressable>
+      );
+    },
+    [activePackInfoKey, togglePackInfo],
+  );
+
+  const renderPackInfoPopover = useCallback(
+    (key: PackInfoKey): ReactNode => {
+      if (activePackInfoKey !== key) return null;
+      const content = PACK_INFO_CONTENT[key];
+      return (
+        <View style={styles.packInfoPopover}>
+          <Text style={styles.packInfoPopoverTitle}>{content.title}</Text>
+          <Text style={styles.packInfoPopoverText}>{content.body}</Text>
+        </View>
+      );
+    },
+    [activePackInfoKey],
+  );
+
+  const renderPackSectionLabel = useCallback(
+    (label: string, infoKey: PackInfoKey): ReactNode => (
+      <View style={styles.packPlannerSectionHeader}>
+        <Text style={styles.packPlannerLabel}>{label}</Text>
+        {renderPackInfoButton(infoKey)}
+      </View>
+    ),
+    [renderPackInfoButton],
+  );
+
   const selectedStyleVibeCount = styleVibeCounts[selectedStyleVibe.id] ?? mainOnlyStylePresets.length;
 
   return (
@@ -3953,14 +4299,98 @@ export default function InstaMeScreen() {
                 A pack is a set of matching AI photos of you in one aesthetic, generated together so they look great as an Instagram grid or carousel.
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.packRail}>
-                {PHOTO_PACK_PRESETS.map((pack) => {
-                  const active = activePhotoPack?.id === pack.id;
+                {!(isMixedPhotoPack && mixedPackSelectionMode) ? (
+                  <View style={[
+                    styles.packCard,
+                    styles.packComboCard,
+                    (isCustomPhotoPack || isMixedPhotoPack) && styles.packCardActive,
+                  ]}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Select Custom Pack"
+                      onPress={() => handlePhotoPackPress(CUSTOM_PHOTO_PACK_ID)}
+                      style={({ pressed }) => [
+                        styles.packComboHalf,
+                        styles.packComboHalfTop,
+                        isCustomPhotoPack && styles.packComboHalfActive,
+                        pressed ? { opacity: 0.88 } : undefined,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={["rgba(134,244,255,0.26)", "rgba(255,79,125,0.12)", "rgba(0,0,0,0.90)"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={StyleSheet.absoluteFillObject as any}
+                      />
+                      <View style={styles.packComboTopRow}>
+                        <View style={isCustomPhotoPack ? styles.packCardActivePill : styles.packComboIcon}>
+                          <Ionicons
+                            name={isCustomPhotoPack ? "checkmark" : "create-outline"}
+                            size={isCustomPhotoPack ? 11 : 14}
+                            color="#071013"
+                          />
+                        </View>
+                        <Text style={styles.packComboMiniText}>15 cr</Text>
+                      </View>
+                      <View style={styles.packComboCopy}>
+                        <Text style={styles.packComboKicker}>CUSTOM</Text>
+                        <Text style={styles.packComboSubtitle}>your own style</Text>
+                      </View>
+                    </Pressable>
+
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Select Mixed Packs"
+                      onPress={() => handlePhotoPackPress(MIXED_PHOTO_PACK_ID)}
+                      style={({ pressed }) => [
+                        styles.packComboHalf,
+                        styles.packComboHalfBottom,
+                        isMixedPhotoPack && styles.packComboHalfActive,
+                        pressed ? { opacity: 0.88 } : undefined,
+                      ]}
+                    >
+                      <LinearGradient
+                        colors={["rgba(255,179,230,0.20)", "rgba(126,243,255,0.15)", "rgba(0,0,0,0.92)"]}
+                        start={{ x: 1, y: 0 }}
+                        end={{ x: 0, y: 1 }}
+                        style={StyleSheet.absoluteFillObject as any}
+                      />
+                      <View style={styles.packComboTopRow}>
+                        <View style={isMixedPhotoPack ? styles.packCardActivePill : styles.packComboIcon}>
+                          <Ionicons
+                            name={isMixedPhotoPack ? "checkmark" : "git-compare-outline"}
+                            size={isMixedPhotoPack ? 11 : 14}
+                            color="#071013"
+                          />
+                        </View>
+                        <Text style={styles.packComboMiniText}>15 cr</Text>
+                      </View>
+                      <View style={styles.packComboCopy}>
+                        <Text style={styles.packComboKicker}>MIX 2</Text>
+                        <Text style={styles.packComboSubtitle}>blend two packs</Text>
+                      </View>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                {(isMixedPhotoPack && mixedPackSelectionMode ? mixedPackOptions : regularPhotoPackPresets).map((pack) => {
+                  const isSelectingMixedPack = isMixedPhotoPack && mixedPackSelectionMode;
+                  const active = isSelectingMixedPack
+                    ? mixedPackSelectedIds.includes(pack.id)
+                    : activePhotoPack?.id === pack.id;
+                  const isCustomCard = pack.id === CUSTOM_PHOTO_PACK_ID;
+                  const isMixedCard = pack.id === MIXED_PHOTO_PACK_ID;
+                  const visuallyDisabled = isSelectingMixedPack && !active && selectedMixedPhotoPacks.length >= MIXED_PACK_SELECTION_LIMIT;
                   const hasImages = (pack.previewImages?.length ?? 0) > 0;
                   const imgCount = pack.previewImages?.length ?? 0;
                   return (
                     <Pressable
                       key={pack.id}
                       onPress={() => {
+                        if (isSelectingMixedPack) {
+                          toggleMixedPackSelection(pack.id);
+                          return;
+                        }
                         if (hasImages) {
                           setPackImagePreviewId(pack.id);
                           setPackImagePreviewIndex(0);
@@ -3971,6 +4401,7 @@ export default function InstaMeScreen() {
                       style={({ pressed }) => [
                         styles.packCard,
                         active && styles.packCardActive,
+                        visuallyDisabled && styles.packCardMuted,
                         pressed ? { opacity: 0.9, transform: [{ scale: 0.97 }] } : undefined,
                       ]}
                     >
@@ -3983,6 +4414,22 @@ export default function InstaMeScreen() {
                         <LinearGradient colors={pack.gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFillObject as any} />
                       )}
 
+                      {isCustomCard || isMixedCard ? (
+                        <View pointerEvents="none" style={styles.packCardFeatureArt}>
+                          <View style={styles.packCardFeatureIcon}>
+                            <Ionicons
+                              name={isMixedCard ? "git-compare-outline" : "create-outline"}
+                              size={18}
+                              color="#071013"
+                            />
+                          </View>
+                          <Text style={styles.packCardFeatureKicker}>{isMixedCard ? "MIX 2" : "CUSTOM"}</Text>
+                          <Text style={styles.packCardFeatureText}>
+                            {isMixedCard ? "blend two packs" : "your own style"}
+                          </Text>
+                        </View>
+                      ) : null}
+
                       {/* Bottom gradient overlay with text */}
                       <LinearGradient
                         colors={["transparent", "transparent", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.92)"]}
@@ -3994,8 +4441,16 @@ export default function InstaMeScreen() {
                             <View style={styles.packCardActivePill}>
                               <Ionicons name="checkmark" size={11} color="#0a0a0f" />
                             </View>
+                          ) : isSelectingMixedPack ? (
+                            <View style={styles.packCardSelectPill}>
+                              <Ionicons name="add" size={13} color="rgba(255,255,255,0.78)" />
+                            </View>
                           ) : <View />}
-                          {hasImages ? (
+                          {isSelectingMixedPack ? (
+                            <Text style={styles.packCardSelectCount}>
+                              {mixedPackSelectedIds.indexOf(pack.id) >= 0 ? mixedPackSelectedIds.indexOf(pack.id) + 1 : ""}
+                            </Text>
+                          ) : hasImages ? (
                             <View style={styles.packCardExpandHint}>
                               <Ionicons name="expand-outline" size={11} color="rgba(255,255,255,0.82)" />
                             </View>
@@ -4006,10 +4461,20 @@ export default function InstaMeScreen() {
                         <View style={styles.packCardBottomCopy}>
                           <Text numberOfLines={2} style={styles.packCardTitle}>{pack.label}</Text>
                           <View style={styles.packCardPriceRow}>
-                            <Ionicons name="diamond-outline" size={10} color="rgba(255,255,255,0.92)" />
+                            <Ionicons
+                              name={isSelectingMixedPack ? "checkmark-done-outline" : "diamond-outline"}
+                              size={10}
+                              color="rgba(255,255,255,0.92)"
+                            />
+                            {isSelectingMixedPack ? (
+                              <Text style={styles.packCardPriceText}>
+                                {active ? "selected" : "tap to mix"}
+                              </Text>
+                            ) : (
                             <Text style={styles.packCardPriceText}>
                               {getInstaMePackBundleCreditCost(pack.count)} cr · {pack.count} photos
                             </Text>
+                            )}
                           </View>
                         </View>
                       </LinearGradient>
@@ -4019,26 +4484,28 @@ export default function InstaMeScreen() {
               </ScrollView>
 
               <View style={styles.packPlannerCard}>
-                <View style={styles.packPlannerProgress}>
-                  <View style={styles.packPlannerProgressTrack}>
-                    {PACK_BRIEF_FLOW_STEPS.map((stepLabel, index) => {
-                      const stepNumber = index + 1;
-                      const reached = stepNumber <= packPlannerCurrentStep;
-                      return (
-                        <View
-                          key={stepLabel}
-                          style={[
-                            styles.packPlannerProgressSegment,
-                            reached && styles.packPlannerProgressSegmentActive,
-                          ]}
-                        />
-                      );
-                    })}
+                {!activePhotoPack ? (
+                  <View style={styles.packPlannerProgress}>
+                    <View style={styles.packPlannerProgressTrack}>
+                      {PACK_BRIEF_FLOW_STEPS.map((stepLabel, index) => {
+                        const stepNumber = index + 1;
+                        const reached = stepNumber <= packPlannerCurrentStep;
+                        return (
+                          <View
+                            key={stepLabel}
+                            style={[
+                              styles.packPlannerProgressSegment,
+                              reached && styles.packPlannerProgressSegmentActive,
+                            ]}
+                          />
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.packPlannerProgressLabel}>
+                      {PACK_BRIEF_FLOW_STEPS[packPlannerCurrentStep - 1]}
+                    </Text>
                   </View>
-                  <Text style={styles.packPlannerProgressLabel}>
-                    {PACK_BRIEF_FLOW_STEPS[packPlannerCurrentStep - 1]}
-                  </Text>
-                </View>
+                ) : null}
 
                 {!activePhotoPack ? (
                   <View style={styles.packPlannerEmptyState}>
@@ -4050,210 +4517,492 @@ export default function InstaMeScreen() {
                   </View>
                 ) : (
                   <>
-                    <View style={styles.packPlannerSummaryCard}>
-                      <Text style={styles.packPlannerSummaryTitle}>{activePhotoPack.label}</Text>
+                    {activePackInfoKey ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Close section info"
+                        onPress={dismissPackInfo}
+                        style={styles.packInfoDismissLayer}
+                      />
+                    ) : null}
+                    <View style={styles.packPlannerConfigHeader}>
+                      <Text style={styles.packPlannerConfigTitle}>Your Configuration</Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.packPlannerSummaryCard,
+                        activePackInfoKey === "cost" && styles.packPlannerActiveInfoRow,
+                      ]}
+                    >
+                      <View style={styles.packSummaryInfoCorner}>
+                        {renderPackInfoButton("cost")}
+                      </View>
+                      <Text style={styles.packPlannerSummaryTitle}>
+                        Preview grid • {INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits
+                      </Text>
                       <Text style={styles.packPlannerSummaryText}>
-                        {selectedPackImageCount} photos • {selectedPackBriefVibe.label}
+                        Per kept photo • {INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit{INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"}
                       </Text>
-                      <Text style={styles.packPlannerSummaryLadder}>
-                        {`Step 1 · Preview the grid — ${INSTAME_GRID_PIPELINE_COMPOSITE_CREDIT_COST} credits\nStep 2 · Keep your photos — ${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE} credit${INSTAME_GRID_PIPELINE_EXTRACT_CREDIT_COST_PER_IMAGE === 1 ? "" : "s"} each`}
+                      <Text style={styles.packPlannerSummaryPriceText}>
+                        Full pack • ~{getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
                       </Text>
-                      <View style={styles.packPlannerSummaryPriceRow}>
-                        <Ionicons name="diamond-outline" size={12} color={Colors.accentTeal} />
-                        <Text style={styles.packPlannerSummaryPriceText}>
-                          Full pack ≈ {getInstaMePackBundleCreditCost(selectedPackImageCount)} credits
-                        </Text>
-                      </View>
                       <Text style={styles.packPlannerSummaryFootnote}>
-                        Takes about 1–2 minutes. You only pay for photos that come out right — failed ones are refunded.
+                        Failed photos refunded
                       </Text>
+                      {renderPackInfoPopover("cost")}
                     </View>
+                    <Text style={styles.packPlannerConfigSubtitle}>
+                      {packPlannerDisplayTitle} • {selectedPackImageCount} photos
+                    </Text>
 
-                    <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>How many photos?</Text>
-                      <Text style={styles.packPlannerHint}>
-                        Starts at your pack's recommended count — change it anytime.
-                      </Text>
-                      <View style={styles.packPlannerCountRow}>
-                        {PACK_IMAGE_COUNT_OPTIONS.map((count) => {
-                          const active = selectedPackImageCount === count;
-                          return (
-                            <Pressable
-                              key={`pack-count-${count}`}
-                              onPress={() => {
-                                setSelectedPackImageCount(count);
-                                setPipelineImageCount(count);
-                                void Haptics.selectionAsync();
-                              }}
-                              style={({ pressed }) => [
-                                styles.packPlannerCountChip,
-                                active && styles.packPlannerCountChipActive,
-                                pressed ? { opacity: 0.88 } : undefined,
-                              ]}
-                            >
-                              <Text style={[styles.packPlannerCountChipText, active && styles.packPlannerCountChipTextActive]}>
-                                {count}
-                              </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </View>
-
-                    <View style={styles.packPlannerBlock}>
-                      <Text style={styles.packPlannerLabel}>Choose your colors</Text>
-                      <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.packPlannerPaletteRail}
+                    {isMixedPhotoPack ? (
+                      <View
+                        style={[
+                          styles.packPlannerSectionBlock,
+                          activePackInfoKey === "selectedPacks" && styles.packPlannerActiveInfoRow,
+                        ]}
                       >
-                        {PACK_COLOR_PALETTES.map((palette) => {
-                          const active = selectedPackPaletteId === palette.id;
-                          return (
+                        {renderPackSectionLabel("Selected Packs", "selectedPacks")}
+                        <View style={styles.mixedPackCompactRow}>
+                          <View style={styles.mixedPackSelectedRow}>
+                            {selectedMixedPhotoPackLabels.length > 0 ? (
+                              selectedMixedPhotoPackLabels.map((label) => (
+                                <View key={`mixed-selected-${label}`} style={styles.mixedPackSelectedPill}>
+                                  <Text numberOfLines={1} style={styles.mixedPackSelectedPillText}>{label}</Text>
+                                </View>
+                              ))
+                            ) : (
+                              <Text style={styles.mixedPackEmptyText}>No packs selected yet.</Text>
+                            )}
+                          </View>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel="Choose two packs to mix"
+                            onPress={() => {
+                              setMixedPackSelectionMode(true);
+                              void Haptics.selectionAsync();
+                            }}
+                            style={({ pressed }) => [
+                              styles.mixedPackChangeButton,
+                              mixedPackSelectionMode && styles.mixedPackChangeButtonActive,
+                              pressed ? { opacity: 0.88 } : undefined,
+                            ]}
+                          >
+                            <Text style={styles.mixedPackChangeButtonText}>
+                              {selectedMixedPhotoPacks.length > 0 ? "Change packs" : "Choose packs"}
+                            </Text>
+                          </Pressable>
+                          {mixedPackSelectionMode ? (
                             <Pressable
-                              key={palette.id}
+                              accessibilityRole="button"
+                              accessibilityLabel="Done choosing mixed packs"
+                              disabled={selectedMixedPhotoPacks.length !== MIXED_PACK_SELECTION_LIMIT}
                               onPress={() => {
-                                setSelectedPackPaletteId(palette.id);
+                                setMixedPackSelectionMode(false);
                                 void Haptics.selectionAsync();
                               }}
                               style={({ pressed }) => [
-                                styles.packPlannerPaletteCard,
-                                active && styles.packPlannerPaletteCardActive,
-                                pressed ? { opacity: 0.9 } : undefined,
+                                styles.mixedPackDoneButton,
+                                selectedMixedPhotoPacks.length !== MIXED_PACK_SELECTION_LIMIT && styles.mixedPackDoneButtonDisabled,
+                                pressed && selectedMixedPhotoPacks.length === MIXED_PACK_SELECTION_LIMIT ? { opacity: 0.85 } : undefined,
                               ]}
                             >
-                              <View style={styles.packPlannerPaletteSwatches}>
-                                {palette.colors.map((color) => (
-                                  <View key={`${palette.id}-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
-                                ))}
-                              </View>
-                              <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>{palette.label}</Text>
+                              <Text style={styles.mixedPackDoneButtonText}>Done</Text>
                             </Pressable>
-                          );
-                        })}
-                        <Pressable
-                          onPress={() => {
-                            setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID);
-                            void Haptics.selectionAsync();
-                          }}
-                          style={({ pressed }) => [
-                            styles.packPlannerPaletteCard,
-                            styles.packPlannerPaletteCustomCard,
-                            selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID && styles.packPlannerPaletteCardActive,
-                            pressed ? { opacity: 0.9 } : undefined,
-                          ]}
-                        >
-                          <View style={styles.packPlannerPaletteCustomIconWrap}>
-                            <Ionicons name="color-palette-outline" size={16} color="rgba(255,255,255,0.82)" />
-                          </View>
-                          <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Custom</Text>
-                        </Pressable>
-                      </ScrollView>
-                      {selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID ? (
-                        <>
+                          ) : null}
+                        </View>
+                        {renderPackInfoPopover("selectedPacks")}
+                      </View>
+                    ) : null}
+
+                    {shouldShowCustomPackInputs ? (
+                      <View
+                        style={[
+                          styles.packPlannerFieldRow,
+                          activePackInfoKey === "style" && styles.packPlannerActiveInfoRow,
+                        ]}
+                      >
+                        <View style={styles.packPlannerFieldLabelColumn}>
+                          {renderPackSectionLabel("Style", "style")}
+                        </View>
+                        <View style={styles.packPlannerFieldControl}>
+                          <TextInput
+                            value={customPackStyleText}
+                            onChangeText={(value) => {
+                              setCustomPackStyleText(value);
+                              setPackGridError(null);
+                            }}
+                            placeholder="Ex: chrome city glam"
+                            placeholderTextColor="rgba(255,255,255,0.40)"
+                            maxLength={90}
+                            style={styles.packPlannerPaletteCustomInput}
+                          />
+                          {customPackStyleText.trim() && customPackStyleWordCount < CUSTOM_PACK_STYLE_MIN_WORDS ? (
+                            <Text style={[styles.packPlannerPaletteCustomHint, styles.packPlannerPaletteCustomHintWarning]}>
+                              {customPackStyleWordCount}/{CUSTOM_PACK_STYLE_MIN_WORDS} words minimum
+                            </Text>
+                          ) : null}
+                        </View>
+                        {renderPackInfoPopover("style")}
+                      </View>
+                    ) : null}
+
+                    {shouldShowCustomPackInputs ? (
+                      <View
+                        style={[
+                          styles.packPlannerFieldRow,
+                          activePackInfoKey === "optionalPalette" && styles.packPlannerActiveInfoRow,
+                        ]}
+                      >
+                        <View style={styles.packPlannerFieldLabelColumn}>
+                          {renderPackSectionLabel("Optional Palette", "optionalPalette")}
+                        </View>
+                        <View style={styles.packPlannerFieldControl}>
                           <TextInput
                             value={customPackPaletteText}
-                            onChangeText={setCustomPackPaletteText}
-                            onFocus={() => setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID)}
-                            placeholder="Ex: ivory cream, burgundy wine, matte black, antique gold"
+                            onChangeText={(value) => {
+                              setCustomPackPaletteText(value);
+                              setPackGridError(null);
+                            }}
+                            placeholder="Ex: black, chrome silver, icy blue"
                             placeholderTextColor="rgba(255,255,255,0.40)"
                             maxLength={120}
                             style={styles.packPlannerPaletteCustomInput}
                           />
-                          <Text style={styles.packPlannerPaletteCustomHint}>
-                            Use 3-5 colors, separated by commas.
-                          </Text>
-                        </>
-                      ) : null}
+                          {customPackPaletteText.trim() && !isCustomPackPaletteValid ? (
+                            <Text style={[styles.packPlannerPaletteCustomHint, styles.packPlannerPaletteCustomHintWarning]}>
+                              {customPackPaletteColorCount}/{CUSTOM_PACK_PALETTE_MIN_COLORS} colors minimum
+                            </Text>
+                          ) : null}
+                        </View>
+                        {renderPackInfoPopover("optionalPalette")}
+                      </View>
+                    ) : null}
+
+                    <View
+                      style={[
+                        styles.packPlannerFieldRow,
+                        activePackInfoKey === "photoCount" && styles.packPlannerActiveInfoRow,
+                      ]}
+                    >
+                      <View style={styles.packPlannerFieldLabelColumn}>
+                        {renderPackSectionLabel("Photo Count", "photoCount")}
+                      </View>
+                      <View style={styles.packPlannerFieldControl}>
+                        <View style={styles.packPlannerCountRow}>
+                          {PACK_IMAGE_COUNT_OPTIONS.map((count) => {
+                            const active = selectedPackImageCount === count;
+                            return (
+                              <Pressable
+                                key={`pack-count-${count}`}
+                                onPress={() => {
+                                  setSelectedPackImageCount(count);
+                                  setPipelineImageCount(count);
+                                  void Haptics.selectionAsync();
+                                }}
+                                style={({ pressed }) => [
+                                  styles.packPlannerCountChip,
+                                  active && styles.packPlannerCountChipActive,
+                                  pressed ? { opacity: 0.88 } : undefined,
+                                ]}
+                              >
+                                <Text style={[styles.packPlannerCountChipText, active && styles.packPlannerCountChipTextActive]}>
+                                  {count}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                      {renderPackInfoPopover("photoCount")}
                     </View>
 
-                    <Pressable
-                      onPress={() => {
-                        setPackBriefShowMore((prev) => !prev);
-                        void Haptics.selectionAsync();
-                      }}
-                      style={({ pressed }) => [styles.packPlannerMoreToggle, pressed ? { opacity: 0.8 } : undefined]}
+                    {!isCustomPhotoPack && !isMixedPhotoPack ? (
+                      <View
+                        style={[
+                          styles.packPlannerSectionBlock,
+                          activePackInfoKey === "palette" && styles.packPlannerActiveInfoRow,
+                        ]}
+                      >
+                        {renderPackSectionLabel("Palette", "palette")}
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.packPlannerPaletteRail}
+                        >
+                          <Pressable
+                            onPress={() => {
+                              setSelectedPackPaletteId(null);
+                              void Haptics.selectionAsync();
+                            }}
+                            style={({ pressed }) => [
+                              styles.packPlannerPaletteCard,
+                              !selectedPackPaletteId && styles.packPlannerPaletteCardActive,
+                              pressed ? { opacity: 0.9 } : undefined,
+                            ]}
+                          >
+                            <View style={styles.packPlannerPaletteSwatches}>
+                              {["#F3EEE4", "#A9A79E", "#6F6357", "#C7A66A"].map((color) => (
+                                <View key={`default-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
+                              ))}
+                            </View>
+                            <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Default</Text>
+                          </Pressable>
+                          {PACK_COLOR_PALETTES.map((palette) => {
+                            const active = selectedPackPaletteId === palette.id;
+                            return (
+                              <Pressable
+                                key={palette.id}
+                                onPress={() => {
+                                  setSelectedPackPaletteId(palette.id);
+                                  void Haptics.selectionAsync();
+                                }}
+                                style={({ pressed }) => [
+                                  styles.packPlannerPaletteCard,
+                                  active && styles.packPlannerPaletteCardActive,
+                                  pressed ? { opacity: 0.9 } : undefined,
+                                ]}
+                              >
+                                <View style={styles.packPlannerPaletteSwatches}>
+                                  {palette.colors.map((color) => (
+                                    <View key={`${palette.id}-${color}`} style={[styles.packPlannerPaletteSwatch, { backgroundColor: color }]} />
+                                  ))}
+                                </View>
+                                <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>{palette.label}</Text>
+                              </Pressable>
+                            );
+                          })}
+                          <Pressable
+                            onPress={() => {
+                              setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID);
+                              void Haptics.selectionAsync();
+                            }}
+                            style={({ pressed }) => [
+                              styles.packPlannerPaletteCard,
+                              styles.packPlannerPaletteCustomCard,
+                              selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID && styles.packPlannerPaletteCardActive,
+                              pressed ? { opacity: 0.9 } : undefined,
+                            ]}
+                          >
+                            <View style={styles.packPlannerPaletteCustomIconWrap}>
+                              <Ionicons name="color-palette-outline" size={16} color="rgba(255,255,255,0.82)" />
+                            </View>
+                            <Text numberOfLines={1} style={styles.packPlannerPaletteTitle}>Custom</Text>
+                          </Pressable>
+                        </ScrollView>
+                        {!selectedPackPaletteId ? (
+                          <>
+                            <TextInput
+                              value={customPackDefaultAccent}
+                              onChangeText={setCustomPackDefaultAccent}
+                              placeholder="Optional accent color for default palette"
+                              placeholderTextColor="rgba(255,255,255,0.40)"
+                              maxLength={40}
+                              style={styles.packPlannerPaletteCustomInput}
+                            />
+                            <Text style={styles.packPlannerPaletteCustomHint}>
+                              Adds one color to the pack's recommended palette.
+                            </Text>
+                          </>
+                        ) : selectedPackPaletteId === PACK_CUSTOM_PALETTE_ID ? (
+                          <>
+                            <TextInput
+                              value={customPackPaletteText}
+                              onChangeText={(value) => {
+                                setCustomPackPaletteText(value);
+                                setPackGridError(null);
+                              }}
+                              onFocus={() => setSelectedPackPaletteId(PACK_CUSTOM_PALETTE_ID)}
+                              placeholder="Ex: ivory cream, burgundy wine, matte black, antique gold"
+                              placeholderTextColor="rgba(255,255,255,0.40)"
+                              maxLength={120}
+                              style={styles.packPlannerPaletteCustomInput}
+                            />
+                            <Text style={styles.packPlannerPaletteCustomHint}>
+                              Use 3-5 colors, separated by commas.
+                            </Text>
+                          </>
+                        ) : null}
+                        {renderPackInfoPopover("palette")}
+                      </View>
+                    ) : null}
+
+                    <View
+                      style={[
+                        styles.packPlannerFieldRow,
+                        activePackInfoKey === "contrast" && styles.packPlannerActiveInfoRow,
+                      ]}
                     >
-                      <Text style={styles.packPlannerMoreToggleText}>
-                        {packBriefShowMore ? "Hide extra options" : "Fine-tune details"}
-                        {!packBriefShowMore && packBriefRequiredElementIds.length > 0
-                          ? ` · ${packBriefRequiredElementIds.length}`
-                          : ""}
-                      </Text>
-                      <Ionicons
-                        name={packBriefShowMore ? "chevron-up" : "chevron-down"}
-                        size={15}
-                        color="rgba(255,255,255,0.62)"
-                      />
-                    </Pressable>
+                      <View style={styles.packPlannerFieldLabelColumn}>
+                        {renderPackSectionLabel("Contrast", "contrast")}
+                      </View>
+                      <View style={styles.packPlannerFieldControl}>
+                        <View style={styles.packContrastList}>
+                          {PACK_GRID_TONE_CONTRAST_OPTIONS.map((option) => {
+                            const active = packGridToneContrast === option.key;
+                            return (
+                              <Pressable
+                                key={option.key}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Select ${option.title}`}
+                                onPress={() => {
+                                  setPackGridToneContrast(option.key);
+                                  void Haptics.selectionAsync();
+                                }}
+                                disabled={packGridPreviewLoading || packGridRenderLoading}
+                                style={({ pressed }) => [
+                                  styles.packContrastOption,
+                                  pressed && !packGridPreviewLoading && !packGridRenderLoading ? { opacity: 0.82 } : undefined,
+                                ]}
+                              >
+                                <Ionicons
+                                  name={active ? "radio-button-on" : "radio-button-off"}
+                                  size={16}
+                                  color={active ? "#F3A0B1" : "rgba(255,255,255,0.42)"}
+                                />
+                                <Text style={[styles.packContrastOptionText, active && styles.packContrastOptionTextActive]}>
+                                  {option.title}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                      {renderPackInfoPopover("contrast")}
+                    </View>
+
+                    <View
+                      style={[
+                        styles.packPlannerMoreToggle,
+                        activePackInfoKey === "fineTune" && styles.packPlannerActiveInfoRow,
+                      ]}
+                    >
+                      <View style={styles.packPlannerSectionHeader}>
+                        <Text style={styles.packPlannerMoreToggleText}>
+                          {packBriefShowMore ? "Hide extra options" : "Fine-tune details"}
+                          {!packBriefShowMore && packBriefRequiredElementIds.length > 0
+                            ? ` - ${packBriefRequiredElementIds.length}`
+                            : ""}
+                        </Text>
+                        {renderPackInfoButton("fineTune")}
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={packBriefShowMore ? "Hide fine tune details" : "Show fine tune details"}
+                        onPress={() => {
+                          setPackBriefShowMore((prev) => !prev);
+                          void Haptics.selectionAsync();
+                        }}
+                        hitSlop={10}
+                        style={({ pressed }) => [styles.packPlannerMoreChevron, pressed ? { opacity: 0.72 } : undefined]}
+                      >
+                        <Ionicons
+                          name={packBriefShowMore ? "chevron-up" : "chevron-forward"}
+                          size={15}
+                          color="rgba(255,255,255,0.62)"
+                        />
+                      </Pressable>
+                      {renderPackInfoPopover("fineTune")}
+                    </View>
 
                     {packBriefShowMore ? (
                       <>
-                        <View style={styles.packPlannerBlock}>
-                          <Text style={styles.packPlannerLabel}>Add a few details</Text>
-                          <View style={styles.packPlannerElementWrap}>
-                            {PACK_BRIEF_REQUIRED_ELEMENTS.map((element) => {
-                              const active = packBriefRequiredElementIds.includes(element.id);
-                              return (
-                                <Pressable
-                                  key={element.id}
-                                  onPress={() => togglePackBriefRequiredElement(element.id)}
-                                  style={({ pressed }) => [
-                                    styles.packPlannerElementChip,
-                                    active && styles.packPlannerElementChipActive,
-                                    pressed ? { opacity: 0.88 } : undefined,
-                                  ]}
-                                >
-                                  <Text style={[styles.packPlannerElementChipText, active && styles.packPlannerElementChipTextActive]}>
-                                    {element.label}
-                                  </Text>
-                                </Pressable>
-                              );
-                            })}
+                        <View
+                          style={[
+                            styles.packPlannerFieldRow,
+                            activePackInfoKey === "details" && styles.packPlannerActiveInfoRow,
+                          ]}
+                        >
+                          <View style={styles.packPlannerFieldLabelColumn}>
+                            {renderPackSectionLabel("Details", "details")}
                           </View>
+                          <View style={styles.packPlannerFieldControl}>
+                            <View style={styles.packPlannerElementWrap}>
+                              {PACK_BRIEF_REQUIRED_ELEMENTS.map((element) => {
+                                const active = packBriefRequiredElementIds.includes(element.id);
+                                return (
+                                  <Pressable
+                                    key={element.id}
+                                    onPress={() => togglePackBriefRequiredElement(element.id)}
+                                    style={({ pressed }) => [
+                                      styles.packPlannerElementChip,
+                                      active && styles.packPlannerElementChipActive,
+                                      pressed ? { opacity: 0.88 } : undefined,
+                                    ]}
+                                  >
+                                    <Text style={[styles.packPlannerElementChipText, active && styles.packPlannerElementChipTextActive]}>
+                                      {element.label}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          </View>
+                          {renderPackInfoPopover("details")}
                         </View>
 
-                        <View style={styles.packPlannerBlock}>
-                          <Text style={styles.packPlannerLabel}>Anything else?</Text>
-                          <TextInput
-                            value={packBriefNotes}
-                            onChangeText={setPackBriefNotes}
-                            placeholder="Ex: white blazer, marble stairs, watch close-up"
-                            placeholderTextColor="rgba(255,255,255,0.40)"
-                            multiline
-                            maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
-                            style={styles.packPlannerNotesInput}
-                          />
+                        <View
+                          style={[
+                            styles.packPlannerFieldRow,
+                            activePackInfoKey === "notes" && styles.packPlannerActiveInfoRow,
+                          ]}
+                        >
+                          <View style={styles.packPlannerFieldLabelColumn}>
+                            {renderPackSectionLabel("Notes", "notes")}
+                          </View>
+                          <View style={styles.packPlannerFieldControl}>
+                            <TextInput
+                              value={packBriefNotes}
+                              onChangeText={setPackBriefNotes}
+                              placeholder="Ex: white blazer, marble stairs, watch close-up"
+                              placeholderTextColor="rgba(255,255,255,0.40)"
+                              multiline
+                              maxLength={PACK_BRIEF_NOTES_MAX_LENGTH}
+                              style={styles.packPlannerNotesInput}
+                            />
+                          </View>
+                          {renderPackInfoPopover("notes")}
                         </View>
 
-                        <View style={styles.packPlannerBlock}>
-                          <Text style={styles.packPlannerLabel}>Scene elements / products</Text>
-                          <Text style={styles.packPlannerHint}>
-                            Add photos of items you want featured in the shots - a product, outfit, or prop. We keep them faithful across the scenes.
-                          </Text>
-                          <View style={styles.packPlannerSceneWrap}>
-                            {packBriefSceneImages.map((image) => (
-                              <View key={image.id} style={styles.packPlannerSceneThumb}>
-                                <Image source={{ uri: image.uri }} style={StyleSheet.absoluteFillObject as any} contentFit="cover" />
-                                <Pressable
-                                  onPress={() => removePackBriefSceneImage(image.id)}
-                                  hitSlop={8}
-                                  style={styles.packPlannerSceneRemove}
-                                >
-                                  <Ionicons name="close" size={12} color="#FFF" />
-                                </Pressable>
-                              </View>
-                            ))}
-                            {packBriefSceneImages.length < PACK_BRIEF_SCENE_IMAGES_MAX ? (
-                              <Pressable
-                                onPress={() => void addPackBriefSceneImage()}
-                                style={({ pressed }) => [styles.packPlannerSceneAdd, pressed ? { opacity: 0.85 } : undefined]}
-                              >
-                                <Ionicons name="add" size={20} color="rgba(255,255,255,0.7)" />
-                                <Text style={styles.packPlannerSceneAddText}>Add</Text>
-                              </Pressable>
-                            ) : null}
+                        <View
+                          style={[
+                            styles.packPlannerFieldRow,
+                            activePackInfoKey === "sceneElements" && styles.packPlannerActiveInfoRow,
+                          ]}
+                        >
+                          <View style={styles.packPlannerFieldLabelColumn}>
+                            {renderPackSectionLabel("Elements", "sceneElements")}
                           </View>
+                          <View style={styles.packPlannerFieldControl}>
+                            <Text style={styles.packPlannerHint}>
+                              Add product, outfit, or prop references.
+                            </Text>
+                            <View style={styles.packPlannerSceneWrap}>
+                              {packBriefSceneImages.map((image) => (
+                                <View key={image.id} style={styles.packPlannerSceneThumb}>
+                                  <Image source={{ uri: image.uri }} style={StyleSheet.absoluteFillObject as any} contentFit="cover" />
+                                  <Pressable
+                                    onPress={() => removePackBriefSceneImage(image.id)}
+                                    hitSlop={8}
+                                    style={styles.packPlannerSceneRemove}
+                                  >
+                                    <Ionicons name="close" size={12} color="#FFF" />
+                                  </Pressable>
+                                </View>
+                              ))}
+                              {packBriefSceneImages.length < PACK_BRIEF_SCENE_IMAGES_MAX ? (
+                                <Pressable
+                                  onPress={() => void addPackBriefSceneImage()}
+                                  style={({ pressed }) => [styles.packPlannerSceneAdd, pressed ? { opacity: 0.85 } : undefined]}
+                                >
+                                  <Ionicons name="add" size={20} color="rgba(255,255,255,0.7)" />
+                                  <Text style={styles.packPlannerSceneAddText}>Add</Text>
+                                </Pressable>
+                              ) : null}
+                            </View>
+                          </View>
+                          {renderPackInfoPopover("sceneElements")}
                         </View>
                       </>
                     ) : null}
@@ -4389,7 +5138,7 @@ export default function InstaMeScreen() {
                               {
                                 key: "max" as InstaMeGridExtractQuality,
                                 title: "Max quality",
-                                subtitle: `${getInstaMeGridExtractCreditCostPerImage("max")} credits/photo - Gemini Pro 4K`,
+                                subtitle: `${getInstaMeGridExtractCreditCostPerImage("max")} credits/photo - highest detail`,
                               },
                             ]).map((option) => {
                               const active = packGridExtractQuality === option.key;
@@ -4410,7 +5159,7 @@ export default function InstaMeScreen() {
                                     <Ionicons
                                       name={active ? "radio-button-on" : "radio-button-off"}
                                       size={16}
-                                      color={active ? "#FFF" : "rgba(255,255,255,0.55)"}
+                                      color={active ? "#F3A0B1" : "rgba(255,255,255,0.42)"}
                                     />
                                     <Text
                                       style={[
@@ -4445,9 +5194,9 @@ export default function InstaMeScreen() {
                             ]}
                           >
                             {packGridRenderLoading ? (
-                              <ActivityIndicator size="small" color="#FFF" />
+                              <ActivityIndicator size="small" color="#111" />
                             ) : (
-                              <Ionicons name="images-outline" size={14} color="#FFF" />
+                              <Ionicons name="images-outline" size={14} color="#111" />
                             )}
                             <Text style={styles.packPlannerRenderButtonText}>
                               {packGridRenderLoading
@@ -5202,7 +5951,7 @@ export default function InstaMeScreen() {
                     ]}
                   >
                     <View style={styles.generateButtonInner}>
-                      {loading ? <ActivityIndicator color="#FF7FB1" /> : <Text style={styles.generateButtonText}>Generate with this aesthetic</Text>}
+                      {loading ? <ActivityIndicator color="#101010" /> : <Text style={styles.generateButtonText}>Generate with this aesthetic</Text>}
                     </View>
                   </Pressable>
                   <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
@@ -5363,7 +6112,7 @@ export default function InstaMeScreen() {
                     ]}
                   >
                     <View style={styles.generateButtonInner}>
-                      {loading ? <ActivityIndicator color="#FF7FB1" /> : <Text style={styles.generateButtonText}>Create art result</Text>}
+                      {loading ? <ActivityIndicator color="#101010" /> : <Text style={styles.generateButtonText}>Create art result</Text>}
                     </View>
                   </Pressable>
                   <Text style={styles.generateCostLabel}>{transformCost} credits</Text>
@@ -6151,8 +6900,8 @@ export default function InstaMeScreen() {
                       ]}
                     >
                       <View style={styles.generateButtonInner}>
-                        {loading ? (
-                          <ActivityIndicator color="#FF7FB1" />
+                          {loading ? (
+                            <ActivityIndicator color="#101010" />
                         ) : (
                           <>
                             <Text style={styles.generateButtonText}>Restyle</Text>
@@ -6678,6 +7427,61 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
+  packCardMuted: {
+    opacity: 0.46,
+  },
+  packComboCard: {
+    padding: 0,
+    backgroundColor: "rgba(10,12,16,0.98)",
+  },
+  packComboHalf: {
+    flex: 1,
+    overflow: "hidden",
+    padding: 10,
+    justifyContent: "space-between",
+  },
+  packComboHalfTop: {
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.14)",
+  },
+  packComboHalfBottom: {},
+  packComboHalfActive: {
+    backgroundColor: "rgba(126,243,255,0.09)",
+  },
+  packComboTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  packComboIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#7EF3FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  packComboMiniText: {
+    color: "rgba(255,255,255,0.68)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+  },
+  packComboCopy: {
+    gap: 2,
+  },
+  packComboKicker: {
+    color: "#FFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 18,
+    lineHeight: 21,
+    letterSpacing: 0.6,
+  },
+  packComboSubtitle: {
+    color: "rgba(255,255,255,0.70)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10.5,
+    lineHeight: 13,
+  },
   packCardDiptych: {
     ...StyleSheet.absoluteFillObject,
     flexDirection: "row",
@@ -6691,6 +7495,42 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 10,
     paddingBottom: 12,
+  },
+  packCardFeatureArt: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingBottom: 44,
+  },
+  packCardFeatureIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#7EF3FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 9,
+    shadowColor: "#7EF3FF",
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  packCardFeatureKicker: {
+    color: "#FFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 21,
+    lineHeight: 25,
+    letterSpacing: 1,
+    textAlign: "center",
+  },
+  packCardFeatureText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10.5,
+    lineHeight: 14,
+    textAlign: "center",
+    marginTop: 2,
   },
   packCardFill: {
     padding: 10,
@@ -6741,6 +7581,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#7EF3FF",
     alignItems: "center",
     justifyContent: "center",
+  },
+  packCardSelectPill: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  packCardSelectCount: {
+    color: "#DFFFFF",
+    fontFamily: "Inter_800ExtraBold",
+    fontSize: 12,
+    minWidth: 18,
+    textAlign: "right",
   },
   // ── Aesthetic lightbox ──────────────────────────────────────────────────────
   packLightboxBackdrop: {
@@ -6890,33 +7747,56 @@ const styles = StyleSheet.create({
   },
   packPlannerCard: {
     marginHorizontal: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(12,12,16,0.95)",
-    padding: 16,
-    gap: 16,
+    borderRadius: 20,
+    backgroundColor: "rgba(6,6,8,0.98)",
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    paddingBottom: 18,
+    gap: 14,
+    position: "relative",
   },
   packPlannerProgress: {
-    gap: 8,
+    gap: 7,
   },
   packPlannerProgressTrack: {
     flexDirection: "row",
-    gap: 5,
+    gap: 6,
   },
   packPlannerProgressSegment: {
     flex: 1,
-    height: 5,
+    height: 4,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.12)",
   },
   packPlannerProgressSegmentActive: {
-    backgroundColor: "#7EF3FF",
+    backgroundColor: "#F3A0B1",
   },
   packPlannerProgressLabel: {
-    color: "rgba(255,255,255,0.78)",
+    color: "rgba(255,255,255,0.62)",
     fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    letterSpacing: 0.2,
+  },
+  packPlannerConfigHeader: {
+    alignItems: "center",
+    gap: 4,
+    paddingTop: 2,
+  },
+  packPlannerConfigTitle: {
+    color: "rgba(255,255,255,0.86)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 30,
+    lineHeight: 36,
+    textAlign: "center",
+  },
+  packPlannerConfigSubtitle: {
+    color: "rgba(255,255,255,0.82)",
+    fontFamily: "Inter_700Bold",
     fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: -4,
+    marginBottom: 18,
   },
   packPlannerStepsRow: {
     flexDirection: "row",
@@ -6962,42 +7842,49 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   packPlannerSummaryCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(126,243,255,0.28)",
-    backgroundColor: "rgba(126,243,255,0.09)",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 2,
+    minHeight: 104,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.07)",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 6,
+    marginTop: 6,
+    position: "relative",
   },
   packPlannerSummaryTitle: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.94)",
     fontFamily: "Inter_700Bold",
-    fontSize: 14,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
   },
   packPlannerSummaryText: {
-    color: "rgba(255,255,255,0.72)",
+    color: "rgba(255,255,255,0.78)",
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
   },
   packPlannerSummaryPriceRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    marginTop: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: "rgba(126,243,255,0.34)",
-    backgroundColor: "rgba(66,214,235,0.10)",
+    marginTop: 2,
+    alignSelf: "center",
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
   },
   packPlannerSummaryPriceText: {
-    color: Colors.accentLight,
+    color: "rgba(255,255,255,0.82)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 11.5,
-    letterSpacing: 0.2,
+    fontSize: 12,
+    lineHeight: 16,
   },
   packIntroText: {
     color: "rgba(255,255,255,0.60)",
@@ -7015,11 +7902,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   packPlannerSummaryFootnote: {
-    color: "rgba(255,255,255,0.55)",
+    color: "rgba(255,255,255,0.42)",
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 8,
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 4,
+    textAlign: "center",
   },
   packPlannerDeliverableText: {
     color: "rgba(255,255,255,0.52)",
@@ -7138,30 +8026,305 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
   },
   packPlannerBlock: {
-    gap: 10,
+    gap: 9,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.09)",
   },
-  packPlannerMoreToggle: {
+  packPlannerSectionBlock: {
+    position: "relative",
+    gap: 9,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    zIndex: 30,
+  },
+  packPlannerFieldRow: {
+    position: "relative",
     flexDirection: "row",
     alignItems: "center",
+    gap: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    zIndex: 30,
+  },
+  packPlannerActiveInfoRow: {
+    zIndex: 90,
+  },
+  packPlannerFieldLabelColumn: {
+    width: 112,
+    flexShrink: 0,
+  },
+  packPlannerFieldControl: {
+    flex: 1,
+    minWidth: 0,
+  },
+  packPlannerSectionTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  packPlannerSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
+    zIndex: 45,
+  },
+  packInfoDismissLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    backgroundColor: "transparent",
+  },
+  packInfoButton: {
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.26)",
+    alignItems: "center",
     justifyContent: "center",
-    gap: 5,
-    paddingVertical: 6,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    zIndex: 46,
   },
-  packPlannerMoreToggleText: {
-    color: "rgba(255,255,255,0.62)",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12.5,
+  packInfoButtonActive: {
+    borderColor: "rgba(243,160,177,0.78)",
+    backgroundColor: "rgba(243,160,177,0.18)",
   },
-  packPlannerLabel: {
+  packInfoButtonText: {
+    color: "rgba(255,255,255,0.66)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    lineHeight: 13,
+  },
+  packInfoButtonTextActive: {
+    color: "#F3A0B1",
+  },
+  packSummaryInfoCorner: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    zIndex: 47,
+  },
+  packInfoPopover: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 38,
+    zIndex: 60,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(243,160,177,0.34)",
+    backgroundColor: "rgba(22,19,22,0.98)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 14,
+    gap: 4,
+  },
+  packInfoPopoverTitle: {
     color: "#FFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 14,
+    fontSize: 12,
+    lineHeight: 16,
   },
-  packPlannerHint: {
-    color: "rgba(255,255,255,0.56)",
+  packInfoPopoverText: {
+    color: "rgba(255,255,255,0.70)",
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     lineHeight: 16,
+  },
+  mixedPackHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  mixedPackCounterText: {
+    color: "#F4A3B6",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  mixedPackSelectedRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  mixedPackCompactRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mixedPackSelectedPill: {
+    maxWidth: "100%",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(244,163,182,0.70)",
+    backgroundColor: "rgba(244,163,182,0.08)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  mixedPackSelectedPillText: {
+    color: "rgba(255,255,255,0.88)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10.5,
+  },
+  mixedPackEmptyText: {
+    color: "rgba(255,255,255,0.48)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+  },
+  mixedPackActionRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  mixedPackChooseButton: {
+    minHeight: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(244,163,182,0.42)",
+    backgroundColor: "rgba(244,163,182,0.10)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 11,
+  },
+  mixedPackChooseButtonActive: {
+    backgroundColor: "rgba(244,163,182,0.16)",
+  },
+  mixedPackChooseButtonText: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  mixedPackChangeButton: {
+    minHeight: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2,
+  },
+  mixedPackChangeButtonActive: {
+    opacity: 0.84,
+  },
+  mixedPackChangeButtonText: {
+    color: "rgba(255,255,255,0.72)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9.5,
+    lineHeight: 13,
+  },
+  mixedPackDoneButton: {
+    minWidth: 72,
+    minHeight: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.055)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  mixedPackDoneButtonDisabled: {
+    opacity: 0.42,
+  },
+  mixedPackDoneButtonText: {
+    color: "rgba(255,255,255,0.78)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  mixedPackRail: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  mixedPackOptionCard: {
+    width: 154,
+    minHeight: 82,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.13)",
+    backgroundColor: "rgba(255,255,255,0.04)",
+    padding: 10,
+    gap: 8,
+  },
+  mixedPackOptionCardActive: {
+    borderColor: "rgba(126,243,255,0.52)",
+    backgroundColor: "rgba(126,243,255,0.13)",
+  },
+  mixedPackOptionCardDisabled: {
+    opacity: 0.45,
+  },
+  mixedPackCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  mixedPackCheckActive: {
+    borderColor: "#7EF3FF",
+    backgroundColor: "#7EF3FF",
+  },
+  mixedPackOptionCopy: {
+    gap: 3,
+  },
+  mixedPackOptionTitle: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12.5,
+    lineHeight: 16,
+  },
+  mixedPackOptionSubtitle: {
+    color: "rgba(255,255,255,0.55)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10.5,
+    lineHeight: 14,
+  },
+  packPlannerMoreToggle: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.09)",
+    zIndex: 30,
+  },
+  packPlannerMoreToggleText: {
+    color: "rgba(255,255,255,0.58)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+  },
+  packPlannerMoreChevron: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 45,
+  },
+  packPlannerLabel: {
+    color: "rgba(255,255,255,0.92)",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12.5,
+    lineHeight: 16,
+  },
+  packPlannerHint: {
+    color: "rgba(255,255,255,0.46)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10.5,
+    lineHeight: 15,
   },
   packPlannerVibeRail: {
     gap: 8,
@@ -7189,48 +8352,53 @@ const styles = StyleSheet.create({
   },
   packPlannerCountRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 0,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.065)",
+    padding: 3,
+    minHeight: 40,
   },
   packPlannerCountChip: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    minHeight: 34,
+    borderRadius: 999,
+    borderWidth: 0,
+    backgroundColor: "transparent",
     alignItems: "center",
-    paddingVertical: 12,
+    justifyContent: "center",
+    paddingVertical: 8,
   },
   packPlannerCountChipActive: {
-    borderColor: "rgba(126,243,255,0.44)",
-    backgroundColor: "rgba(126,243,255,0.16)",
+    backgroundColor: "#F3A0B1",
   },
   packPlannerCountChipText: {
-    color: "rgba(255,255,255,0.78)",
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    color: "rgba(255,255,255,0.74)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
   packPlannerCountChipTextActive: {
-    color: "#DFFFFF",
+    color: "#101010",
+    fontFamily: "Inter_800ExtraBold",
   },
   packPlannerPaletteRail: {
     gap: 8,
     paddingRight: 8,
   },
   packPlannerPaletteCard: {
-    width: 96,
-    borderRadius: 14,
+    width: 92,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    padding: 9,
-    gap: 8,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    padding: 8,
+    gap: 7,
   },
   packPlannerPaletteCustomCard: {
     borderStyle: "dashed",
   },
   packPlannerPaletteCardActive: {
-    borderColor: "rgba(126,243,255,0.46)",
-    backgroundColor: "rgba(126,243,255,0.12)",
+    borderColor: "rgba(244,163,182,0.58)",
+    backgroundColor: "rgba(244,163,182,0.10)",
   },
   packPlannerPaletteCustomIconWrap: {
     flexDirection: "row",
@@ -7245,15 +8413,15 @@ const styles = StyleSheet.create({
   },
   packPlannerPaletteSwatch: {
     flex: 1,
-    height: 22,
-    borderRadius: 6,
+    height: 20,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.24)",
   },
   packPlannerPaletteTitle: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.88)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontSize: 11,
   },
   packPlannerPaletteSubtitle: {
     color: "rgba(255,255,255,0.62)",
@@ -7261,43 +8429,49 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   packPlannerPaletteCustomInput: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    minHeight: 44,
+    borderRadius: 11,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "rgba(255,255,255,0.075)",
     color: "#FFF",
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_500Medium",
+    fontStyle: "italic",
     fontSize: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    marginTop: 2,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 0,
   },
   packPlannerPaletteCustomHint: {
-    color: "rgba(255,255,255,0.50)",
+    color: "rgba(255,255,255,0.42)",
     fontFamily: "Inter_400Regular",
     fontSize: 10,
+    lineHeight: 14,
+  },
+  packPlannerPaletteCustomHintWarning: {
+    color: "#FF8CAB",
   },
   packPlannerElementWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 7,
   },
   packPlannerElementChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   packPlannerElementChipActive: {
-    borderColor: "rgba(255,79,125,0.52)",
-    backgroundColor: "rgba(255,79,125,0.14)",
+    borderColor: "rgba(244,163,182,0.62)",
+    backgroundColor: "rgba(244,163,182,0.12)",
   },
   packPlannerElementChipText: {
     color: "rgba(255,255,255,0.72)",
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   packPlannerElementChipTextActive: {
     color: "#FFF",
@@ -7337,31 +8511,32 @@ const styles = StyleSheet.create({
   },
   packPlannerNotesInput: {
     minHeight: 72,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.14)",
-    backgroundColor: "rgba(255,255,255,0.04)",
-    paddingHorizontal: 12,
+    borderRadius: 11,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "rgba(255,255,255,0.075)",
+    paddingHorizontal: 14,
     paddingVertical: 10,
     color: "#FFF",
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    lineHeight: 18,
+    fontFamily: "Inter_500Medium",
+    fontStyle: "italic",
+    fontSize: 12,
+    lineHeight: 17,
     textAlignVertical: "top",
   },
   packPlannerSceneWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 9,
   },
   packPlannerSceneThumb: {
-    width: 72,
-    height: 72,
-    borderRadius: 14,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
   packPlannerSceneRemove: {
     position: "absolute",
@@ -7377,12 +8552,12 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.16)",
   },
   packPlannerSceneAdd: {
-    width: 72,
-    height: 72,
-    borderRadius: 14,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.16)",
     backgroundColor: "rgba(255,255,255,0.04)",
     alignItems: "center",
     justifyContent: "center",
@@ -7432,46 +8607,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   packPlannerPreviewButton: {
-    borderRadius: 12,
-    backgroundColor: "#FFF",
+    minHeight: 48,
+    borderRadius: 18,
+    backgroundColor: "#F3A0B1",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
   },
   packPlannerPreviewButtonText: {
-    color: "#000",
+    color: "#111",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
   },
   packPlannerRenderButton: {
-    borderRadius: 12,
-    backgroundColor: "rgba(126,243,255,0.80)",
+    minHeight: 48,
+    borderRadius: 18,
+    backgroundColor: "#F3A0B1",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
     marginTop: 4,
   },
   packQualityRow: {
     flexDirection: "row",
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 2,
+    gap: 7,
+    marginTop: 2,
+    marginBottom: 0,
   },
   packQualityOption: {
     flex: 1,
+    minHeight: 42,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    borderColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "rgba(255,255,255,0.035)",
     paddingHorizontal: 10,
     paddingVertical: 9,
-    gap: 4,
+    gap: 3,
   },
   packQualityOptionActive: {
     borderColor: "rgba(35,227,184,0.6)",
@@ -7488,20 +8666,40 @@ const styles = StyleSheet.create({
   },
   packQualityOptionTitle: {
     color: "rgba(255,255,255,0.72)",
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
   },
   packQualityOptionTitleActive: {
     color: "#FFF",
   },
   packQualityOptionSubtitle: {
-    color: "rgba(255,255,255,0.5)",
+    color: "rgba(255,255,255,0.42)",
     fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    lineHeight: 13,
+    fontSize: 9.5,
+    lineHeight: 12,
+  },
+  packContrastList: {
+    gap: 7,
+    alignItems: "flex-start",
+  },
+  packContrastOption: {
+    minHeight: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  packContrastOptionText: {
+    color: "rgba(255,255,255,0.76)",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  packContrastOptionTextActive: {
+    color: "#FFF",
+    fontFamily: "Inter_700Bold",
   },
   packPlannerRenderButtonText: {
-    color: "#000",
+    color: "#111",
     fontFamily: "Inter_700Bold",
     fontSize: 12,
   },
@@ -8445,40 +9643,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "nowrap",
     justifyContent: "space-between",
-    gap: 10,
+    gap: 6,
   },
   portraitSourceCard: {
     flex: 1,
     minWidth: 0,
-    minHeight: 78,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(8,12,16,0.82)",
+    minHeight: 42,
+    borderRadius: 999,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "rgba(255,255,255,0.065)",
     paddingHorizontal: 8,
-    paddingVertical: 12,
+    paddingVertical: 8,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 5,
   },
   portraitSourceCardActive: {
-    borderColor: "rgba(126,243,255,0.52)",
-    backgroundColor: "rgba(126,243,255,0.12)",
-    shadowColor: "#58F0FF",
-    shadowOpacity: 0.36,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    borderColor: "transparent",
+    backgroundColor: "#F3A0B1",
   },
   portraitSourceCardText: {
-    color: Colors.accentPale,
+    color: "rgba(255,255,255,0.74)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    lineHeight: 14,
+    fontSize: 10.5,
+    lineHeight: 13,
     textAlign: "center",
   },
   portraitSourceCardTextActive: {
-    color: "#DFFFFF",
+    color: "#101010",
+    fontFamily: "Inter_800ExtraBold",
   },
   studioPortraitSelected: {
     flexDirection: "row",
@@ -8519,26 +9713,21 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   portraitEnhanceCard: {
-    minHeight: 74,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "rgba(126,243,255,0.34)",
-    backgroundColor: "rgba(16,28,34,0.92)",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    minHeight: 50,
+    borderRadius: 14,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "rgba(255,255,255,0.075)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    shadowColor: "#53ECFF",
-    shadowOpacity: 0.46,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
+    gap: 10,
   },
   portraitEnhanceCardIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     overflow: "hidden",
   },
   portraitEnhanceCardIconFill: {
@@ -8551,30 +9740,31 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   portraitEnhanceCardTitle: {
-    color: "#E8FFFF",
+    color: "rgba(255,255,255,0.92)",
     fontFamily: "Inter_700Bold",
-    fontSize: 14,
+    fontSize: 12.5,
+    lineHeight: 16,
   },
   portraitEnhanceCardSubtitle: {
-    color: "rgba(235,255,255,0.68)",
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    lineHeight: 17,
+    color: "rgba(255,255,255,0.48)",
+    fontFamily: "Inter_400Regular",
+    fontSize: 10.5,
+    lineHeight: 14,
   },
   portraitEnhanceCardBadge: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(126,243,255,0.24)",
-    backgroundColor: "rgba(126,243,255,0.14)",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    borderColor: "rgba(243,160,177,0.34)",
+    backgroundColor: "rgba(243,160,177,0.10)",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     alignSelf: "flex-start",
   },
   portraitEnhanceCardBadgeText: {
-    color: "#DFFFFF",
+    color: "#F3A0B1",
     fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    letterSpacing: 0.8,
+    fontSize: 9.5,
+    letterSpacing: 0,
     textTransform: "uppercase",
   },
   inlineGalleryPanel: {
@@ -10008,21 +11198,17 @@ const styles = StyleSheet.create({
   },
   generateButton: {
     marginTop: 4,
-    height: 56,
-    borderRadius: 28,
+    height: 50,
+    borderRadius: 18,
     overflow: "hidden",
-    shadowColor: "#FF4F7D",
-    shadowOpacity: 0.36,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    backgroundColor: "#F3A0B1",
   },
   generateButtonInner: {
     flex: 1,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: "rgba(255,127,177,0.72)",
-    backgroundColor: "rgba(0,0,0,0.88)",
+    borderRadius: 18,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "transparent",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -10033,20 +11219,25 @@ const styles = StyleSheet.create({
     opacity: 0.5,
     shadowOpacity: 0,
   },
-  generateButtonText: { color: "rgba(255,255,255,0.9)", fontFamily: "Inter_600SemiBold", fontSize: 16, letterSpacing: 0.3 },
+  generateButtonText: {
+    color: "#101010",
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    letterSpacing: 0,
+  },
   generateButtonCostPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(255,127,177,0.42)",
-    backgroundColor: "rgba(255,79,125,0.14)",
+    borderColor: "rgba(16,16,16,0.18)",
+    backgroundColor: "rgba(255,255,255,0.22)",
   },
   generateButtonCostText: {
-    color: "#FF9CC0",
-    fontFamily: "Inter_600SemiBold",
+    color: "#101010",
+    fontFamily: "Inter_700Bold",
     fontSize: 12,
-    letterSpacing: 0.2,
+    letterSpacing: 0,
   },
   generateCostLabel: {
     textAlign: "center",
@@ -10355,18 +11546,18 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.82)",
+    backgroundColor: "rgba(0,0,0,0.86)",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
   },
   modalCard: {
     width: "100%",
     maxWidth: 520,
     maxHeight: "100%",
-    backgroundColor: "#0E1014",
-    borderRadius: 32,
+    backgroundColor: "rgba(6,6,8,0.98)",
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.08)",
     overflow: "hidden",
@@ -10384,12 +11575,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalScrollContent: {
-    padding: 16,
-    gap: 14,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 22,
+    gap: 12,
   },
   modalHero: {
-    height: 470,
-    borderRadius: 26,
+    height: 448,
+    borderRadius: 18,
     overflow: "hidden",
     backgroundColor: "#090B10",
   },
@@ -10540,17 +11733,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   modalSection: {
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.06)",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    padding: 14,
-    gap: 12,
+    borderRadius: 0,
+    borderWidth: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.10)",
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingVertical: 14,
+    gap: 10,
   },
   similarStylesTitle: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.92)",
     fontFamily: "Inter_700Bold",
-    fontSize: 14,
+    fontSize: 12.5,
+    lineHeight: 16,
   },
   similarStylesRow: {
     gap: 10,
@@ -10574,60 +11770,65 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   modalSectionTitle: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.92)",
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    fontSize: 12.5,
+    lineHeight: 16,
   },
   modalRetouchToggle: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: 10,
+    minHeight: 36,
   },
   modalRetouchToggleCopy: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   modalRetouchToggleTitle: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.92)",
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    fontSize: 12.5,
+    lineHeight: 16,
   },
   modalRetouchToggleSubtitle: {
-    color: "rgba(255,255,255,0.62)",
+    color: "rgba(255,255,255,0.48)",
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 10.5,
+    lineHeight: 14,
   },
   modalRetouchToggleIconWrap: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-    backgroundColor: "rgba(255,255,255,0.04)",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
   modalToggleIconChip: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 1,
-    borderColor: "rgba(255,127,177,0.30)",
-    backgroundColor: "rgba(255,79,125,0.10)",
+    borderColor: "rgba(243,160,177,0.42)",
+    backgroundColor: "rgba(243,160,177,0.08)",
     alignItems: "center",
     justifyContent: "center",
   },
   modalSectionPlain: {
     borderColor: "transparent",
+    borderBottomColor: "transparent",
     backgroundColor: "transparent",
     paddingHorizontal: 0,
     paddingVertical: 6,
     gap: 8,
   },
   modalRetouchDrawer: {
-    gap: 12,
+    gap: 10,
+    paddingTop: 6,
   },
   modalRetouchDrawerEmpty: {
     borderRadius: 16,
@@ -10700,65 +11901,62 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   modalPromptInput: {
-    minHeight: 48,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: "rgba(0,229,204,0.50)",
-    backgroundColor: "rgba(10,30,55,0.58)",
+    minHeight: 74,
+    borderRadius: 11,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "rgba(255,255,255,0.075)",
     paddingHorizontal: 14,
     paddingVertical: 10,
     color: "#FFF",
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    lineHeight: 20,
+    fontFamily: "Inter_500Medium",
+    fontStyle: "italic",
+    fontSize: 12,
+    lineHeight: 17,
     textAlignVertical: "top",
-    shadowColor: "#00E5CC",
-    shadowOpacity: 0.40,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
   },
   modalQualityRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 0,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.065)",
+    padding: 3,
+    minHeight: 58,
   },
   modalQualityButton: {
     flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    backgroundColor: "rgba(0,0,0,0.26)",
+    borderRadius: 999,
+    borderWidth: 0,
+    borderColor: "transparent",
+    backgroundColor: "transparent",
     paddingHorizontal: 8,
-    paddingVertical: 12,
-    gap: 4,
+    paddingVertical: 8,
+    gap: 2,
     alignItems: "center",
+    justifyContent: "center",
   },
   modalQualityButtonActive: {
-    borderColor: "rgba(255,122,176,0.72)",
-    backgroundColor: "rgba(255,79,125,0.14)",
-    shadowColor: "#FF4F7D",
-    shadowOpacity: 0.28,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
+    borderColor: "transparent",
+    backgroundColor: "#F3A0B1",
   },
   modalQualityButtonLabel: {
-    color: "#FFF",
+    color: "rgba(255,255,255,0.82)",
     fontFamily: "Inter_700Bold",
-    fontSize: 14,
+    fontSize: 11.5,
+    lineHeight: 15,
   },
   modalQualityButtonLabelActive: {
-    color: Colors.accentPale,
+    color: "#101010",
   },
   modalQualityButtonMeta: {
-    color: "rgba(255,255,255,0.64)",
+    color: "rgba(255,255,255,0.54)",
     fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 9.5,
+    lineHeight: 12,
     textAlign: "center",
   },
   modalQualityButtonMetaActive: {
-    color: "rgba(255,255,255,0.86)",
+    color: "rgba(16,16,16,0.72)",
   },
   modalImageWrap: {
     width: 290,

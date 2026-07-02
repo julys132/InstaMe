@@ -40,6 +40,15 @@ export default function MainTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="library"
+        options={{
+          title: "Packs",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="albums-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="credits"
         options={{
           title: "Credits",
